@@ -62,14 +62,6 @@ export default function TradesPage() {
     setTrades(trades.filter(t => t.id !== id))
   }
 
-  const handleDeleteAll = async () => {
-    if (!confirm('Delete ALL trades? This cannot be undone.')) return
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('trades').delete().eq('user_id', user.id)
-    setTrades([])
-  }
-
   const handleExport = () => {
     const escapeCSV = (val: string) => {
       if (val.includes(',') || val.includes('"') || val.includes('\n')) {
@@ -109,24 +101,14 @@ export default function TradesPage() {
             {!loading && <span className={totalPnl >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(totalPnl)}</span>}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleExport}
-            disabled={filteredTrades.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-gray-300 hover:text-white hover:border-primary transition-colors disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
-          <button
-            onClick={handleDeleteAll}
-            disabled={trades.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-surface border border-danger/50 rounded-lg text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete All
-          </button>
-        </div>
+        <button
+          onClick={handleExport}
+          disabled={filteredTrades.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-gray-300 hover:text-white hover:border-primary transition-colors disabled:opacity-50"
+        >
+          <Download className="w-4 h-4" />
+          Export CSV
+        </button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
