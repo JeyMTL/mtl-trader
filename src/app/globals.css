@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0f1e;
+  --foreground: #e2e8f0;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #3b82f6;
+  --accent: #06b6d4;
+  --surface: #111827;
+  --surface-light: #1f2937;
+  --border: #1e3a5f;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+}
+
+:root.light {
+  --background: #f0f0f3;
+  --foreground: #2d3142;
+  --primary: #4a6cf7;
+  --primary-dark: #3b57d9;
+  --primary-light: #6b87f9;
+  --accent: #5b9aa9;
+  --surface: #e8e8ec;
+  --surface-light: #dcdce2;
+  --border: #c5c5d0;
+  --success: #3a9d5e;
+  --danger: #c94040;
+  --warning: #c49024;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
+  --color-accent: var(--accent);
+  --color-surface: var(--surface);
+  --color-surface-light: var(--surface-light);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) var(--surface);
+}
+
+/* Light mode overrides for Tailwind text utilities */
+:root.light .text-white { color: var(--foreground) !important; }
+:root.light .text-gray-300 { color: #444a5e !important; }
+:root.light .text-gray-400 { color: #555b72 !important; }
+:root.light .text-gray-500 { color: #6b7089 !important; }
+:root.light .fill-gray-500 { fill: #6b7089 !important; }
+:root.light .bg-surface\/50 { background-color: rgba(232,232,236,0.85) !important; }
+:root.light input::placeholder { color: #6b7089 !important; }
+:root.light select { color: var(--foreground) !important; }
+:root.light input, :root.light textarea { color: var(--foreground) !important; }
+:root.light .bg-success\/20 { background-color: rgba(58,157,94,0.12) !important; }
+:root.light .bg-danger\/20 { background-color: rgba(201,64,64,0.12) !important; }
+:root.light .bg-primary\/10 { background-color: rgba(74,108,247,0.1) !important; }
+:root.light .bg-primary\/20 { background-color: rgba(74,108,247,0.12) !important; }
+:root.light .bg-success\/10 { background-color: rgba(58,157,94,0.1) !important; }
+:root.light .bg-danger\/10 { background-color: rgba(201,64,64,0.1) !important; }
+:root.light .bg-warning\/20 { background-color: rgba(196,144,36,0.12) !important; }
+:root.light .bg-accent\/20 { background-color: rgba(91,154,169,0.12) !important; }
