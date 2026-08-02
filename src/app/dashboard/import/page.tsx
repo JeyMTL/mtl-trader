@@ -163,7 +163,7 @@ export default function ImportPage() {
           setParsedData(trades)
           setLoading(false)
         },
-        error: (parseError) => {
+        error: (parseError: { message: string }) => {
           setError('Error parsing file: ' + parseError.message)
           setLoading(false)
         }
