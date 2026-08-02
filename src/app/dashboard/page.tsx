@@ -128,7 +128,7 @@ export default function DashboardPage() {
                 <Tooltip
                   contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #1e3a5f', borderRadius: '8px' }}
                   labelStyle={{ color: '#9ca3af' }}
-                  formatter={(value: number) => [formatCurrency(value), 'Balance']}
+                  formatter={(value) => [formatCurrency(Number(value)), 'Balance']}
                 />
                 <Area type="monotone" dataKey="balance" stroke={totalPnl >= 0 ? '#22c55e' : '#ef4444'} fill="url(#equityGradient)" strokeWidth={2} />
               </AreaChart>
