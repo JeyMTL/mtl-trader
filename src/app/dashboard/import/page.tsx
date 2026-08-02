@@ -23,6 +23,7 @@ interface ParsedTrade {
 function parseMT5Date(dateStr: string): string {
   if (!dateStr) return ''
   const cleaned = String(dateStr).trim()
+  if (!cleaned || cleaned.toLowerCase().includes('running') || cleaned.toLowerCase().includes('open')) return ''
   if (cleaned.includes('-') || cleaned.includes('T')) return cleaned
   return cleaned.replace(/(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}:\d{2}:\d{2})/, '$1-$2-$3T$4')
 }
