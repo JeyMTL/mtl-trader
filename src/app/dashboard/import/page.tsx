@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertCircle, X, Trash2, Clock } from 'lucide-react'
 import Papa from 'papaparse'
 import { supabase } from '@/lib/supabase'
 
@@ -28,6 +28,26 @@ function parseMT5Date(dateStr: string): string {
   return cleaned.replace(/(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}:\d{2}:\d{2})/, '$1-$2-$3T$4')
 }
 
+interface ImportRecord {
+  id: string
+  filename: string
+  tradeCount: number
+  timestamp: string
+}
+
+function getImports(): ImportRecord[] {
+  if (typeof window === 'undefined') return []
+  try {
+    return JSON.parse(localStorage.getItem('mtl_imports') || '[]')
+  } catch {
+    return []
+  }
+}
+
+function saveImports(imports: ImportRecord[]) {
+  localStorage.setItem('mtl_imports', JSON.stringify(imports))
+}
+
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<ParsedTrade[]>([])
@@ -36,8 +56,11 @@ export default function ImportPage() {
   const [error, setError] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
   const [importCount, setImportCount] = useState(0)
+  const [imports, setImports] = useState<ImportRecord[]>([])
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
   useEffect(() => {
+    setImports(getImports())
     async function getUser() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) setUserId(user.id)
@@ -203,6 +226,7 @@ export default function ImportPage() {
     setLoading(true)
     setError('')
 
+    const importTimestamp = new Date().toISOString()
     const batchSize = 100
     let imported = 0
 
@@ -235,6 +259,16 @@ export default function ImportPage() {
       setImportCount(imported)
     }
 
+    const newImport: ImportRecord = {
+      id: crypto.randomUUID(),
+      filename: file?.name || 'Unknown',
+      tradeCount: parsedData.length,
+      timestamp: importTimestamp,
+    }
+    const updatedImports = [newImport, ...getImports()]
+    saveImports(updatedImports)
+    setImports(updatedImports)
+
     setSuccess(true)
     setLoading(false)
   }
@@ -245,6 +279,46 @@ export default function ImportPage() {
     setSuccess(false)
     setError('')
     setImportCount(0)
+  }
+
+  const handleDeleteImport = async (imp: ImportRecord) => {
+    if (!confirm(`Delete all ${imp.tradeCount} trades from "${imp.filename}"?`)) return
+    setDeleteLoading(imp.id)
+
+    const importTime = new Date(imp.timestamp).getTime()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: trades } = await supabase
+      .from('trades')
+      .select('id, created_at')
+      .eq('user_id', user.id)
+
+    const toDelete = (trades || [])
+      .filter(t => {
+        if (!t.created_at) return false
+        const tTime = new Date(t.created_at).getTime()
+        return Math.abs(tTime - importTime) < 60000
+      })
+      .map(t => t.id)
+
+    if (toDelete.length > 0) {
+      await supabase.from('trades').delete().in('id', toDelete)
+    }
+
+    const updatedImports = imports.filter(i => i.id !== imp.id)
+    saveImports(updatedImports)
+    setImports(updatedImports)
+    setDeleteLoading(null)
+  }
+
+  const handleDeleteAllTrades = async () => {
+    if (!confirm('Delete ALL trades? This cannot be undone.')) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('trades').delete().eq('user_id', user.id)
+    saveImports([])
+    setImports([])
   }
 
   const wins = parsedData.filter(t => t.pnl > 0).length
@@ -412,6 +486,53 @@ export default function ImportPage() {
             Important: Make sure to export as CSV, not as Report (HTML/XLSX). The Report format is a summary and won&apos;t import individual trades.
           </p>
         </div>
+      </div>
+
+      <div className="bg-surface border border-border rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">Import History</h3>
+          {imports.length > 0 && (
+            <button
+              onClick={handleDeleteAllTrades}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm border border-danger/50 rounded-lg text-danger hover:bg-danger/10 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete All
+            </button>
+          )}
+        </div>
+        {imports.length === 0 ? (
+          <p className="text-gray-500 text-sm">No imports yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {imports.map((imp) => (
+              <div key={imp.id} className="flex items-center justify-between py-3 px-4 bg-surface-light rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">{imp.filename}</p>
+                    <p className="text-xs text-gray-400">
+                      {imp.tradeCount} trades • {new Date(imp.timestamp).toLocaleDateString()} {new Date(imp.timestamp).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDeleteImport(imp)}
+                  disabled={deleteLoading === imp.id}
+                  className="text-gray-500 hover:text-danger transition-colors disabled:opacity-50"
+                >
+                  {deleteLoading === imp.id ? (
+                    <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
