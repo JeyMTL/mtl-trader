@@ -13,7 +13,8 @@ import {
   X,
   Plus,
   Shield,
-  Calendar
+  Calendar,
+  RefreshCw
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Add Trade', href: '/dashboard/trades/new', icon: Plus },
   { name: 'Trades', href: '/dashboard/trades', icon: TrendingUp },
   { name: 'Import', href: '/dashboard/import', icon: Upload },
+  { name: 'MT5 Sync', href: '/dashboard/sync', icon: RefreshCw },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
