@@ -42,7 +42,7 @@ export default function LoginPage() {
           <p className="text-gray-400 mt-2">Login to your trading journal</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-surface border border-border rounded-2xl p-8 space-y-6">
+        <form onSubmit={handleLogin} className="bg-surface border border-border rounded-2xl p-8 space-y-6 shadow-2xl shadow-primary/5">
           {error && (
             <div className="bg-danger/10 border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">
               {error}
@@ -82,7 +82,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full btn-gradient text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>

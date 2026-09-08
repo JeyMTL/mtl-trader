@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/server-auth'
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!
 const PAYPAL_BASE = 'https://api-m.paypal.com'
+
+const PLAN_MAP: Record<string, { amount: string; name: string }> = {
+  basic: { amount: '9.99', name: 'Basic Plan' },
+  pro: { amount: '29.99', name: 'Pro Plan' },
+}
 
 async function getAccessToken(): Promise<string> {
   const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')
@@ -21,6 +27,11 @@ async function getAccessToken(): Promise<string> {
 
 export async function POST(req: Request) {
   try {
+    const authUser = await getAuthUser(req)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { orderId } = await req.json()
 
     if (!orderId) {
@@ -49,7 +60,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No metadata found' }, { status: 400 })
     }
 
-    const { userId, planId } = JSON.parse(customId)
+    let userId: string
+    let planId: string
+    try {
+      const parsed = JSON.parse(customId)
+      userId = parsed.userId
+      planId = parsed.planId
+    } catch {
+      return NextResponse.json({ error: 'Invalid order metadata' }, { status: 400 })
+    }
+
+    // Only the account owner may capture their own order
+    if (authUser.id !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Verify the paid amount matches the plan price
+    const expectedAmount = PLAN_MAP[planId]?.amount
+    const paidAmount = purchaseUnit?.amount?.value
+    if (!expectedAmount || !paidAmount || Number(paidAmount) !== Number(expectedAmount)) {
+      return NextResponse.json({ error: 'Amount mismatch, payment not applied' }, { status: 400 })
+    }
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

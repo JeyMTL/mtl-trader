@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle, XCircle, Clock, Loader2, Shield } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api'
 
 interface PaymentRequest {
   id: string
@@ -26,11 +27,17 @@ export default function AdminPage() {
 
   const fetchRequests = async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('payment_requests')
-      .select('*, users!inner(id, email, full_name)')
-      .order('created_at', { ascending: false })
-    setRequests(data || [])
+    try {
+      const res = await authedFetch('/api/admin/payments')
+      const data = await res.json()
+      if (res.ok) {
+        setRequests(data.requests || [])
+      } else {
+        alert('Error: ' + (data.error || 'Failed to load requests'))
+      }
+    } catch {
+      alert('Failed to load payment requests')
+    }
     setLoading(false)
   }
 
@@ -44,11 +51,11 @@ export default function AdminPage() {
 
       const { data: userData } = await supabase
         .from('users')
-        .select('subscription_tier')
+        .select('is_admin')
         .eq('id', user.id)
         .single()
 
-      if (userData?.subscription_tier !== 'pro') {
+      if (userData?.is_admin !== true) {
         router.push('/dashboard')
         return
       }
@@ -60,14 +67,11 @@ export default function AdminPage() {
   }, [router])
 
   const handleAction = async (requestId: string, action: 'approve' | 'reject') => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     setProcessingId(requestId)
-    const res = await fetch('/api/admin/payments', {
+    const res = await authedFetch('/api/admin/payments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId, action, adminId: user.id }),
+      body: JSON.stringify({ requestId, action }),
     })
     const data = await res.json()
 

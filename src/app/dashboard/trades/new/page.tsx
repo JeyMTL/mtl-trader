@@ -48,6 +48,28 @@ export default function NewTradePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    // Monthly quota check (server enforces this too)
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('max_trades')
+      .eq('id', user.id)
+      .single()
+    if (userRow?.max_trades && userRow.max_trades !== -1) {
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+      const { count } = await supabase
+        .from('trades')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', startOfMonth.toISOString())
+      if ((count ?? 0) >= userRow.max_trades) {
+        alert(`You have reached your monthly limit of ${userRow.max_trades} trades. Upgrade your plan for more.`)
+        setSaving(false)
+        return
+      }
+    }
+
     const { error } = await supabase.from('trades').insert({
       user_id: user.id,
       symbol: form.symbol.toUpperCase(),

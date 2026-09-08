@@ -4,10 +4,13 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 
 ## Features
 
-- **Trade Import** - Upload MT5 CSV trade history
+- **Trade Import** - Upload MT5/broker trade history as CSV, .xlsx, or Excel-saved-as-CSV (auto-detects xlsx, tab/semicolon separators, and both MT5 and broker column layouts)
 - **Dashboard** - Overview of your trading performance
 - **Analytics** - Win rate, profit factor, equity curve, strategy analysis
-- **Subscription System** - Free trial + paid tiers
+- **Trading Calendar** - Daily P&L heatmap
+- **MT5 Auto Sync** - Python agent that syncs closed trades every 60s with proper entry/exit pairing
+- **Subscription System** - Free trial + paid tiers (PayPal + bank transfer)
+- **Monthly Trade Quota** - Enforced server-side by a Postgres trigger
 - **Dark Blue Theme** - Professional trading interface
 
 ## Tech Stack
@@ -16,9 +19,9 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Backend:** Next.js API Routes
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase Auth
-- **Payments:** Stripe
+- **Payments:** PayPal Checkout (one-time capture) + manual bank transfer with admin approval
 - **Charts:** Recharts
-- **CSV Parsing:** PapaParse
+- **CSV Parsing:** PapaParse + SheetJS (xlsx)
 - **Hosting:** Vercel (free tier)
 
 ## Setup Instructions
@@ -106,6 +109,8 @@ npx vercel
 | Basic | $9.99 | 50 |
 | Pro | $29.99 | Unlimited |
 
+Trades are counted per calendar month (historical imports don't count against the limit).
+
 ## Project Structure
 
 ```
@@ -118,13 +123,30 @@ src/
 │   │   └── signup/page.tsx   # Signup page
 │   ├── dashboard/
 │   │   ├── page.tsx          # Dashboard overview
-│   │   ├── trades/page.tsx   # Trade history
-│   │   ├── import/page.tsx   # CSV import
+│   │   ├── trades/           # Trade history, add/edit
+│   │   ├── import/page.tsx   # CSV/xlsx import
+│   │   ├── sync/page.tsx     # MT5 auto-sync setup
 │   │   ├── analytics/page.tsx # Performance analytics
+│   │   ├── calendar/page.tsx # Trading calendar
+│   │   ├── admin/page.tsx    # Payment approval (is_admin only)
+│   │   ├── payment/page.tsx  # Bank transfer flow
 │   │   └── settings/page.tsx # User settings
 │   ├── pricing/page.tsx      # Pricing page
-│   └── api/                  # API routes
+│   └── api/                  # API routes (auth, checkout, paypal/capture, sync, admin)
 ├── components/               # Reusable components
-├── lib/                      # Utilities, config, plans
+├── lib/                      # Utilities, config, plans, server-auth
 └── types/                    # TypeScript types
+```
+
+## Database Migrations
+
+Run migrations in `supabase/migrations/` in order. The latest migration
+(`20260908_full_schema_rls_quota.sql`) is idempotent and creates the full
+schema, RLS policies, and the monthly quota trigger — safe to run on an
+existing database.
+
+Grant yourself admin access (used for the Admin panel / payment approvals):
+
+```sql
+UPDATE users SET is_admin = true WHERE email = 'you@example.com';
 ```

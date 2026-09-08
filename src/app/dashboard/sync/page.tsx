@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, RefreshCw, Key, Server, CheckCircle, XCircle, Loader2, Copy, Check } from 'lucide-react'
+import { Download, Key, Server, XCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api'
 
 export default function SyncPage() {
   const router = useRouter()
@@ -14,7 +15,6 @@ export default function SyncPage() {
   const [brokerName, setBrokerName] = useState('')
   const [server, setServer] = useState('')
   const [login, setLogin] = useState('')
-  const [password, setPassword] = useState('')
 
   useEffect(() => {
     async function loadUser() {
@@ -25,7 +25,7 @@ export default function SyncPage() {
       }
       setUser({ id: authUser.id, email: authUser.email! })
 
-      const response = await fetch(`/api/sync?userId=${authUser.id}`)
+      const response = await authedFetch(`/api/sync?userId=${authUser.id}`)
       const data = await response.json()
       if (data.token) {
         setToken(data.token)
@@ -36,10 +36,28 @@ export default function SyncPage() {
   }, [router])
 
   const copyCommand = () => {
-    const cmd = `python mt5_agent.py ${user?.id} ${token} "${brokerName}" "${server}" "${login}" "${password}"`
+    const cmd = `python mt5_agent.py ${user?.id} ${token} "${brokerName}" "${server}" "${login}"`
     navigator.clipboard.writeText(cmd)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const regenerateToken = async () => {
+    if (!confirm('Rotate your sync token? The old token will stop working immediately.')) return
+    setLoading(true)
+    try {
+      const res = await authedFetch('/api/sync/rotate', { method: 'POST' })
+      const data = await res.json()
+      if (data.token) {
+        setToken(data.token)
+        alert('New token generated. Update your agent command and restart it.')
+      } else {
+        alert('Error: ' + (data.error || 'Failed to rotate token'))
+      }
+    } catch {
+      alert('Failed to rotate token')
+    }
+    setLoading(false)
   }
 
   if (loading) {
@@ -77,7 +95,16 @@ export default function SyncPage() {
           >
             {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
           </button>
+          <button
+            onClick={regenerateToken}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-3 bg-surface-light rounded-lg hover:bg-surface transition-colors text-sm text-gray-300 disabled:opacity-50"
+          >
+            <RefreshCw className="w-4 h-4 text-gray-400" />
+            Rotate
+          </button>
         </div>
+        <p className="text-xs text-gray-500 mt-2">Rotate the token if it ever leaks. Old tokens stop working immediately.</p>
       </div>
 
       <div className="bg-surface rounded-xl border border-border p-6">
@@ -121,17 +148,8 @@ export default function SyncPage() {
               className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primary"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your MT5 password"
-              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primary"
-            />
-          </div>
         </div>
+        <p className="text-xs text-gray-500 mt-3">You&apos;ll type your MT5 password into the agent&apos;s prompt when it runs — it never touches the browser or our servers.</p>
       </div>
 
       <div className="bg-surface rounded-xl border border-border p-6">
@@ -183,7 +201,7 @@ export default function SyncPage() {
               <p className="text-white font-medium">Run the agent with this command</p>
               <div className="mt-2 flex items-center gap-2">
                 <code className="flex-1 bg-background px-3 py-2 rounded text-sm text-gray-300 overflow-x-auto">
-                  {`python mt5_agent.py ${user?.id} ${token} "${brokerName || 'YOUR_BROKER'}" "${server || 'YOUR_SERVER'}" "${login || 'YOUR_LOGIN'}" "${password || 'YOUR_PASSWORD'}"`}
+                  {`python mt5_agent.py ${user?.id} ${token} "${brokerName || 'YOUR_BROKER'}" "${server || 'YOUR_SERVER'}" "${login || 'YOUR_LOGIN'}"`}
                 </code>
                 <button
                   onClick={copyCommand}
@@ -192,6 +210,9 @@ export default function SyncPage() {
                   {copied ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4 text-white" />}
                 </button>
               </div>
+              <p className="text-xs text-gray-500 mt-2">
+                The agent will prompt you for your MT5 password when it starts — it is never stored or sent to our servers.
+              </p>
             </div>
           </div>
 
@@ -215,8 +236,8 @@ export default function SyncPage() {
             <ul className="mt-2 text-sm text-gray-400 space-y-1">
               <li>• MT5 terminal must be running on your computer</li>
               <li>• The agent only works while your computer is on</li>
-              <li>• Your credentials are never stored on our servers</li>
-              <li>• All data is encrypted during transfer</li>
+              <li>• Your credentials are never stored on our servers (you type the password only in the local prompt)</li>
+              <li>• All data is encrypted during transfer (HTTPS)</li>
             </ul>
           </div>
         </div>

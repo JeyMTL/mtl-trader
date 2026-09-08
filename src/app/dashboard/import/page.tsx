@@ -18,14 +18,299 @@ interface ParsedTrade {
   closeDate: string
   sl: number
   tp: number
+  ticket?: number
 }
 
-function parseMT5Date(dateStr: string): string {
-  if (!dateStr) return ''
-  const cleaned = String(dateStr).trim()
-  if (!cleaned || cleaned.toLowerCase().includes('running') || cleaned.toLowerCase().includes('open')) return ''
-  if (cleaned.includes('-') || cleaned.includes('T')) return cleaned
-  return cleaned.replace(/(\d{4})\.(\d{2})\.(\d{2})\s+(\d{2}:\d{2}:\d{2})/, '$1-$2-$3T$4')
+function normalizeHeader(s: unknown): string {
+  return String(s ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
+function parseNumeric(v: unknown): number {
+  if (v === null || v === undefined || v === '') return 0
+  // Strip thousands separators and handle comma decimal points (EU style)
+  const n = parseFloat(String(v).replace(/,/g, '').trim())
+  return isNaN(n) ? 0 : n
+}
+
+function parseTicket(v: unknown): number | undefined {
+  if (v === null || v === undefined || v === '') return undefined
+  const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10)
+  return isNaN(n) || n <= 0 ? undefined : n
+}
+
+function normalizeDate(v: unknown): string {
+  if (!v) return ''
+  if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString()
+  const s = String(v).trim()
+  if (!s) return ''
+  const lower = s.toLowerCase()
+  if (lower.includes('running') || lower.includes('open')) return ''
+
+  // Already ISO-ish: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SS"
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?/)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}T${iso[4]}:${iso[5]}:${iso[6] || '00'}`
+
+  // MT5 export: "YYYY.MM.DD HH:MM:SS"
+  const mt5 = s.match(/^(\d{4})\.(\d{2})\.(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
+  if (mt5) return `${mt5[1]}-${mt5[2]}-${mt5[3]}T${mt5[4]}:${mt5[5]}:${mt5[6] || '00'}`
+
+  // US Excel format: "MM/DD/YYYY HH:MM:SS"
+  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
+  if (us) {
+    const month = Number(us[1])
+    const day = Number(us[2])
+    const year = Number(us[3])
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1990 && year <= 2100) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${us[4]}:${us[5]}:${us[6] || '00'}`
+    }
+  }
+
+  return s
+}
+
+/** Detect the delimiter (comma, semicolon, or tab) by counting outside quotes. */
+function detectDelimiter(text: string): string {
+  const lines = text.split(/\r?\n/).filter(l => l.trim()).slice(0, 20)
+  const counts: Record<string, number> = { ',': 0, ';': 0, '\t': 0 }
+  for (const line of lines) {
+    let inQuotes = false
+    for (const ch of line) {
+      if (ch === '"') inQuotes = !inQuotes
+      else if (!inQuotes && counts[ch] !== undefined) counts[ch]++
+    }
+  }
+  let best = ','
+  let bestCount = -1
+  for (const [delim, n] of Object.entries(counts)) {
+    if (n > bestCount) {
+      bestCount = n
+      best = delim
+    }
+  }
+  return best
+}
+
+/** Read any supported file (xlsx / csv / tsv / txt) into rows of strings. */
+async function parseFileToRows(file: File): Promise<string[][]> {
+  const buffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+
+  // ZIP magic bytes => real Excel file (often saved with a .csv extension)
+  if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) {
+    const XLSX = await import('xlsx')
+    const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as unknown[][]
+    return rows.map(row =>
+      (row || []).map(v => (v instanceof Date ? v.toISOString() : String(v ?? '').trim()))
+    )
+  }
+
+  let text = new TextDecoder('utf-8').decode(buffer)
+  // Strip UTF-8 BOM (Excel adds one to CSVs)
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
+  if (!text.trim()) return []
+
+  const delimiter = detectDelimiter(text)
+  const parsed = Papa.parse<string[]>(text, {
+    header: false,
+    delimiter,
+    skipEmptyLines: true,
+  })
+  if (parsed.errors && parsed.errors.length > 0) {
+    console.warn('PapaParse warnings:', parsed.errors)
+  }
+  return parsed.data
+}
+
+interface ColumnMap {
+  ticket: number
+  openTime: number
+  closeTime: number
+  symbol: number
+  type: number
+  lot: number
+  entry: number
+  exit: number
+  sl: number
+  tp: number
+  profit: number
+  commission: number
+  swap: number
+}
+
+function buildColumnMap(headerRow: string[]): ColumnMap {
+  const idx: Record<string, number[]> = {}
+  headerRow.forEach((h, i) => {
+    const key = normalizeHeader(h)
+    if (!key) return
+    if (!idx[key]) idx[key] = []
+    idx[key].push(i)
+  })
+
+  const first = (...keys: string[]) => {
+    for (const k of keys) if (idx[k]?.length) return idx[k][0]
+    return -1
+  }
+  const nth = (key: string, n: number) => (idx[key] && idx[key].length > n ? idx[key][n] : -1)
+
+  const openTime = first('time', 'opentime', 'starttime', 'opendate')
+  const closeTime = first('closetime', 'time2') !== -1 ? first('closetime', 'time2') : nth('time', 1)
+  const entry = first('openprice', 'entryprice', 'priceopen') !== -1
+    ? first('openprice', 'entryprice', 'priceopen')
+    : nth('price', 0)
+  const exit = first('closeprice', 'exitprice', 'priceclose') !== -1
+    ? first('closeprice', 'exitprice', 'priceclose')
+    : nth('price', 1)
+
+  return {
+    ticket: first('ticket', 'ticketid', 'position'),
+    openTime,
+    closeTime,
+    symbol: first('symbol', 'instrument'),
+    type: first('type', 'direction'),
+    lot: first('volume', 'lots', 'volumelots', 'size'),
+    entry,
+    exit,
+    sl: first('sl', 'stoploss'),
+    tp: first('tp', 'takeprofit'),
+    profit: first('profit', 'pnl', 'netprofit', 'profitloss'),
+    commission: first('commission', 'commision', 'fee'),
+    swap: first('swap', 'swaps'),
+  }
+}
+
+const HEADER_HINTS = ['time', 'opentime', 'closetime', 'starttime', 'symbol', 'instrument', 'type', 'direction', 'volume', 'lots', 'price', 'openprice', 'closeprice', 'entryprice', 'exitprice', 'profit', 'pnl', 'commission', 'swap', 'ticket', 'ticketid', 'position', 'sl', 'tp']
+
+function findHeaderRow(rows: string[][]): { idx: number; map: ColumnMap | null } {
+  for (let i = 0; i < Math.min(rows.length, 60); i++) {
+    const row = (rows[i] || []).map(c => String(c ?? '').trim())
+    if (row.length < 3) continue
+    const set = new Set(row.map(normalizeHeader).filter(Boolean))
+    const hits = [...set].filter(h => HEADER_HINTS.some(hint => h.includes(hint))).length
+    if (hits >= 3) {
+      return { idx: i, map: buildColumnMap(row) }
+    }
+  }
+  return { idx: -1, map: null }
+}
+
+function extractTrades(rows: string[][]): ParsedTrade[] {
+  const trades: ParsedTrade[] = []
+  const { idx: headerRowIdx, map } = findHeaderRow(rows)
+
+  // ---- Header-driven parsing (handles MT5 exports, broker exports, xlsx, tsv) ----
+  if (headerRowIdx !== -1 && map) {
+    const get = (row: unknown[], i: number) => (i >= 0 ? row[i] : undefined)
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const row = rows[i]
+      if (!row || row.length < 3) continue
+
+      const timeVal = String(get(row, map.openTime) ?? '').trim()
+      if (!timeVal || !/\d{4}/.test(timeVal)) continue
+
+      const symbol = String(get(row, map.symbol) ?? '').trim().toUpperCase()
+      const type = String(get(row, map.type) ?? '').trim().toUpperCase()
+      const lot = parseNumeric(get(row, map.lot))
+      if (!symbol || (type !== 'BUY' && type !== 'SELL') || lot <= 0) continue
+
+      trades.push({
+        symbol,
+        type: type as 'BUY' | 'SELL',
+        entry: parseNumeric(get(row, map.entry)),
+        exit: parseNumeric(get(row, map.exit)),
+        lot,
+        pnl: parseNumeric(get(row, map.profit)),
+        commission: parseNumeric(get(row, map.commission)),
+        swap: parseNumeric(get(row, map.swap)),
+        date: normalizeDate(get(row, map.openTime)),
+        closeDate: normalizeDate(get(row, map.closeTime)),
+        sl: parseNumeric(get(row, map.sl)),
+        tp: parseNumeric(get(row, map.tp)),
+        ticket: parseTicket(get(row, map.ticket)),
+      })
+    }
+    return trades
+  }
+
+  // ---- Fallback: positional heuristics for files without a recognizable header ----
+  let format: 'mt5' | 'broker' = 'mt5'
+
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const row = rows[i].map(c => String(c || '').trim().toLowerCase())
+    if (row[0] === 'time' && row.includes('symbol') && row.includes('type')) {
+      format = 'mt5'
+      break
+    }
+    if (row.includes('ticket') || (row[9] && row[9].match(/[a-z]{2,6}/) && row[10] && (row[10] === 'buy' || row[10] === 'sell'))) {
+      format = 'broker'
+      break
+    }
+  }
+
+  const startRow = (() => {
+    for (let i = 0; i < Math.min(rows.length, 50); i++) {
+      const firstCell = String(rows[i][0] || '').trim()
+      if (firstCell.match(/^\d{4}[.-]\d{2}[.-]\d{2}/) || firstCell.match(/^\d{1,2}\/\d{1,2}\/\d{4}/)) {
+        return i
+      }
+    }
+    return 0
+  })()
+
+  for (let i = startRow; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row || row.length < 8) continue
+
+    if (format === 'broker') {
+      const time = String(row[1] || '').trim()
+      if (!time || !time.match(/\d{4}/)) continue
+      const symbol = String(row[9] || '').trim().toUpperCase()
+      const type = String(row[10] || '').trim().toUpperCase()
+      const lot = parseFloat(String(row[6] || '0')) || 0
+      if (!symbol || (type !== 'BUY' && type !== 'SELL') || lot <= 0) continue
+      trades.push({
+        symbol,
+        type: type as 'BUY' | 'SELL',
+        entry: parseFloat(String(row[2] || '0')) || 0,
+        exit: parseFloat(String(row[4] || '0')) || 0,
+        lot,
+        pnl: parseFloat(String(row[5] || '0')) || 0,
+        commission: parseFloat(String(row[7] || '0')) || 0,
+        swap: parseFloat(String(row[8] || '0')) || 0,
+        date: normalizeDate(String(row[1] || '').trim()),
+        closeDate: normalizeDate(String(row[3] || '').trim()),
+        sl: parseFloat(String(row[11] || '0')) || 0,
+        tp: parseFloat(String(row[12] || '0')) || 0,
+        ticket: parseTicket(row[0]),
+      })
+    } else {
+      const time = String(row[0] || '').trim()
+      if (!time || time.match(/^[a-zA-Z]/) || !time.match(/\d{4}/)) continue
+      const symbol = String(row[2] || '').trim().toUpperCase()
+      const type = String(row[3] || '').trim().toUpperCase()
+      const lot = parseFloat(String(row[4] || '0')) || 0
+      if (!symbol || (type !== 'BUY' && type !== 'SELL') || lot <= 0) continue
+      trades.push({
+        symbol,
+        type: type as 'BUY' | 'SELL',
+        entry: parseFloat(String(row[5] || '0')) || 0,
+        exit: parseFloat(String(row[9] || '0')) || 0,
+        lot,
+        pnl: parseFloat(String(row[12] || '0')) || 0,
+        commission: parseFloat(String(row[10] || '0')) || 0,
+        swap: parseFloat(String(row[11] || '0')) || 0,
+        date: normalizeDate(time),
+        closeDate: normalizeDate(String(row[8] || '').trim()),
+        sl: parseFloat(String(row[6] || '0')) || 0,
+        tp: parseFloat(String(row[7] || '0')) || 0,
+        ticket: parseTicket(row[1]),
+      })
+    }
+  }
+  return trades
 }
 
 interface ImportRecord {
@@ -48,19 +333,26 @@ function saveImports(imports: ImportRecord[]) {
   localStorage.setItem('mtl_imports', JSON.stringify(imports))
 }
 
+function startOfCurrentMonth(): Date {
+  const d = new Date()
+  d.setDate(1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<ParsedTrade[]>([])
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
   const [importCount, setImportCount] = useState(0)
-  const [imports, setImports] = useState<ImportRecord[]>([])
+  const [imports, setImports] = useState<ImportRecord[]>(() => getImports())
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    setImports(getImports())
     async function getUser() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) setUserId(user.id)
@@ -68,136 +360,27 @@ export default function ImportPage() {
     getUser()
   }, [])
 
-  const extractTrades = (rows: string[][]): ParsedTrade[] => {
-    const trades: ParsedTrade[] = []
-
-    let format = 'mt5'
-    if (rows.length > 0) {
-      const firstRow = rows[0].map(h => String(h || '').trim().toLowerCase())
-      if (firstRow.includes('ticket id') || firstRow.includes('ticket')) {
-        format = 'broker'
-      }
-    }
-
-    const startRow = format === 'broker' ? 1 : (rows[0] && String(rows[0][0] || '').trim() === 'Time' ? 1 : 0)
-
-    for (let idx = startRow; idx < rows.length; idx++) {
-      const row = rows[idx]
-      if (!row || row.length < 8) continue
-
-      if (format === 'broker') {
-        const time = String(row[1] || '').trim()
-        if (!time.match(/\d{4}/)) continue
-        const symbol = String(row[9] || '').trim()
-        const type = String(row[10] || '').trim().toUpperCase()
-        const lot = parseFloat(String(row[6] || '0')) || 0
-        const entry = parseFloat(String(row[2] || '0')) || 0
-        const exit = parseFloat(String(row[4] || '0')) || 0
-        const profit = parseFloat(String(row[5] || '0')) || 0
-        const commission = parseFloat(String(row[7] || '0')) || 0
-        const swap = parseFloat(String(row[8] || '0')) || 0
-        const sl = parseFloat(String(row[11] || '0')) || 0
-        const tp = parseFloat(String(row[12] || '0')) || 0
-        const closeTime = String(row[3] || '').trim()
-
-        if (!symbol || !type) continue
-        if (type !== 'BUY' && type !== 'SELL') continue
-        const normType = type === 'BUY' ? 'BUY' : 'SELL'
-        if (lot <= 0) continue
-
-        trades.push({
-          symbol,
-          type: normType,
-          entry,
-          exit,
-          lot,
-          pnl: profit,
-          commission,
-          swap,
-          date: parseMT5Date(time),
-          closeDate: parseMT5Date(closeTime),
-          sl,
-          tp,
-        })
-      } else {
-        const time = String(row[0] || '').trim()
-        if (!time) continue
-        if (time === 'Time' || time.startsWith('Total') || time.startsWith('Short') || time.startsWith('Long') || time.startsWith('Initial') || time.startsWith('Trade') || time.startsWith('Name') || time.startsWith('Account') || time.startsWith('Company') || time.startsWith('Date') || time.startsWith('Positions') || !time.match(/\d{4}/)) continue
-
-        const symbol = String(row[2] || '').trim()
-        const type = String(row[3] || '').trim().toUpperCase()
-        const lot = parseFloat(String(row[4] || '0')) || 0
-        const entry = parseFloat(String(row[5] || '0')) || 0
-        const sl = parseFloat(String(row[6] || '0')) || 0
-        const tp = parseFloat(String(row[7] || '0')) || 0
-        const closeTime = String(row[8] || '').trim()
-        const exit = parseFloat(String(row[9] || '0')) || 0
-        const commission = parseFloat(String(row[10] || '0')) || 0
-        const swap = parseFloat(String(row[11] || '0')) || 0
-        const profit = parseFloat(String(row[12] || '0')) || 0
-
-        if (!symbol || !type) continue
-        if (type !== 'BUY' && type !== 'SELL') continue
-        if (lot <= 0) continue
-
-        trades.push({
-          symbol,
-          type,
-          entry,
-          exit,
-          lot,
-          pnl: profit,
-          commission,
-          swap,
-          date: parseMT5Date(time),
-          closeDate: parseMT5Date(closeTime),
-          sl,
-          tp,
-        })
-      }
-    }
-    return trades
-  }
-
-  const parseCSV = useCallback((file: File) => {
+  const parseFile = useCallback(async (selectedFile: File) => {
     setLoading(true)
     setError('')
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-
-      if (!text || text.length === 0) {
-        setError('File is empty or could not be read. If this is an Excel file, please export as CSV instead.')
+    setNotice('')
+    try {
+      const rows = await parseFileToRows(selectedFile)
+      if (!rows || rows.length === 0) {
+        setError('No readable data found in this file. If it came from Excel, try "Save As → CSV UTF-8" or export from MT5 as CSV.')
         setLoading(false)
         return
       }
-
-      if (text.charCodeAt(0) === 0x50 && text.charCodeAt(1) === 0x4B) {
-        setError('This is an Excel (.xlsx) file. Please export as CSV from MT5 instead. Right-click in History → Export Deals → CSV format.')
-        setLoading(false)
-        return
+      const trades = extractTrades(rows)
+      setParsedData(trades)
+      if (trades.length === 0) {
+        setError('No trades could be detected in this file. Make sure it contains an MT5 or broker trade history export.')
       }
-
-      Papa.parse(text, {
-        header: false,
-        complete: (results) => {
-          const rows = results.data as string[][]
-          const trades = extractTrades(rows)
-          setParsedData(trades)
-          setLoading(false)
-        },
-        error: (parseError: { message: string }) => {
-          setError('Error parsing file: ' + parseError.message)
-          setLoading(false)
-        }
-      })
+    } catch (e) {
+      console.error(e)
+      setError('Could not read this file. Please try exporting it as a CSV from Excel or MT5.')
     }
-    reader.onerror = () => {
-      setError('Failed to read file')
-      setLoading(false)
-    }
-    reader.readAsText(file)
+    setLoading(false)
   }, [])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -205,15 +388,15 @@ export default function ImportPage() {
     const droppedFile = e.dataTransfer.files[0]
     if (droppedFile) {
       setFile(droppedFile)
-      parseCSV(droppedFile)
+      parseFile(droppedFile)
     }
-  }, [parseCSV])
+  }, [parseFile])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
       setFile(selectedFile)
-      parseCSV(selectedFile)
+      parseFile(selectedFile)
     }
   }
 
@@ -222,16 +405,45 @@ export default function ImportPage() {
       setError('You must be logged in to import trades')
       return
     }
+    if (parsedData.length === 0) return
 
     setLoading(true)
     setError('')
+    setNotice('')
 
+    // Monthly quota pre-check (server enforces this too)
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('max_trades')
+      .eq('id', userId)
+      .single()
+
+    let toImport = parsedData
+    if (userRow?.max_trades && userRow.max_trades !== -1) {
+      const { count } = await supabase
+        .from('trades')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', startOfCurrentMonth().toISOString())
+      const remaining = Math.max(0, userRow.max_trades - (count ?? 0))
+      if (remaining === 0) {
+        setError(`You have reached your monthly limit of ${userRow.max_trades} trades. Upgrade your plan for more.`)
+        setLoading(false)
+        return
+      }
+      if (remaining < parsedData.length) {
+        toImport = parsedData.slice(0, remaining)
+        setNotice(`Monthly limit: importing ${remaining} of ${parsedData.length} trades. Upgrade your plan to import the rest.`)
+      }
+    }
+
+    const importId = crypto.randomUUID()
     const importTimestamp = new Date().toISOString()
     const batchSize = 100
     let imported = 0
 
-    for (let i = 0; i < parsedData.length; i += batchSize) {
-      const batch = parsedData.slice(i, i + batchSize)
+    for (let i = 0; i < toImport.length; i += batchSize) {
+      const batch = toImport.slice(i, i + batchSize)
       const tradesToInsert = batch.map((trade) => ({
         user_id: userId,
         symbol: trade.symbol,
@@ -246,6 +458,8 @@ export default function ImportPage() {
         swap: trade.swap || 0,
         open_time: trade.date || null,
         close_time: trade.closeDate || null,
+        ticket: trade.ticket ?? null,
+        import_id: importId,
       })).filter(t => t.lot_size > 0)
 
       const { error: insertError } = await supabase.from('trades').insert(tradesToInsert)
@@ -260,9 +474,9 @@ export default function ImportPage() {
     }
 
     const newImport: ImportRecord = {
-      id: crypto.randomUUID(),
+      id: importId,
       filename: file?.name || 'Unknown',
-      tradeCount: parsedData.length,
+      tradeCount: imported,
       timestamp: importTimestamp,
     }
     const updatedImports = [newImport, ...getImports()]
@@ -278,6 +492,7 @@ export default function ImportPage() {
     setParsedData([])
     setSuccess(false)
     setError('')
+    setNotice('')
     setImportCount(0)
   }
 
@@ -285,26 +500,10 @@ export default function ImportPage() {
     if (!confirm(`Delete all ${imp.tradeCount} trades from "${imp.filename}"?`)) return
     setDeleteLoading(imp.id)
 
-    const importTime = new Date(imp.timestamp).getTime()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: trades } = await supabase
-      .from('trades')
-      .select('id, created_at')
-      .eq('user_id', user.id)
-
-    const toDelete = (trades || [])
-      .filter(t => {
-        if (!t.created_at) return false
-        const tTime = new Date(t.created_at).getTime()
-        return Math.abs(tTime - importTime) < 60000
-      })
-      .map(t => t.id)
-
-    if (toDelete.length > 0) {
-      await supabase.from('trades').delete().in('id', toDelete)
-    }
+    await supabase.from('trades').delete().eq('user_id', user.id).eq('import_id', imp.id)
 
     const updatedImports = imports.filter(i => i.id !== imp.id)
     saveImports(updatedImports)
@@ -329,7 +528,7 @@ export default function ImportPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Import Trades</h1>
-        <p className="text-gray-400 text-sm mt-1">Upload your MT5 trade history CSV file</p>
+        <p className="text-gray-400 text-sm mt-1">Upload your MT5 or broker trade history — CSV, Excel (.xlsx), or any file Excel saved as CSV</p>
       </div>
 
       {!file ? (
@@ -340,7 +539,7 @@ export default function ImportPage() {
         >
           <input
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls,.tsv,.txt"
             onChange={handleFileSelect}
             className="hidden"
             id="file-upload"
@@ -348,13 +547,13 @@ export default function ImportPage() {
           <label htmlFor="file-upload" className="cursor-pointer">
             <Upload className="w-12 h-12 text-gray-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-white mb-2">
-              Drag and drop your CSV file here
+              Drag and drop your file here
             </p>
             <p className="text-gray-400 text-sm mb-4">
               or click to browse
             </p>
             <p className="text-gray-500 text-xs">
-              Only CSV files are supported. Export from MT5 using History → Export Deals
+              Works with MT5 CSV exports, broker CSVs, Excel .xlsx files, and Excel-saved-as-CSV — even tab- or semicolon-separated files
             </p>
           </label>
         </div>
@@ -365,6 +564,11 @@ export default function ImportPage() {
           <p className="text-gray-400 mb-6">
             {importCount} trades have been imported to your journal.
           </p>
+          {notice && (
+            <p className="text-warning bg-warning/10 border border-warning/30 rounded-lg px-4 py-2 text-sm mb-6 max-w-md mx-auto">
+              {notice}
+            </p>
+          )}
           <div className="flex gap-3 justify-center">
             <button
               onClick={reset}
@@ -479,11 +683,11 @@ export default function ImportPage() {
           <li>3. Select all trades (Ctrl+A)</li>
           <li>4. Right-click → Click &quot;Export Deals&quot;</li>
           <li>5. Choose <span className="text-primary font-semibold">CSV</span> format and save</li>
-          <li>6. Upload the CSV file above</li>
+          <li>6. Upload the file above — we also read <span className="text-primary font-semibold">.xlsx</span> and Excel-saved-as-CSV files automatically</li>
         </ol>
         <div className="mt-4 bg-warning/10 border border-warning/30 rounded-lg p-3">
           <p className="text-warning text-xs font-medium">
-            Important: Make sure to export as CSV, not as Report (HTML/XLSX). The Report format is a summary and won&apos;t import individual trades.
+            Tip: If MT5 only offers the Report format (HTML/XLSX), upload the XLSX directly — we parse it for you. Avoid the HTML summary report.
           </p>
         </div>
       </div>

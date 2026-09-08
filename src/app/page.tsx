@@ -11,21 +11,25 @@ const features = [
     icon: BarChart3,
     title: 'Advanced Analytics',
     description: 'Deep insights into your trading performance with win rate, profit factor, and risk/reward analysis.',
+    tile: 'icon-tile-blue',
   },
   {
     icon: TrendingUp,
     title: 'Equity Curve',
     description: 'Visualize your account growth over time with beautiful interactive charts.',
+    tile: 'icon-tile-green',
   },
   {
     icon: Shield,
     title: 'Risk Management',
     description: 'Track drawdowns, position sizes, and risk per trade to protect your capital.',
+    tile: 'icon-tile-amber',
   },
   {
     icon: Zap,
     title: 'MT5 Integration',
     description: 'Import trades directly from MetaTrader 5 with CSV upload or real-time sync.',
+    tile: 'icon-tile-violet',
   },
 ]
 
@@ -52,39 +56,56 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-            Track. Analyze. <span className="text-primary">Improve.</span>
+      <section className="py-24 px-4 relative overflow-hidden">
+        {/* Ambient background */}
+        <div className="absolute inset-0 hero-grid" />
+        <div className="hero-blob w-96 h-96 bg-primary top-[-120px] left-[10%]" />
+        <div className="hero-blob w-80 h-80 bg-violet-500 top-[-60px] right-[12%]" style={{ animationDelay: '-5s' }} />
+        <div className="hero-blob w-72 h-72 bg-primary-light bottom-[-120px] left-[45%]" style={{ animationDelay: '-9s', opacity: 0.22 }} />
+
+        <div className="max-w-7xl mx-auto text-center relative">
+          <div className="fade-up">
+            <span className="badge-pill mb-8">
+              <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
+              The professional trading journal
+            </span>
+          </div>
+          <h1 className="fade-up-1 text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight">
+            Track. Analyze. <span className="text-gradient">Improve.</span>
           </h1>
-          <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-            The professional trading journal that helps you identify patterns, 
+          <p className="fade-up-2 text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
+            The professional trading journal that helps you identify patterns,
             eliminate mistakes, and maximize your trading edge.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/signup" className="bg-primary hover:bg-primary-dark text-white px-8 py-4 rounded-lg text-lg font-semibold transition-colors flex items-center justify-center gap-2">
+          <div className="fade-up-3 flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/auth/signup" className="btn-gradient glow-primary text-white px-8 py-4 rounded-xl text-lg font-semibold flex items-center justify-center gap-2">
               Start Free Trial <ArrowRight className="w-5 h-5" />
             </Link>
-            <Link href="#pricing" className="border border-border hover:border-primary text-gray-300 hover:text-white px-8 py-4 rounded-lg text-lg transition-colors">
+            <Link href="#pricing" className="border border-border hover:border-primary text-gray-300 hover:text-white px-8 py-4 rounded-xl text-lg transition-colors">
               View Pricing
             </Link>
           </div>
-          <p className="text-gray-500 mt-4 text-sm">No credit card required • 7-day free trial</p>
+          <p className="fade-up-3 text-gray-500 mt-5 text-sm">No credit card required • 7-day free trial</p>
         </div>
       </section>
 
       {/* Features */}
       <section className="py-20 px-4 bg-surface/30">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">
-            Everything You Need to Trade Better
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
+              Everything You Need to <span className="text-gradient">Trade Better</span>
+            </h2>
+            <p className="text-gray-400 max-w-xl mx-auto">One place for your trades, analytics, and growth.</p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature) => (
-              <div key={feature.title} className="bg-surface border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
-                <feature.icon className="w-10 h-10 text-primary mb-4" />
+              <div key={feature.title} className="card-hover bg-surface border border-border rounded-xl p-6">
+                <div className={`icon-tile ${feature.tile} mb-5`}>
+                  <feature.icon className="w-6 h-6" />
+                </div>
                 <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-gray-400 text-sm">{feature.description}</p>
+                <p className="text-gray-400 text-sm leading-relaxed">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -94,22 +115,22 @@ export default function HomePage() {
       {/* Stats Preview */}
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="bg-surface border border-border rounded-2xl p-8">
+          <div className="card-hover bg-surface border border-border rounded-2xl p-8 glow-primary">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               <div className="text-center">
-                <div className="text-3xl font-bold text-success">67.3%</div>
+                <div className="text-3xl md:text-4xl font-bold text-gradient">67.3%</div>
                 <div className="text-gray-400 text-sm mt-1">Win Rate</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary">$12,847</div>
+                <div className="text-3xl md:text-4xl font-bold text-gradient">$12,847</div>
                 <div className="text-gray-400 text-sm mt-1">Total P&L</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-accent">2.4</div>
+                <div className="text-3xl md:text-4xl font-bold text-gradient">2.4</div>
                 <div className="text-gray-400 text-sm mt-1">Profit Factor</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-warning">1:2.8</div>
+                <div className="text-3xl md:text-4xl font-bold text-gradient">1:2.8</div>
                 <div className="text-gray-400 text-sm mt-1">Avg Risk/Reward</div>
               </div>
             </div>
@@ -130,12 +151,12 @@ export default function HomePage() {
             {PLANS.map((plan) => (
               <div
                 key={plan.id}
-                className={`bg-surface border rounded-2xl p-8 ${
-                  plan.popular ? 'border-primary shadow-lg shadow-primary/20' : 'border-border'
+                className={`card-hover bg-surface border rounded-2xl p-8 ${
+                  plan.popular ? 'border-primary glow-primary' : 'border-border'
                 }`}
               >
                 {plan.popular && (
-                  <div className="text-primary text-sm font-semibold mb-2">MOST POPULAR</div>
+                  <div className="badge-pill mb-3">MOST POPULAR</div>
                 )}
                 <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
                 <div className="mb-6">
@@ -154,9 +175,9 @@ export default function HomePage() {
                 </ul>
                 <Link
                   href="/auth/signup"
-                  className={`block w-full text-center py-3 rounded-lg font-semibold transition-colors ${
+                  className={`block w-full text-center py-3 rounded-xl font-semibold transition-colors ${
                     plan.popular
-                      ? 'bg-primary hover:bg-primary-dark text-white'
+                      ? 'btn-gradient text-white'
                       : 'border border-border hover:border-primary text-gray-300 hover:text-white'
                   }`}
                 >

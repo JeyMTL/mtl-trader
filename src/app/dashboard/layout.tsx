@@ -40,7 +40,7 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [user, setUser] = useState<{ tier: string; status: string; tradesRemaining: number; maxTrades: number; trialEndsAt: string | null } | null>(null)
+  const [user, setUser] = useState<{ tier: string; status: string; isAdmin: boolean; maxTrades: number; tradesUsed: number; trialEndsAt: string | null } | null>(null)
   const [trialDaysLeft, setTrialDaysLeft] = useState(0)
 
   useEffect(() => {
@@ -52,36 +52,37 @@ export default function DashboardLayout({
       }
       let { data } = await supabase
         .from('users')
-        .select('subscription_tier, subscription_status, trades_remaining, max_trades, trial_ends_at')
+        .select('subscription_tier, subscription_status, max_trades, trial_ends_at, is_admin')
         .eq('id', authUser.id)
         .single()
 
       if (!data) {
-        const trialEnds = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        await supabase.from('users').insert({
-          id: authUser.id,
-          email: authUser.email!,
-          full_name: authUser.user_metadata?.full_name || '',
+        data = {
           subscription_tier: 'free',
           subscription_status: 'trial',
-          trades_remaining: 10,
           max_trades: 10,
-          trial_ends_at: trialEnds,
-        })
-        const { data: newData } = await supabase
-          .from('users')
-          .select('subscription_tier, subscription_status, trades_remaining, max_trades, trial_ends_at')
-          .eq('id', authUser.id)
-          .single()
-        data = newData
+          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          is_admin: false,
+        }
       }
+
+      // Trades used this month (drives the quota display)
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+      const { count } = await supabase
+        .from('trades')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', authUser.id)
+        .gte('created_at', startOfMonth.toISOString())
 
       if (data) {
         setUser({
           tier: data.subscription_tier || 'free',
           status: data.subscription_status || 'trial',
-          tradesRemaining: data.trades_remaining ?? 0,
+          isAdmin: data.is_admin === true,
           maxTrades: data.max_trades ?? 10,
+          tradesUsed: count ?? 0,
           trialEndsAt: data.trial_ends_at,
         })
         if (data.trial_ends_at) {
@@ -98,8 +99,12 @@ export default function DashboardLayout({
   }
 
   const trialProgress = user?.maxTrades && user.maxTrades > 0
-    ? Math.min(100, ((user.maxTrades - user.tradesRemaining) / user.maxTrades) * 100)
+    ? Math.min(100, (user.tradesUsed / user.maxTrades) * 100)
     : 0
+
+  const tradesRemaining = user?.maxTrades === -1 || !user
+    ? null
+    : Math.max(0, user.maxTrades - user.tradesUsed)
 
   const isPro = user?.tier === 'pro'
   const isBasic = user?.tier === 'basic'
@@ -137,7 +142,7 @@ export default function DashboardLayout({
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary/10 text-primary"
+                      ? "nav-active"
                       : "text-gray-400 hover:text-white hover:bg-surface-light"
                   )}
                 >
@@ -146,14 +151,14 @@ export default function DashboardLayout({
                 </Link>
               )
             })}
-            {isPro && (
+            {user?.isAdmin && (
               <Link
                 href="/dashboard/admin"
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   pathname === '/dashboard/admin'
-                    ? "bg-primary/10 text-primary"
+                    ? "nav-active"
                     : "text-gray-400 hover:text-white hover:bg-surface-light"
                 )}
               >
@@ -170,7 +175,7 @@ export default function DashboardLayout({
                   {isPro ? 'Pro Plan' : isBasic ? 'Basic Plan' : 'Free Trial'}
                 </div>
                 <div className="text-sm text-white font-medium">
-                  {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${user.tradesRemaining} / ${user.maxTrades} trades remaining`) :
+                  {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
                    user.status === 'trial' ? `${trialDaysLeft} days remaining` :
                    'Expired'}
                 </div>
@@ -202,10 +207,12 @@ export default function DashboardLayout({
           <div className="flex items-center gap-4">
             {user && (
               <div className="text-sm text-gray-400">
-                <span className="text-white font-medium">{user.tradesRemaining}</span> / {user.maxTrades === -1 ? '∞' : user.maxTrades} trades remaining
+                {isPro ? 'Unlimited trades' : (
+                  <><span className="text-white font-medium">{tradesRemaining}</span> / {user.maxTrades} trades remaining this month</>
+                )}
               </div>
             )}
-            <Link href="/pricing" className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <Link href="/pricing" className="btn-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">
               Upgrade
             </Link>
           </div>
