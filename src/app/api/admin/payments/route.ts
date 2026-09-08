@@ -1,20 +1,22 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getAdminClient, requireAdmin } from '@/lib/server-auth'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const { user, error } = await requireAdmin(req)
+    if (!user) {
+      return NextResponse.json({ error }, { status: error === 'Unauthorized' ? 401 : 403 })
+    }
 
-    const { data: requests, error } = await supabase
+    const supabase = getAdminClient()
+
+    const { data: requests, error: dbError } = await supabase
       .from('payment_requests')
       .select('*, users!inner(id, email, full_name)')
       .order('created_at', { ascending: false })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (dbError) {
+      return NextResponse.json({ error: dbError.message }, { status: 500 })
     }
 
     return NextResponse.json({ requests: requests || [] })
@@ -26,9 +28,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { requestId, action, adminId } = await req.json()
+    const { requestId, action } = await req.json()
 
-    if (!requestId || !action || !adminId) {
+    if (!requestId || !action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -36,10 +38,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const { user, error } = await requireAdmin(req)
+    if (!user) {
+      return NextResponse.json({ error }, { status: error === 'Unauthorized' ? 401 : 403 })
+    }
+
+    const supabase = getAdminClient()
 
     const { data: request, error: reqError } = await supabase
       .from('payment_requests')
@@ -59,7 +63,7 @@ export async function POST(req: Request) {
 
     await supabase
       .from('payment_requests')
-      .update({ status: newStatus, reviewed_by: adminId, reviewed_at: new Date().toISOString() })
+      .update({ status: newStatus, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
       .eq('id', requestId)
 
     if (action === 'approve') {

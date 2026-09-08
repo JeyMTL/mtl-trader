@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { getAdminClient, getAuthUser } from '@/lib/server-auth'
+import { randomBytes } from 'node:crypto'
 
 interface MT5Trade {
   ticket: number
@@ -32,7 +28,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing trades, userId, or token' }, { status: 400 })
     }
 
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await getAdminClient()
       .from('users')
       .select('id, agent_token')
       .eq('id', userId)
@@ -46,7 +42,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    const { data: existingTrades } = await supabase
+    const { data: existingTrades } = await getAdminClient()
       .from('trades')
       .select('ticket')
       .eq('user_id', userId)
@@ -78,7 +74,7 @@ export async function POST(req: Request) {
       strategy: trade.strategy || '',
     }))
 
-    const { data: inserted, error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await getAdminClient()
       .from('trades')
       .insert(tradesToInsert)
       .select('id')
@@ -87,14 +83,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: insertError.message }, { status: 500 })
     }
 
-    const { data: userData } = await supabase
+    const { data: userData } = await getAdminClient()
       .from('users')
       .select('trades_remaining')
       .eq('id', userId)
       .single()
 
     if (userData && userData.trades_remaining !== -1) {
-      await supabase
+      await getAdminClient()
         .from('users')
         .update({ trades_remaining: Math.max(0, userData.trades_remaining - inserted!.length) })
         .eq('id', userId)
@@ -116,7 +112,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
     }
 
-    const { data: user, error: userError } = await supabase
+    const authUser = await getAuthUser(req)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (authUser.id !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { data: user, error: userError } = await getAdminClient()
       .from('users')
       .select('id, agent_token')
       .eq('id', userId)
@@ -128,7 +132,7 @@ export async function GET(req: Request) {
 
     if (!user.agent_token) {
       const token = generateToken()
-      await supabase
+      await getAdminClient()
         .from('users')
         .update({ agent_token: token })
         .eq('id', userId)
@@ -144,10 +148,5 @@ export async function GET(req: Request) {
 }
 
 function generateToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
+  return randomBytes(32).toString('hex')
 }

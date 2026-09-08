@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/server-auth'
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!
@@ -33,6 +34,14 @@ export async function POST(req: Request) {
 
     if (!userId || !email) {
       return NextResponse.json({ error: 'Missing userId or email' }, { status: 400 })
+    }
+
+    const authUser = await getAuthUser(req)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (authUser.id !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessToken = await getAccessToken()

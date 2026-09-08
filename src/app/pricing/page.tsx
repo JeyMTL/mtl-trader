@@ -71,7 +71,9 @@ export default function PricingPage() {
       <div className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-white mb-4">Simple, Transparent Pricing</h1>
+            <h1 className="text-4xl font-bold text-white mb-4">
+              Simple, <span className="text-gradient">Transparent</span> Pricing
+            </h1>
             <p className="text-gray-400 text-lg">Start free, upgrade when you need more</p>
           </div>
 
@@ -79,12 +81,12 @@ export default function PricingPage() {
             {PLANS.map((plan) => (
               <div
                 key={plan.id}
-                className={`bg-surface border rounded-2xl p-8 ${
-                  plan.popular ? 'border-primary shadow-lg shadow-primary/20' : 'border-border'
+                className={`card-hover bg-surface border rounded-2xl p-8 ${
+                  plan.popular ? 'border-primary glow-primary' : 'border-border'
                 }`}
               >
                 {plan.popular && (
-                  <div className="text-primary text-sm font-semibold mb-2">MOST POPULAR</div>
+                  <div className="badge-pill mb-3">MOST POPULAR</div>
                 )}
                 <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
                 <div className="mb-6">
@@ -113,9 +115,9 @@ export default function PricingPage() {
                     <button
                       onClick={() => handleCheckout(plan.id)}
                       disabled={loading === plan.id}
-                      className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
+                      className={`w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 ${
                         plan.popular
-                          ? 'bg-primary hover:bg-primary-dark text-white'
+                          ? 'btn-gradient text-white'
                           : 'border border-border hover:border-primary text-gray-300 hover:text-white'
                       } disabled:opacity-50`}
                     >

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { CheckCircle, Loader2, XCircle } from 'lucide-react'
 import Link from 'next/link'
+import { authedFetch } from '@/lib/api'
 
 function PayPalSuccessContent() {
   const searchParams = useSearchParams()
@@ -20,7 +21,7 @@ function PayPalSuccessContent() {
 
     async function capture() {
       try {
-        const res = await fetch('/api/paypal/capture', {
+        const res = await authedFetch('/api/paypal/capture', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ orderId }),

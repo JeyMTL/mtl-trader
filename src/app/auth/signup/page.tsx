@@ -12,11 +12,13 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccess('')
 
     const { data, error: authError } = await supabase.auth.signUp({
       email,
@@ -32,24 +34,36 @@ export default function SignupPage() {
       return
     }
 
-    if (data.user) {
-      const { error: insertError } = await supabase.from('users').insert({
-        id: data.user.id,
-        email: data.user.email!,
-        full_name: fullName,
-        subscription_tier: 'free',
-        subscription_status: 'trial',
-        trades_remaining: 10,
-        max_trades: 10,
-      })
-      if (insertError) {
-        setError('Failed to create profile: ' + insertError.message)
-        setLoading(false)
-        return
-      }
+    if (!data.user) {
+      setError('Account creation did not return a user. Please try again.')
+      setLoading(false)
+      return
     }
 
-    window.location.href = '/dashboard'
+    const profileResponse = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: data.user.id,
+        email: data.user.email || email,
+        fullName,
+      }),
+    })
+
+    if (!profileResponse.ok) {
+      const profileError = await profileResponse.json().catch(() => null)
+      setError(profileError?.error || 'Your account was created, but your profile could not be set up.')
+      setLoading(false)
+      return
+    }
+
+    if (data.session) {
+      window.location.href = '/dashboard'
+      return
+    }
+
+    setSuccess('Account created. Check your email to confirm your account, then log in.')
+    setLoading(false)
   }
 
   return (
@@ -63,10 +77,15 @@ export default function SignupPage() {
           <p className="text-gray-400 mt-2">Start your 7-day free trial</p>
         </div>
 
-        <form onSubmit={handleSignup} className="bg-surface border border-border rounded-2xl p-8 space-y-6">
+        <form onSubmit={handleSignup} className="bg-surface border border-border rounded-2xl p-8 space-y-6 shadow-2xl shadow-primary/5">
           {error && (
             <div className="bg-danger/10 border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">
               {error}
+            </div>
+          )}
+          {success && (
+            <div className="bg-success/10 border border-success/30 text-success px-4 py-3 rounded-lg text-sm">
+              {success}
             </div>
           )}
 
@@ -119,7 +138,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full btn-gradient text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating account...' : 'Start Free Trial'}
           </button>

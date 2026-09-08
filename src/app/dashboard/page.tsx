@@ -77,11 +77,11 @@ export default function DashboardPage() {
   }, [trades, totalDeposits])
 
   const statCards = [
-    { label: 'Account Balance', value: formatCurrency(balance), icon: DollarSign, positive: balance >= 0 },
-    { label: 'Total P&L', value: formatCurrency(totalPnl), icon: TrendingUp, positive: totalPnl >= 0 },
-    { label: 'Win Rate', value: `${winRate.toFixed(1)}%`, icon: Target, positive: winRate >= 50 },
-    { label: 'Profit Factor', value: profitFactor.toFixed(2), icon: BarChart3, positive: profitFactor >= 1 },
-    { label: 'Max Drawdown', value: `${maxDrawdown.toFixed(1)}%`, icon: AlertTriangle, positive: maxDrawdown < 10 },
+    { label: 'Account Balance', value: formatCurrency(balance), icon: DollarSign, positive: balance >= 0, tile: 'icon-tile-green' },
+    { label: 'Total P&L', value: formatCurrency(totalPnl), icon: TrendingUp, positive: totalPnl >= 0, tile: 'icon-tile-blue' },
+    { label: 'Win Rate', value: `${winRate.toFixed(1)}%`, icon: Target, positive: winRate >= 50, tile: 'icon-tile-violet' },
+    { label: 'Profit Factor', value: profitFactor.toFixed(2), icon: BarChart3, positive: profitFactor >= 1, tile: 'icon-tile-amber' },
+    { label: 'Max Drawdown', value: `${maxDrawdown.toFixed(1)}%`, icon: AlertTriangle, positive: maxDrawdown < 10, tile: 'icon-tile-blue' },
   ]
 
   const recentTrades = [...trades].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5)
@@ -97,12 +97,12 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat) => (
-          <div key={stat.label} className="bg-surface border border-border rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm">{stat.label}</span>
-              <stat.icon className="w-5 h-5 text-gray-500" />
+          <div key={stat.label} className="card-hover bg-surface border border-border rounded-xl p-4">
+            <div className={`icon-tile ${stat.tile} mb-3`}>
+              <stat.icon className="w-5 h-5" />
             </div>
-            <div className="text-2xl font-bold text-white">{stat.value}</div>
+            <div className="text-gray-400 text-sm">{stat.label}</div>
+            <div className="text-2xl font-bold text-white mt-1">{stat.value}</div>
             <div className={`text-sm mt-1 flex items-center gap-1 ${stat.positive ? 'text-success' : 'text-danger'}`}>
               {stat.positive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
               {stat.positive ? 'Good' : 'Needs attention'}
@@ -170,36 +170,36 @@ export default function DashboardPage() {
       <div className="bg-surface border border-border rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
         <div className="grid sm:grid-cols-4 gap-4">
-          <a href="/dashboard/trades/new" className="flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg hover:border-primary transition-colors">
-            <div className="w-10 h-10 bg-success/20 rounded-lg flex items-center justify-center">
-              <Plus className="w-5 h-5 text-success" />
+          <a href="/dashboard/trades/new" className="card-hover flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg">
+            <div className="icon-tile icon-tile-green">
+              <Plus className="w-5 h-5" />
             </div>
             <div>
               <div className="text-sm font-medium text-white">Add Trade</div>
               <div className="text-xs text-gray-400">Manual entry</div>
             </div>
           </a>
-          <a href="/dashboard/import" className="flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg hover:border-primary transition-colors">
-            <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-primary" />
+          <a href="/dashboard/import" className="card-hover flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg">
+            <div className="icon-tile icon-tile-blue">
+              <TrendingUp className="w-5 h-5" />
             </div>
             <div>
               <div className="text-sm font-medium text-white">Import Trades</div>
               <div className="text-xs text-gray-400">Upload MT5 CSV</div>
             </div>
           </a>
-          <a href="/dashboard/analytics" className="flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg hover:border-primary transition-colors">
-            <div className="w-10 h-10 bg-accent/20 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-accent" />
+          <a href="/dashboard/analytics" className="card-hover flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg">
+            <div className="icon-tile icon-tile-violet">
+              <BarChart3 className="w-5 h-5" />
             </div>
             <div>
               <div className="text-sm font-medium text-white">View Analytics</div>
               <div className="text-xs text-gray-400">Deep performance insights</div>
             </div>
           </a>
-          <a href="/dashboard/settings" className="flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg hover:border-primary transition-colors">
-            <div className="w-10 h-10 bg-warning/20 rounded-lg flex items-center justify-center">
-              <Target className="w-5 h-5 text-warning" />
+          <a href="/dashboard/settings" className="card-hover flex items-center gap-3 p-4 bg-surface-light border border-border rounded-lg">
+            <div className="icon-tile icon-tile-amber">
+              <Target className="w-5 h-5" />
             </div>
             <div>
               <div className="text-sm font-medium text-white">Settings</div>
