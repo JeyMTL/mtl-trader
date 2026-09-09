@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/server-auth'
+import { PLANS } from '@/lib/plans'
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!
 const PAYPAL_BASE = 'https://api-m.paypal.com'
 
-const PLAN_MAP: Record<string, { amount: string; name: string }> = {
-  basic: { amount: '9.99', name: 'Basic Plan' },
-  pro: { amount: '29.99', name: 'Pro Plan' },
-}
+// Derived from PLANS so captured amounts must match the displayed prices.
+const PLAN_MAP: Record<string, { amount: string; name: string }> = Object.fromEntries(
+  PLANS.filter(p => p.price > 0).map(p => [p.id, { amount: p.price.toFixed(2), name: `${p.name} Plan` }])
+)
 
 async function getAccessToken(): Promise<string> {
   const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')

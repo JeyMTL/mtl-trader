@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
+import { PLANS } from '@/lib/plans'
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!
@@ -19,10 +20,10 @@ async function getAccessToken(): Promise<string> {
   return data.access_token
 }
 
-const PLAN_MAP: Record<string, { amount: string; name: string }> = {
-  basic: { amount: '9.99', name: 'Basic Plan' },
-  pro: { amount: '29.99', name: 'Pro Plan' },
-}
+// Derived from PLANS so checkout can never drift from the displayed prices.
+const PLAN_MAP: Record<string, { amount: string; name: string }> = Object.fromEntries(
+  PLANS.filter(p => p.price > 0).map(p => [p.id, { amount: p.price.toFixed(2), name: `${p.name} Plan` }])
+)
 
 export async function POST(req: Request) {
   try {
