@@ -60,8 +60,8 @@ export default function DashboardLayout({
         data = {
           subscription_tier: 'free',
           subscription_status: 'trial',
-          max_trades: 10,
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          max_trades: -1,
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           is_admin: false,
         }
       }
@@ -172,14 +172,14 @@ export default function DashboardLayout({
             {user && (
               <div className="bg-surface-light rounded-lg p-3 mb-3">
                 <div className="text-xs text-gray-400">
-                  {isPro ? 'Pro Plan' : isBasic ? 'Basic Plan' : 'Free Trial'}
+                  {isPro ? 'Pro Plan' : isBasic ? 'Basic Plan' : '30-Day Free Trial'}
                 </div>
                 <div className="text-sm text-white font-medium">
                   {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
-                   user.status === 'trial' ? `${trialDaysLeft} days remaining` :
+                   user.status === 'trial' ? `${trialDaysLeft} days remaining, unlimited trades` :
                    'Expired'}
                 </div>
-                {!isPro && (
+                 {!isPro && user.status !== 'trial' && (
                   <div className="w-full bg-background rounded-full h-2 mt-2">
                     <div className="bg-primary h-2 rounded-full" style={{ width: `${trialProgress}%` }} />
                   </div>

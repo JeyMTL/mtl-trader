@@ -29,8 +29,14 @@ function normalizeHeader(s: unknown): string {
 
 function parseNumeric(v: unknown): number {
   if (v === null || v === undefined || v === '') return 0
-  // Strip thousands separators and handle comma decimal points (EU style)
-  const n = parseFloat(String(v).replace(/,/g, '').trim())
+  const raw = String(v).trim().replace(/[ currency$€£]/gi, '')
+  const value = raw.replace(/^\((.*)\)$/, '-$1').replace(/\s/g, '')
+  const normalized = value.includes(',') && value.includes('.')
+    ? value.lastIndexOf(',') > value.lastIndexOf('.')
+      ? value.replace(/\./g, '').replace(',', '.')
+      : value.replace(/,/g, '')
+    : value.replace(',', '.')
+  const n = parseFloat(normalized)
   return isNaN(n) ? 0 : n
 }
 
@@ -38,6 +44,15 @@ function parseTicket(v: unknown): number | undefined {
   if (v === null || v === undefined || v === '') return undefined
   const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10)
   return isNaN(n) || n <= 0 ? undefined : n
+}
+
+/**
+ * Normalize signed costs to the app convention (negative = paid).
+ * MT5 reports already store commission/swap as negative numbers. Brokers that
+ * export them as positive costs get flipped so P&L math stays consistent.
+ */
+function normalizeSignedCost(v: number): number {
+  return v > 0 ? -v : v
 }
 
 function normalizeDate(v: unknown): string {
@@ -67,6 +82,19 @@ function normalizeDate(v: unknown): string {
     }
   }
 
+  const dateOnly = s.match(/^(\d{4})[.-](\d{2})[.-](\d{2})$/)
+  if (dateOnly) return `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}T00:00:00`
+
+  const usDateOnly = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (usDateOnly) {
+    const month = Number(usDateOnly[1])
+    const day = Number(usDateOnly[2])
+    const year = Number(usDateOnly[3])
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1990 && year <= 2100) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00`
+    }
+  }
+
   return s
 }
 
@@ -92,13 +120,19 @@ function detectDelimiter(text: string): string {
   return best
 }
 
-/** Read any supported file (xlsx / csv / tsv / txt) into rows of strings. */
+/** Read any supported file (xlsx / xls / xml / csv / tsv / txt) into rows of strings. */
 async function parseFileToRows(file: File): Promise<string[][]> {
   const buffer = await file.arrayBuffer()
   const bytes = new Uint8Array(buffer)
 
-  // ZIP magic bytes => real Excel file (often saved with a .csv extension)
-  if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) {
+  const lowerName = file.name.toLowerCase()
+  const isZip = bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b
+  const isLegacyExcel = bytes.length >= 4 && bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0
+  const isXml = bytes.length >= 5 && bytes[0] === 0x3c && bytes[1] === 0x3f && bytes[2] === 0x78 && bytes[3] === 0x6d && bytes[4] === 0x6c // "<?xml"
+  const looksLikeXml = isXml || lowerName.endsWith('.xml')
+
+  // Read both modern .xlsx and legacy .xls files, even when the extension is wrong.
+  if (isZip || isLegacyExcel || lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
     const XLSX = await import('xlsx')
     const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
     const ws = wb.Sheets[wb.SheetNames[0]]
@@ -109,9 +143,16 @@ async function parseFileToRows(file: File): Promise<string[][]> {
   }
 
   let text = new TextDecoder('utf-8').decode(buffer)
-  // Strip UTF-8 BOM (Excel adds one to CSVs)
+  // Strip UTF-8 BOM (Excel adds one to CSVs; the XML check above catches "<?xml" first)
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
   if (!text.trim()) return []
+
+  // MT5 "Report" / "Export Deals" saves XML (SpreadsheetML, "ReportHistory-<account>") or PAMM-style HTML2 markup.
+  if (looksLikeXml || /^\s*<\?xml/i.test(text) || /\sxmlns:html2=\"urn:report-component/.test(text)) {
+    const parsed = xmlStringToRows(text)
+    if (parsed.length > 0) return parsed
+    // Fall through to the delimiter path if the markup had no tabular data.
+  }
 
   const delimiter = detectDelimiter(text)
   const parsed = Papa.parse<string[]>(text, {
@@ -125,9 +166,97 @@ async function parseFileToRows(file: File): Promise<string[][]> {
   return parsed.data
 }
 
+/** Minimal XML helper: returns the first <tag ...>...</tag> block (or self-closing tag). */
+function matchTag(text: string, tag: string, from: number): { attrs: string; inner: string; next: number } | null {
+  const open = text.indexOf(`<${tag}`, from)
+  if (open === -1) return null
+  const attrsEnd = text.indexOf('>', open)
+  if (attrsEnd === -1) return null
+  const attrs = text.slice(open + tag.length + 1, attrsEnd)
+  if (text[attrsEnd - 1] === '/') {
+    return { attrs, inner: '', next: attrsEnd + 1 }
+  }
+  const close = text.indexOf(`</${tag}>`, attrsEnd)
+  if (close === -1) return null
+  return { attrs, inner: text.slice(attrsEnd + 1, close), next: close + tag.length + 3 }
+}
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&amp;/g, '&')
+}
+
+/**
+ * Flatten XML/HTML2 markup into rows of strings. Covers:
+ *  - SpreadsheetML 2003 XML (what MT5 writes for its Trade History Report)
+ *  - PAMM/investor statement markup (xmlns:html2="urn:report-component)
+ * Each top-level row of the first visible table becomes one string[] of cell text.
+ */
+function xmlStringToRows(text: string): string[][] {
+  const unescapeText = (s: string) => decodeXmlEntities(s.replace(/<[^>]*>/g, '')).trim()
+
+  // SpreadsheetML: Worksheet > Table > Row > Cell > Data
+  const sheet = matchTag(text, 'Worksheet', 0)
+  const table = sheet ? matchTag(sheet.inner, 'Table', 0) : null
+  if (table) {
+    const rows: string[][] = []
+    let rowPos = 0
+    for (;;) {
+      const row = matchTag(table.inner, 'Row', rowPos)
+      if (!row) break
+      rowPos = row.next
+      const cells: string[] = []
+      let cellPos = 0
+      let colIndex = 0
+      for (;;) {
+        const cell = matchTag(row.inner, 'Cell', cellPos)
+        if (!cell) break
+        cellPos = cell.next
+        // Respect ss:Index / ss:MergeDown so columns stay aligned.
+        const indexMatch = cell.attrs.match(/ss:Index\s*=\s*"(\d+)"/)
+        const mergeDownMatch = cell.attrs.match(/ss:MergeDown\s*=\s*"(\d+)"/)
+        const spanMatch = cell.attrs.match(/ss:MergeAcross\s*=\s*"(\d+)"/)
+        const targetIndex = indexMatch ? parseInt(indexMatch[1], 10) - 1 : colIndex
+        while (cells.length < targetIndex) cells.push('')
+        const data = matchTag(cell.inner, 'Data', 0)
+        cells.push(data ? unescapeText(data.inner) : '')
+        const colSpan = 1 + (spanMatch ? parseInt(spanMatch[1], 10) : 0)
+        for (let extra = 1; extra < colSpan; extra++) cells.push('')
+        colIndex = cells.length
+        if (mergeDownMatch && parseInt(mergeDownMatch[1], 10) > 0) {
+          cells.push(cells[cells.length - 1])
+        }
+      }
+      rows.push(cells)
+    }
+    if (rows.length > 0) return rows
+  }
+
+  // Generic/PAMM markup: every top-level <row> of the first table-like block.
+  const rowRegex = /<row(?:\s[^>]*)?>([\s\S]*?)<\/row>/gi
+  const rows: string[][] = []
+  for (const m of text.matchAll(rowRegex)) {
+    if (/<\/(tr|h|d|name|value)>/i.test(m[1])) {
+      const cells: string[] = []
+      const cellRegex = /<(?:[ch]:)?(?:tr|h|d|name|value)(?:\s[^>]*)?>([\s\S]*?)<\/(?:[ch]:)?(?:tr|h|d|name|value)>/gi
+      for (const c of m[1].matchAll(cellRegex)) cells.push(unescapeText(c[1]))
+      if (cells.length > 0) rows.push(cells)
+    }
+  }
+  return rows
+}
+
 interface ColumnMap {
   ticket: number
+  openDate: number
   openTime: number
+  closeDate: number
   closeTime: number
   symbol: number
   type: number
@@ -137,8 +266,11 @@ interface ColumnMap {
   sl: number
   tp: number
   profit: number
+  profitIsNet: boolean
   commission: number
   swap: number
+  direction?: number
+  dealVolumeIdx?: number
 }
 
 function buildColumnMap(headerRow: string[]): ColumnMap {
@@ -156,7 +288,9 @@ function buildColumnMap(headerRow: string[]): ColumnMap {
   }
   const nth = (key: string, n: number) => (idx[key] && idx[key].length > n ? idx[key][n] : -1)
 
-  const openTime = first('time', 'opentime', 'starttime', 'opendate')
+  const openDate = first('date', 'opendate', 'tradedate')
+  const openTime = first('time', 'opentime', 'starttime')
+  const closeDate = first('closedate', 'exitdate')
   const closeTime = first('closetime', 'time2') !== -1 ? first('closetime', 'time2') : nth('time', 1)
   const entry = first('openprice', 'entryprice', 'priceopen') !== -1
     ? first('openprice', 'entryprice', 'priceopen')
@@ -164,10 +298,15 @@ function buildColumnMap(headerRow: string[]): ColumnMap {
   const exit = first('closeprice', 'exitprice', 'priceclose') !== -1
     ? first('closeprice', 'exitprice', 'priceclose')
     : nth('price', 1)
+  const profitIsNet = ['netprofit', 'netpl', 'profitloss', 'result', 'gainloss'].some(key => idx[key]?.length)
 
+  // MT5 report Positions rows carry a unique "Position" id — ideal dedup key.
+  // (Only the Deals section reuses Position ids across partial fills, and we never parse that section.)
   return {
-    ticket: first('ticket', 'ticketid', 'position'),
+    ticket: first('ticket', 'ticketid', 'deal', 'dealid', 'position'),
+    openDate,
     openTime,
+    closeDate,
     closeTime,
     symbol: first('symbol', 'instrument'),
     type: first('type', 'direction'),
@@ -176,13 +315,30 @@ function buildColumnMap(headerRow: string[]): ColumnMap {
     exit,
     sl: first('sl', 'stoploss'),
     tp: first('tp', 'takeprofit'),
-    profit: first('profit', 'pnl', 'netprofit', 'profitloss'),
+    profit: first('profit', 'pnl', 'pl', 'netprofit', 'netpl', 'profitloss', 'result', 'gainloss'),
+    profitIsNet,
     commission: first('commission', 'commision', 'fee'),
     swap: first('swap', 'swaps'),
+    // Deals section: "Type" is buy/sell and "Direction" is in/out; Volume column follows Direction.
+    direction: idx['direction']?.length ? idx['direction'][0] : -1,
+    dealVolumeIdx: idx['direction']?.length ? idx['direction'][0] + 1 : -1,
   }
 }
 
-const HEADER_HINTS = ['time', 'opentime', 'closetime', 'starttime', 'symbol', 'instrument', 'type', 'direction', 'volume', 'lots', 'price', 'openprice', 'closeprice', 'entryprice', 'exitprice', 'profit', 'pnl', 'commission', 'swap', 'ticket', 'ticketid', 'position', 'sl', 'tp']
+/**
+ * In MT5 reports (Positions + Orders + Deals sections share one sheet), stop at the
+ * section markers so Orders/Deals rows are not imported as duplicate trades.
+ */
+const MT5_SECTION_MARKERS = new Set(['orders', 'deals', 'results'])
+
+function isMt5SectionMarker(row: string[]): boolean {
+  const first = String(row[0] || '').trim().toLowerCase()
+  if (!MT5_SECTION_MARKERS.has(first)) return false
+  const rest = row.slice(1, 6).map(c => String(c || '').trim()).filter(Boolean)
+  return rest.length === 0
+}
+
+const HEADER_HINTS = ['date', 'closedate', 'exitdate', 'time', 'opentime', 'closetime', 'starttime', 'symbol', 'instrument', 'type', 'direction', 'volume', 'lots', 'price', 'openprice', 'closeprice', 'entryprice', 'exitprice', 'profit', 'pnl', 'pl', 'netprofit', 'netpl', 'profitloss', 'result', 'gainloss', 'commission', 'swap', 'ticket', 'ticketid', 'deal', 'dealid', 'position', 'sl', 'tp']
 
 function findHeaderRow(rows: string[][]): { idx: number; map: ColumnMap | null } {
   for (let i = 0; i < Math.min(rows.length, 60); i++) {
@@ -201,14 +357,21 @@ function extractTrades(rows: string[][]): ParsedTrade[] {
   const trades: ParsedTrade[] = []
   const { idx: headerRowIdx, map } = findHeaderRow(rows)
 
-  // ---- Header-driven parsing (handles MT5 exports, broker exports, xlsx, tsv) ----
+  // ---- Header-driven parsing (handles MT5 exports, broker exports, xlsx, xml) ----
   if (headerRowIdx !== -1 && map) {
     const get = (row: unknown[], i: number) => (i >= 0 ? row[i] : undefined)
+    const dateTime = (row: unknown[], dateIndex: number, timeIndex: number) => {
+      const date = String(get(row, dateIndex) ?? '').trim()
+      const time = String(get(row, timeIndex) ?? '').trim()
+      if (date && time && date !== time) return `${date} ${time}`
+      return time || date
+    }
     for (let i = headerRowIdx + 1; i < rows.length; i++) {
       const row = rows[i]
+      if (isMt5SectionMarker(row || [])) break // next report section starts — stop here
       if (!row || row.length < 3) continue
 
-      const timeVal = String(get(row, map.openTime) ?? '').trim()
+      const timeVal = dateTime(row, map.openDate, map.openTime)
       if (!timeVal || !/\d{4}/.test(timeVal)) continue
 
       const symbol = String(get(row, map.symbol) ?? '').trim().toUpperCase()
@@ -216,17 +379,30 @@ function extractTrades(rows: string[][]): ParsedTrade[] {
       const lot = parseNumeric(get(row, map.lot))
       if (!symbol || (type !== 'BUY' && type !== 'SELL') || lot <= 0) continue
 
+      // Deals-format rows (Direction column): "in" opens, "out" closes — keep one row per trade.
+      const directionIdx = map.direction ?? -1
+      const dealVolumeIdx = map.dealVolumeIdx ?? -1
+      const direction = String(get(row, directionIdx) ?? '').trim().toLowerCase()
+      if (direction && direction !== 'out') continue
+      const effectiveLot = direction === 'out' && dealVolumeIdx >= 0
+        ? parseNumeric(get(row, dealVolumeIdx))
+        : lot
+
+      const profit = parseNumeric(get(row, map.profit))
+      const commission = normalizeSignedCost(parseNumeric(get(row, map.commission)))
+      const swap = normalizeSignedCost(parseNumeric(get(row, map.swap)))
+
       trades.push({
         symbol,
         type: type as 'BUY' | 'SELL',
         entry: parseNumeric(get(row, map.entry)),
         exit: parseNumeric(get(row, map.exit)),
-        lot,
-        pnl: parseNumeric(get(row, map.profit)),
-        commission: parseNumeric(get(row, map.commission)),
-        swap: parseNumeric(get(row, map.swap)),
-        date: normalizeDate(get(row, map.openTime)),
-        closeDate: normalizeDate(get(row, map.closeTime)),
+        lot: effectiveLot,
+        pnl: map.profitIsNet ? profit : profit + commission + swap,
+        commission,
+        swap,
+        date: normalizeDate(timeVal),
+        closeDate: normalizeDate(dateTime(row, map.closeDate, map.closeTime)),
         sl: parseNumeric(get(row, map.sl)),
         tp: parseNumeric(get(row, map.tp)),
         ticket: parseTicket(get(row, map.ticket)),
@@ -271,15 +447,17 @@ function extractTrades(rows: string[][]): ParsedTrade[] {
       const type = String(row[10] || '').trim().toUpperCase()
       const lot = parseFloat(String(row[6] || '0')) || 0
       if (!symbol || (type !== 'BUY' && type !== 'SELL') || lot <= 0) continue
+      const commission = normalizeSignedCost(parseNumeric(row[7]))
+      const swap = normalizeSignedCost(parseNumeric(row[8]))
       trades.push({
         symbol,
         type: type as 'BUY' | 'SELL',
         entry: parseFloat(String(row[2] || '0')) || 0,
         exit: parseFloat(String(row[4] || '0')) || 0,
         lot,
-        pnl: parseFloat(String(row[5] || '0')) || 0,
-        commission: parseFloat(String(row[7] || '0')) || 0,
-        swap: parseFloat(String(row[8] || '0')) || 0,
+        pnl: parseNumeric(row[5]) + commission + swap,
+        commission,
+        swap,
         date: normalizeDate(String(row[1] || '').trim()),
         closeDate: normalizeDate(String(row[3] || '').trim()),
         sl: parseFloat(String(row[11] || '0')) || 0,
@@ -293,20 +471,23 @@ function extractTrades(rows: string[][]): ParsedTrade[] {
       const type = String(row[3] || '').trim().toUpperCase()
       const lot = parseFloat(String(row[4] || '0')) || 0
       if (!symbol || (type !== 'BUY' && type !== 'SELL') || lot <= 0) continue
+      const commission = normalizeSignedCost(parseNumeric(row[10]))
+      const swap = normalizeSignedCost(parseNumeric(row[11]))
       trades.push({
         symbol,
         type: type as 'BUY' | 'SELL',
         entry: parseFloat(String(row[5] || '0')) || 0,
         exit: parseFloat(String(row[9] || '0')) || 0,
         lot,
-        pnl: parseFloat(String(row[12] || '0')) || 0,
-        commission: parseFloat(String(row[10] || '0')) || 0,
-        swap: parseFloat(String(row[11] || '0')) || 0,
+        pnl: parseNumeric(row[12]) + commission + swap,
+        commission,
+        swap,
         date: normalizeDate(time),
         closeDate: normalizeDate(String(row[8] || '').trim()),
         sl: parseFloat(String(row[6] || '0')) || 0,
         tp: parseFloat(String(row[7] || '0')) || 0,
-        ticket: parseTicket(row[1]),
+        // MT5 Position is not unique across partial fills, so do not use it as a ticket.
+        ticket: undefined,
       })
     }
   }
@@ -411,23 +592,39 @@ export default function ImportPage() {
     setError('')
     setNotice('')
 
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setError('Your session has expired. Please log in again.')
+      setLoading(false)
+      return
+    }
+
+    // Repair accounts created before the unlimited 30-day trial change.
+    await fetch('/api/trial/activate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+
     // Monthly quota pre-check (server enforces this too)
     const { data: userRow } = await supabase
       .from('users')
-      .select('max_trades')
+      .select('max_trades, subscription_status, trial_ends_at')
       .eq('id', userId)
       .single()
 
     let toImport = parsedData
-    if (userRow?.max_trades && userRow.max_trades !== -1) {
+    const activeTrial = userRow?.subscription_status === 'trial' &&
+      userRow.trial_ends_at && new Date(userRow.trial_ends_at) > new Date()
+    const effectiveMaxTrades = activeTrial ? -1 : userRow?.max_trades
+    if (effectiveMaxTrades && effectiveMaxTrades !== -1) {
       const { count } = await supabase
         .from('trades')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
         .gte('created_at', startOfCurrentMonth().toISOString())
-      const remaining = Math.max(0, userRow.max_trades - (count ?? 0))
+      const remaining = Math.max(0, effectiveMaxTrades - (count ?? 0))
       if (remaining === 0) {
-        setError(`You have reached your monthly limit of ${userRow.max_trades} trades. Upgrade your plan for more.`)
+        setError(`You have reached your monthly limit of ${effectiveMaxTrades} trades. Upgrade your plan for more.`)
         setLoading(false)
         return
       }
@@ -441,9 +638,46 @@ export default function ImportPage() {
     const importTimestamp = new Date().toISOString()
     const batchSize = 100
     let imported = 0
+    let skipped = 0
 
-    for (let i = 0; i < toImport.length; i += batchSize) {
-      const batch = toImport.slice(i, i + batchSize)
+    const tickets = toImport
+      .map(trade => trade.ticket)
+      .filter((ticket): ticket is number => ticket !== undefined)
+    const existingTickets = new Set<number>()
+    if (tickets.length > 0) {
+      const { data: existingTrades, error: existingError } = await supabase
+        .from('trades')
+        .select('ticket')
+        .eq('user_id', userId)
+        .in('ticket', tickets)
+      if (existingError) {
+        setError('Could not check for duplicate trades: ' + existingError.message)
+        setLoading(false)
+        return
+      }
+      existingTrades?.forEach(trade => {
+        if (trade.ticket !== null) existingTickets.add(trade.ticket)
+      })
+    }
+
+    const importedTickets = new Set<number>()
+    const newTrades = toImport.filter(trade => {
+      if (!trade.ticket) return true
+      if (existingTickets.has(trade.ticket) || importedTickets.has(trade.ticket)) return false
+      importedTickets.add(trade.ticket)
+      return true
+    })
+    skipped = toImport.length - newTrades.length
+    if (newTrades.length === 0) {
+      setImportCount(0)
+      setSuccess(true)
+      setNotice(`All ${skipped} trades were skipped because they are already in your journal.`)
+      setLoading(false)
+      return
+    }
+
+    for (let i = 0; i < newTrades.length; i += batchSize) {
+      const batch = newTrades.slice(i, i + batchSize)
       const tradesToInsert = batch.map((trade) => ({
         user_id: userId,
         symbol: trade.symbol,
@@ -462,14 +696,16 @@ export default function ImportPage() {
         import_id: importId,
       })).filter(t => t.lot_size > 0)
 
-      const { error: insertError } = await supabase.from('trades').insert(tradesToInsert)
+      const { error: insertError } = await supabase
+        .from('trades')
+        .insert(tradesToInsert)
 
       if (insertError) {
         setError('Error saving trades: ' + insertError.message)
         setLoading(false)
         return
       }
-      imported += batch.length
+      imported += tradesToInsert.length
       setImportCount(imported)
     }
 
@@ -484,6 +720,9 @@ export default function ImportPage() {
     setImports(updatedImports)
 
     setSuccess(true)
+    if (skipped > 0) {
+      setNotice(`${imported} new trades imported. ${skipped} duplicate trades were skipped because they are already in your journal.`)
+    }
     setLoading(false)
   }
 
@@ -515,9 +754,16 @@ export default function ImportPage() {
     if (!confirm('Delete ALL trades? This cannot be undone.')) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('trades').delete().eq('user_id', user.id)
+    setDeleteLoading('all')
+    const { error: deleteError } = await supabase.from('trades').delete().eq('user_id', user.id)
+    if (deleteError) {
+      setError('Could not clear the journal: ' + deleteError.message)
+      setDeleteLoading(null)
+      return
+    }
     saveImports([])
     setImports([])
+    setDeleteLoading(null)
   }
 
   const wins = parsedData.filter(t => t.pnl > 0).length
@@ -528,7 +774,7 @@ export default function ImportPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Import Trades</h1>
-        <p className="text-gray-400 text-sm mt-1">Upload your MT5 or broker trade history — CSV, Excel (.xlsx), or any file Excel saved as CSV</p>
+        <p className="text-gray-400 text-sm mt-1">Upload your MT5 or broker trade history — XML report, CSV, or Excel (.xlsx)</p>
       </div>
 
       {!file ? (
@@ -539,7 +785,7 @@ export default function ImportPage() {
         >
           <input
             type="file"
-            accept=".csv,.xlsx,.xls,.tsv,.txt"
+            accept=".csv,.xlsx,.xls,.xml,.tsv,.txt"
             onChange={handleFileSelect}
             className="hidden"
             id="file-upload"
@@ -553,7 +799,7 @@ export default function ImportPage() {
               or click to browse
             </p>
             <p className="text-gray-500 text-xs">
-              Works with MT5 CSV exports, broker CSVs, Excel .xlsx files, and Excel-saved-as-CSV — even tab- or semicolon-separated files
+              Works with MT5 XML reports (ReportHistory files), MT5 CSV exports, broker CSVs, Excel .xlsx files, and Excel-saved-as-CSV — even tab- or semicolon-separated files
             </p>
           </label>
         </div>
@@ -630,7 +876,8 @@ export default function ImportPage() {
                         <th className="text-left px-4 py-2 text-xs text-gray-400">Volume</th>
                         <th className="text-left px-4 py-2 text-xs text-gray-400">Entry</th>
                         <th className="text-left px-4 py-2 text-xs text-gray-400">Exit</th>
-                        <th className="text-left px-4 py-2 text-xs text-gray-400">P&L</th>
+                        <th className="text-left px-4 py-2 text-xs text-gray-400">Costs</th>
+                        <th className="text-left px-4 py-2 text-xs text-gray-400">P&L (net)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -645,6 +892,9 @@ export default function ImportPage() {
                           <td className="px-4 py-2 text-gray-300">{trade.lot}</td>
                           <td className="px-4 py-2 text-gray-300">{trade.entry}</td>
                           <td className="px-4 py-2 text-gray-300">{trade.exit}</td>
+                          <td className="px-4 py-2 text-gray-400" title="Commission + swap (already deducted from net P&L)">
+                            {(trade.commission || trade.swap) ? (trade.commission + trade.swap).toFixed(2) : '—'}
+                          </td>
                           <td className={`px-4 py-2 font-medium ${trade.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
                             ${trade.pnl.toFixed(2)}
                           </td>
@@ -681,13 +931,16 @@ export default function ImportPage() {
           <li>1. Open MetaTrader 5 → Go to &quot;History&quot; tab (bottom)</li>
           <li>2. Right-click → Select &quot;All History&quot;</li>
           <li>3. Select all trades (Ctrl+A)</li>
-          <li>4. Right-click → Click &quot;Export Deals&quot;</li>
-          <li>5. Choose <span className="text-primary font-semibold">CSV</span> format and save</li>
-          <li>6. Upload the file above — we also read <span className="text-primary font-semibold">.xlsx</span> and Excel-saved-as-CSV files automatically</li>
+          <li>4. Right-click → Click &quot;Report&quot; (or &quot;Export Deals&quot;)</li>
+          <li>5. MT5 saves the Trade History Report as an <span className="text-primary font-semibold">XML / Excel file</span> named like <span className="text-primary font-semibold">ReportHistory-1234567</span> — upload it directly, no conversion needed</li>
+          <li>6. We also read plain <span className="text-primary font-semibold">CSV</span> and <span className="text-primary font-semibold">.xlsx</span> exports automatically</li>
         </ol>
         <div className="mt-4 bg-warning/10 border border-warning/30 rounded-lg p-3">
           <p className="text-warning text-xs font-medium">
             Tip: If MT5 only offers the Report format (HTML/XLSX), upload the XLSX directly — we parse it for you. Avoid the HTML summary report.
+          </p>
+          <p className="text-gray-400 text-xs mt-2">
+            P&L is stored <span className="text-white font-medium">net</span>: MT5 Profit + Commission + Swap. MT5&apos;s report lists these in separate columns, so a trade&apos;s P&L here differs from MT5&apos;s Profit column by its costs — totals still match MT5&apos;s Total Net Profit.
           </p>
         </div>
       </div>
@@ -698,10 +951,11 @@ export default function ImportPage() {
           {imports.length > 0 && (
             <button
               onClick={handleDeleteAllTrades}
+              disabled={deleteLoading === 'all'}
               className="flex items-center gap-2 px-3 py-1.5 text-sm border border-danger/50 rounded-lg text-danger hover:bg-danger/10 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Delete All
+              {deleteLoading === 'all' ? 'Clearing...' : 'Clear Journal'}
             </button>
           )}
         </div>

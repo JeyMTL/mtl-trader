@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS users (
   subscription_tier TEXT DEFAULT 'free',
   subscription_status TEXT DEFAULT 'trial',
   trial_ends_at TIMESTAMP WITH TIME ZONE,
-  trades_remaining INTEGER DEFAULT 10,
-  max_trades INTEGER DEFAULT 10,
+  trades_remaining INTEGER DEFAULT -1,
+  max_trades INTEGER DEFAULT -1,
   stripe_customer_id TEXT,
   agent_token TEXT,
   is_admin BOOLEAN NOT NULL DEFAULT false,
@@ -29,8 +29,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'free';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'trial';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMP WITH TIME ZONE;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS trades_remaining INTEGER DEFAULT 10;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS max_trades INTEGER DEFAULT 10;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS trades_remaining INTEGER DEFAULT -1;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS max_trades INTEGER DEFAULT -1;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS agent_token TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
@@ -177,7 +177,16 @@ DECLARE
   m_count BIGINT;
   m_ts TIMESTAMP WITH TIME ZONE;
 BEGIN
-  SELECT COALESCE(max_trades, 10) INTO m_max FROM users WHERE id = NEW.user_id;
+  SELECT COALESCE(max_trades, -1) INTO m_max FROM users WHERE id = NEW.user_id;
+  IF EXISTS (
+    SELECT 1 FROM users
+    WHERE id = NEW.user_id
+      AND subscription_status = 'trial'
+      AND trial_ends_at IS NOT NULL
+      AND trial_ends_at <= now()
+  ) THEN
+    RAISE EXCEPTION 'Free trial ended. Choose a paid plan to add trades.';
+  END IF;
   IF m_max IS NULL OR m_max = -1 THEN
     RETURN NEW; -- unlimited (pro) or unknown user
   END IF;

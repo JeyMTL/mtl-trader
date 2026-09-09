@@ -35,6 +35,10 @@ export function getPointValue(symbol: string): number {
   return 100000
 }
 
+/**
+ * P&L = gross price movement + commission + swap.
+ * Commission and swap are stored SIGNED (negative = cost paid, MT5 convention).
+ */
 export function calculatePnL(trade: {
   type: string
   symbol?: string
@@ -51,7 +55,7 @@ export function calculatePnL(trade: {
   } else {
     pnl = (trade.entry_price - trade.exit_price) * trade.lot_size * pointValue
   }
-  pnl -= (trade.commission || 0)
+  pnl += (trade.commission || 0)
   pnl += (trade.swap || 0)
   return pnl
 }

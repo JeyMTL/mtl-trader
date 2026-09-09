@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { Target, DollarSign, AlertTriangle, Clock } from 'lucide-react'
+import { Target, DollarSign, AlertTriangle, Clock, Sparkles, Loader2 } from 'lucide-react'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts'
@@ -40,6 +40,9 @@ export default function AnalyticsPage() {
   const [trades, setTrades] = useState<Trade[]>([])
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiReview, setAiReview] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   useEffect(() => {
     async function fetchData() {
@@ -148,11 +151,77 @@ export default function AnalyticsPage() {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, pnl]) => ({ month, pnl: parseFloat(pnl.toFixed(2)) }))
 
+  const handleAiReview = async () => {
+    setAiLoading(true)
+    setAiError('')
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setAiError('Please log in again to request an AI review.')
+      setAiLoading(false)
+      return
+    }
+
+    const response = await fetch('/api/ai/review', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        totalTrades,
+        wins,
+        losses,
+        winRate: Number(winRate.toFixed(2)),
+        totalPnl: Number(totalPnl.toFixed(2)),
+        profitFactor: Number(profitFactor.toFixed(2)),
+        maxDrawdown: Number(maxDrawdown.toFixed(2)),
+        expectancy: Number(expectancy.toFixed(2)),
+        avgWin: Number(avgWin.toFixed(2)),
+        avgLoss: Number(avgLoss.toFixed(2)),
+        symbols: symbolData.slice(0, 20),
+        weekdays: dayData,
+        months: monthlyData.slice(-12),
+      }),
+    })
+    const data = await response.json() as { review?: string; error?: string }
+    if (!response.ok) {
+      setAiError(data.error || 'Could not generate an AI review.')
+    } else {
+      setAiReview(data.review || '')
+    }
+    setAiLoading(false)
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Analytics</h1>
         <p className="text-gray-400 text-sm mt-1">Your real trading performance</p>
+      </div>
+
+      <div className="bg-surface border border-primary/40 rounded-xl p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold text-white">AI Trading Review</h2>
+            </div>
+            <p className="text-sm text-gray-400 mt-1">Get educational feedback based on your journal statistics.</p>
+          </div>
+          <button
+            onClick={handleAiReview}
+            disabled={aiLoading || totalTrades === 0}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
+          >
+            {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {aiLoading ? 'Reviewing...' : 'Review My Journal'}
+          </button>
+        </div>
+        {aiError && <p className="mt-4 text-sm text-warning bg-warning/10 border border-warning/30 rounded-lg p-3">{aiError}</p>}
+        {aiReview && (
+          <div className="mt-5 pt-5 border-t border-border text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{aiReview}</div>
+        )}
+        <p className="text-xs text-gray-500 mt-4">AI feedback is educational and is not financial advice.</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">

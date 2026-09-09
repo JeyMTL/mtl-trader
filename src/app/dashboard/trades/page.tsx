@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Trash2, TrendingUp, TrendingDown, Pencil, Download } from 'lucide-react'
+import { Search, Trash2, TrendingUp, TrendingDown, Pencil, Download, Loader2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
@@ -14,6 +14,8 @@ interface Trade {
   exit_price: number
   lot_size: number
   pnl: number
+  commission?: number | null
+  swap?: number | null
   created_at: string
   close_time: string
   strategy: string
@@ -24,6 +26,8 @@ export default function TradesPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [clearLoading, setClearLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     async function fetchTrades() {
@@ -58,8 +62,31 @@ export default function TradesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this trade?')) return
-    await supabase.from('trades').delete().eq('id', id)
+    const { error: deleteError } = await supabase.from('trades').delete().eq('id', id)
+    if (deleteError) {
+      setError('Could not delete the trade: ' + deleteError.message)
+      return
+    }
     setTrades(trades.filter(t => t.id !== id))
+  }
+
+  const handleClearJournal = async () => {
+    if (!confirm('Clear every trade in your journal? This cannot be undone.')) return
+    setClearLoading(true)
+    setError('')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setError('You must be logged in to clear the journal.')
+      setClearLoading(false)
+      return
+    }
+    const { error: deleteError } = await supabase.from('trades').delete().eq('user_id', user.id)
+    if (deleteError) {
+      setError('Could not clear the journal: ' + deleteError.message)
+    } else {
+      setTrades([])
+    }
+    setClearLoading(false)
   }
 
   const handleExport = () => {
@@ -109,7 +136,17 @@ export default function TradesPage() {
           <Download className="w-4 h-4" />
           Export CSV
         </button>
+        <button
+          onClick={handleClearJournal}
+          disabled={clearLoading || trades.length === 0}
+          className="flex items-center gap-2 px-4 py-2 border border-danger/50 rounded-lg text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
+        >
+          {clearLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          {clearLoading ? 'Clearing...' : 'Clear Journal'}
+        </button>
       </div>
+
+      {error && <p className="bg-danger/10 border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">{error}</p>}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -150,6 +187,7 @@ export default function TradesPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Exit</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Lot</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">P&L</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Costs</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Date</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Actions</th>
               </tr>
@@ -157,11 +195,11 @@ export default function TradesPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">Loading trades...</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">Loading trades...</td>
                 </tr>
               ) : filteredTrades.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">No trades found. Import or add your first trade!</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">No trades found. Import or add your first trade!</td>
                 </tr>
               ) : filteredTrades.map((trade) => (
                 <tr key={trade.id} className="border-b border-border last:border-0 hover:bg-surface-light transition-colors">
@@ -181,6 +219,11 @@ export default function TradesPage() {
                   <td className="px-4 py-3 text-sm text-gray-300">{trade.lot_size}</td>
                   <td className={`px-4 py-3 text-sm font-medium ${trade.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
                     {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-400 tabular-nums" title="Commission + swap (already deducted from P&L)">
+                    {(trade.commission || trade.swap)
+                      ? `${formatCurrency((trade.commission || 0) + (trade.swap || 0))}`
+                      : '—'}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-400">
                     {trade.created_at ? new Date(trade.created_at).toLocaleDateString() : '-'}
