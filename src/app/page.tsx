@@ -85,7 +85,7 @@ export default function HomePage() {
               View Pricing
             </Link>
           </div>
-          <p className="fade-up-3 text-gray-500 mt-5 text-sm">No credit card required • 7-day free trial</p>
+          <p className="fade-up-3 text-gray-500 mt-5 text-sm">No credit card required • Unlimited access for 30 days</p>
         </div>
       </section>
 

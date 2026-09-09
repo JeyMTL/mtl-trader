@@ -6,6 +6,22 @@ import { Mail, Lock, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message && error.message !== '{}') return error.message
+  if (typeof error === 'string' && error.trim() && error.trim() !== '{}') return error
+  if (error && typeof error === 'object') {
+    const message = 'message' in error && typeof error.message === 'string' ? error.message : ''
+    if (message && message !== '{}') return message
+    try {
+      const details = JSON.stringify(error)
+      if (details && details !== '{}') return details
+    } catch {
+      // Use the fallback when the error cannot be serialized.
+    }
+  }
+  return fallback
+}
+
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,50 +36,55 @@ export default function SignupPage() {
     setError('')
     setSuccess('')
 
-    const { data, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    })
+    try {
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+        },
+      })
 
-    if (authError) {
-      setError(authError.message)
+      if (authError) {
+        setError(getErrorMessage(authError, 'Supabase rejected the signup request. Check your email and password, then try again.'))
+        setLoading(false)
+        return
+      }
+
+      if (!data.user) {
+        setError('Account creation did not return a user. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      const profileResponse = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: data.user.id,
+          email: data.user.email || email,
+          fullName,
+        }),
+      })
+
+      if (!profileResponse.ok) {
+        const profileError = await profileResponse.json().catch(() => null)
+        setError(profileError?.error || 'Your account was created, but your profile could not be set up.')
+        setLoading(false)
+        return
+      }
+
+      if (data.session) {
+        window.location.href = '/dashboard'
+        return
+      }
+
+      setSuccess('Account created. Check your email to confirm your account, then log in.')
+    } catch (signupError) {
+      setError(getErrorMessage(signupError, 'Unable to create your account. Please try again.'))
+    } finally {
       setLoading(false)
-      return
     }
-
-    if (!data.user) {
-      setError('Account creation did not return a user. Please try again.')
-      setLoading(false)
-      return
-    }
-
-    const profileResponse = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: data.user.id,
-        email: data.user.email || email,
-        fullName,
-      }),
-    })
-
-    if (!profileResponse.ok) {
-      const profileError = await profileResponse.json().catch(() => null)
-      setError(profileError?.error || 'Your account was created, but your profile could not be set up.')
-      setLoading(false)
-      return
-    }
-
-    if (data.session) {
-      window.location.href = '/dashboard'
-      return
-    }
-
-    setSuccess('Account created. Check your email to confirm your account, then log in.')
-    setLoading(false)
   }
 
   return (
@@ -74,7 +95,7 @@ export default function SignupPage() {
             <Logo size="md" />
           </Link>
           <h1 className="text-2xl font-bold text-white">Create your account</h1>
-          <p className="text-gray-400 mt-2">Start your 7-day free trial</p>
+          <p className="text-gray-400 mt-2">Enjoy unlimited access free for 30 days</p>
         </div>
 
         <form onSubmit={handleSignup} className="bg-surface border border-border rounded-2xl p-8 space-y-6 shadow-2xl shadow-primary/5">
@@ -140,7 +161,7 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full btn-gradient text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating account...' : 'Start Free Trial'}
+            {loading ? 'Creating account...' : 'Start 30-Day Free Trial'}
           </button>
 
           <p className="text-center text-gray-400 text-sm">

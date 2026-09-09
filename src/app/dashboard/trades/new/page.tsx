@@ -38,7 +38,8 @@ export default function NewTradePage() {
     const raw = form.type === 'BUY'
       ? (exit - entry) * lots * pointValue
       : (entry - exit) * lots * pointValue
-    return raw - comm + swapVal
+    // Commission/swap are stored signed (negative = cost paid, MT5 convention).
+    return raw + comm + swapVal
   })()
 
   const handleSubmit = async () => {
@@ -51,10 +52,13 @@ export default function NewTradePage() {
     // Monthly quota check (server enforces this too)
     const { data: userRow } = await supabase
       .from('users')
-      .select('max_trades')
+      .select('max_trades, subscription_status, trial_ends_at')
       .eq('id', user.id)
       .single()
-    if (userRow?.max_trades && userRow.max_trades !== -1) {
+    const activeTrial = userRow?.subscription_status === 'trial' &&
+      userRow.trial_ends_at && new Date(userRow.trial_ends_at) > new Date()
+    const effectiveMaxTrades = activeTrial ? -1 : userRow?.max_trades
+    if (effectiveMaxTrades && effectiveMaxTrades !== -1) {
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
@@ -63,8 +67,8 @@ export default function NewTradePage() {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .gte('created_at', startOfMonth.toISOString())
-      if ((count ?? 0) >= userRow.max_trades) {
-        alert(`You have reached your monthly limit of ${userRow.max_trades} trades. Upgrade your plan for more.`)
+      if ((count ?? 0) >= effectiveMaxTrades) {
+        alert(`You have reached your monthly limit of ${effectiveMaxTrades} trades. Upgrade your plan for more.`)
         setSaving(false)
         return
       }
@@ -222,24 +226,24 @@ export default function NewTradePage() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Commission</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Commission (negative = cost)</label>
             <input
               type="number"
               step="any"
               value={form.commission}
               onChange={(e) => update('commission', e.target.value)}
-              placeholder="0.00"
+              placeholder="-2.50"
               className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Swap</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Swap (negative = cost)</label>
             <input
               type="number"
               step="any"
               value={form.swap}
               onChange={(e) => update('swap', e.target.value)}
-              placeholder="0.00"
+              placeholder="-0.74"
               className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
             />
           </div>

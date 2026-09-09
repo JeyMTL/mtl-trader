@@ -73,7 +73,8 @@ export default function EditTradePage({ params }: { params: Promise<{ id: string
     const raw = form.type === 'BUY'
       ? (exit - entry) * lots * pointValue
       : (entry - exit) * lots * pointValue
-    return raw - comm + swapVal
+    // Commission/swap are stored signed (negative = cost paid, MT5 convention).
+    return raw + comm + swapVal
   })()
 
   const handleSubmit = async () => {
@@ -235,24 +236,24 @@ export default function EditTradePage({ params }: { params: Promise<{ id: string
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Commission</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Commission (negative = cost)</label>
             <input
               type="number"
               step="any"
               value={form.commission}
               onChange={(e) => update('commission', e.target.value)}
-              placeholder="0.00"
+              placeholder="-2.50"
               className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Swap</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Swap (negative = cost)</label>
             <input
               type="number"
               step="any"
               value={form.swap}
               onChange={(e) => update('swap', e.target.value)}
-              placeholder="0.00"
+              placeholder="-0.74"
               className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
             />
           </div>

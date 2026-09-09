@@ -5,12 +5,12 @@ export const PLANS: SubscriptionPlan[] = [
     id: 'free',
     name: 'Free Trial',
     price: 0,
-    max_trades: 10,
+    max_trades: -1,
     features: [
-      '10 trades per month',
+      'Unlimited trades for 30 days',
       'Basic P&L tracking',
       'Win rate statistics',
-      '7-day trial period',
+      'No credit card required',
     ],
   },
   {

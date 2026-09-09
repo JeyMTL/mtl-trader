@@ -38,8 +38,8 @@ export async function POST(req: Request) {
       .update({
         subscription_tier: 'free',
         subscription_status: 'cancelled',
-        max_trades: 10,
-        trades_remaining: 10,
+        max_trades: 0,
+        trades_remaining: 0,
       })
       .eq('id', userId)
 

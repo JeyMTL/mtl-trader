@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+.env*
+
+# Private MT5 account reports
+ReportHistory-*.xlsx
+ReportHistory-*.xml
+*.xls

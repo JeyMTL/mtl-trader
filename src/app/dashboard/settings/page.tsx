@@ -543,10 +543,10 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-white">
-                      {userPlan.tier === 'pro' ? 'Pro Plan' : userPlan.tier === 'basic' ? 'Basic Plan' : 'Free Trial'}
+                      {userPlan.tier === 'pro' ? 'Pro Plan' : userPlan.tier === 'basic' ? 'Basic Plan' : '30-Day Free Trial'}
                     </h3>
                     <p className="text-sm text-gray-400">
-                      {userPlan.tier === 'free' ? '10 trades per month' :
+                      {userPlan.tier === 'free' ? 'Unlimited trades for 30 days, then choose a paid plan' :
                        userPlan.tier === 'basic' ? '50 trades per month' : 'Unlimited trades'}
                     </p>
                   </div>
