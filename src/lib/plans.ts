@@ -16,7 +16,7 @@ export const PLANS: SubscriptionPlan[] = [
   {
     id: 'basic',
     name: 'Basic',
-    price: 9.99,
+    price: 2.5,
     max_trades: 50,
     features: [
       '50 trades per month',
@@ -31,7 +31,7 @@ export const PLANS: SubscriptionPlan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 29.99,
+    price: 5,
     max_trades: -1,
     features: [
       'Unlimited trades',

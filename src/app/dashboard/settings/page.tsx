@@ -5,6 +5,10 @@ import { User, CreditCard, Bell, Shield, Save, Wallet, Trash2, Palette, Loader2 
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useTheme } from '@/lib/theme'
+import { PLANS } from '@/lib/plans'
+
+const BASIC_PRICE = PLANS.find(p => p.id === 'basic')?.price ?? 0
+const PRO_PRICE = PLANS.find(p => p.id === 'pro')?.price ?? 0
 
 interface Deposit {
   id: string
@@ -579,7 +583,7 @@ export default function SettingsPage() {
                   userPlan.tier === 'basic' ? 'border-primary' : 'border-border'
                 }`}>
                   <h3 className="font-semibold text-white mb-2">Basic Plan</h3>
-                  <p className="text-2xl font-bold text-white mb-2">$9.99<span className="text-sm text-gray-400">/mo</span></p>
+                  <p className="text-2xl font-bold text-white mb-2">{formatCurrency(BASIC_PRICE)}<span className="text-sm text-gray-400">/mo</span></p>
                   <p className="text-sm text-gray-400 mb-4">50 trades per month</p>
                   <div className="space-y-2">
                     <button
@@ -604,7 +608,7 @@ export default function SettingsPage() {
                 }`}>
                   {userPlan.tier !== 'pro' && <div className="text-primary text-xs font-semibold mb-2">MOST POPULAR</div>}
                   <h3 className="font-semibold text-white mb-2">Pro Plan</h3>
-                  <p className="text-2xl font-bold text-white mb-2">$29.99<span className="text-sm text-gray-400">/mo</span></p>
+                  <p className="text-2xl font-bold text-white mb-2">{formatCurrency(PRO_PRICE)}<span className="text-sm text-gray-400">/mo</span></p>
                   <p className="text-sm text-gray-400 mb-4">Unlimited trades</p>
                   <div className="space-y-2">
                     <button

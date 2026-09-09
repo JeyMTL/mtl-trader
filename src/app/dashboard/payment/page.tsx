@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Upload, CheckCircle, Clock, XCircle, Loader2, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { PLANS } from '@/lib/plans'
 
 interface PaymentRequest {
   id: string
@@ -21,10 +22,10 @@ const BANK_DETAILS = {
   branch: 'Lundazi',
 }
 
-const PLAN_PRICES: Record<string, { name: string; amount: number }> = {
-  basic: { name: 'Basic Plan', amount: 9.99 },
-  pro: { name: 'Pro Plan', amount: 29.99 },
-}
+// Derived from PLANS so the bank-transfer page can never drift from the displayed prices.
+const PLAN_PRICES: Record<string, { name: string; amount: number }> = Object.fromEntries(
+  PLANS.filter(p => p.price > 0).map(p => [p.id, { name: `${p.name} Plan`, amount: p.price }])
+)
 
 export default function PaymentPage() {
   const router = useRouter()

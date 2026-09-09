@@ -106,8 +106,8 @@ npx vercel
 | Plan | Price | Trades/Month |
 |------|-------|--------------|
 | Free Trial | $0 | 10 |
-| Basic | $9.99 | 50 |
-| Pro | $29.99 | Unlimited |
+| Basic | $2.50 | 50 |
+| Pro | $5.00 | Unlimited |
 
 Trades are counted per calendar month (historical imports don't count against the limit).
 
