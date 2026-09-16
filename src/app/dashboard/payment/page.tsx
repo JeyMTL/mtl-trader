@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Upload, CheckCircle, Clock, XCircle, Loader2, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { PLANS } from '@/lib/plans'
+import { authedFetch } from '@/lib/api'
 
 interface PaymentRequest {
   id: string
@@ -31,7 +32,7 @@ export default function PaymentPage() {
   const router = useRouter()
   const [selectedPlan, setSelectedPlan] = useState('')
   const [reference, setReference] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [referenceLoading, setReferenceLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [requests, setRequests] = useState<PaymentRequest[]>([])
   const [userId, setUserId] = useState<string | null>(null)
@@ -60,26 +61,27 @@ export default function PaymentPage() {
     load()
   }, [router])
 
-  const handleSubmit = async () => {
-    if (!selectedPlan || !reference.trim() || !userId) return
-    setLoading(true)
+  const handleGenerateReference = async () => {
+    if (!selectedPlan || !userId) return
+    setReferenceLoading(true)
 
-    const { error } = await supabase.from('payment_requests').insert({
-      user_id: userId,
-      plan_id: selectedPlan,
-      amount: PLAN_PRICES[selectedPlan].amount,
-      reference: reference.trim(),
-      status: 'pending',
+    const response = await authedFetch('/api/payment-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planId: selectedPlan,
+      }),
     })
+    const result = await response.json()
 
-    if (error) {
-      alert('Error: ' + error.message)
-      setLoading(false)
+    if (!response.ok) {
+      alert('Error: ' + (result.error || 'Could not submit payment request'))
+      setReferenceLoading(false)
       return
     }
 
-    setSubmitted(true)
-    setLoading(false)
+    setReference(result.reference)
+    setReferenceLoading(false)
 
     const { data } = await supabase
       .from('payment_requests')
@@ -87,6 +89,10 @@ export default function PaymentPage() {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
     setRequests(data || [])
+  }
+
+  const handleSubmit = () => {
+    if (reference) setSubmitted(true)
   }
 
   const copyToClipboard = (text: string) => {
@@ -126,7 +132,7 @@ export default function PaymentPage() {
               {Object.entries(PLAN_PRICES).map(([id, plan]) => (
                 <button
                   key={id}
-                  onClick={() => setSelectedPlan(id)}
+                  onClick={() => { setSelectedPlan(id); setReference('') }}
                   className={`p-4 rounded-lg border text-left transition-colors ${
                     selectedPlan === id
                       ? 'border-primary bg-primary/10'
@@ -144,15 +150,15 @@ export default function PaymentPage() {
             <div className="bg-surface border border-border rounded-xl p-6">
               <h2 className="text-lg font-semibold text-white mb-4">2. Bank Transfer Details</h2>
               <div className="bg-surface-light rounded-lg p-4 space-y-3">
-                <div className="flex justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Bank</span>
                   <span className="text-white font-medium">{BANK_DETAILS.bank_name}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Account Name</span>
                   <span className="text-white font-medium">{BANK_DETAILS.account_name}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Account Number</span>
                   <div className="flex items-center gap-2">
                     <span className="text-white font-medium font-mono">{BANK_DETAILS.account_number}</span>
@@ -161,46 +167,48 @@ export default function PaymentPage() {
                     </button>
                   </div>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Branch</span>
                   <span className="text-white font-medium">{BANK_DETAILS.branch}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Amount</span>
                   <span className="text-success font-bold text-lg">${PLAN_PRICES[selectedPlan].amount}</span>
                 </div>
               </div>
               <div className="mt-4 bg-warning/10 border border-warning/30 rounded-lg p-3">
                 <p className="text-warning text-xs font-medium">
-                  Important: Use your email as the payment reference when making the transfer.
+                  Generate your unique reference below and include it with the bank transfer.
                 </p>
               </div>
+              {!reference && (
+                <button
+                  onClick={handleGenerateReference}
+                  disabled={referenceLoading}
+                  className="mt-4 flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
+                >
+                  {referenceLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing...</> : 'Continue to payment details'}
+                </button>
+              )}
             </div>
           )}
 
-          {selectedPlan && (
+          {selectedPlan && reference && (
             <div className="bg-surface border border-border rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">3. Submit Payment Reference</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">3. Make the transfer</h2>
               <p className="text-gray-400 text-sm mb-4">
-                After making the bank transfer, enter the transaction reference or your email used for payment.
+                Include this exact reference in your bank transfer. After sending the money, confirm below so your request is ready for payment review.
               </p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Payment Reference</label>
-                  <input
-                    type="text"
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                    placeholder="e.g. Your email or transaction ID"
-                    className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
-                  />
+                  <div className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white font-mono tracking-wide">{reference}</div>
                 </div>
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || !reference.trim()}
                   className="flex items-center gap-2 px-6 py-2 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
                 >
-                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : <><Upload className="w-4 h-4" /> Submit Payment</>}
+                  <Upload className="w-4 h-4" /> I&apos;ve made the transfer
                 </button>
               </div>
             </div>

@@ -4,6 +4,7 @@ Connects to MetaTrader 5 and syncs closed trades to your MTL Trader account.
 
 Usage:
     python mt5_agent.py <user_id> <token> [broker_name] [server] [login]
+    python mt5_agent.py --config mtl-trader-config.json
 
 Or set environment variables: MTL_USER_ID, MTL_TOKEN, MT5_BROKER, MT5_SERVER, MT5_LOGIN, MT5_PASSWORD
 
@@ -25,6 +26,12 @@ from getpass import getpass
 # Default configuration
 DEFAULT_APP_URL = "https://mtl-trader.vercel.app"
 SYNC_INTERVAL = 60
+
+
+def load_config(path):
+    """Load the browser-downloaded setup file, if present."""
+    with open(path, "r", encoding="utf-8") as config_file:
+        return json.load(config_file)
 
 
 def connect_to_mt5(broker_name, server, login, password):
@@ -148,28 +155,42 @@ def main():
     print("MTL Trader - MT5 Sync Agent")
     print("=" * 50)
 
-    # Try to load from environment variables first
-    user_id = os.environ.get("MTL_USER_ID")
-    token = os.environ.get("MTL_TOKEN")
-    app_url = os.environ.get("MTL_APP_URL", DEFAULT_APP_URL)
+    config = {}
+    if "--config" in sys.argv:
+        config_index = sys.argv.index("--config")
+        if len(sys.argv) <= config_index + 1:
+            print("Error: --config requires a JSON file path.")
+            sys.exit(1)
+        try:
+            config = load_config(sys.argv[config_index + 1])
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"Could not read setup file: {error}")
+            sys.exit(1)
 
-    broker_name = os.environ.get("MT5_BROKER")
-    server = os.environ.get("MT5_SERVER", "")
-    login = os.environ.get("MT5_LOGIN", "")
+    # Environment variables take priority, then the downloaded setup file.
+    user_id = os.environ.get("MTL_USER_ID") or config.get("user_id")
+    token = os.environ.get("MTL_TOKEN") or config.get("token")
+    app_url = os.environ.get("MTL_APP_URL") or config.get("app_url", DEFAULT_APP_URL)
+
+    broker_name = os.environ.get("MT5_BROKER") or config.get("broker_name")
+    server = os.environ.get("MT5_SERVER") or config.get("server", "")
+    login = os.environ.get("MT5_LOGIN") or config.get("login", "")
     password = os.environ.get("MT5_PASSWORD", "")
 
     # Fallback to CLI arguments if env vars are missing
     if not user_id or not token:
-        if len(sys.argv) < 3:
+        positional_args = [arg for arg in sys.argv[1:] if arg != "--config"]
+        if len(positional_args) < 2:
             print("Usage: python mt5_agent.py <user_id> <token> [broker_name] [server] [login] [password]")
+            print("   Or: python mt5_agent.py --config mtl-trader-config.json")
             print("\nOr set environment variables: MTL_USER_ID, MTL_TOKEN, MT5_BROKER, MT5_SERVER, MT5_LOGIN, MT5_PASSWORD")
             sys.exit(1)
-        user_id = sys.argv[1]
-        token = sys.argv[2]
-        if len(sys.argv) > 3: broker_name = sys.argv[3]
-        if len(sys.argv) > 4: server = sys.argv[4]
-        if len(sys.argv) > 5: login = sys.argv[5]
-        if len(sys.argv) > 6: password = sys.argv[6]
+        user_id = positional_args[0]
+        token = positional_args[1]
+        if len(positional_args) > 2: broker_name = positional_args[2]
+        if len(positional_args) > 3: server = positional_args[3]
+        if len(positional_args) > 4: login = positional_args[4]
+        if len(positional_args) > 5: password = positional_args[5]
 
     if not broker_name or not login:
         print("Error: Broker name and Login are required via CLI or environment variables.")

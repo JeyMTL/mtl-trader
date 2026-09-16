@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, requireAdmin } from '@/lib/server-auth'
+import { PLANS } from '@/lib/plans'
+
+const PLAN_MAP = new Map(PLANS.filter((plan) => plan.price > 0).map((plan) => [plan.id, plan]))
 
 export async function GET(req: Request) {
   try {
@@ -59,24 +62,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Request already processed' }, { status: 400 })
     }
 
+    const plan = PLAN_MAP.get(request.plan_id)
+    if (!plan || Number(request.amount) !== plan.price) {
+      return NextResponse.json({ error: 'Payment request has an invalid plan or amount' }, { status: 400 })
+    }
+
     const newStatus = action === 'approve' ? 'approved' : 'rejected'
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('payment_requests')
       .update({ status: newStatus, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
       .eq('id', requestId)
 
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
+
     if (action === 'approve') {
       const maxTrades = request.plan_id === 'pro' ? -1 : request.plan_id === 'basic' ? 50 : 10
-      await supabase
+      const { error: subscriptionError } = await supabase
         .from('users')
         .update({
-          subscription_tier: request.plan_id,
+          subscription_tier: plan.id,
           subscription_status: 'active',
           max_trades: maxTrades,
           trades_remaining: maxTrades === -1 ? -1 : maxTrades,
         })
         .eq('id', request.user_id)
+
+      if (subscriptionError) {
+        return NextResponse.json({ error: subscriptionError.message }, { status: 500 })
+      }
     }
 
     return NextResponse.json({ success: true })

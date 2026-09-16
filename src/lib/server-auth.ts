@@ -16,7 +16,7 @@ export async function getAuthUser(req: Request) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null
   const token = authHeader.slice('Bearer '.length)
   const { data: { user }, error } = await getAdminClient().auth.getUser(token)
-  if (error || !user) return null
+  if (error || !user || !user.email_confirmed_at) return null
   return user
 }
 

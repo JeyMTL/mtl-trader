@@ -74,12 +74,13 @@ export default function SignupPage() {
         return
       }
 
-      if (data.session) {
+      if (data.session && data.user.email_confirmed_at) {
         window.location.href = '/dashboard'
         return
       }
 
-      setSuccess('Account created. Check your email to confirm your account, then log in.')
+      if (data.session) await supabase.auth.signOut()
+      setSuccess('Account created. Check your email and click the verification link before logging in.')
     } catch (signupError) {
       setError(getErrorMessage(signupError, 'Unable to create your account. Please try again.'))
     } finally {

@@ -1,7 +1,7 @@
 # MTL Trader - Project Notes
 
 ## What is this?
-A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with Next.js 16, React 19, TypeScript, Tailwind CSS 4, Supabase, Recharts, and Stripe.
+A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with Next.js 16, React 19, TypeScript, Tailwind CSS 4, Supabase, Recharts, and PayPal.
 
 ## Completed Features
 - **Landing page** - Hero, features, pricing, footer
@@ -17,7 +17,8 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with
 - **Settings** - Profile, Balance (deposits/withdrawals), Appearance, Subscription, Notifications, Security
 - **Deposit/Withdrawal System** - Add deposits, view history, total balance. `deposits` table in Supabase with RLS policies
 - **PayPal Integration** - Checkout API at `/api/checkout` creates a PayPal order; `/api/paypal/capture` verifies the payer, the paid amount, and applies the plan to the user's account
-- **Bank Transfer Payments** - Manual payment flow at `/dashboard/payment` submits a payment request; admins approve/reject via `/dashboard/admin` (protected by `is_admin` flag, not subscription tier)
+- **Bank Transfer Payments** - `/dashboard/payment` creates a server-validated request with a unique user/plan reference; admins approve/reject via `/dashboard/admin` (protected by `is_admin` flag, not subscription tier)
+- **Email Verification** - Supabase-confirmed email is required for dashboard and bearer-authenticated API access
 - **Monthly Trade Quota** - Postgres trigger (`enforce_trade_quota`) blocks inserts beyond the plan's monthly limit; historical imports don't count against it
 - **Import Reliability** - Trades are stamped with `import_id` so deleting an import removes exactly those trades; MT5 tickets are captured for sync/import dedupe
 
@@ -54,11 +55,13 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - Supabase anon key in `.env.local` may be placeholder - verify it's real
 - PayPal keys need to be configured for payments to work
 - `.env.example` contains real-looking values - sanitize it before sharing
-- There is no PayPal webhook yet; plan upgrades rely on the capture call from the success page (keep it, and don't close the tab before it completes)
+- There is no PayPal webhook yet; plan upgrades rely on the capture call from the success page (keep it, and don&apos;t close the tab before it completes)
+- Bank-transfer upgrades still require admin approval until a bank transaction API or webhook is connected
 
 ## Pending / Nice to Have
 - Trade notes/tags inline editing
 - PayPal webhook for robust subscription state
+- Bank transaction API/webhook for automatic bank-transfer activation
 - Auto-expiry of trial/subscription statuses
 
 ## File Structure

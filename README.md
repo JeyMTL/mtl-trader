@@ -10,6 +10,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Trading Calendar** - Daily P&L heatmap
 - **MT5 Auto Sync** - Python agent that syncs closed trades every 60s with proper entry/exit pairing
 - **Subscription System** - Free trial + paid tiers (PayPal + bank transfer)
+- **Email Verification** - Users must verify a real email address before using the journal
 - **Monthly Trade Quota** - Enforced server-side by a Postgres trigger
 - **Dark Blue Theme** - Professional trading interface
 
@@ -19,7 +20,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Backend:** Next.js API Routes
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase Auth
-- **Payments:** PayPal Checkout (one-time capture) + manual bank transfer with admin approval
+- **Payments:** PayPal Checkout (one-time capture) + bank transfer with unique references and admin approval
 - **Charts:** Recharts
 - **CSV Parsing:** PapaParse + SheetJS (xlsx)
 - **Hosting:** Vercel (free tier)
@@ -96,7 +97,11 @@ npm run dev
 
 Visit http://localhost:3000
 
-### 5. Deploy to Vercel
+### 5. Enable email confirmation
+
+In Supabase, open `Authentication` → `Providers` → `Email` and enable **Confirm email**. Add the local and production URLs under the Auth URL configuration so verification links return to the app.
+
+### 6. Deploy to Vercel
 ```bash
 npx vercel
 ```
@@ -140,10 +145,9 @@ src/
 
 ## Database Migrations
 
-Run migrations in `supabase/migrations/` in order. The latest migration
-(`20260908_full_schema_rls_quota.sql`) is idempotent and creates the full
-schema, RLS policies, and the monthly quota trigger — safe to run on an
-existing database.
+Run every migration in `supabase/migrations/` in filename order. Later migrations add the 30-day trial, notification preferences, and server-only payment request creation. Apply them to existing databases as well.
+
+Bank-transfer subscriptions currently require admin approval. Automatic bank activation requires a bank transaction API or webhook; the unique payment reference is already stored with the user and plan for that integration.
 
 Grant yourself admin access (used for the Admin panel / payment approvals):
 

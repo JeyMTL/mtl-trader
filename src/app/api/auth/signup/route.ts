@@ -22,16 +22,25 @@ export async function POST(req: Request) {
       serviceRoleKey
     )
 
+    const { data: authData, error: authError } = await supabase.auth.admin.getUserById(userId)
+    if (authError || !authData.user) {
+      return NextResponse.json({ error: 'Auth user not found' }, { status: 404 })
+    }
+
+    if ((authData.user.email || '').toLowerCase() !== String(email).trim().toLowerCase()) {
+      return NextResponse.json({ error: 'Email does not match the authenticated user' }, { status: 403 })
+    }
+
     const { error } = await supabase.from('users').upsert({
       id: userId,
-      email,
+      email: authData.user.email,
       full_name: fullName || '',
       subscription_tier: 'free',
       subscription_status: 'trial',
       trades_remaining: -1,
       max_trades: -1,
       trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    }, { onConflict: 'id' })
+    }, { onConflict: 'id', ignoreDuplicates: true })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

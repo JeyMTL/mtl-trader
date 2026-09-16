@@ -1,0 +1,17 @@
+# Build outputs
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+android/app/src/main/assets/capacitor.config.json.bak
+
+# Deps
+node_modules/
+
+# Capacitor copies a placeholder here; the real content loads from the live site
+www/
+
+# IDE
+.idea/
+*.iml
+.DS_Store

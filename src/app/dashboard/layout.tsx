@@ -16,10 +16,11 @@ import {
   Calendar,
   RefreshCw
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { cn } from '@/lib/utils'
+import { useState, useEffect, useCallback } from 'react'
+import { cn, isMobile } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
+import { useBackButton } from '@/hooks/useCapacitor'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -40,13 +41,15 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
   const [user, setUser] = useState<{ tier: string; status: string; isAdmin: boolean; maxTrades: number; tradesUsed: number; trialEndsAt: string | null } | null>(null)
   const [trialDaysLeft, setTrialDaysLeft] = useState(0)
 
   useEffect(() => {
     async function loadUser() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) {
+      if (!authUser || !authUser.email_confirmed_at) {
+        if (authUser) await supabase.auth.signOut()
         router.push('/auth/login')
         return
       }
@@ -89,6 +92,7 @@ export default function DashboardLayout({
           setTrialDaysLeft(Math.max(0, Math.ceil((new Date(data.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))))
         }
       }
+      setAuthChecked(true)
     }
     loadUser()
   }, [router])
@@ -96,6 +100,20 @@ export default function DashboardLayout({
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  const handleBackButton = useCallback(() => {
+    if (sidebarOpen) {
+      setSidebarOpen(false)
+    } else {
+      router.back()
+    }
+  }, [sidebarOpen, router])
+
+  useBackButton(handleBackButton)
+
+  if (!authChecked) {
+    return <div className="min-h-screen bg-background" />
   }
 
   const trialProgress = user?.maxTrades && user.maxTrades > 0
@@ -110,7 +128,10 @@ export default function DashboardLayout({
   const isBasic = user?.tier === 'basic'
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className={cn(
+      "min-h-screen bg-background flex",
+      isMobile() && "mobile-app"
+    )}>
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -199,20 +220,20 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 bg-surface/50 backdrop-blur-sm border-b border-border h-16 flex items-center px-4 lg:px-6">
+        <header className="sticky top-0 z-30 bg-surface/50 backdrop-blur-sm border-b border-border min-h-16 flex items-center px-3 sm:px-4 lg:px-6 py-2">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-400 hover:text-white mr-4">
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex-1" />
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             {user && (
-              <div className="text-sm text-gray-400">
+              <div className="hidden sm:block text-sm text-gray-400 truncate">
                 {isPro ? 'Unlimited trades' : (
                   <><span className="text-white font-medium">{tradesRemaining}</span> / {user.maxTrades} trades remaining this month</>
                 )}
               </div>
             )}
-            <Link href="/pricing" className="btn-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <Link href="/pricing" className="btn-gradient text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
               Upgrade
             </Link>
           </div>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MTL Trader</string>
+    <string name="title_activity_main">MTL Trader</string>
+    <string name="package_name">com.mtltrader.journal</string>
+    <string name="custom_url_scheme">com.mtltrader.journal</string>
+</resources>

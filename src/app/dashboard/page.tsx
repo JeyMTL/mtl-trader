@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { TrendingUp, TrendingDown, BarChart3, DollarSign, Target, AlertTriangle, Plus } from 'lucide-react'
+import { TrendingUp, TrendingDown, BarChart3, DollarSign, Target, AlertTriangle, Plus, Bell, ClipboardPenLine } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
@@ -15,6 +15,7 @@ interface Trade {
   exit_price: number
   lot_size: number
   created_at: string
+  open_time?: string | null
   close_time: string
 }
 
@@ -22,9 +23,22 @@ interface Deposit {
   amount: number
 }
 
+interface NotificationPreferences {
+  notifications_journal_reminders: boolean
+  notifications_monthly_overview: boolean
+}
+
+function tradeDate(trade: Trade) {
+  return trade.close_time || trade.created_at || trade.open_time
+}
+
 export default function DashboardPage() {
   const [trades, setTrades] = useState<Trade[]>([])
   const [deposits, setDeposits] = useState<Deposit[]>([])
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
+    notifications_journal_reminders: true,
+    notifications_monthly_overview: true,
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -35,13 +49,15 @@ export default function DashboardPage() {
         return
       }
 
-      const [tradesRes, depositsRes] = await Promise.all([
+      const [tradesRes, depositsRes, userRes] = await Promise.all([
         supabase.from('trades').select('*').eq('user_id', user.id).order('close_time', { ascending: true }),
         supabase.from('deposits').select('amount').eq('user_id', user.id),
+        supabase.from('users').select('notifications_journal_reminders, notifications_monthly_overview').eq('id', user.id).single(),
       ])
 
       setTrades(tradesRes.data || [])
       setDeposits(depositsRes.data || [])
+      if (userRes.data) setNotificationPreferences(userRes.data)
       setLoading(false)
     }
     fetchData()
@@ -55,6 +71,32 @@ export default function DashboardPage() {
   const grossWins = useMemo(() => trades.filter(t => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0), [trades])
   const grossLosses = useMemo(() => Math.abs(trades.filter(t => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0)), [trades])
   const profitFactor = grossLosses > 0 ? grossWins / grossLosses : 0
+
+  const today = new Date()
+  const isWorkingDay = today.getDay() >= 1 && today.getDay() <= 5
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const journaledToday = trades.some((trade) => tradeDate(trade)?.slice(0, 10) === todayKey)
+  const showJournalReminder = notificationPreferences.notifications_journal_reminders && isWorkingDay && !journaledToday
+
+  const monthlyOverview = useMemo(() => {
+    const currentDate = new Date()
+    const month = currentDate.getMonth()
+    const year = currentDate.getFullYear()
+    const monthTrades = trades.filter((trade) => {
+      const date = tradeDate(trade)
+      if (!date) return false
+      const parsed = new Date(date)
+      return parsed.getMonth() === month && parsed.getFullYear() === year
+    })
+    const pnl = monthTrades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0)
+    const wins = monthTrades.filter((trade) => trade.pnl > 0).length
+    return {
+      trades: monthTrades.length,
+      pnl,
+      winRate: monthTrades.length > 0 ? (wins / monthTrades.length) * 100 : 0,
+      winningDays: new Set(monthTrades.filter((trade) => trade.pnl > 0).map((trade) => tradeDate(trade)?.slice(0, 10))).size,
+    }
+  }, [trades])
 
   const { equityData, maxDrawdown } = useMemo(() => {
     const initialBalance = totalDeposits
@@ -94,6 +136,38 @@ export default function DashboardPage() {
           {loading ? 'Loading...' : 'Welcome back! Here\'s your trading overview.'}
         </p>
       </div>
+
+      {showJournalReminder && (
+        <div className="bg-primary/10 border border-primary/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-start gap-3">
+          <Bell className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-white font-medium">Keep today&apos;s journal current</p>
+            <p className="text-sm text-gray-400 mt-1">You have not recorded a trade today. Add your notes while the session is still fresh.</p>
+          </div>
+          <a href="/dashboard/trades/new" className="w-full sm:w-auto justify-center flex items-center gap-2 px-3 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-medium transition-colors">
+            <ClipboardPenLine className="w-4 h-4" />
+            Journal trade
+          </a>
+        </div>
+      )}
+
+      {notificationPreferences.notifications_monthly_overview && (
+        <div className="bg-surface border border-border rounded-xl p-6">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white">This month</h2>
+              <p className="text-sm text-gray-400">A quick overview of your current trading month</p>
+            </div>
+            <a href="/dashboard/analytics" className="text-sm text-primary hover:text-primary-light">View analytics</a>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div><div className="text-xs text-gray-400">Trades</div><div className="text-xl font-bold text-white mt-1">{monthlyOverview.trades}</div></div>
+            <div><div className="text-xs text-gray-400">P&amp;L</div><div className={`text-xl font-bold mt-1 ${monthlyOverview.pnl >= 0 ? 'text-success' : 'text-danger'}`}>{formatCurrency(monthlyOverview.pnl)}</div></div>
+            <div><div className="text-xs text-gray-400">Win rate</div><div className="text-xl font-bold text-white mt-1">{monthlyOverview.winRate.toFixed(1)}%</div></div>
+            <div><div className="text-xs text-gray-400">Winning days</div><div className="text-xl font-bold text-white mt-1">{monthlyOverview.winningDays}</div></div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat) => (

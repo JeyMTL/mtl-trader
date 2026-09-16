@@ -1,0 +1,40 @@
+{
+  "appId": "com.mtltrader.journal",
+  "appName": "MTL Trader",
+  "webDir": "www",
+  "server": {
+    "url": "https://mtl-trader.vercel.app",
+    "cleartext": false,
+    "allowNavigation": [
+      "*vercel.app",
+      "*paypal.com",
+      "*paypalobjects.com",
+      "*supabase.co",
+      "*.supabase.co"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0d1117",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "spinnerColor": "#3884ff",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0d1117",
+      "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    }
+  }
+}

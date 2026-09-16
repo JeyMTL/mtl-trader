@@ -59,3 +59,42 @@ export function calculatePnL(trade: {
   pnl += (trade.swap || 0)
   return pnl
 }
+
+// Mobile/Capacitor detection utilities
+interface CapacitorWindow {
+  Capacitor?: {
+    isNativePlatform?: () => boolean
+    getPlatform?: () => string
+    Plugins?: Record<string, unknown>
+    isReady?: () => boolean
+  }
+}
+
+export function isCapacitor(): boolean {
+  if (typeof window === 'undefined') return false
+  return !!(window as unknown as CapacitorWindow).Capacitor
+}
+
+export function isNativePlatform(): boolean {
+  if (typeof window === 'undefined') return false
+  const capacitor = (window as unknown as CapacitorWindow).Capacitor
+  return capacitor?.isNativePlatform?.() ?? false
+}
+
+export function isIOS(): boolean {
+  if (typeof window === 'undefined') return false
+  const capacitor = (window as unknown as CapacitorWindow).Capacitor
+  return capacitor?.getPlatform?.() === 'ios'
+}
+
+export function isAndroid(): boolean {
+  if (typeof window === 'undefined') return false
+  const capacitor = (window as unknown as CapacitorWindow).Capacitor
+  return capacitor?.getPlatform?.() === 'android'
+}
+
+export function isMobile(): boolean {
+  if (typeof window === 'undefined') return false
+  if (isCapacitor()) return true
+  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}

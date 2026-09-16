@@ -11,13 +11,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccess('')
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -28,7 +30,30 @@ export default function LoginPage() {
       return
     }
 
+    if (!data.user?.email_confirmed_at) {
+      await supabase.auth.signOut()
+      setError('Please verify your email address before logging in.')
+      setLoading(false)
+      return
+    }
+
     window.location.href = '/dashboard'
+  }
+
+  const resendVerification = async () => {
+    if (!email) {
+      setError('Enter your email address first.')
+      return
+    }
+    setLoading(true)
+    setError('')
+    const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+    if (resendError) {
+      setError(resendError.message)
+    } else {
+      setSuccess('A new verification email has been sent.')
+    }
+    setLoading(false)
   }
 
   return (
@@ -46,6 +71,11 @@ export default function LoginPage() {
           {error && (
             <div className="bg-danger/10 border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">
               {error}
+            </div>
+          )}
+          {success && (
+            <div className="bg-success/10 border border-success/30 text-success px-4 py-3 rounded-lg text-sm">
+              {success}
             </div>
           )}
 
@@ -85,6 +115,15 @@ export default function LoginPage() {
             className="w-full btn-gradient text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Logging in...' : 'Login'}
+          </button>
+
+          <button
+            type="button"
+            onClick={resendVerification}
+            disabled={loading}
+            className="w-full text-sm text-primary hover:text-primary-light disabled:opacity-50"
+          >
+            Resend verification email
           </button>
 
           <p className="text-center text-gray-400 text-sm">

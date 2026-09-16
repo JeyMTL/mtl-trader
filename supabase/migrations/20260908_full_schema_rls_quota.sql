@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS users (
   notifications_daily BOOLEAN DEFAULT true,
   notifications_weekly BOOLEAN DEFAULT false,
   notifications_marketing BOOLEAN DEFAULT false,
+  notifications_journal_reminders BOOLEAN DEFAULT true,
+  notifications_monthly_overview BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -40,6 +42,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_email BOOLEAN DEFAULT t
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_daily BOOLEAN DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_weekly BOOLEAN DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_marketing BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_journal_reminders BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_monthly_overview BOOLEAN DEFAULT true;
 
 -- ---------- trades ----------
 CREATE TABLE IF NOT EXISTS trades (

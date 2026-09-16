@@ -36,10 +36,29 @@ export default function SyncPage() {
   }, [router])
 
   const copyCommand = () => {
-    const cmd = `python mt5_agent.py ${user?.id} ${token} "${brokerName}" "${server}" "${login}"`
+    const cmd = 'python mt5_agent.py --config mtl-trader-config.json'
     navigator.clipboard.writeText(cmd)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const downloadConfig = () => {
+    if (!user || !token) return
+    const config = {
+      app_url: window.location.origin,
+      user_id: user.id,
+      token,
+      broker_name: brokerName,
+      server,
+      login,
+    }
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'mtl-trader-config.json'
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const regenerateToken = async () => {
@@ -85,20 +104,20 @@ export default function SyncPage() {
             <p className="text-sm text-gray-400">This token authenticates your MT5 agent</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 bg-background px-4 py-3 rounded-lg text-sm text-gray-300 font-mono">
+        <div className="flex flex-col sm:flex-row items-stretch gap-2">
+          <code className="flex-1 min-w-0 break-all bg-background px-4 py-3 rounded-lg text-sm text-gray-300 font-mono">
             {token}
           </code>
           <button
             onClick={() => { navigator.clipboard.writeText(token); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-            className="px-4 py-3 bg-surface-light rounded-lg hover:bg-surface transition-colors"
+            className="px-4 py-3 bg-surface-light rounded-lg hover:bg-surface transition-colors self-stretch sm:self-auto"
           >
             {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
           </button>
           <button
             onClick={regenerateToken}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-3 bg-surface-light rounded-lg hover:bg-surface transition-colors text-sm text-gray-300 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-surface-light rounded-lg hover:bg-surface transition-colors text-sm text-gray-300 disabled:opacity-50"
           >
             <RefreshCw className="w-4 h-4 text-gray-400" />
             Rotate
@@ -114,7 +133,7 @@ export default function SyncPage() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-white">MT5 Connection Details</h2>
-            <p className="text-sm text-gray-400">Enter your MT5 broker details</p>
+              <p className="text-sm text-gray-400">Enter these once, then download your setup file</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -149,7 +168,15 @@ export default function SyncPage() {
             />
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-3">You&apos;ll type your MT5 password into the agent&apos;s prompt when it runs — it never touches the browser or our servers.</p>
+        <button
+          onClick={downloadConfig}
+          disabled={!brokerName || !server || !login}
+          className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          <Download className="w-4 h-4" />
+          Download setup file
+        </button>
+        <p className="text-xs text-gray-500 mt-3">The setup file contains your sync token. Keep it private. Your MT5 password is entered only into the local agent and never sent to our servers.</p>
       </div>
 
       <div className="bg-surface rounded-xl border border-border p-6">
@@ -198,10 +225,10 @@ export default function SyncPage() {
               <span className="text-xs font-bold text-primary">3</span>
             </div>
             <div>
-              <p className="text-white font-medium">Run the agent with this command</p>
+              <p className="text-white font-medium">Run the agent with one command</p>
               <div className="mt-2 flex items-center gap-2">
                 <code className="flex-1 bg-background px-3 py-2 rounded text-sm text-gray-300 overflow-x-auto">
-                  {`python mt5_agent.py ${user?.id} ${token} "${brokerName || 'YOUR_BROKER'}" "${server || 'YOUR_SERVER'}" "${login || 'YOUR_LOGIN'}"`}
+                  python mt5_agent.py --config mtl-trader-config.json
                 </code>
                 <button
                   onClick={copyCommand}
@@ -210,9 +237,7 @@ export default function SyncPage() {
                   {copied ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4 text-white" />}
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                The agent will prompt you for your MT5 password when it starts — it is never stored or sent to our servers.
-              </p>
+              <p className="text-xs text-gray-500 mt-2">Put the downloaded setup file beside mt5_agent.py. The agent will ask only for your MT5 password.</p>
             </div>
           </div>
 
