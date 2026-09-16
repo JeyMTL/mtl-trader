@@ -182,8 +182,8 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
           <button onClick={prevMonth} className="p-2 hover:bg-surface-light rounded-lg transition-colors">
             <ChevronLeft className="w-5 h-5 text-gray-400" />
           </button>
@@ -191,6 +191,12 @@ export default function CalendarPage() {
           <button onClick={nextMonth} className="p-2 hover:bg-surface-light rounded-lg transition-colors">
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mb-4 text-[11px] sm:text-xs text-gray-400">
+          <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-success" />Profit</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-danger" />Loss</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-500" />No trades</span>
         </div>
 
         <div className="grid grid-cols-7 gap-1 mb-2">
@@ -204,7 +210,7 @@ export default function CalendarPage() {
         {!loaded ? (
           <div className="grid grid-cols-7 gap-1">
             {Array.from({ length: 42 }).map((_, i) => (
-              <div key={i} className="h-24 rounded-lg bg-surface-light animate-pulse" />
+              <div key={i} className="h-20 sm:h-24 rounded-lg bg-surface-light animate-pulse" />
             ))}
           </div>
         ) : (
@@ -223,7 +229,7 @@ export default function CalendarPage() {
                   key={day}
                   onClick={() => hasTrades && setSelectedDay(isSelected ? null : dayData)}
                   className={cn(
-                    "h-24 rounded-lg border p-2 text-left transition-all relative",
+                    "h-20 sm:h-24 rounded-lg border p-1.5 sm:p-2 text-left transition-all relative",
                     !hasTrades && "border-border/50 bg-surface-light/30",
                     hasTrades && !isProfit && !isLoss && "border-border bg-surface-light",
                     isProfit && "border-success/30 bg-success/5",
@@ -232,17 +238,20 @@ export default function CalendarPage() {
                     hasTrades && "hover:ring-1 hover:ring-primary/50 cursor-pointer"
                   )}
                 >
-                  <div className="text-sm text-gray-400">{day}</div>
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="text-xs sm:text-sm text-gray-400">{day}</div>
+                    {hasTrades && <span className={cn("w-1.5 h-1.5 rounded-full", isProfit ? "bg-success" : isLoss ? "bg-danger" : "bg-gray-500")} />}
+                  </div>
                   {hasTrades && (
                     <>
                       <div className={cn(
-                        "text-xs font-semibold mt-1",
+                        "text-[10px] sm:text-xs font-semibold mt-1 truncate",
                         isProfit ? "text-success" : isLoss ? "text-danger" : "text-gray-400"
-                      )}>
-                        {formatCurrency(dayData.pnl)}
+                      )} title={`${isProfit ? '+' : ''}${formatCurrency(dayData.pnl)}`}>
+                        {isProfit ? '+' : ''}{formatCurrency(dayData.pnl)}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">
-                        {dayData.trades} trade{dayData.trades !== 1 ? 's' : ''}
+                      <div className="text-[9px] sm:text-[10px] text-gray-500 mt-0.5 truncate">
+                        {dayData.trades} {dayData.trades === 1 ? 'trade' : 'trades'}
                       </div>
                     </>
                   )}
@@ -254,7 +263,7 @@ export default function CalendarPage() {
       </div>
 
       {selectedDay && (
-        <div className="bg-surface border border-border rounded-xl p-6">
+        <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white">
               {new Date(selectedDay.date + 'T00:00:00').toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
@@ -265,8 +274,8 @@ export default function CalendarPage() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div>
-              <div className="text-xs text-gray-400">Daily P&L</div>
+            <div className="col-span-2 sm:col-span-1">
+              <div className="text-xs text-gray-400">Net daily P&amp;L</div>
               <div className={cn("text-xl font-bold", selectedDay.pnl >= 0 ? "text-success" : "text-danger")}>
                 {formatCurrency(selectedDay.pnl)}
               </div>
