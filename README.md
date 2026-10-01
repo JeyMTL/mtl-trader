@@ -25,6 +25,11 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **CSV Parsing:** PapaParse + SheetJS (xlsx)
 - **Hosting:** Vercel (free tier)
 
+## Documentation
+
+- [docs/REPO_MAP.md](docs/REPO_MAP.md) — quick guide to the codebase and how the app fits together
+- [docs/SELLER_BRIEF.md](docs/SELLER_BRIEF.md) — concise overview for a buyer or investor
+
 ## Setup Instructions
 
 ### 1. Install dependencies

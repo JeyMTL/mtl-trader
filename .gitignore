@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local editor tooling
+.kilo/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -47,3 +50,4 @@ next-env.d.ts
 ReportHistory-*.xlsx
 ReportHistory-*.xml
 *.xls
+*.xlsx
