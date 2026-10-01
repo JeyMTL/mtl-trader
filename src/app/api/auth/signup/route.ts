@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { trialFields } from '@/lib/subscription'
 
 export async function POST(req: Request) {
   try {
@@ -35,11 +36,7 @@ export async function POST(req: Request) {
       id: userId,
       email: authData.user.email,
       full_name: fullName || '',
-      subscription_tier: 'free',
-      subscription_status: 'trial',
-      trades_remaining: -1,
-      max_trades: -1,
-      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      ...trialFields(),
     }, { onConflict: 'id', ignoreDuplicates: true })
 
     if (error) {

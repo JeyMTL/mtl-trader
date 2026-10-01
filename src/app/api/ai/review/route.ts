@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
+import { rateLimit } from '@/lib/rate-limit'
 
 interface ReviewPayload {
   totalTrades: number
@@ -21,6 +22,15 @@ export async function POST(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Each call bills the OpenAI account, so cap it per user.
+    const limit = rateLimit(`ai-review:${user.id}`, 5, 10 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many review requests. Please try again in a few minutes.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
+      )
+    }
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {

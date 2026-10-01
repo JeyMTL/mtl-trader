@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/server-auth'
-import { PLANS } from '@/lib/plans'
-
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!
-const PAYPAL_BASE = 'https://api-m.paypal.com'
-
-// Derived from PLANS so captured amounts must match the displayed prices.
-const PLAN_MAP: Record<string, { amount: string; name: string }> = Object.fromEntries(
-  PLANS.filter(p => p.price > 0).map(p => [p.id, { amount: p.price.toFixed(2), name: `${p.name} Plan` }])
-)
+import { applyPaidOrder, parseCustomId, PAYPAL_BASE } from '@/lib/payments'
 
 async function getAccessToken(): Promise<string> {
-  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')
+  const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`).toString('base64')
   const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -56,55 +46,41 @@ export async function POST(req: Request) {
     }
 
     const purchaseUnit = data.purchase_units?.[0]
-    const customId = purchaseUnit?.custom_id
-    if (!customId) {
-      return NextResponse.json({ error: 'No metadata found' }, { status: 400 })
-    }
-
-    let userId: string
-    let planId: string
-    try {
-      const parsed = JSON.parse(customId)
-      userId = parsed.userId
-      planId = parsed.planId
-    } catch {
+    const parsed = parseCustomId(purchaseUnit?.custom_id)
+    if (!parsed) {
       return NextResponse.json({ error: 'Invalid order metadata' }, { status: 400 })
     }
 
     // Only the account owner may capture their own order
-    if (authUser.id !== userId) {
+    if (authUser.id !== parsed.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Verify the paid amount matches the plan price
-    const expectedAmount = PLAN_MAP[planId]?.amount
-    const paidAmount = purchaseUnit?.amount?.value
-    if (!expectedAmount || !paidAmount || Number(paidAmount) !== Number(expectedAmount)) {
+    // The capture id matches the id the webhook and reconciliation use, so all
+    // three paths de-dupe against the same payment_events row.
+    const captureId = purchaseUnit?.payments?.captures?.[0]?.id
+
+    const result = await applyPaidOrder({
+      userId: parsed.userId,
+      planId: parsed.planId,
+      amount: purchaseUnit?.amount?.value ?? '0',
+      provider: 'paypal',
+      providerEventId: `paypal:capture:${captureId || orderId}`,
+    })
+
+    if (result.applied || result.reason === 'duplicate') {
+      return NextResponse.json({ success: true })
+    }
+    if (result.reason === 'would_downgrade') {
+      return NextResponse.json({ success: true, note: 'Already on an equal or higher plan' })
+    }
+    if (result.reason === 'amount_mismatch') {
       return NextResponse.json({ error: 'Amount mismatch, payment not applied' }, { status: 400 })
     }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    const maxTrades = planId === 'pro' ? -1 : planId === 'basic' ? 50 : 10
-
-    const { error } = await supabase
-      .from('users')
-      .update({
-        subscription_tier: planId,
-        subscription_status: 'active',
-        max_trades: maxTrades,
-        trades_remaining: maxTrades === -1 ? -1 : maxTrades,
-      })
-      .eq('id', userId)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (result.reason === 'unknown_user') {
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ error: 'Payment could not be applied' }, { status: 400 })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

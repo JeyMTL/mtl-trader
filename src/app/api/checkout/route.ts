@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
 import { PLANS } from '@/lib/plans'
+import { PAYPAL_BASE } from '@/lib/payments'
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!
-const PAYPAL_BASE = 'https://api-m.paypal.com'
 
 async function getAccessToken(): Promise<string> {
   const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')

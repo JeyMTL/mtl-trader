@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save, TrendingUp, TrendingDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, getPointValue } from '@/lib/utils'
+import { effectiveMaxTrades, UNLIMITED } from '@/lib/subscription'
 
 export default function NewTradePage() {
   const router = useRouter()
@@ -55,10 +56,8 @@ export default function NewTradePage() {
       .select('max_trades, subscription_status, trial_ends_at')
       .eq('id', user.id)
       .single()
-    const activeTrial = userRow?.subscription_status === 'trial' &&
-      userRow.trial_ends_at && new Date(userRow.trial_ends_at) > new Date()
-    const effectiveMaxTrades = activeTrial ? -1 : userRow?.max_trades
-    if (effectiveMaxTrades && effectiveMaxTrades !== -1) {
+    const effectiveMax = effectiveMaxTrades(userRow ?? {})
+    if (effectiveMax !== UNLIMITED) {
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
@@ -67,8 +66,8 @@ export default function NewTradePage() {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .gte('created_at', startOfMonth.toISOString())
-      if ((count ?? 0) >= effectiveMaxTrades) {
-        alert(`You have reached your monthly limit of ${effectiveMaxTrades} trades. Upgrade your plan for more.`)
+      if ((count ?? 0) >= effectiveMax) {
+        alert(`You have reached your monthly limit of ${effectiveMax} trades. Upgrade your plan for more.`)
         setSaving(false)
         return
       }

@@ -100,19 +100,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: insertError.message }, { status: 500 })
     }
 
-    const { data: userData } = await getAdminClient()
-      .from('users')
-      .select('trades_remaining')
-      .eq('id', userId)
-      .single()
-
-    if (userData && userData.trades_remaining !== -1) {
-      await getAdminClient()
-        .from('users')
-        .update({ trades_remaining: Math.max(0, userData.trades_remaining - inserted!.length) })
-        .eq('id', userId)
-    }
-
+    // `trades_remaining` is not authoritative: the enforce_trade_quota trigger
+    // enforces the monthly limit from `max_trades`, so we no longer mutate it here.
     return NextResponse.json({ message: 'Sync complete', imported: inserted!.length })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'

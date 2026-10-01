@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
+import { isTrialActive, maxTradesForPlan } from '@/lib/subscription'
 
+/**
+ * Repairs accounts created before the unlimited 30-day trial change by raising an
+ * active trial's allowance to unlimited. Idempotent and safe to call on every import.
+ */
 export async function POST(req: Request) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,16 +21,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Account not found' }, { status: 404 })
   }
 
-  const trialEndsAt = account.trial_ends_at ? new Date(account.trial_ends_at) : null
-  const trialActive = account.subscription_status === 'trial' && trialEndsAt && trialEndsAt > new Date()
-  if (!trialActive) {
+  if (!isTrialActive(account)) {
     return NextResponse.json({ unlimited: false })
   }
 
-  if (account.max_trades !== -1) {
+  const trialMax = maxTradesForPlan('free')
+  if (account.max_trades !== trialMax) {
     const { error: updateError } = await supabase
       .from('users')
-      .update({ max_trades: -1, trades_remaining: -1 })
+      .update({ max_trades: trialMax, trades_remaining: trialMax })
       .eq('id', user.id)
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
   }

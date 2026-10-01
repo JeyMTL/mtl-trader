@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/reconcile",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/notifications",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}

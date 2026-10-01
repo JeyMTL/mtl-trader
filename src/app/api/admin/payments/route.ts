@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, requireAdmin } from '@/lib/server-auth'
 import { PLANS } from '@/lib/plans'
+import { planFields } from '@/lib/subscription'
 
 const PLAN_MAP = new Map(PLANS.filter((plan) => plan.price > 0).map((plan) => [plan.id, plan]))
 
@@ -79,15 +80,9 @@ export async function POST(req: Request) {
     }
 
     if (action === 'approve') {
-      const maxTrades = request.plan_id === 'pro' ? -1 : request.plan_id === 'basic' ? 50 : 10
       const { error: subscriptionError } = await supabase
         .from('users')
-        .update({
-          subscription_tier: plan.id,
-          subscription_status: 'active',
-          max_trades: maxTrades,
-          trades_remaining: maxTrades === -1 ? -1 : maxTrades,
-        })
+        .update(planFields(plan.id))
         .eq('id', request.user_id)
 
       if (subscriptionError) {

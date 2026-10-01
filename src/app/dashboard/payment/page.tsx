@@ -16,11 +16,11 @@ interface PaymentRequest {
   created_at: string
 }
 
-const BANK_DETAILS = {
-  bank_name: 'Access Bank',
-  account_name: 'Jeremiah Chipeta',
-  account_number: '0416486191025',
-  branch: 'Lundazi',
+interface BankDetails {
+  bank_name: string
+  account_name: string
+  account_number: string
+  branch: string
 }
 
 // Derived from PLANS so the bank-transfer page can never drift from the displayed prices.
@@ -36,6 +36,8 @@ export default function PaymentPage() {
   const [submitted, setSubmitted] = useState(false)
   const [requests, setRequests] = useState<PaymentRequest[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [bank, setBank] = useState<BankDetails | null>(null)
+  const [bankError, setBankError] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -56,6 +58,15 @@ export default function PaymentPage() {
       const urlPlan = new URLSearchParams(window.location.search).get('plan')
       if (urlPlan && PLAN_PRICES[urlPlan]) {
         setSelectedPlan(urlPlan)
+      }
+
+      const bankRes = await authedFetch('/api/bank-details')
+      if (bankRes.ok) {
+        const bankData = await bankRes.json()
+        setBank(bankData.bank || null)
+      } else {
+        const bankData = await bankRes.json().catch(() => null)
+        setBankError(bankData?.error || 'Bank transfer is not available right now.')
       }
     }
     load()
@@ -149,27 +160,30 @@ export default function PaymentPage() {
           {selectedPlan && (
             <div className="bg-surface border border-border rounded-xl p-6">
               <h2 className="text-lg font-semibold text-white mb-4">2. Bank Transfer Details</h2>
+              {bankError && (
+                <p className="text-warning bg-warning/10 border border-warning/30 rounded-lg p-3 text-sm mb-4">{bankError}</p>
+              )}
               <div className="bg-surface-light rounded-lg p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Bank</span>
-                  <span className="text-white font-medium">{BANK_DETAILS.bank_name}</span>
+                  <span className="text-white font-medium">{bank?.bank_name}</span>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Account Name</span>
-                  <span className="text-white font-medium">{BANK_DETAILS.account_name}</span>
+                  <span className="text-white font-medium">{bank?.account_name}</span>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Account Number</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-medium font-mono">{BANK_DETAILS.account_number}</span>
-                    <button onClick={() => copyToClipboard(BANK_DETAILS.account_number)} className="text-primary hover:text-primary-light">
+                    <span className="text-white font-medium font-mono">{bank?.account_number}</span>
+                    <button onClick={() => copyToClipboard(bank?.account_number || '')} className="text-primary hover:text-primary-light">
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Branch</span>
-                  <span className="text-white font-medium">{BANK_DETAILS.branch}</span>
+                  <span className="text-white font-medium">{bank?.branch}</span>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="text-gray-400">Amount</span>
@@ -181,7 +195,7 @@ export default function PaymentPage() {
                   Generate your unique reference below and include it with the bank transfer.
                 </p>
               </div>
-              {!reference && (
+              {!reference && bank && (
                 <button
                   onClick={handleGenerateReference}
                   disabled={referenceLoading}

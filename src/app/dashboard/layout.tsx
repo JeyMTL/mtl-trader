@@ -19,6 +19,7 @@ import {
 import { useState, useEffect, useCallback } from 'react'
 import { cn, isMobile } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { maxTradesForPlan, trialEndsAtFrom } from '@/lib/subscription'
 import { Logo } from '@/components/logo'
 import { useBackButton } from '@/hooks/useCapacitor'
 
@@ -63,8 +64,8 @@ export default function DashboardLayout({
         data = {
           subscription_tier: 'free',
           subscription_status: 'trial',
-          max_trades: -1,
-          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          max_trades: maxTradesForPlan('free'),
+          trial_ends_at: trialEndsAtFrom(),
           is_admin: false,
         }
       }

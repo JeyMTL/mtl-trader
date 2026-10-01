@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { PLANS } from '@/lib/plans'
+import { rateLimit } from '@/lib/rate-limit'
 import { randomBytes } from 'node:crypto'
 
 const PLAN_MAP = new Map(
@@ -11,6 +12,15 @@ export async function POST(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Keep one account from flooding the admin review queue.
+    const limit = rateLimit(`payment-requests:${user.id}`, 10, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many payment requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
+      )
+    }
 
     const body = await req.json() as { planId?: unknown; reference?: unknown }
     const planId = typeof body.planId === 'string' ? body.planId : ''

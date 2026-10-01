@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
+import { cancelledFields } from '@/lib/subscription'
 
 export async function POST(req: Request) {
   try {
@@ -35,12 +36,7 @@ export async function POST(req: Request) {
 
     await supabase
       .from('users')
-      .update({
-        subscription_tier: 'free',
-        subscription_status: 'cancelled',
-        max_trades: 0,
-        trades_remaining: 0,
-      })
+      .update(cancelledFields())
       .eq('id', userId)
 
     return NextResponse.json({ success: true })
