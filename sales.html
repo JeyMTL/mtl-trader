@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MTL Trader | SaaS Trading Journal MVP</title>
+    <meta
+      name="description"
+      content="MTL Trader is a trading journal SaaS MVP with trade import, analytics, subscriptions, admin workflows, and MT5 sync automation."
+    />
+    <style>
+      :root {
+        --bg: #06121c;
+        --panel: #0d1f2d;
+        --panel-2: #11293b;
+        --text: #eaf5ff;
+        --muted: #a8bfd4;
+        --primary: #4dd0ff;
+        --primary-2: #89f7d5;
+        --accent: #ffb863;
+        --border: rgba(154, 210, 255, 0.2);
+        --success: #40d98d;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: linear-gradient(180deg, #06121c 0%, #0b1b2a 100%);
+        color: var(--text);
+        line-height: 1.6;
+      }
+
+      a { color: var(--primary); text-decoration: none; }
+      ul { padding-left: 1.2rem; }
+      .container {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        border-bottom: 1px solid var(--border);
+        background: rgba(6, 18, 28, 0.8);
+        backdrop-filter: blur(8px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .topbar-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 70px;
+      }
+
+      .brand {
+        font-weight: 700;
+        font-size: 1.15rem;
+        letter-spacing: 0.04em;
+      }
+
+      .pill {
+        display: inline-block;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.6rem 0.9rem;
+        color: var(--text);
+        background: rgba(255,255,255,0.02);
+      }
+
+      .hero {
+        padding: 72px 0 40px;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 32px;
+        align-items: center;
+      }
+
+      h1 {
+        margin: 0 0 18px;
+        font-size: clamp(2.2rem, 5vw, 4rem);
+        line-height: 1.08;
+      }
+
+      .lead {
+        font-size: 1.12rem;
+        color: var(--muted);
+        max-width: 650px;
+        margin-bottom: 28px;
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+
+      .button {
+        display: inline-block;
+        padding: 0.9rem 1.3rem;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        font-weight: 700;
+      }
+
+      .button.primary {
+        background: linear-gradient(135deg, var(--primary), var(--primary-2));
+        color: #051821;
+      }
+
+      .button.secondary {
+        border-color: var(--border);
+        background: rgba(255,255,255,0.02);
+        color: var(--text);
+      }
+
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        color: var(--muted);
+      }
+
+      .stat {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 18px;
+        min-width: 120px;
+      }
+
+      .stat strong {
+        display: block;
+        color: var(--text);
+        font-size: 1.25rem;
+      }
+
+      .card {
+        background: linear-gradient(180deg, rgba(17,41,59,0.92), rgba(13,31,45,0.95));
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+      }
+
+      .demo {
+        padding: 24px;
+      }
+
+      .demo-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .mini-panel {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+      }
+
+      .mini-panel .label {
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      .mini-panel .value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin-top: 8px;
+      }
+
+      .section {
+        padding: 28px 0;
+      }
+
+      .section h2 {
+        margin: 0 0 18px;
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 20px;
+      }
+
+      .feature {
+        padding: 22px;
+      }
+
+      .feature h3 {
+        margin-top: 0;
+        font-size: 1.1rem;
+      }
+
+      .feature p {
+        color: var(--muted);
+        margin-bottom: 0;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .list-box {
+        padding: 22px;
+      }
+
+      .price-box {
+        padding: 28px 24px;
+        background: linear-gradient(180deg, rgba(17,41,59,0.95), rgba(8,20,30,0.95));
+      }
+
+      .price {
+        font-size: 2.6rem;
+        font-weight: 700;
+        margin: 10px 0 4px;
+      }
+
+      .muted { color: var(--muted); }
+
+      .footer {
+        padding: 26px 0 40px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      @media (max-width: 860px) {
+        .hero-grid, .features-grid, .two-col {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="container topbar-inner">
+        <div class="brand">MTL Trader</div>
+        <span class="pill">SaaS trading journal MVP</span>
+      </div>
+    </div>
+
+    <main class="container">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <span class="pill">Built with Next.js + Supabase</span>
+            <h1>Trading journal SaaS for serious traders.</h1>
+            <p class="lead">
+              MTL Trader is a working MVP for tracking trade performance, importing MT5/export files,
+              measuring analytics, and enforcing subscription limits with real account and billing logic.
+            </p>
+
+            <div class="cta-row">
+              <a class="button primary" href="#price">View asking price</a>
+              <a class="button secondary" href="#details">See product details</a>
+            </div>
+
+            <div class="stats">
+              <div class="stat"><strong>Working</strong> MVP flow</div>
+              <div class="stat"><strong>Auth</strong> + billing</div>
+              <div class="stat"><strong>Mobile</strong> ready</div>
+            </div>
+          </div>
+
+          <div class="card demo">
+            <div class="demo-header">
+              <strong>Live app overview</strong>
+              <span class="pill">Status: MVP</span>
+            </div>
+
+            <div class="mini-grid">
+              <div class="mini-panel">
+                <div class="label">Imported trades</div>
+                <div class="value">1,200+</div>
+              </div>
+              <div class="mini-panel">
+                <div class="label">Win rate</div>
+                <div class="value">62%</div>
+              </div>
+              <div class="mini-panel">
+                <div class="label">Plans</div>
+                <div class="value">3</div>
+              </div>
+              <div class="mini-panel">
+                <div class="label">Sync</div>
+                <div class="value">MT5</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="details">
+        <h2>What is included</h2>
+        <div class="features-grid">
+          <div class="card feature">
+            <h3>Trade import and journal</h3>
+            <p>CSV and Excel-style trade uploads with a dashboard for tracking entries, exits, performance, and strategy reviews.</p>
+          </div>
+          <div class="card feature">
+            <h3>Performance analytics</h3>
+            <p>Overview metrics, calendar views, symbol breakdowns, and operational reporting for active traders.</p>
+          </div>
+          <div class="card feature">
+            <h3>MT5 sync flow</h3>
+            <p>Automation layer for syncing trade history and reducing manual input for users with MT5-based workflows.</p>
+          </div>
+          <div class="card feature">
+            <h3>Subscription logic</h3>
+            <p>Free trial and plan-based quota enforcement at the database level, including protected server-side rules.</p>
+          </div>
+          <div class="card feature">
+            <h3>Payment + admin</h3>
+            <p>Checkout and approval-based flows for payments, plan management, and internal admin review actions.</p>
+          </div>
+          <div class="card feature">
+            <h3>Mobile-ready app</h3>
+            <p>Capacitor wrapper and app structure make it easy to extend into a mobile-first product.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="two-col">
+          <div class="card list-box">
+            <h2>Why this is a strong acquisition</h2>
+            <ul>
+              <li>Real product flow with auth, analytics, and billing</li>
+              <li>Clear trading niche and user problem</li>
+              <li>Well-structured Next.js + Supabase codebase</li>
+              <li>App already includes admin, mobile, and sync components</li>
+              <li>Easy to expand into a more advanced trading SaaS</li>
+            </ul>
+          </div>
+
+          <div class="card list-box">
+            <h2>Tech stack</h2>
+            <ul>
+              <li>Next.js 16 + React 19 + TypeScript</li>
+              <li>Supabase Postgres + Auth</li>
+              <li>PayPal and bank transfer flow</li>
+              <li>Capacitor mobile wrapper</li>
+              <li>Vercel-ready deployment</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="price">
+        <div class="card price-box">
+          <div class="muted">Asking price</div>
+          <div class="price">USD $4,500</div>
+          <div class="muted">Flexible for a serious buyer or strategic acquisition.</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="card list-box">
+          <h2>Seller notes</h2>
+          <p>
+            This is best positioned as a working trading SaaS MVP rather than a fully mature startup. It is a strong starter product for a founder who wants a trading journal, analytics platform, or subscription-based workflow with clear extension potential.
+          </p>
+          <p>
+            Interested buyers should be comfortable with the environment setup and Supabase configuration required for a real deployment.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      MTL Trader • Trading journal SaaS MVP • Available for acquisition
+    </footer>
+  </body>
+</html>

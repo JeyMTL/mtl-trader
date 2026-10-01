@@ -27,8 +27,10 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 
 ## Documentation
 
+- [sales.html](sales.html) — buyer-facing product page for selling the app
 - [docs/REPO_MAP.md](docs/REPO_MAP.md) — quick guide to the codebase and how the app fits together
 - [docs/SELLER_BRIEF.md](docs/SELLER_BRIEF.md) — concise overview for a buyer or investor
+- [docs/SELLER_PAGE.md](docs/SELLER_PAGE.md) — product brief for listings and outreach
 
 ## Setup Instructions
 
