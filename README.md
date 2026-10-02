@@ -89,7 +89,9 @@ npm test          # run once
 npm run test:watch
 ```
 
-Coverage includes the trade-import parser (CSV, SpreadsheetML XML, signed costs, MT5 section boundaries), P&L/point-value math, the plan/trial/quota rules, the timezone-aware notification windows/journal-reminder logic, and the notifications cron route itself (mocked Supabase + Resend).
+Coverage includes the trade-import parser (CSV, SpreadsheetML XML, signed costs, MT5 section boundaries), P&L/point-value math, the plan/trial/quota rules, the timezone-aware notification windows/journal-reminder logic, the notifications cron route itself (mocked Supabase + Resend), and the AI review pipeline (edge stats, note retrieval, structured-output validation, caching, providers, outcomes, auto-tagging).
+
+See `docs/AI.md` for the AI review architecture, endpoints, and provider setup.
 
 To check notifications against real credentials (config audit, a Resend test send, or invoking the deployed cron):
 ```bash
@@ -130,7 +132,9 @@ Trades are counted per calendar month and enforcement lives in the database trig
 | `RESEND_API_KEY` | Resend API key. When unset, email sending is a no-op (the app never fails because email is missing) |
 | `EMAIL_FROM` | From address for summary emails, e.g. `MTL Trader <reports@yourdomain.com>` (must be a Resend-verified domain) |
 | `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, `BANK_BRANCH` | Bank transfer details shown on the payment page. When unset, the page shows a "contact support" message instead |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | Optional, for the AI trading review |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | Optional; enables the AI journal review on OpenAI |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Optional alternative AI provider |
+| `AI_PROVIDER`, `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `AI_VISION_MODEL` | Optional AI overrides / OpenAI-compatible gateway |
 
 The app uses the production PayPal endpoint (`api-m.paypal.com`); set `PAYPAL_API_BASE` to `https://api-m.sandbox.paypal.com` for testing.
 

@@ -16,10 +16,45 @@ interface Trade {
   open_time: string
   close_time: string
   strategy: string
+  notes?: string | null
+  tags?: string[] | null
+  created_at?: string | null
 }
 
 interface Deposit {
   amount: number
+}
+
+interface Finding {
+  title: string
+  detail: string
+  evidence?: string
+}
+
+interface SimilarSetup {
+  note: string
+  outcome: number
+  when?: string | null
+  score?: number
+}
+
+interface AiReview {
+  headline: string
+  confidence: 'low' | 'medium' | 'high'
+  sampleSize: number
+  strengths: Finding[]
+  risks: Finding[]
+  actions: Finding[]
+  similarSetups: SimilarSetup[]
+  disclaimer: string
+}
+
+interface AiReviewMeta {
+  provider?: string
+  model?: string
+  cached: boolean
+  skipped: boolean
+  generatedAt: string
 }
 
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) => {
@@ -40,7 +75,8 @@ export default function AnalyticsPage() {
   const [trades, setTrades] = useState<Trade[]>([])
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [loading, setLoading] = useState(true)
-  const [aiReview, setAiReview] = useState('')
+  const [aiReview, setAiReview] = useState<AiReview | null>(null)
+  const [aiMeta, setAiMeta] = useState<AiReviewMeta | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
 
@@ -59,6 +95,24 @@ export default function AnalyticsPage() {
       setLoading(false)
     }
     fetchData()
+  }, [])
+
+  useEffect(() => {
+    async function loadLatest() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/ai/review', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json() as { reviews?: Array<{ review: AiReview; created_at: string; provider?: string; model?: string }> }
+      const latest = data.reviews?.[0]
+      if (latest?.review) {
+        setAiReview(latest.review)
+        setAiMeta({ provider: latest.provider, model: latest.model, cached: true, skipped: false, generatedAt: latest.created_at })
+      }
+    }
+    loadLatest()
   }, [])
 
   const { equityData, maxDrawdown } = useMemo(() => {
@@ -161,36 +215,77 @@ export default function AnalyticsPage() {
       return
     }
 
-    const response = await fetch('/api/ai/review', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        totalTrades,
-        wins,
-        losses,
-        winRate: Number(winRate.toFixed(2)),
-        totalPnl: Number(totalPnl.toFixed(2)),
-        profitFactor: Number(profitFactor.toFixed(2)),
-        maxDrawdown: Number(maxDrawdown.toFixed(2)),
-        expectancy: Number(expectancy.toFixed(2)),
-        avgWin: Number(avgWin.toFixed(2)),
-        avgLoss: Number(avgLoss.toFixed(2)),
-        symbols: symbolData.slice(0, 20),
-        weekdays: dayData,
-        months: monthlyData.slice(-12),
-      }),
-    })
-    const data = await response.json() as { review?: string; error?: string }
-    if (!response.ok) {
-      setAiError(data.error || 'Could not generate an AI review.')
-    } else {
-      setAiReview(data.review || '')
+    try {
+      const response = await fetch('/api/ai/review', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          totalTrades,
+          wins,
+          losses,
+          winRate: Number(winRate.toFixed(2)),
+          totalPnl: Number(totalPnl.toFixed(2)),
+          profitFactor: Number(profitFactor.toFixed(2)),
+          maxDrawdown: Number(maxDrawdown.toFixed(2)),
+          expectancy: Number(expectancy.toFixed(2)),
+          avgWin: Number(avgWin.toFixed(2)),
+          avgLoss: Number(avgLoss.toFixed(2)),
+          symbols: symbolData.slice(0, 20),
+          weekdays: dayData,
+          months: monthlyData.slice(-12),
+          // Full trades let the review cite notes, sessions and hold times.
+          trades: trades.map((t) => ({
+            symbol: t.symbol,
+            type: t.type,
+            pnl: t.pnl,
+            lot_size: t.lot_size,
+            open_time: t.open_time,
+            close_time: t.close_time,
+            strategy: t.strategy,
+            notes: t.notes ?? null,
+            tags: t.tags ?? null,
+          })),
+        }),
+      })
+      const data = await response.json() as { review?: AiReview; meta?: AiReviewMeta; error?: string }
+      if (!response.ok) {
+        setAiError(data.error || 'Could not generate an AI review.')
+      } else {
+        setAiReview(data.review || null)
+        setAiMeta(data.meta || null)
+      }
+    } catch {
+      setAiError('Could not generate an AI review.')
     }
     setAiLoading(false)
   }
+
+  const renderFindings = (label: string, items: Finding[], color: string) =>
+    items.length > 0 ? (
+      <div>
+        <p className={`text-xs font-semibold uppercase tracking-wide ${color}`}>{label}</p>
+        <ul className="mt-2 space-y-2">
+          {items.map((finding, index) => (
+            <li key={index} className="text-sm">
+              <span className="text-white font-medium">{finding.title}</span>
+              <span className="text-gray-400"> — {finding.detail}</span>
+              {finding.evidence && (
+                <span className="block text-xs text-gray-500 mt-0.5">evidence: {finding.evidence}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null
+
+  const confidenceClass = aiReview?.confidence === 'high'
+    ? 'bg-success/20 text-success'
+    : aiReview?.confidence === 'medium'
+    ? 'bg-primary/20 text-primary'
+    : 'bg-warning/20 text-warning'
 
   return (
     <div className="space-y-6">
@@ -219,7 +314,38 @@ export default function AnalyticsPage() {
         </div>
         {aiError && <p className="mt-4 text-sm text-warning bg-warning/10 border border-warning/30 rounded-lg p-3">{aiError}</p>}
         {aiReview && (
-          <div className="mt-5 pt-5 border-t border-border text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{aiReview}</div>
+          <div className="mt-5 pt-5 border-t border-border space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${confidenceClass}`}>
+                {aiReview.confidence} confidence
+              </span>
+              <span className="text-xs text-gray-500">{aiReview.sampleSize} trades analysed</span>
+              {aiMeta?.cached && aiMeta.generatedAt && (
+                <span className="text-xs text-gray-500">saved {new Date(aiMeta.generatedAt).toLocaleDateString()}</span>
+              )}
+            </div>
+            <p className="text-sm text-white font-medium">{aiReview.headline}</p>
+            {renderFindings('Strengths', aiReview.strengths, 'text-success')}
+            {renderFindings('Risks', aiReview.risks, 'text-warning')}
+            {renderFindings('Actions', aiReview.actions, 'text-primary')}
+            {aiReview.similarSetups.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">From your notes</p>
+                <ul className="mt-2 space-y-2">
+                  {aiReview.similarSetups.map((setup, index) => (
+                    <li key={index} className="text-sm text-gray-400">
+                      <span className={setup.outcome >= 0 ? 'text-success' : 'text-danger'}>
+                        {setup.outcome >= 0 ? '+' : ''}{formatCurrency(setup.outcome)}
+                      </span>{' '}
+                      {setup.note}
+                      {setup.when && <span className="text-xs text-gray-500"> ({setup.when.slice(0, 10)})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <p className="text-xs text-gray-500">{aiReview.disclaimer}</p>
+          </div>
         )}
         <p className="text-xs text-gray-500 mt-4">AI feedback is educational and is not financial advice.</p>
       </div>
