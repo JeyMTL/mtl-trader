@@ -57,6 +57,9 @@ trade_data.json
 trades_clean.csv
 ReportHistory-*.json
 
+# Ship the example env file (placeholders only) despite the .env* rule above
+!.env.example
+
 # IDE / editor
 .idea/
 
