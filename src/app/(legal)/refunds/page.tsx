@@ -53,7 +53,7 @@ export default function RefundPolicyPage() {
 
       <h2>5. How to request a refund</h2>
       <p>
-        Email <strong>[contact email]</strong> from the address on your account with the PayPal transaction ID or
+        Email <strong>jfx064@gmail.com</strong> from the address on your account with the PayPal transaction ID or
         bank reference and the date of payment. We reply within two business days. Approved refunds are returned
         by the original payment method: PayPal payments usually within 5 business days, bank transfers within 10
         business days of receiving the return details.
@@ -67,7 +67,7 @@ export default function RefundPolicyPage() {
 
       <h2>7. Contact</h2>
       <p>
-        Billing questions: <strong>[contact email]</strong>. See also our <Link href="/terms">Terms of Service</Link>{' '}
+        Billing questions: <strong>jfx064@gmail.com</strong>. See also our <Link href="/terms">Terms of Service</Link>{' '}
         and <Link href="/privacy">Privacy Policy</Link>.
       </p>
     </article>

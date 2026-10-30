@@ -39,7 +39,7 @@ export default function TermsPage() {
         <li>You must provide a valid email address and keep your password confidential.</li>
         <li>You must be at least 18 years old and legally able to enter this agreement.</li>
         <li>One person or business per account. You are responsible for activity under your account.</li>
-        <li>Tell us promptly at <strong>[contact email]</strong> if you believe your account has been compromised.</li>
+        <li>Tell us promptly at <strong>jfx064@gmail.com</strong> if you believe your account has been compromised.</li>
       </ul>
 
       <h2>3. Your data</h2>
@@ -119,7 +119,7 @@ export default function TermsPage() {
 
       <h2>11. Contact</h2>
       <p>
-        Questions about these terms: <strong>[contact email]</strong>.
+        Questions about these terms: <strong>jfx064@gmail.com</strong>.
       </p>
     </article>
   )

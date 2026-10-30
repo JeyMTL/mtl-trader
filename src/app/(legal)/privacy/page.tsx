@@ -102,7 +102,7 @@ export default function PrivacyPage() {
         <li><strong>Deletion</strong> — Settings → Data → Delete account removes the data described above after email confirmation.</li>
       </ul>
       <p>
-        For anything else, write to <strong>[contact email]</strong>. We answer within 30 days and may ask you to
+        For anything else, write to <strong>jfx064@gmail.com</strong>. We answer within 30 days and may ask you to
         verify your identity. You also have the right to complain to your local data protection authority.
       </p>
 
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
       <h2>10. Contact</h2>
       <p>
         Data controller: <strong>[legal entity]</strong>, <strong>[registered address]</strong>.
-        Email: <strong>[contact email]</strong>. See also our <Link href="/terms">Terms of Service</Link> and{' '}
+        Email: <strong>jfx064@gmail.com</strong>. See also our <Link href="/terms">Terms of Service</Link> and{' '}
         <Link href="/refunds">Refund Policy</Link>.
       </p>
     </article>
