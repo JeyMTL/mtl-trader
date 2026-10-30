@@ -6,12 +6,16 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with
 ## Completed Features
 - **Landing page** - Hero, features, pricing, footer
 - **Auth** - Login/signup with Supabase Auth
-- **Dashboard** - Account balance, total P&L, win rate, profit factor, max drawdown, equity curve (Recharts), recent trades, quick actions
+- **Dashboard** - Command-center layout: account balance, net P&L, win rate, profit factor, drawdown/best/worst/expectancy strip, equity/daily P&L toggle, current-month heatmap, time edge, latest journal entries, recent fills, quick actions
 - **Trade History** - Search, filter (all/wins/losses), delete, edit trades
 - **CSV Import** - Upload MT5 CSV trade history; also reads .xlsx files and Excel-saved-as-CSV (auto-detects the real format via magic bytes + delimiter sniffing, and maps columns from headers for both MT5 and broker layouts)
 - **Analytics** - Equity curve, P&L by day chart, monthly P&L chart, performance by symbol table, stats (win rate, profit factor, expectancy, max drawdown)
 - **Manual Trade Entry** - Form at `/dashboard/trades/new` with symbol, buy/sell, entry/exit, lot size, SL, TP, commission, swap, strategy, dates, notes, live P&L preview
 - **Trade Editing** - Edit form at `/dashboard/trades/[id]/edit` - same fields as manual entry
+- **Journal Media** - Photos (camera/gallery) and voice notes (MediaRecorder, or an uploaded audio file) attach to a trade. Stored in the private `journal-media` Supabase Storage bucket at `<user_id>/<trade_id|draft>/...`; metadata in `trade_attachments`; UI uses one-hour signed URLs. Create-mode files upload immediately and are linked after the trade row exists, with retry-safe attach
+- **Entry/Exit Time Window** - `open_time`/`close_time` are surfaced as a dedicated section with pickers, duration, and an exit-before-entry check; the trade log shows the clock window and time in market
+- **Time Edge Report** - `time_stats()` buckets trades by entry hour in the user's timezone and by session (Asian / London / overlap / New York / late). Analytics and the dashboard show most-profitable/most-losing hours and sessions, a 24-hour P&L chart, session win rates and median hold time. Pure helpers live in `src/lib/edge-window.ts` (unit tested)
+- **Flutter Mobile App** - `mobile_flutter/` is a native Flutter client with the same Supabase project: flat design, desk KPIs + equity chart, paged journal, photo/voice-note capture, entry/exit time window, time edge report and account/plan screen. It replaces the Capacitor shell for phones; platform folders are generated with `flutter create`
 - **Export Trades** - Download filtered trades as CSV from trade history page
 - **Dark/Light Mode** - Toggle in Settings > Appearance, saved to localStorage. Light mode uses soft muted tones for eye comfort
 - **Settings** - Profile, Balance (deposits/withdrawals), Appearance, Subscription, Notifications, Security
@@ -36,6 +40,8 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with
 - `deposits` - Deposit/withdrawal history (user_id, amount, type, description)
 - `payment_requests` - Bank transfer payment requests awaiting admin approval
 - `payment_events` - One row per processed payment event (`provider` + `provider_event_id` unique), for idempotent application and reconciliation
+- `trade_attachments` - One row per journal photo or voice note (`kind`, `storage_path`, `mime_type`, `size_bytes`, `duration_seconds`), cascading with the trade; RLS own rows only
+- Storage bucket `journal-media` - Private; policies require the first path segment to equal `auth.uid()`
 
 Schema + RLS + quota trigger live in `supabase/migrations/20260908_full_schema_rls_quota.sql` (idempotent).
 Grant admin with: `UPDATE users SET is_admin = true WHERE email = 'you@example.com';`
@@ -80,6 +86,8 @@ CRON_SECRET=<random-string>
 Set `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, and `BANK_BRANCH` in `.env.local`; the payment page fetches them from `/api/bank-details`.
 
 ## Known Issues
+- Apply `supabase/migrations/20261028_journal_media_and_time_stats.sql` before using media, the time edge report or the redesigned dashboard; the RPCs and storage bucket live there
+- Flutter is not installed in every dev environment. `mobile_flutter/` ships Dart source only: run `flutter create --platforms=android,ios --project-name mtl_trader_mobile .` once from that folder to generate `android/` and `ios/`, then `flutter pub get`
 - `@next/swc-win32-x64-msvc` not a valid Win32 app (uses WASM fallback, works fine)
 - Supabase anon key in `.env.local` may be placeholder - verify it's real
 - PayPal keys need to be configured for payments to work
@@ -120,18 +128,25 @@ src/app/
   api/bank-details/route.ts   # Bank details (from BANK_* env vars)
   api/cron/notifications/route.ts # Daily/weekly/monthly summary emails (cron)
   api/plans/route.ts          # Plans API
+src/components/
+  journal-media.tsx           # Photo picker, voice recorder, audio upload, previews
+mobile_flutter/               # Native Flutter app (flat design)
+  lib/core/, lib/models/, lib/services/, lib/screens/, lib/ui/
+supabase/migrations/20261028_journal_media_and_time_stats.sql
 src/lib/
   supabase.ts                 # Browser Supabase client
   server-auth.ts              # Bearer auth + admin client (service role)
   subscription.ts             # Single source of truth for plan/trial/quota rules
   import-parser.ts            # CSV/XLSX/SpreadsheetML trade parser (unit tested)
-  rate-limit.ts               # In-memory per-user rate limiter
+  rate-limit.ts               # Shared (Postgres-backed) per-user rate limiter
   payments.ts                 # PayPal helpers + idempotent applyPaidOrder
   email.ts                    # Resend wrapper (no-ops when unconfigured)
   summaries.ts                # Summary math + HTML email rendering
   auth-guards.ts              # Timing-safe bearer/cron secret checks
   bank.ts                     # Bank details from env
-  utils.ts                    # formatCurrency, formatPercent, calculatePnL, getPointValue
+  utils.ts                    # formatCurrency, formatPercent, formatDuration, calculatePnL, getPointValue
+  journal-media.ts            # Upload/sign/list/delete journal photos and audio
+  edge-window.ts              # Best/worst hour and session ranking (unit tested)
   plans.ts                    # Pricing plan data
   theme.tsx                   # Dark/light mode context
 src/types/

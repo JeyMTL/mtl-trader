@@ -13,10 +13,22 @@ export function getAdminClient(): SupabaseClient {
 
 export async function getAuthUser(req: Request) {
   const authHeader = req.headers.get('Authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null
-  const token = authHeader.slice('Bearer '.length)
-  const { data: { user }, error } = await getAdminClient().auth.getUser(token)
-  if (error || !user || !user.email_confirmed_at) return null
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice('Bearer '.length)
+    const { data: { user }, error } = await getAdminClient().auth.getUser(token)
+    if (error || !user || !user.email_confirmed_at) return null
+    return user
+  }
+
+  // Same-origin calls made from server components carry the cookie session, not
+  // a bearer token. Imported lazily so `next/headers` is never loaded for tests
+  // or for the bearer path.
+  const { createServerSupabase } = await import('@/lib/supabase-server')
+  const supabase = await createServerSupabase()
+  if (!supabase) return null
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !user.email_confirmed_at) return null
   return user
 }
 

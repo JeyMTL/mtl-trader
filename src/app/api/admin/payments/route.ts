@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, requireAdmin } from '@/lib/server-auth'
-import { PLANS } from '@/lib/plans'
-import { planFields } from '@/lib/subscription'
-
-const PLAN_MAP = new Map(PLANS.filter((plan) => plan.price > 0).map((plan) => [plan.id, plan]))
+import { apiError, logEvent } from '@/lib/log'
 
 export async function GET(req: Request) {
   try {
@@ -20,13 +17,12 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
 
     if (dbError) {
-      return NextResponse.json({ error: dbError.message }, { status: 500 })
+      return apiError('admin.payments.list', dbError, 500, 'Could not load payment requests.')
     }
 
     return NextResponse.json({ requests: requests || [] })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('admin.payments', error, 500, 'Could not load payment requests.')
   }
 }
 
@@ -34,7 +30,7 @@ export async function POST(req: Request) {
   try {
     const { requestId, action } = await req.json()
 
-    if (!requestId || !action) {
+    if (typeof requestId !== 'string' || !requestId || !action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -47,52 +43,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error }, { status: error === 'Unauthorized' ? 401 : 403 })
     }
 
-    const supabase = getAdminClient()
+    const { data: result, error: reviewError } = await getAdminClient().rpc('review_bank_payment_request', {
+      p_request_id: requestId,
+      p_reviewer_id: user.id,
+      p_action: action,
+    })
 
-    const { data: request, error: reqError } = await supabase
-      .from('payment_requests')
-      .select('*')
-      .eq('id', requestId)
-      .single()
-
-    if (reqError || !request) {
+    if (reviewError) {
+      return apiError('admin.payments.review', reviewError, 500, 'Could not review the payment request.')
+    }
+    if (result === 'not_found') {
       return NextResponse.json({ error: 'Payment request not found' }, { status: 404 })
     }
-
-    if (request.status !== 'pending') {
-      return NextResponse.json({ error: 'Request already processed' }, { status: 400 })
+    if (result === 'already_processed') {
+      return NextResponse.json({ error: 'Request already processed' }, { status: 409 })
+    }
+    if (result === 'invalid_action') {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+    if (result === 'invalid_plan' || result === 'amount_mismatch' || result === 'unknown_user') {
+      return NextResponse.json({ error: 'Payment request has an invalid plan, amount, or account' }, { status: 400 })
+    }
+    if (result !== 'applied' && result !== 'would_downgrade' && result !== 'duplicate' && result !== 'rejected') {
+      throw new Error(`Unexpected bank payment review result: ${String(result)}`)
     }
 
-    const plan = PLAN_MAP.get(request.plan_id)
-    if (!plan || Number(request.amount) !== plan.price) {
-      return NextResponse.json({ error: 'Payment request has an invalid plan or amount' }, { status: 400 })
-    }
-
-    const newStatus = action === 'approve' ? 'approved' : 'rejected'
-
-    const { error: updateError } = await supabase
-      .from('payment_requests')
-      .update({ status: newStatus, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
-      .eq('id', requestId)
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
-
-    if (action === 'approve') {
-      const { error: subscriptionError } = await supabase
-        .from('users')
-        .update(planFields(plan.id))
-        .eq('id', request.user_id)
-
-      if (subscriptionError) {
-        return NextResponse.json({ error: subscriptionError.message }, { status: 500 })
-      }
-    }
-
-    return NextResponse.json({ success: true })
+    logEvent('info', 'admin.payments.review', { requestId, action, reviewer: user.id, result })
+    return NextResponse.json({
+      success: true,
+      note: result === 'would_downgrade' ? 'Account is already on a higher plan' : undefined,
+    })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('admin.payments', error, 500, 'Could not load payment requests.')
   }
 }

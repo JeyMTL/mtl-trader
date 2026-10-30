@@ -1,27 +1,42 @@
 import { NextResponse } from 'next/server'
-import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { randomBytes } from 'node:crypto'
+import { getAdminClient, getAuthUser } from '@/lib/server-auth'
+import { rateLimit } from '@/lib/rate-limit'
+import { apiError, logEvent } from '@/lib/log'
 
+/**
+ * Rotates the MT5 agent token.
+ *
+ * The sync page has always had a "Rotate" button pointing at this route, but the
+ * route did not exist, so a leaked token could never be revoked. Rotating
+ * invalidates the old token immediately.
+ */
 export async function POST(req: Request) {
   try {
-    const authUser = await getAuthUser(req)
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const user = await getAuthUser(req)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const limit = await rateLimit(`sync-rotate:${user.id}`, 5, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many token rotations. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
+      )
     }
 
     const token = randomBytes(32).toString('hex')
     const { error } = await getAdminClient()
       .from('users')
       .update({ agent_token: token })
-      .eq('id', authUser.id)
+      .eq('id', user.id)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return apiError('sync.rotate', error, 500, 'Could not rotate the sync token.')
     }
 
-    return NextResponse.json({ token })
+    logEvent('info', 'sync.rotate', { userId: user.id })
+    return NextResponse.json({ token, rotated: true })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('sync.rotate', error, 500, 'Could not rotate the sync token.')
   }
 }

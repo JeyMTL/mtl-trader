@@ -191,8 +191,13 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
-        <div className="max-w-7xl mx-auto text-center text-gray-500 text-sm">
+        <div className="max-w-7xl mx-auto flex flex-col items-center justify-between gap-3 text-gray-500 text-sm sm:flex-row">
           <p>&copy; 2026 MTL Trader. All rights reserved.</p>
+          <nav className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link href="/refunds" className="hover:text-white transition-colors">Refunds</Link>
+          </nav>
         </div>
       </footer>
     </div>

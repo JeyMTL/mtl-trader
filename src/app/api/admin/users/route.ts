@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, requireAdmin } from '@/lib/server-auth'
+import { apiError } from '@/lib/log'
 
 export async function GET(req: Request) {
   try {
@@ -18,10 +19,10 @@ export async function GET(req: Request) {
     ])
 
     if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 500 })
+      return apiError('admin.users.auth', authError, 500, 'Could not load users.')
     }
     if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 500 })
+      return apiError('admin.users.profiles', profileError, 500, 'Could not load user profiles.')
     }
 
     const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]))
@@ -42,7 +43,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ users })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('admin.users', error, 500, 'Could not load users.')
   }
 }

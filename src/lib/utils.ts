@@ -24,6 +24,16 @@ export function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
+/** Minutes → `2h 15m`, used by trade time windows and hold stats. */
+export function formatDuration(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined || !Number.isFinite(minutes)) return '—'
+  const total = Math.max(0, Math.round(minutes))
+  if (total < 60) return `${total}m`
+  const hours = Math.floor(total / 60)
+  const rest = total % 60
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
+}
+
 export function getPointValue(symbol: string): number {
   // Keep digits: index symbols like US30 / NAS100 / JP225 depend on them.
   const s = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '')

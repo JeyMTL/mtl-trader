@@ -165,6 +165,13 @@ export default function SignupPage() {
             {loading ? 'Creating account...' : 'Start 30-Day Free Trial'}
           </button>
 
+          <p className="text-center text-xs leading-relaxed text-gray-500">
+            By creating an account you agree to our{' '}
+            <Link href="/terms" className="text-gray-300 underline underline-offset-2 hover:text-white">Terms</Link>
+            {' '}and{' '}
+            <Link href="/privacy" className="text-gray-300 underline underline-offset-2 hover:text-white">Privacy Policy</Link>.
+          </p>
+
           <p className="text-center text-gray-400 text-sm">
             Already have an account?{' '}
             <Link href="/auth/login" className="text-primary hover:text-primary-light transition-colors">

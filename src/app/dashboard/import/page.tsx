@@ -120,7 +120,7 @@ export default function ImportPage() {
     // Monthly quota pre-check (server enforces this too)
     const { data: userRow } = await supabase
       .from('users')
-      .select('max_trades, subscription_status, trial_ends_at')
+      .select('max_trades, subscription_tier, subscription_status, trial_ends_at, current_period_end')
       .eq('id', userId)
       .single()
 

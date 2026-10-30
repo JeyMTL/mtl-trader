@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getPointValue, calculatePnL, formatCurrency, formatPercent } from '@/lib/utils'
+import { getPointValue, calculatePnL, formatCurrency, formatDuration, formatPercent } from '@/lib/utils'
 
 describe('getPointValue', () => {
   it('classifies FX, JPY, metals, crypto and indices', () => {
@@ -49,5 +49,12 @@ describe('formatters', () => {
     expect(formatCurrency(1234.5)).toBe('$1,234.50')
     expect(formatCurrency(-5)).toBe('-$5.00')
     expect(formatPercent(62.5)).toBe('62.5%')
+  })
+
+  it('formats a trade time window', () => {
+    expect(formatDuration(45)).toBe('45m')
+    expect(formatDuration(95)).toBe('1h 35m')
+    expect(formatDuration(120)).toBe('2h')
+    expect(formatDuration(null)).toBe('—')
   })
 })

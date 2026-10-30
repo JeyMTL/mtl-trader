@@ -8,7 +8,8 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    // Node by default; UI tests opt into jsdom with a file-level docblock.
     environment: 'node',
   },
 })

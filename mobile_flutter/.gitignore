@@ -1,0 +1,22 @@
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/*
+# The checked-in Flutter run configuration is the only editor state worth sharing
+!.idea/runConfigurations/
+# Holds the Supabase anon key passed with --dart-define-from-file
+.vscode/launch.json
+dart_defines.json
+android/.gradle/
+android/local.properties
+android/.kotlin/
+android/app/build/
+android/build/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+.DS_Store

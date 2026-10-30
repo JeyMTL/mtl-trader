@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Download, Key, Server, XCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
+import { useToast } from '@/components/toast'
 
 export default function SyncPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(true)
@@ -69,12 +71,12 @@ export default function SyncPage() {
       const data = await res.json()
       if (data.token) {
         setToken(data.token)
-        alert('New token generated. Update your agent command and restart it.')
+        toast('New token generated. Update your agent command and restart it.', { tone: 'success' })
       } else {
-        alert('Error: ' + (data.error || 'Failed to rotate token'))
+        toast(data.error || 'Could not rotate the token.', { tone: 'error' })
       }
     } catch {
-      alert('Failed to rotate token')
+      toast('Could not rotate the token. Check your connection and try again.', { tone: 'error' })
     }
     setLoading(false)
   }

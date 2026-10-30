@@ -3,15 +3,18 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, CreditCard, Loader2 } from 'lucide-react'
+import { Check, CreditCard, Loader2, RefreshCw } from 'lucide-react'
 import { PLANS } from '@/lib/plans'
 import { formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
+import { useToast } from '@/components/toast'
 
 export default function PricingPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [loading, setLoading] = useState<string | null>(null)
+  const [flwLoading, setFlwLoading] = useState<string | null>(null)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -36,12 +39,43 @@ export default function PricingPage() {
       if (data.url) {
         setRedirectUrl(data.url)
       } else {
-        alert('Error: ' + (data.error || 'Something went wrong'))
+        toast(data.error || 'Could not start checkout.', { tone: 'error' })
       }
     } catch {
-      alert('Failed to start checkout')
+      toast('Could not start checkout. Check your connection and try again.', { tone: 'error' })
     }
     setLoading(null)
+  }
+
+  /**
+   * Card subscription: the first payment subscribes the card to a monthly
+   * Flutterwave payment plan, so renewals are automatic. The webhook is what
+   * applies each renewal to the account.
+   */
+  const handleCardSubscription = async (planId: string) => {
+    setFlwLoading(planId)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/auth/signup')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/flutterwave/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, userId: user.id }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        toast(data.error || 'Could not start the card checkout.', { tone: 'error' })
+      }
+    } catch {
+      toast('Could not start the card checkout. Check your connection and try again.', { tone: 'error' })
+    }
+    setFlwLoading(null)
   }
 
   const handleBankTransfer = (planId: string) => {
@@ -113,13 +147,27 @@ export default function PricingPage() {
                 ) : (
                   <div className="space-y-2">
                     <button
-                      onClick={() => handleCheckout(plan.id)}
-                      disabled={loading === plan.id}
+                      onClick={() => handleCardSubscription(plan.id)}
+                      disabled={flwLoading === plan.id}
                       className={`w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 ${
                         plan.popular
                           ? 'btn-gradient text-white'
                           : 'border border-border hover:border-primary text-gray-300 hover:text-white'
                       } disabled:opacity-50`}
+                    >
+                      {flwLoading === plan.id ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
+                      ) : (
+                        <><RefreshCw className="w-4 h-4" /> Subscribe with card</>
+                      )}
+                    </button>
+                    <p className="text-xs text-gray-500 text-center">
+                      Auto-renews monthly · cancel any time
+                    </p>
+                    <button
+                      onClick={() => handleCheckout(plan.id)}
+                      disabled={loading === plan.id}
+                      className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white disabled:opacity-50"
                     >
                       {loading === plan.id ? (
                         <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
@@ -138,8 +186,25 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
+
+          <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-gray-500">
+            Card subscriptions renew monthly through Flutterwave and can be stopped from
+            Settings at any time; access continues until the paid period ends. PayPal is a
+            one-time 30-day payment, and bank transfers are approved manually.
+          </p>
         </div>
       </div>
+
+      <footer className="border-t border-border py-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-xs text-gray-500 sm:flex-row">
+          <p>&copy; 2026 MTL Trader. All rights reserved.</p>
+          <div className="flex gap-4">
+            <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
+            <Link href="/privacy" className="transition-colors hover:text-white">Privacy</Link>
+            <Link href="/refunds" className="transition-colors hover:text-white">Refunds</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

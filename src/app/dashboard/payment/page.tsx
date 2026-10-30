@@ -6,6 +6,7 @@ import { ArrowLeft, Upload, CheckCircle, Clock, XCircle, Loader2, Copy } from 'l
 import { supabase } from '@/lib/supabase'
 import { PLANS } from '@/lib/plans'
 import { authedFetch } from '@/lib/api'
+import { useToast } from '@/components/toast'
 
 interface PaymentRequest {
   id: string
@@ -29,6 +30,7 @@ const PLAN_PRICES: Record<string, { name: string; amount: number }> = Object.fro
 )
 
 export default function PaymentPage() {
+  const { toast } = useToast()
   const router = useRouter()
   const [selectedPlan, setSelectedPlan] = useState('')
   const [reference, setReference] = useState('')
@@ -86,7 +88,7 @@ export default function PaymentPage() {
     const result = await response.json()
 
     if (!response.ok) {
-      alert('Error: ' + (result.error || 'Could not submit payment request'))
+      toast(result.error || 'Could not submit the payment request.', { tone: 'error' })
       setReferenceLoading(false)
       return
     }

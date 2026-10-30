@@ -3,6 +3,7 @@ import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { PLANS } from '@/lib/plans'
 import { rateLimit } from '@/lib/rate-limit'
 import { randomBytes } from 'node:crypto'
+import { apiError } from '@/lib/log'
 
 const PLAN_MAP = new Map(
   PLANS.filter((plan) => plan.price > 0).map((plan) => [plan.id, plan])
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Keep one account from flooding the admin review queue.
-    const limit = rateLimit(`payment-requests:${user.id}`, 10, 60 * 60 * 1000)
+    const limit = await rateLimit(`payment-requests:${user.id}`, 10, 60 * 60 * 1000)
     if (!limit.ok) {
       return NextResponse.json(
         { error: 'Too many payment requests. Please try again later.' },
@@ -45,12 +46,11 @@ export async function POST(req: Request) {
     })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return apiError('payment_requests.insert', error, 500, 'Could not create the payment request.')
     }
 
     return NextResponse.json({ success: true, reference })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('payment_requests', error, 500, 'Could not create the payment request.')
   }
 }

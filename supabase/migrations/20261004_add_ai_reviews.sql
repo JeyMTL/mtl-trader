@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS ai_reviews (
   model TEXT,
   review JSONB NOT NULL,
   stats JSONB,
-  similar JSONB,
+  -- `similar` is a reserved keyword in Postgres and must be quoted here.
+  "similar" JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

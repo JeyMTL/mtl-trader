@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { isTrialActive, maxTradesForPlan } from '@/lib/subscription'
+import { apiError } from '@/lib/log'
 
 /**
  * Repairs accounts created before the unlimited 30-day trial change by raising an
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       .from('users')
       .update({ max_trades: trialMax, trades_remaining: trialMax })
       .eq('id', user.id)
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    if (updateError) return apiError('trial.activate', updateError, 500, 'Could not activate the trial.')
   }
 
   return NextResponse.json({ unlimited: true })

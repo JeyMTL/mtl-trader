@@ -1,5 +1,4 @@
 import { PLANS } from '@/lib/plans'
-import { shouldApplyPlan, planFields, type AccountState } from '@/lib/subscription'
 import { getAdminClient } from '@/lib/server-auth'
 
 /**
@@ -42,7 +41,7 @@ export interface PaidOrder {
   userId: string
   planId: string
   amount: number | string
-  provider: 'paypal' | 'bank'
+  provider: 'paypal' | 'bank' | 'flutterwave'
   providerEventId: string
 }
 
@@ -63,48 +62,37 @@ export async function applyPaidOrder(order: PaidOrder): Promise<ApplyResult> {
   if (!expected) return { applied: false, reason: 'invalid_plan' }
   if (Number(order.amount) !== Number(expected)) return { applied: false, reason: 'amount_mismatch' }
 
-  const supabase = getAdminClient()
-  const { data: account, error: readError } = await supabase
-    .from('users')
-    .select('subscription_tier, subscription_status, max_trades, trial_ends_at')
-    .eq('id', order.userId)
-    .single()
+  const { data, error } = await getAdminClient().rpc('apply_paid_order', {
+    p_user_id: order.userId,
+    p_provider: order.provider,
+    p_provider_event_id: order.providerEventId,
+    p_plan_id: order.planId,
+    p_amount: Number(order.amount),
+  })
 
-  if (readError || !account) return { applied: false, reason: 'unknown_user' }
+  if (error) throw new Error(`Could not apply paid order: ${error.message}`)
+  if (
+    data === 'applied' ||
+    data === 'duplicate' ||
+    data === 'amount_mismatch' ||
+    data === 'invalid_plan' ||
+    data === 'would_downgrade' ||
+    data === 'unknown_user'
+  ) {
+    return { applied: data === 'applied', reason: data }
+  }
 
-  const shouldApply = shouldApplyPlan(account as AccountState, order.planId)
-
-  // ON CONFLICT DO NOTHING: an empty result means this event was already handled.
-  const { data: inserted, error: insertError } = await supabase
-    .from('payment_events')
-    .upsert(
-      {
-        user_id: order.userId,
-        provider: order.provider,
-        provider_event_id: order.providerEventId,
-        plan_id: order.planId,
-        amount: Number(order.amount),
-        status: shouldApply ? 'applied' : 'skipped_downgrade',
-      },
-      { onConflict: 'provider,provider_event_id', ignoreDuplicates: true }
-    )
-    .select('id')
-
-  if (insertError) throw new Error(insertError.message)
-  if (!inserted || inserted.length === 0) return { applied: false, reason: 'duplicate' }
-  if (!shouldApply) return { applied: false, reason: 'would_downgrade' }
-
-  const { error: updateError } = await supabase
-    .from('users')
-    .update(planFields(order.planId))
-    .eq('id', order.userId)
-
-  if (updateError) throw new Error(updateError.message)
-  return { applied: true, reason: 'applied' }
+  throw new Error(`Unexpected paid-order result: ${String(data)}`)
 }
 
 export async function getPayPalAccessToken(): Promise<string> {
-  const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`).toString('base64')
+  const clientId = process.env.PAYPAL_CLIENT_ID
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
+    throw new Error('PayPal payments are not configured')
+  }
+
+  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
   const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -113,8 +101,87 @@ export async function getPayPalAccessToken(): Promise<string> {
     },
     body: 'grant_type=client_credentials',
   })
-  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(`PayPal token request failed (${res.status})`)
+  }
+
+  const data = await res.json() as { access_token?: unknown }
+  if (typeof data.access_token !== 'string' || !data.access_token) {
+    throw new Error('PayPal token response did not include an access token')
+  }
   return data.access_token
+}
+
+export type RevokeReason = 'revoked' | 'duplicate' | 'unknown_user' | 'invalid_plan'
+
+/**
+ * Reverses a payment: refunds, reversals and disputes drop the account back to
+ * free immediately. Keyed by `providerEventId` like `applyPaidOrder`, so a
+ * replayed refund can never double-apply.
+ */
+export async function revokePaidOrder(order: PaidOrder): Promise<RevokeReason> {
+  const { data, error } = await getAdminClient().rpc('revoke_paid_order', {
+    p_user_id: order.userId,
+    p_provider: order.provider,
+    p_provider_event_id: order.providerEventId,
+    p_plan_id: order.planId,
+    p_amount: Number(order.amount),
+  })
+
+  if (error) throw new Error(`Could not revoke paid order: ${error.message}`)
+  if (
+    data === 'revoked' ||
+    data === 'duplicate' ||
+    data === 'unknown_user' ||
+    data === 'invalid_plan'
+  ) {
+    return data
+  }
+
+  throw new Error(`Unexpected paid-order revocation result: ${String(data)}`)
+}
+
+/** Downgrades every account whose paid period has already ended. Returns the count. */
+export async function expireLapsedSubscriptions(): Promise<number> {
+  const { data, error } = await getAdminClient().rpc('expire_lapsed_subscriptions')
+  if (error) throw new Error(`Could not expire lapsed subscriptions: ${error.message}`)
+  return typeof data === 'number' ? data : Number(data ?? 0)
+}
+
+export interface RefundEventDetails {
+  refundId: string
+  amount: string
+  customId: string | null
+  captureId: string | null
+}
+
+/**
+ * Refund and reversal webhooks describe the refund, not the original capture.
+ * PayPal does not always echo `custom_id` on the refund, so the capture id is
+ * read from the `up` link and used to look the order up in `payment_events`.
+ */
+export function parseRefundEvent(event: {
+  resource?: {
+    id?: string
+    custom_id?: string
+    amount?: { value?: string }
+    links?: Array<{ rel?: string; href?: string }>
+  }
+}): RefundEventDetails | null {
+  const refundId = event.resource?.id
+  if (typeof refundId !== 'string' || !refundId) return null
+
+  const upLink = (event.resource?.links || []).find(
+    (link) => link.rel === 'up' && typeof link.href === 'string'
+  )
+  const captureId = upLink?.href?.match(/\/captures\/([A-Za-z0-9_-]+)\/?$/)?.[1] ?? null
+
+  return {
+    refundId,
+    amount: event.resource?.amount?.value ?? '0',
+    customId: typeof event.resource?.custom_id === 'string' ? event.resource.custom_id : null,
+    captureId,
+  }
 }
 
 interface PayPalWebhookEvent {

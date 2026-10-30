@@ -1,17 +1,20 @@
+import { getAdminClient } from '@/lib/server-auth'
+import { logEvent } from '@/lib/log'
+
 /**
- * Minimal in-memory fixed-window rate limiter.
+ * Shared fixed-window rate limiter.
  *
- * Caveat: on serverless or multi-instance deployments this state is per-instance,
- * so it is an abuse/cost speed bump rather than a hard global limit. Back it with
- * a shared store (e.g. Redis) if a strict limit is ever required.
+ * The counter lives in the `rate_limits` table and is incremented atomically by
+ * `check_rate_limit`, so the limit holds across every serverless instance. The
+ * previous in-memory implementation gave each lambda its own counter, which
+ * meant the AI and payment-request budgets effectively did not exist in
+ * production.
+ *
+ * If the RPC is unavailable (migration not applied yet, or the database is
+ * briefly unreachable) we fall back to per-instance buckets rather than failing
+ * the request. That fallback is a speed bump, not a guarantee — the same caveat
+ * the old implementation had.
  */
-
-interface Bucket {
-  count: number
-  resetAt: number
-}
-
-const buckets = new Map<string, Bucket>()
 
 export interface RateLimitResult {
   ok: boolean
@@ -19,11 +22,17 @@ export interface RateLimitResult {
   retryAfterMs: number
 }
 
+interface Bucket {
+  count: number
+  resetAt: number
+}
 
-export function rateLimit(key: string, limit: number, windowMs: number, now: number = Date.now()): RateLimitResult {
-  const bucket = buckets.get(key)
+const fallbackBuckets = new Map<string, Bucket>()
+
+function fallbackRateLimit(key: string, limit: number, windowMs: number, now: number): RateLimitResult {
+  const bucket = fallbackBuckets.get(key)
   if (!bucket || bucket.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs })
+    fallbackBuckets.set(key, { count: 1, resetAt: now + windowMs })
     return { ok: true, remaining: limit - 1, retryAfterMs: 0 }
   }
   if (bucket.count >= limit) {
@@ -33,6 +42,40 @@ export function rateLimit(key: string, limit: number, windowMs: number, now: num
   return { ok: true, remaining: limit - bucket.count, retryAfterMs: 0 }
 }
 
+export async function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+  now: number = Date.now()
+): Promise<RateLimitResult> {
+  try {
+    const { data, error } = await getAdminClient().rpc('check_rate_limit', {
+      p_key: key,
+      p_limit: limit,
+      p_window_ms: windowMs,
+    })
+
+    if (error) throw new Error(error.message)
+
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { allowed?: boolean; remaining?: number; retry_after_ms?: number }
+      | null
+
+    if (!row || typeof row.allowed !== 'boolean') {
+      throw new Error('check_rate_limit returned an unexpected shape')
+    }
+
+    return {
+      ok: row.allowed,
+      remaining: Math.max(0, Number(row.remaining ?? 0)),
+      retryAfterMs: Math.max(0, Number(row.retry_after_ms ?? 0)),
+    }
+  } catch (error: unknown) {
+    logEvent('warn', 'rate_limit.fallback', { error, key })
+    return fallbackRateLimit(key, limit, windowMs, now)
+  }
+}
+
 /** Best-effort client identity for unauthenticated routes. */
 export function clientKey(req: Request, scope: string): string {
   const forwarded = req.headers.get('x-forwarded-for') || ''
@@ -40,9 +83,9 @@ export function clientKey(req: Request, scope: string): string {
   return `${scope}:${ip}`
 }
 
-/** Drop expired buckets so a long-lived process does not grow unbounded. */
+/** Drops expired fallback buckets so a long-lived process does not grow unbounded. */
 export function sweepExpired(now: number = Date.now()): void {
-  for (const [key, bucket] of buckets) {
-    if (bucket.resetAt <= now) buckets.delete(key)
+  for (const [key, bucket] of fallbackBuckets) {
+    if (bucket.resetAt <= now) fallbackBuckets.delete(key)
   }
 }

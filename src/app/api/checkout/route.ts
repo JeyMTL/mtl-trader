@@ -1,24 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
 import { PLANS } from '@/lib/plans'
-import { PAYPAL_BASE } from '@/lib/payments'
-
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID!
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET!
-
-async function getAccessToken(): Promise<string> {
-  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64')
-  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  })
-  const data = await res.json()
-  return data.access_token
-}
+import { getPayPalAccessToken, PAYPAL_BASE } from '@/lib/payments'
+import { apiError, logEvent } from '@/lib/log'
 
 // Derived from PLANS so checkout can never drift from the displayed prices.
 const PLAN_MAP: Record<string, { amount: string; name: string }> = Object.fromEntries(
@@ -45,7 +29,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const accessToken = await getAccessToken()
+    const accessToken = await getPayPalAccessToken()
     const plan = PLAN_MAP[planId]
 
     const response = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
@@ -61,7 +45,9 @@ export async function POST(req: Request) {
             currency_code: 'USD',
             value: plan.amount,
           },
-          description: `MTL Trader - ${plan.name} Monthly Subscription`,
+          // Honest description: one payment buys one 30-day period. Access ends
+          // unless it is renewed (see `expire_lapsed_subscriptions`).
+          description: `MTL Trader - ${plan.name} Plan (30 days)`,
           custom_id: JSON.stringify({ userId, planId }),
         }],
         application_context: {
@@ -77,14 +63,19 @@ export async function POST(req: Request) {
     const data = await response.json()
 
     if (!data.id) {
-      return NextResponse.json({ error: data.message || 'Failed to create PayPal order' }, { status: 400 })
+      logEvent('error', 'checkout.create_order_failed', {
+        planId,
+        userId,
+        providerMessage: data.message,
+        providerName: data.name,
+      })
+      return NextResponse.json({ error: 'Could not start the PayPal checkout. Please try again.' }, { status: 502 })
     }
 
     const approveUrl = data.links?.find((l: { rel: string; href: string }) => l.rel === 'approve')?.href
 
     return NextResponse.json({ orderId: data.id, url: approveUrl })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('checkout', error, 500, 'Could not start the checkout. Please try again.')
   }
 }

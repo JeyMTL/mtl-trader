@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { suggestTags } from '@/lib/ai/autotag'
+import { apiError } from '@/lib/log'
 
 /**
  * POST /api/ai/autotag
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const limit = rateLimit(`ai-autotag:${user.id}`, 60, 60 * 1000)
+    const limit = await rateLimit(`ai-autotag:${user.id}`, 60, 60 * 1000)
     if (!limit.ok) {
       return NextResponse.json(
         { error: 'Too many requests.' },
@@ -31,9 +32,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ tags: suggestTags(body.note) })
   } catch (error: unknown) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+    return apiError('ai.autotag', error, 500, 'Could not suggest tags.')
   }
 }

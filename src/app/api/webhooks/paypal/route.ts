@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getPayPalAccessToken, parseCustomId, applyPaidOrder, PAYPAL_BASE } from '@/lib/payments'
+import {
+  applyPaidOrder,
+  getPayPalAccessToken,
+  parseCustomId,
+  parseRefundEvent,
+  revokePaidOrder,
+  PAYPAL_BASE,
+} from '@/lib/payments'
+import { getAdminClient } from '@/lib/server-auth'
+import { apiError, logEvent } from '@/lib/log'
 
 /**
  * PayPal webhook — the durable upgrade path.
@@ -8,8 +17,17 @@ import { getPayPalAccessToken, parseCustomId, applyPaidOrder, PAYPAL_BASE } from
  * user closes the tab before it completes the upgrade is applied here instead.
  * Every event is verified with PayPal's signature-verification API before any
  * account change is made, and `applyPaidOrder` makes replaying an event a no-op.
+ *
+ * Refunds, reversals and disputes revoke access through `revokePaidOrder`. A
+ * partial refund also revokes: the product has no partial state, and continuing
+ * to serve a refunded account is worse than ending access early.
  */
 
+const REFUND_EVENTS = new Set([
+  'PAYMENT.CAPTURE.REFUNDED',
+  'PAYMENT.CAPTURE.REVERSED',
+  'PAYMENT.CAPTURE.DENIED',
+])
 
 interface PayPalWebhookEvent {
   id?: string
@@ -18,6 +36,42 @@ interface PayPalWebhookEvent {
     id?: string
     custom_id?: string
     amount?: { value?: string; currency_code?: string }
+    links?: Array<{ rel?: string; href?: string }>
+  }
+}
+
+/** Finds the order behind a refund, falling back to the recorded capture event. */
+async function resolveRefundTarget(event: PayPalWebhookEvent) {
+  const details = parseRefundEvent(event)
+  if (!details) return null
+
+  const fromCustomId = parseCustomId(details.customId) ?? parseCustomId(event.resource?.custom_id)
+  if (fromCustomId) {
+    return {
+      userId: fromCustomId.userId,
+      planId: fromCustomId.planId,
+      amount: details.amount,
+      refundId: details.refundId,
+    }
+  }
+
+  if (!details.captureId) return null
+
+  const { data, error } = await getAdminClient()
+    .from('payment_events')
+    .select('user_id, plan_id, amount')
+    .eq('provider', 'paypal')
+    .eq('provider_event_id', `paypal:capture:${details.captureId}`)
+    .maybeSingle()
+
+  if (error) throw new Error(`Could not look up the refunded capture: ${error.message}`)
+  if (!data || !data.user_id) return null
+
+  return {
+    userId: data.user_id as string,
+    planId: (data.plan_id as string) ?? 'unknown',
+    amount: details.amount !== '0' ? details.amount : String(data.amount ?? '0'),
+    refundId: details.refundId,
   }
 }
 
@@ -67,11 +121,42 @@ export async function POST(req: Request) {
     })
     const verification = await verifyRes.json() as { verification_status?: string }
     if (verification.verification_status !== 'SUCCESS') {
+      logEvent('warn', 'paypal.webhook.invalid_signature', { eventType: event.event_type })
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: `Signature verification failed: ${message}` }, { status: 502 })
+    // Returning non-2xx asks PayPal to retry, which is what we want here.
+    return apiError('paypal.webhook.verify', error, 502, 'Signature verification failed')
+  }
+
+  if (REFUND_EVENTS.has(event.event_type || '')) {
+    try {
+      const target = await resolveRefundTarget(event)
+      if (!target) {
+        logEvent('warn', 'paypal.webhook.unresolved_refund', {
+          eventType: event.event_type,
+          resourceId: event.resource?.id,
+        })
+        return NextResponse.json({ received: true, ignored: 'unresolved_refund' })
+      }
+
+      const result = await revokePaidOrder({
+        userId: target.userId,
+        planId: target.planId,
+        amount: target.amount,
+        provider: 'paypal',
+        providerEventId: `paypal:refund:${target.refundId}`,
+      })
+
+      logEvent('info', 'paypal.webhook.revoked', {
+        eventType: event.event_type,
+        userId: target.userId,
+        result,
+      })
+      return NextResponse.json({ received: true, revoked: result })
+    } catch (error: unknown) {
+      return apiError('paypal.webhook.revoke', error, 500, 'Could not process the refund')
+    }
   }
 
   // Acknowledge everything that is not a completed capture.
@@ -95,8 +180,6 @@ export async function POST(req: Request) {
     })
     return NextResponse.json({ received: true, ...result })
   } catch (error: unknown) {
-    // Returning non-2xx asks PayPal to retry.
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('paypal.webhook.apply', error, 500, 'Could not apply the payment')
   }
 }

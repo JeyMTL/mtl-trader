@@ -10,7 +10,8 @@ This project is a trading journal SaaS built with Next.js and Supabase. It is or
 - `src/types` — TypeScript models used across the app
 - `supabase/migrations` — database schema and trigger logic
 - `public` — static files and sample data
-- `mobile` — Capacitor mobile wrapper
+- `mobile_flutter` — Native Flutter mobile app (flat design; the phone client)
+- `mobile` — Legacy Capacitor wrapper around the web app
 - `scripts` — helper scripts
 
 ## Main business flows
@@ -20,6 +21,8 @@ The app uses Supabase Auth and app-level user metadata. The user flows live unde
 
 ### 2. Trade import and journal workflow
 Trade uploads are handled in the dashboard import flow and then stored in the `trades` table. The app can ingest CSV/XLSX data and then display it in dashboard, analytics, and calendar views.
+
+Journal photos and voice notes attach through `trade_attachments` and the private `journal-media` storage bucket. Entry and exit times feed the `time_stats` RPC, which powers the time edge report on the dashboard, analytics page and Flutter Edge tab.
 
 ### 3. MT5 sync automation
 The app includes a sync process for MT5 trade exports. The Python agent under `public/mt5_agent.py` is the automation layer that pulls trade data and updates the journal.
@@ -42,8 +45,9 @@ The app contains admin-only approval routes for payment review and account actio
 
 - This project expects a Supabase project and matching environment variables.
 - Database migrations should be applied in filename order.
-- The app is designed for Vercel hosting, but the mobile wrapper uses Capacitor.
+- The app is designed for Vercel hosting. The phone app is the Flutter project in `mobile_flutter/`; the Capacitor wrapper in `mobile/` is retained for the web shell.
 - Trial and plan enforcement is controlled by user metadata and database logic rather than application-only checks.
+- Apply every migration in filename order. The latest one, `20261028_journal_media_and_time_stats.sql`, creates the journal media table, storage bucket/policies and the time-of-day RPCs.
 
 ## How to understand it quickly
 
@@ -63,4 +67,6 @@ This is a SaaS trading journal MVP with:
 - MT5 sync workflow
 - paid plan logic
 - admin review layer
-- mobile-ready wrapper
+- native Flutter mobile app
+- journal photo/voice-note capture
+- time-of-day edge report

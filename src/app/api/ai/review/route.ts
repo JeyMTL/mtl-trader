@@ -6,7 +6,8 @@ import { hashPayload } from '@/lib/ai/cache'
 import { createProvider, resolveProviderConfig } from '@/lib/ai/providers'
 import { generateReview, prepareReview } from '@/lib/ai/review'
 import { normalizeReview } from '@/lib/ai/schema'
-import type { ReviewRequest, ReviewResult, EdgeStats, SimilarSetup } from '@/lib/ai/types'
+import type { ReviewRequest, ReviewResult, EdgeStats, SimilarSetup, TradeRecord } from '@/lib/ai/types'
+import { apiError, logEvent } from '@/lib/log'
 
 /**
  * POST /api/ai/review
@@ -23,6 +24,9 @@ export const dynamic = 'force-dynamic'
 const RATE_LIMIT = 5
 const RATE_WINDOW_MS = 10 * 60 * 1000
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+// Upper bound on the trades read for one review. Recent history is what the
+// model can actually use, and it keeps the request bounded for large journals.
+const REVIEW_TRADE_LIMIT = 1000
 
 function cacheKey(input: ReviewRequest) {
   return {
@@ -78,13 +82,10 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(20)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return apiError('ai.review.list', error, 500, 'Could not load saved reviews.')
     return NextResponse.json({ reviews: data || [] })
   } catch (error: unknown) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+    return apiError('ai.review.list', error, 500, 'Could not load saved reviews.')
   }
 }
 
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Each call can bill the provider, so cap it per user.
-    const limit = rateLimit(`ai-review:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS)
+    const limit = await rateLimit(`ai-review:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS)
     if (!limit.ok) {
       return NextResponse.json(
         { error: 'Too many review requests. Please try again in a few minutes.' },
@@ -120,6 +121,24 @@ export async function POST(req: Request) {
     }
 
     const supabase = getAdminClient()
+
+    // The analytics page sends summary statistics only; the note-bearing trades
+    // are loaded here, so the browser no longer uploads the whole journal.
+    if (!Array.isArray(input.trades) || input.trades.length === 0) {
+      const { data: tradesForReview, error: tradesError } = await supabase
+        .from('trades')
+        .select('symbol, type, pnl, lot_size, open_time, close_time, created_at, timeframe, strategy, notes, tags')
+        .eq('user_id', user.id)
+        .order('close_time', { ascending: false })
+        .limit(REVIEW_TRADE_LIMIT)
+
+      if (tradesError) {
+        logEvent('warn', 'ai.review.trades', { error: tradesError, userId: user.id })
+      } else if (tradesForReview?.length) {
+        input.trades = tradesForReview as TradeRecord[]
+      }
+    }
+
     const summaryHash = hashPayload(cacheKey(input))
 
     // Serve a recent identical review instead of re-billing the model.
@@ -199,7 +218,8 @@ export async function POST(req: Request) {
               meta: { provider: provider.name, model: provider.model, cached: false, skipped: false, generatedAt: new Date().toISOString() },
             })
           } catch (error: unknown) {
-            send({ type: 'error', error: error instanceof Error ? error.message : 'AI request failed' })
+            logEvent('error', 'ai.review.stream', { error })
+            send({ type: 'error', error: 'AI request failed. Please try again.' })
           } finally {
             controller.close()
           }
@@ -241,7 +261,6 @@ export async function POST(req: Request) {
       },
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('ai.review', error, 500, 'Could not generate a review. Please try again.')
   }
 }

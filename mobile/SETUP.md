@@ -1,4 +1,10 @@
-# MTL Trader Mobile Setup Guide
+# MTL Trader Capacitor Shell (legacy)
+
+> The phone app is now the native Flutter project in [`../mobile_flutter`](../mobile_flutter/README.md).
+> This Capacitor wrapper still loads the live web app and remains useful for a zero-install shell,
+> but new mobile work belongs in the Flutter app.
+
+# Capacitor Setup Guide
 
 ## Prerequisites
 - Node.js 18+ installed
@@ -66,8 +72,11 @@ npm run open:ios
 ## Configuration
 
 ### App URL
-The app loads from `https://mtl-trader.vercel.app` by default.
-To change this, edit `capacitor.config.json`:
+The app loads from `https://mtl-trader.vercel.app` by default, which means the mobile UI ships with the web deploy — no app-store release is needed for layout changes. Deploy the web app first, then reopen the native shell.
+
+On phones the dashboard renders a native-style shell (fixed app bar, bottom tab bar, More sheet, safe-area insets, card lists instead of tables). The desktop layout is unchanged at `lg` and above.
+
+To change the loaded URL, edit `capacitor.config.json`:
 ```json
 {
   "server": {

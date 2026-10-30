@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { rateLimit } from '@/lib/rate-limit'
+import { apiError, logEvent } from '@/lib/log'
 
 interface MT5Trade {
   ticket: number
@@ -34,6 +36,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Sync batch is limited to 1000 trades' }, { status: 413 })
     }
 
+    // The agent polls every 60s, so 240/hour leaves room for retries without
+    // letting a leaked token hammer the database.
+    const limit = await rateLimit(`sync:${userId}`, 240, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many sync requests. The agent will retry shortly.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
+      )
+    }
+
     const { data: user, error: userError } = await getAdminClient()
       .from('users')
       .select('id, agent_token')
@@ -58,15 +70,30 @@ export async function POST(req: Request) {
     if (!trades.every(isValidTrade)) {
       return NextResponse.json({ error: 'One or more trades has invalid data' }, { status: 400 })
     }
+    if (trades.length === 0) {
+      return NextResponse.json({ message: 'No new trades', imported: 0 })
+    }
 
-    const { data: existingTrades } = await getAdminClient()
+    const supabase = getAdminClient()
+    const incomingTickets = [...new Set(trades.map((trade) => trade.ticket))]
+    const { data: existingTrades, error: existingError } = await supabase
       .from('trades')
       .select('ticket')
       .eq('user_id', userId)
+      .in('ticket', incomingTickets)
 
-    const existingTickets = new Set(existingTrades?.map(t => t.ticket) || [])
+    if (existingError) {
+      return apiError('sync.existing', existingError, 500, 'Could not check existing trades.')
+    }
 
-    const newTrades = trades.filter((trade) => !existingTickets.has(trade.ticket))
+    const existingTickets = new Set(existingTrades.map(t => t.ticket))
+
+    const seenTickets = new Set(existingTickets)
+    const newTrades = trades.filter((trade) => {
+      if (seenTickets.has(trade.ticket)) return false
+      seenTickets.add(trade.ticket)
+      return true
+    })
 
     if (newTrades.length === 0) {
       return NextResponse.json({ message: 'No new trades', imported: 0 })
@@ -91,21 +118,20 @@ export async function POST(req: Request) {
       strategy: trade.strategy || '',
     }))
 
-    const { data: inserted, error: insertError } = await getAdminClient()
+    const { data: inserted, error: insertError } = await supabase
       .from('trades')
       .insert(tradesToInsert)
       .select('id')
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+      return apiError('sync.insert', insertError, 500, 'Could not save the synced trades.')
     }
 
     // `trades_remaining` is not authoritative: the enforce_trade_quota trigger
     // enforces the monthly limit from `max_trades`, so we no longer mutate it here.
     return NextResponse.json({ message: 'Sync complete', imported: inserted!.length })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('sync.post', error, 500, 'Could not sync trades.')
   }
 }
 
@@ -138,18 +164,22 @@ export async function GET(req: Request) {
 
     if (!user.agent_token) {
       const token = generateToken()
-      await getAdminClient()
+      const { error: updateError } = await getAdminClient()
         .from('users')
         .update({ agent_token: token })
         .eq('id', userId)
 
+      if (updateError) {
+        return apiError('sync.token', updateError, 500, 'Could not save the sync token.')
+      }
+
+      logEvent('info', 'sync.token.created', { userId })
       return NextResponse.json({ token, isNew: true })
     }
 
     return NextResponse.json({ token: user.agent_token, isNew: false })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('sync.get', error, 500, 'Could not load the sync token.')
   }
 }
 
@@ -160,11 +190,22 @@ function generateToken(): string {
 function isValidTrade(value: unknown): value is MT5Trade {
   if (!value || typeof value !== 'object') return false
   const trade = value as Record<string, unknown>
-  const numericFields = ['ticket', 'entry_price', 'exit_price', 'lot_size', 'pnl', 'commission', 'swap']
+  const numericFields = ['ticket', 'entry_price', 'exit_price', 'lot_size', 'pnl']
   const hasValidNumbers = numericFields.every((field) => typeof trade[field] === 'number' && Number.isFinite(trade[field]))
-  const hasValidDates = typeof trade.open_time === 'string' && typeof trade.close_time === 'string'
+  const optionalNumbers = ['stop_loss', 'take_profit', 'commission', 'swap']
+  const hasValidOptionalNumbers = optionalNumbers.every((field) =>
+    trade[field] === undefined || (typeof trade[field] === 'number' && Number.isFinite(trade[field]))
+  )
+  const hasValidDates =
+    typeof trade.open_time === 'string' &&
+    Number.isFinite(Date.parse(trade.open_time)) &&
+    typeof trade.close_time === 'string' &&
+    Number.isFinite(Date.parse(trade.close_time))
   const hasValidIdentity = Number.isInteger(trade.ticket) && (trade.ticket as number) > 0 &&
     typeof trade.symbol === 'string' && trade.symbol.length > 0 && trade.symbol.length <= 32 &&
     (trade.type === 'BUY' || trade.type === 'SELL')
-  return hasValidNumbers && hasValidDates && hasValidIdentity
+  const hasValidOptionalText = ['timeframe', 'strategy'].every((field) =>
+    trade[field] === undefined || (typeof trade[field] === 'string' && trade[field].length <= 100)
+  )
+  return hasValidNumbers && hasValidOptionalNumbers && hasValidDates && hasValidIdentity && hasValidOptionalText
 }

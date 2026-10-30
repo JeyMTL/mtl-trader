@@ -35,7 +35,14 @@ describe('planRank', () => {
 })
 
 describe('shouldApplyPlan', () => {
-  const active = (tier: string) => ({ subscription_tier: tier, subscription_status: 'active', max_trades: 50, trial_ends_at: null })
+  const NOW = new Date('2026-06-01T12:00:00.000Z')
+  const active = (tier: string) => ({
+    subscription_tier: tier,
+    subscription_status: 'active',
+    max_trades: 50,
+    trial_ends_at: null,
+    current_period_end: new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  })
 
   it('applies paid plans to trials, cancelled accounts and upgrades', () => {
     expect(shouldApplyPlan({ subscription_status: 'trial', subscription_tier: 'free' }, 'pro')).toBe(true)
@@ -45,7 +52,12 @@ describe('shouldApplyPlan', () => {
   })
 
   it('never downgrades an active higher plan', () => {
-    expect(shouldApplyPlan(active('pro'), 'basic')).toBe(false)
+    expect(shouldApplyPlan(active('pro'), 'basic', NOW)).toBe(false)
+  })
+
+  it('allows any plan once the higher paid period has lapsed', () => {
+    const lapsed = { ...active('pro'), current_period_end: '2026-05-01T00:00:00.000Z' }
+    expect(shouldApplyPlan(lapsed, 'basic', NOW)).toBe(true)
   })
 
   it('ignores unknown or free plan ids', () => {

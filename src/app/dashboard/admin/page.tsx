@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, XCircle, Clock, Loader2, Shield, Users, RefreshCw } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Loader2, Shield, Users, RefreshCw, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
 
@@ -38,6 +38,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [usersLoading, setUsersLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   const fetchRequests = async () => {
     setLoading(true)
@@ -121,6 +122,32 @@ export default function AdminPage() {
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    setErrorMessage('')
+    try {
+      const res = await authedFetch('/api/admin/payments/export')
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setErrorMessage(data?.error || 'Could not export payment requests')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `payment-requests-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setErrorMessage('Could not export payment requests. Check your connection and try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (!isAdmin) return null
 
   const filtered = requests.filter(r => filter === 'all' || r.status === filter)
@@ -143,7 +170,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {['pending', 'approved', 'rejected', 'all'].map((f) => (
           <button
             key={f}
@@ -160,6 +187,14 @@ export default function AdminPage() {
             )}
           </button>
         ))}
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="ml-auto flex items-center gap-1.5 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:text-white disabled:opacity-50"
+        >
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Export CSV
+        </button>
       </div>
 
       <div className="bg-surface border border-border rounded-xl overflow-hidden">

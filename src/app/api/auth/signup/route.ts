@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { trialFields } from '@/lib/subscription'
+import { apiError, logEvent } from '@/lib/log'
 
 export async function POST(req: Request) {
   try {
@@ -40,12 +41,12 @@ export async function POST(req: Request) {
     }, { onConflict: 'id', ignoreDuplicates: true })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return apiError('auth.signup.profile', error, 500, 'Could not create your profile. Please try again.')
     }
 
+    logEvent('info', 'auth.signup.profile', { userId })
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('auth.signup', error, 500, 'Could not create your profile. Please try again.')
   }
 }

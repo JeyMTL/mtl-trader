@@ -39,6 +39,9 @@ yarn-error.log*
 # local editor tooling
 .kilo/
 
+# local SDK downloads used for verification
+.tooling/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -61,7 +64,9 @@ ReportHistory-*.json
 !.env.example
 
 # IDE / editor
-.idea/
+.idea/*
+# Flutter run configurations are shared so the play button works on a fresh clone
+!**/.idea/runConfigurations/
 
 # Android local + build output (machine-specific SDK path, Gradle builds)
 mobile/android/local.properties

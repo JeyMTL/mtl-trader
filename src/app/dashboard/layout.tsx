@@ -2,26 +2,28 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   TrendingUp,
-  BarChart3, 
-  Settings, 
+  BarChart3,
+  Settings,
   LogOut,
   Upload,
-  Menu,
-  X,
   Plus,
   Shield,
   Calendar,
-  RefreshCw
+  RefreshCw,
+  MoreHorizontal,
+  ChevronRight,
+  ChevronLeft,
+  X,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
-import { cn, isMobile } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import { maxTradesForPlan, trialEndsAtFrom } from '@/lib/subscription'
+import { effectiveMaxTrades, maxTradesForPlan, trialEndsAtFrom } from '@/lib/subscription'
 import { Logo } from '@/components/logo'
-import { useBackButton } from '@/hooks/useCapacitor'
+import { useBackButton, useHaptics } from '@/hooks/useCapacitor'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -34,6 +36,22 @@ const navigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
+/** Everything that does not fit in five bottom tabs lives in the sheet. */
+const moreNavigation = [
+  { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
+  { name: 'Import trades', href: '/dashboard/import', icon: Upload },
+  { name: 'MT5 auto sync', href: '/dashboard/sync', icon: RefreshCw },
+  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+]
+
+function initialsOf(name: string | null | undefined, email: string | null | undefined): string {
+  const source = (name || '').trim() || (email || '').trim()
+  if (!source) return 'MT'
+  const parts = source.split(/[\s@._-]+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return source.slice(0, 2).toUpperCase()
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -41,9 +59,19 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { trigger } = useHaptics()
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
-  const [user, setUser] = useState<{ tier: string; status: string; isAdmin: boolean; maxTrades: number; tradesUsed: number; trialEndsAt: string | null } | null>(null)
+  const [user, setUser] = useState<{
+    tier: string
+    status: string
+    isAdmin: boolean
+    maxTrades: number
+    tradesUsed: number
+    trialEndsAt: string | null
+    fullName: string | null
+    email: string | null
+  } | null>(null)
   const [trialDaysLeft, setTrialDaysLeft] = useState(0)
 
   useEffect(() => {
@@ -56,16 +84,20 @@ export default function DashboardLayout({
       }
       let { data } = await supabase
         .from('users')
-        .select('subscription_tier, subscription_status, max_trades, trial_ends_at, is_admin')
+        .select('full_name, email, subscription_tier, subscription_status, max_trades, trial_ends_at, current_period_end, cancel_at_period_end, is_admin')
         .eq('id', authUser.id)
         .single()
 
       if (!data) {
         data = {
+          full_name: null,
+          email: authUser.email ?? null,
           subscription_tier: 'free',
           subscription_status: 'trial',
           max_trades: maxTradesForPlan('free'),
           trial_ends_at: trialEndsAtFrom(),
+          current_period_end: null,
+          cancel_at_period_end: false,
           is_admin: false,
         }
       }
@@ -80,23 +112,36 @@ export default function DashboardLayout({
         .eq('user_id', authUser.id)
         .gte('created_at', startOfMonth.toISOString())
 
-      if (data) {
-        setUser({
-          tier: data.subscription_tier || 'free',
-          status: data.subscription_status || 'trial',
-          isAdmin: data.is_admin === true,
-          maxTrades: data.max_trades ?? 10,
-          tradesUsed: count ?? 0,
-          trialEndsAt: data.trial_ends_at,
-        })
-        if (data.trial_ends_at) {
-          setTrialDaysLeft(Math.max(0, Math.ceil((new Date(data.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))))
-        }
+      setUser({
+        tier: data.subscription_tier || 'free',
+        status: data.subscription_status || 'trial',
+        isAdmin: data.is_admin === true,
+        maxTrades: effectiveMaxTrades(data),
+        tradesUsed: count ?? 0,
+        trialEndsAt: data.trial_ends_at,
+        fullName: data.full_name ?? null,
+        email: data.email ?? authUser.email ?? null,
+      })
+      if (data.trial_ends_at) {
+        setTrialDaysLeft(Math.max(0, Math.ceil((new Date(data.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))))
       }
       setAuthChecked(true)
     }
     loadUser()
   }, [router])
+
+  const openSheet = useCallback(() => {
+    trigger('light')
+    setSheetOpen(true)
+  }, [trigger])
+
+  // Tapping the tab you are already on scrolls to the top, like a native app.
+  const handleTabClick = (active: boolean) => {
+    trigger('light')
+    if (active && typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -104,17 +149,17 @@ export default function DashboardLayout({
   }
 
   const handleBackButton = useCallback(() => {
-    if (sidebarOpen) {
-      setSidebarOpen(false)
+    if (sheetOpen) {
+      setSheetOpen(false)
     } else {
       router.back()
     }
-  }, [sidebarOpen, router])
+  }, [sheetOpen, router])
 
   useBackButton(handleBackButton)
 
   if (!authChecked) {
-    return <div className="min-h-screen bg-background" />
+    return <div className="min-h-dvh bg-background" />
   }
 
   const trialProgress = user?.maxTrades && user.maxTrades > 0
@@ -128,122 +173,305 @@ export default function DashboardLayout({
   const isPro = user?.tier === 'pro'
   const isBasic = user?.tier === 'basic'
 
+  const planLabel = !user
+    ? ''
+    : user.status === 'active'
+      ? (isPro ? 'Pro' : isBasic ? 'Basic' : 'Paid')
+      : user.status === 'trial'
+        ? `${trialDaysLeft}d trial`
+        : 'Free'
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') return pathname === '/dashboard'
+    // The Add screen is its own tab, so it must not light up "Trades".
+    if (href === '/dashboard/trades') {
+      return pathname.startsWith('/dashboard/trades') && !pathname.startsWith('/dashboard/trades/new')
+    }
+    return pathname === href || pathname.startsWith(href + '/')
+  }
+
+  // Inner screens get a native back affordance; tab roots show the brand.
+  const subRouteTitles: Record<string, string> = {
+    '/dashboard/trades/new': 'Add trade',
+    '/dashboard/import': 'Import trades',
+    '/dashboard/sync': 'MT5 sync',
+    '/dashboard/calendar': 'Calendar',
+    '/dashboard/settings': 'Settings',
+    '/dashboard/payment': 'Payment',
+    '/dashboard/admin': 'Admin',
+  }
+  const subRouteTitle = pathname.startsWith('/dashboard/trades/') && pathname.endsWith('/edit')
+    ? 'Edit trade'
+    : subRouteTitles[pathname]
+
+  const tabClass = (active: boolean) =>
+    cn(
+      'flex h-full flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors active:opacity-60',
+      active ? 'text-primary' : 'text-gray-500'
+    )
+
   return (
-    <div className={cn(
-      "min-h-screen bg-background flex",
-      isMobile() && "mobile-app"
-    )}>
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
+    <div className="min-h-dvh bg-background">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:w-64 lg:flex-col bg-surface border-r border-border">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-border">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <Logo size="sm" />
+          </Link>
+        </div>
 
-      {/* Sidebar */}
-      <aside className={cn(
-        "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-surface border-r border-border transform transition-transform duration-200 ease-in-out",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      )}>
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between h-16 px-4 border-b border-border">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <Logo size="sm" />
-            </Link>
-            <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <nav className="flex-1 px-3 py-4 space-y-1">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive
-                      ? "nav-active"
-                      : "text-gray-400 hover:text-white hover:bg-surface-light"
-                  )}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.name}
-                </Link>
-              )
-            })}
-            {user?.isAdmin && (
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {navigation.map((item) => {
+            const active = pathname === item.href
+            return (
               <Link
-                href="/dashboard/admin"
-                onClick={() => setSidebarOpen(false)}
+                key={item.name}
+                href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  pathname === '/dashboard/admin'
-                    ? "nav-active"
-                    : "text-gray-400 hover:text-white hover:bg-surface-light"
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  active
+                    ? 'nav-active'
+                    : 'text-gray-400 hover:text-white hover:bg-surface-light'
                 )}
               >
-                <Shield className="w-5 h-5" />
-                Admin
+                <item.icon className="w-5 h-5" />
+                {item.name}
               </Link>
-            )}
-          </nav>
-
-          <div className="p-3 border-t border-border">
-            {user && (
-              <div className="bg-surface-light rounded-lg p-3 mb-3">
-                <div className="text-xs text-gray-400">
-                  {isPro ? 'Pro Plan' : isBasic ? 'Basic Plan' : '30-Day Free Trial'}
-                </div>
-                <div className="text-sm text-white font-medium">
-                  {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
-                   user.status === 'trial' ? `${trialDaysLeft} days remaining, unlimited trades` :
-                   'Expired'}
-                </div>
-                 {!isPro && user.status !== 'trial' && (
-                  <div className="w-full bg-background rounded-full h-2 mt-2">
-                    <div className="bg-primary h-2 rounded-full" style={{ width: `${trialProgress}%` }} />
-                  </div>
-                )}
-              </div>
-            )}
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-surface-light transition-colors"
+            )
+          })}
+          {user?.isAdmin && (
+            <Link
+              href="/dashboard/admin"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                pathname === '/dashboard/admin'
+                  ? 'nav-active'
+                  : 'text-gray-400 hover:text-white hover:bg-surface-light'
+              )}
             >
-              <LogOut className="w-5 h-5" />
-              Logout
-            </button>
-          </div>
+              <Shield className="w-5 h-5" />
+              Admin
+            </Link>
+          )}
+        </nav>
+
+        <div className="p-3 border-t border-border">
+          {user && (
+            <div className="bg-surface-light rounded-lg p-3 mb-3">
+              <div className="text-xs text-gray-400">
+                {isPro ? 'Pro Plan' : isBasic ? 'Basic Plan' : '30-Day Free Trial'}
+              </div>
+              <div className="text-sm text-white font-medium">
+                {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
+                 user.status === 'trial' ? `${trialDaysLeft} days remaining, unlimited trades` :
+                 'Expired'}
+              </div>
+              {!isPro && user.status !== 'trial' && (
+                <div className="w-full bg-background rounded-full h-2 mt-2">
+                  <div className="bg-primary h-2 rounded-full" style={{ width: `${trialProgress}%` }} />
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-surface-light transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            Logout
+          </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 bg-surface/50 backdrop-blur-sm border-b border-border min-h-16 flex items-center px-3 sm:px-4 lg:px-6 py-2">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-400 hover:text-white mr-4">
-            <Menu className="w-6 h-6" />
-          </button>
+      <div className="lg:pl-64 min-h-dvh flex flex-col">
+        {/* Desktop header */}
+        <header className="hidden lg:flex sticky top-0 z-30 bg-surface/50 backdrop-blur-sm border-b border-border min-h-16 items-center px-6 py-2">
           <div className="flex-1" />
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <div className="flex items-center gap-4 min-w-0">
             {user && (
-              <div className="hidden sm:block text-sm text-gray-400 truncate">
+              <div className="text-sm text-gray-400 truncate">
                 {isPro ? 'Unlimited trades' : (
                   <><span className="text-white font-medium">{tradesRemaining}</span> / {user.maxTrades} trades remaining this month</>
                 )}
               </div>
             )}
-            <Link href="/pricing" className="btn-gradient text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+            <Link href="/pricing" className="btn-gradient text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
               Upgrade
             </Link>
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        <main className="flex-1 px-4 lg:p-6 mobile-main">
           {children}
         </main>
       </div>
+
+      {/* Mobile top bar */}
+      <header className="mobile-appbar lg:hidden fixed inset-x-0 top-0 z-40 border-b border-border bg-surface/85 backdrop-blur-xl">
+        <div className="flex h-14 items-center justify-between gap-2 px-4">
+          {subRouteTitle ? (
+            <div className="flex min-w-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => { trigger('light'); router.back() }}
+                aria-label="Go back"
+                className="-ml-2 flex h-9 items-center gap-0.5 rounded-lg pl-1 pr-2 text-primary active:opacity-60"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <span className="truncate text-base font-semibold text-white">{subRouteTitle}</span>
+            </div>
+          ) : (
+            <Link href="/dashboard" className="flex items-center gap-2 active:opacity-60" onClick={() => trigger('light')}>
+              <Logo size="sm" />
+            </Link>
+          )}
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="rounded-full border border-border bg-surface-light px-2.5 py-1 text-[11px] font-medium text-gray-300">
+              {planLabel}
+            </span>
+            <button
+              type="button"
+              onClick={openSheet}
+              aria-label="Open menu"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface-light text-xs font-semibold text-white active:scale-95 transition-transform"
+            >
+              {initialsOf(user?.fullName, user?.email)}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="mobile-tabbar lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/90 backdrop-blur-xl">
+        <div className="grid h-14 grid-cols-5 items-end px-1">
+          <Link href="/dashboard" className={tabClass(pathname === '/dashboard')} onClick={() => handleTabClick(pathname === '/dashboard')}>
+            <LayoutDashboard className="h-5 w-5" />
+            Home
+          </Link>
+          <Link href="/dashboard/trades" className={tabClass(isActive('/dashboard/trades'))} onClick={() => handleTabClick(isActive('/dashboard/trades'))}>
+            <TrendingUp className="h-5 w-5" />
+            Trades
+          </Link>
+          <Link
+            href="/dashboard/trades/new"
+            aria-label="Add trade"
+            onClick={() => trigger('medium')}
+            className="flex justify-center active:opacity-80"
+          >
+            <span className="btn-gradient -mt-6 flex h-12 w-12 items-center justify-center rounded-2xl text-white ring-4 ring-background">
+              <Plus className="h-6 w-6" />
+            </span>
+          </Link>
+          <Link href="/dashboard/analytics" className={tabClass(isActive('/dashboard/analytics'))} onClick={() => handleTabClick(isActive('/dashboard/analytics'))}>
+            <BarChart3 className="h-5 w-5" />
+            Analytics
+          </Link>
+          <button type="button" onClick={openSheet} className={tabClass(sheetOpen)}>
+            <MoreHorizontal className="h-5 w-5" />
+            More
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile More sheet */}
+      {sheetOpen && (
+        <div className="lg:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="More options">
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="absolute inset-0 h-full w-full bg-black/60 backdrop-blur-sm"
+            onClick={() => setSheetOpen(false)}
+          />
+
+          <div className="sheet-in mobile-sheet absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-border bg-surface px-4 pt-3">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
+
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-white">
+                  {user?.fullName || user?.email || 'Your account'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {isPro ? 'Pro plan' : isBasic ? 'Basic plan' : user?.status === 'trial' ? 'Free trial' : 'Free plan'}
+                  {user?.status === 'trial' && trialDaysLeft > 0 ? ` · ${trialDaysLeft} days left` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => setSheetOpen(false)}
+                aria-label="Close"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-light text-gray-400 active:scale-95 transition-transform"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {user && (
+              <div className="mb-4 rounded-2xl border border-border bg-surface-light p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs text-gray-400">
+                    {user.status === 'active'
+                      ? (isPro ? 'Unlimited trades' : `${tradesRemaining} of ${user.maxTrades} trades left this month`)
+                      : user.status === 'trial'
+                        ? 'Unlimited trades during the trial'
+                        : 'No active plan'}
+                  </span>
+                  <Link
+                    href="/pricing"
+                    onClick={() => setSheetOpen(false)}
+                    className="text-xs font-semibold text-primary active:opacity-60"
+                  >
+                    {isPro ? 'Manage' : 'Upgrade'}
+                  </Link>
+                </div>
+                {!isPro && user.status !== 'trial' && (
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-background">
+                    <div className="h-1.5 rounded-full bg-primary" style={{ width: `${trialProgress}%` }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface-light">
+              {moreNavigation.map((item, index) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setSheetOpen(false)}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-white active:bg-surface',
+                    index > 0 && 'border-t border-border'
+                  )}
+                >
+                  <item.icon className="h-5 w-5 text-gray-400" />
+                  <span className="flex-1">{item.name}</span>
+                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                </Link>
+              ))}
+              {user?.isAdmin && (
+                <Link
+                  href="/dashboard/admin"
+                  onClick={() => setSheetOpen(false)}
+                  className="flex items-center gap-3 border-t border-border px-4 py-3.5 text-sm font-medium text-white active:bg-surface"
+                >
+                  <Shield className="h-5 w-5 text-gray-400" />
+                  <span className="flex-1">Admin</span>
+                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                </Link>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-danger/40 px-4 py-3 text-sm font-semibold text-danger active:bg-danger/10"
+            >
+              <LogOut className="h-4 w-4" />
+              Log out
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -6,27 +6,72 @@ type Row = Record<string, unknown>
 const state = vi.hoisted(() => ({
   users: [] as Row[],
   trades: [] as Row[],
+  sends: new Set<string>(),
   emailConfigured: true,
   sent: [] as Array<{ to: string; subject: string; html: string }>,
 }))
 
-vi.mock('@/lib/server-auth', () => ({
-  getAdminClient: () => ({
-    from: (table: string) => {
-      const result = Promise.resolve({
-        data: table === 'users' ? state.users : state.trades,
-        error: null,
-      })
-      const chain = {
-        select: () => chain,
-        eq: () => chain,
-        limit: () => result,
-        then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
-          result.then(resolve, reject),
+function makeClient() {
+  return {
+    from(table: string) {
+      if (table === 'users') {
+        const builder = {
+          select: () => builder,
+          eq: () => builder,
+          order: () => builder,
+          range: (from: number, to: number) =>
+            Promise.resolve({ data: state.users.slice(from, to + 1), error: null }),
+          then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+            Promise.resolve({ data: state.users, error: null }).then(resolve, reject),
+        }
+        return builder
       }
-      return chain
+
+      if (table === 'notification_sends') {
+        const claim = (row: Row) => {
+          const id = `${row.user_id}:${row.kind}:${row.window_key}`
+          if (state.sends.has(id)) {
+            return Promise.resolve({ data: null, error: { code: '23505', message: 'duplicate key' } })
+          }
+          state.sends.add(id)
+          return Promise.resolve({ data: row, error: null })
+        }
+
+        const remove = () => {
+          const filters: Record<string, unknown> = {}
+          const builder = {
+            eq(column: string, value: unknown) {
+              filters[column] = value
+              return builder
+            },
+            then(resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) {
+              state.sends.delete(`${filters.user_id}:${filters.kind}:${filters.window_key}`)
+              return Promise.resolve({ data: null, error: null }).then(resolve, reject)
+            },
+          }
+          return builder
+        }
+
+        return {
+          insert: (row: Row) => claim(row),
+          delete: () => remove(),
+        }
+      }
+
+      throw new Error(`Unexpected table: ${table}`)
     },
-  }),
+    rpc(name: string, args: Row) {
+      if (name !== 'notification_trades') throw new Error(`Unexpected rpc: ${name}`)
+      if (args?.p_user_id === 'bad-user') {
+        return Promise.resolve({ data: null, error: { message: 'boom' } })
+      }
+      return Promise.resolve({ data: state.trades, error: null })
+    },
+  }
+}
+
+vi.mock('@/lib/server-auth', () => ({
+  getAdminClient: () => makeClient(),
 }))
 
 vi.mock('@/lib/email', () => ({
@@ -54,6 +99,7 @@ function user(overrides: Row = {}): Row {
     full_name: 'Ann',
     currency: 'USD',
     timezone: 'UTC',
+    notifications_email: true,
     notifications_daily: false,
     notifications_weekly: false,
     notifications_monthly_email: false,
@@ -65,6 +111,7 @@ function user(overrides: Row = {}): Row {
 beforeEach(() => {
   state.users = []
   state.trades = []
+  state.sends.clear()
   state.emailConfigured = true
   state.sent = []
   process.env.CRON_SECRET = 'test-secret'
@@ -125,6 +172,17 @@ describe('notifications cron', () => {
     expect(body.emailsSent).toBe(0)
   })
 
+  it('never sends the same email twice when the cron is re-run', async () => {
+    state.users = [user({ notifications_journal_reminders: true })]
+
+    const first = await runCron(AUTH_HEADERS)
+    const second = await runCron(AUTH_HEADERS)
+
+    expect(first.body.emailsSent).toBe(1)
+    expect(second.body.emailsSent).toBe(0)
+    expect(state.sent).toHaveLength(1)
+  })
+
   it('sends the weekly report only on Mondays', async () => {
     state.users = [user({ notifications_weekly: true })]
     state.trades = [{ pnl: 50, close_time: '2026-06-01T10:00:00.000Z' }]
@@ -157,5 +215,18 @@ describe('notifications cron', () => {
 
     const { body } = await runCron(AUTH_HEADERS)
     expect(body.emailsSent).toBe(1)
+  })
+
+  it('isolates a failing user from the rest of the run', async () => {
+    state.users = [
+      user({ id: 'bad-user', email: 'bad@example.com', notifications_journal_reminders: true }),
+      user({ id: 'good-user', email: 'good@example.com', notifications_journal_reminders: true }),
+    ]
+
+    const { body } = await runCron(AUTH_HEADERS)
+    expect(body.emailsSent).toBe(1)
+    expect(body.failed).toBe(1)
+    expect(state.sent).toHaveLength(1)
+    expect(state.sent[0].to).toBe('good@example.com')
   })
 })

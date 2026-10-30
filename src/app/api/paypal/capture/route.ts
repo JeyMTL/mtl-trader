@@ -1,20 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
-import { applyPaidOrder, parseCustomId, PAYPAL_BASE } from '@/lib/payments'
-
-async function getAccessToken(): Promise<string> {
-  const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`).toString('base64')
-  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  })
-  const data = await res.json()
-  return data.access_token
-}
+import { applyPaidOrder, getPayPalAccessToken, parseCustomId, PAYPAL_BASE } from '@/lib/payments'
+import { apiError, logEvent } from '@/lib/log'
 
 export async function POST(req: Request) {
   try {
@@ -29,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing orderId' }, { status: 400 })
     }
 
-    const accessToken = await getAccessToken()
+    const accessToken = await getPayPalAccessToken()
 
     const response = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${orderId}/capture`, {
       method: 'POST',
@@ -42,6 +29,7 @@ export async function POST(req: Request) {
     const data = await response.json()
 
     if (data.status !== 'COMPLETED') {
+      logEvent('warn', 'paypal.capture.incomplete', { orderId, status: data.status, userId: authUser.id })
       return NextResponse.json({ error: 'Payment not completed' }, { status: 400 })
     }
 
@@ -82,7 +70,6 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ error: 'Payment could not be applied' }, { status: 400 })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return apiError('paypal.capture', error, 500, 'Could not confirm the payment. If you were charged, it will be applied automatically.')
   }
 }

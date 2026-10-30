@@ -5,6 +5,7 @@ import { User, CreditCard, Bell, Shield, Save, Wallet, Trash2, Palette, Loader2 
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useTheme } from '@/lib/theme'
+import { useToast } from '@/components/toast'
 import { PLANS } from '@/lib/plans'
 
 const BASIC_PRICE = PLANS.find(p => p.id === 'basic')?.price ?? 0
@@ -34,6 +35,7 @@ interface UserProfile {
 
 export default function SettingsPage() {
   const { theme, toggle } = useTheme()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('profile')
   const [saved, setSaved] = useState(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
@@ -43,7 +45,13 @@ export default function SettingsPage() {
   const [depLoading, setDepLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
-  const [userPlan, setUserPlan] = useState({ tier: 'free', status: 'trial', stripeCustomerId: '' as string | null })
+  const [userPlan, setUserPlan] = useState({
+    tier: 'free',
+    status: 'trial',
+    stripeCustomerId: '' as string | null,
+    currentPeriodEnd: null as string | null,
+    cancelAtPeriodEnd: false,
+  })
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile>({
     full_name: '',
@@ -102,6 +110,8 @@ export default function SettingsPage() {
         tier: userData.subscription_tier || 'free',
         status: userData.subscription_status || 'trial',
         stripeCustomerId: userData.stripe_customer_id,
+        currentPeriodEnd: userData.current_period_end ?? null,
+        cancelAtPeriodEnd: userData.cancel_at_period_end === true,
       })
     } else {
       setProfile(prev => ({ ...prev, email: user.email || '' }))
@@ -145,6 +155,8 @@ export default function SettingsPage() {
           tier: userData.subscription_tier || 'free',
           status: userData.subscription_status || 'trial',
           stripeCustomerId: userData.stripe_customer_id,
+          currentPeriodEnd: userData.current_period_end ?? null,
+          cancelAtPeriodEnd: userData.cancel_at_period_end === true,
         })
       } else {
         setProfile(prev => ({ ...prev, email: user.email || '' }))
@@ -173,7 +185,7 @@ export default function SettingsPage() {
       })
       .eq('id', userId)
     if (error) {
-      alert('Error saving profile: ' + error.message)
+      toast('Could not save your profile: ' + error.message, { tone: 'error' })
     }
     setTimeout(() => setSaved(false), 2000)
   }
@@ -194,7 +206,7 @@ export default function SettingsPage() {
       })
       .eq('id', userId)
     if (error) {
-      alert('Error saving notifications: ' + error.message)
+      toast('Could not save your notification settings: ' + error.message, { tone: 'error' })
     }
     setTimeout(() => setSaved(false), 2000)
   }
@@ -248,15 +260,43 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return
     if (!confirm('This will permanently delete all your trades, deposits, and account data. Continue?')) return
-    setDeleteLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
-    await supabase.from('trades').delete().eq('user_id', user.id)
-    await supabase.from('deposits').delete().eq('user_id', user.id)
-    await supabase.from('users').delete().eq('id', user.id)
-    await supabase.auth.signOut()
-    window.location.href = '/'
+    // Typing the email is the last line of defence against an accidental click
+    // or a stray request destroying the account.
+    const confirmation = window.prompt(
+      `Type your email (${profile.email}) to confirm permanent deletion:`,
+      ''
+    )
+    if (confirmation === null) return
+
+    setDeleteLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast('You must be signed in to delete your account.', { tone: 'error' })
+        return
+      }
+
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ confirmEmail: confirmation.trim() }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete account')
+      }
+
+      await supabase.auth.signOut()
+      window.location.href = '/'
+    } catch (error: unknown) {
+      toast(error instanceof Error ? error.message : 'Could not delete your account.', { tone: 'error' })
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   const handleAddDeposit = async () => {
@@ -271,7 +311,7 @@ export default function SettingsPage() {
       description: depDesc || null,
     })
     if (error) {
-      alert('Error adding deposit: ' + error.message)
+      toast('Could not add that entry: ' + error.message, { tone: 'error' })
       setDepLoading(false)
       return
     }
@@ -303,16 +343,19 @@ export default function SettingsPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
-        alert('Error: ' + (data.error || 'Something went wrong'))
+        toast(data.error || 'Could not start checkout.', { tone: 'error' })
       }
     } catch {
-      alert('Failed to start checkout')
+      toast('Could not start checkout. Check your connection and try again.', { tone: 'error' })
     }
     setCheckoutLoading(null)
   }
 
   const handleCancelSubscription = async () => {
-    if (!confirm('Are you sure you want to cancel your subscription? You will lose access to premium features.')) return
+    const until = userPlan.currentPeriodEnd
+      ? new Date(userPlan.currentPeriodEnd).toLocaleDateString()
+      : 'the end of your paid period'
+    if (!confirm(`Stop renewing your subscription? You keep full access until ${until}.`)) return
     setPortalLoading(true)
     try {
       const res = await fetch('/api/subscription/cancel', {
@@ -322,15 +365,40 @@ export default function SettingsPage() {
       })
       const data = await res.json()
       if (data.success) {
-        alert('Subscription cancelled successfully')
+        toast(`Renewal cancelled. You keep access until ${data.accessUntil ? new Date(data.accessUntil).toLocaleDateString() : until}.`, { tone: 'success' })
         fetchData()
       } else {
-        alert('Error: ' + (data.error || 'Failed to cancel'))
+        toast(data.error || 'Could not cancel the renewal.', { tone: 'error' })
       }
     } catch {
-      alert('Failed to cancel subscription')
+      toast('Could not cancel the renewal. Check your connection and try again.', { tone: 'error' })
     }
     setPortalLoading(false)
+  }
+
+  const handleExportData = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      toast('You must be signed in to export your data.', { tone: 'error' })
+      return
+    }
+
+    const response = await fetch('/api/account/export', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      toast(body?.error || 'Could not export your data.', { tone: 'error' })
+      return
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `mtl-trader-export-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -340,21 +408,21 @@ export default function SettingsPage() {
         <p className="text-gray-400 text-sm mt-1">Manage your account preferences</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Sidebar */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        {/* Tabs: horizontal chips on phones, sidebar on desktop */}
         <div className="lg:w-64">
-          <nav className="bg-surface border border-border rounded-xl p-2 space-y-1">
+          <nav className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:rounded-xl lg:border lg:border-border lg:bg-surface lg:p-2 lg:pb-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium transition-colors lg:w-full lg:gap-3 lg:rounded-lg lg:border-0 lg:px-3 ${
                   activeTab === tab.id
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-gray-400 hover:text-white hover:bg-surface-light'
+                    ? 'border-primary/50 bg-primary/10 text-primary'
+                    : 'border-border bg-surface text-gray-400 active:opacity-70 lg:border-0 lg:bg-transparent lg:hover:bg-surface-light lg:hover:text-white'
                 }`}
               >
-                <tab.icon className="w-5 h-5" />
+                <tab.icon className="w-4 h-4 lg:w-5 lg:h-5" />
                 {tab.name}
               </button>
             ))}
@@ -555,7 +623,18 @@ export default function SettingsPage() {
           {activeTab === 'subscription' && (
             <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
               <h2 className="text-lg font-semibold text-white">Subscription</h2>
-              
+
+              <p className="text-sm text-gray-400">
+                Card subscriptions renew monthly and can be started on the{' '}
+                <button
+                  onClick={() => { window.location.href = '/pricing' }}
+                  className="text-primary hover:text-primary-light underline transition-colors"
+                >
+                  pricing page
+                </button>
+                .
+              </p>
+
               <div className={`border rounded-xl p-4 ${
                 userPlan.tier !== 'free' ? 'bg-surface-light border-primary' : 'bg-surface-light border-border'
               }`}>
@@ -583,14 +662,23 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {userPlan.tier !== 'free' && (
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={portalLoading}
-                  className="flex items-center gap-2 px-4 py-2 border border-danger text-danger rounded-lg hover:bg-danger/10 transition-colors disabled:opacity-50"
-                >
-                  {portalLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> : 'Cancel Subscription'}
-                </button>
+              {userPlan.tier !== 'free' && userPlan.status === 'active' && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-surface-light border border-border rounded-xl p-4">
+                  <p className="text-sm text-gray-400">
+                    {userPlan.cancelAtPeriodEnd
+                      ? `Renewal cancelled. You keep access until ${userPlan.currentPeriodEnd ? new Date(userPlan.currentPeriodEnd).toLocaleDateString() : 'the end of the paid period'}.`
+                      : `Paid through ${userPlan.currentPeriodEnd ? new Date(userPlan.currentPeriodEnd).toLocaleDateString() : 'the end of the current period'}. Renew with a payment before then to keep access.`}
+                  </p>
+                  {!userPlan.cancelAtPeriodEnd && (
+                    <button
+                      onClick={handleCancelSubscription}
+                      disabled={portalLoading}
+                      className="flex items-center justify-center gap-2 px-4 py-2 border border-danger text-danger rounded-lg hover:bg-danger/10 transition-colors disabled:opacity-50"
+                    >
+                      {portalLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> : 'Stop renewal'}
+                    </button>
+                  )}
+                </div>
               )}
 
               <div className="grid sm:grid-cols-2 gap-4">
@@ -603,11 +691,12 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <button
                       onClick={() => handleCheckout('basic')}
-                      disabled={checkoutLoading === 'basic' || userPlan.tier === 'basic'}
+                      disabled={checkoutLoading === 'basic' || (userPlan.tier === 'basic' && !userPlan.cancelAtPeriodEnd)}
                       className="w-full py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {checkoutLoading === 'basic' ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> :
-                       userPlan.tier === 'basic' ? 'Current Plan' : 'Pay with PayPal'}
+                       userPlan.tier === 'basic' && !userPlan.cancelAtPeriodEnd ? 'Current Plan' :
+                       userPlan.tier === 'basic' ? 'Resume with PayPal' : 'Pay with PayPal'}
                     </button>
                     <button
                       onClick={() => window.location.href = '/dashboard/payment?plan=basic'}
@@ -628,11 +717,12 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <button
                       onClick={() => handleCheckout('pro')}
-                      disabled={checkoutLoading === 'pro' || userPlan.tier === 'pro'}
+                      disabled={checkoutLoading === 'pro' || (userPlan.tier === 'pro' && !userPlan.cancelAtPeriodEnd)}
                       className="w-full py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {checkoutLoading === 'pro' ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> :
-                       userPlan.tier === 'pro' ? 'Current Plan' : 'Pay with PayPal'}
+                       userPlan.tier === 'pro' && !userPlan.cancelAtPeriodEnd ? 'Current Plan' :
+                       userPlan.tier === 'pro' ? 'Resume with PayPal' : 'Pay with PayPal'}
                     </button>
                     <button
                       onClick={() => window.location.href = '/dashboard/payment?plan=pro'}
@@ -737,6 +827,17 @@ export default function SettingsPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
                 >
                   {passwordLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</> : <><Save className="w-4 h-4" /> Update Password</>}
+                </button>
+              </div>
+
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-sm font-medium text-white mb-2">Your data</h3>
+                <p className="text-sm text-gray-400 mb-4">Download every trade, deposit, payment record and AI review we hold for you.</p>
+                <button
+                  onClick={handleExportData}
+                  className="flex items-center gap-2 px-4 py-2 border border-border text-gray-300 rounded-lg hover:text-white hover:border-primary transition-colors"
+                >
+                  <Save className="w-4 h-4" /> Export my data (JSON)
                 </button>
               </div>
 
