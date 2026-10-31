@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ChangeEvent } from 'react'
 import { User, CreditCard, Bell, Shield, Save, Wallet, Trash2, Palette, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useTheme } from '@/lib/theme'
 import { useToast } from '@/components/toast'
 import { Avatar } from '@/components/avatar'
+import { deleteAvatarByUrl, uploadAvatar, validateAvatarFile } from '@/lib/avatar-upload'
 import { PLANS } from '@/lib/plans'
 
 const BASIC_PRICE = PLANS.find(p => p.id === 'basic')?.price ?? 0
@@ -44,6 +45,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState<'profile' | 'notifications' | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingAvatar, setSavingAvatar] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [savingNotifications, setSavingNotifications] = useState(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [depAmount, setDepAmount] = useState('')
@@ -176,6 +178,41 @@ export default function SettingsPage() {
       return
     }
     toast(value ? 'Profile picture updated' : 'Profile picture removed')
+  }
+
+  const handleAvatarFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    // Clearing the input lets the same file be picked again after an error.
+    event.target.value = ''
+    if (!file) return
+
+    const invalid = validateAvatarFile(file)
+    if (invalid) {
+      toast(invalid, { tone: 'error' })
+      return
+    }
+    if (!userId) {
+      toast('Sign in again to change your picture.', { tone: 'error' })
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      const previous = profile.avatar_url
+      const url = await uploadAvatar({ file, userId })
+      const { error } = await supabase.auth.updateUser({
+        data: { avatar_url: url },
+      })
+      if (error) throw new Error(error.message)
+      setProfile(prev => ({ ...prev, avatar_url: url }))
+      await deleteAvatarByUrl(previous, userId)
+      toast('Profile picture updated')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      toast('Could not upload the picture: ' + message, { tone: 'error' })
+    } finally {
+      setUploadingAvatar(false)
+    }
   }
 
   const handleSaveNotifications = async () => {
@@ -455,9 +492,23 @@ export default function SettingsPage() {
                       >
                         {savingAvatar ? 'Saving…' : 'Save'}
                       </button>
+                      <label
+                        className={`shrink-0 cursor-pointer rounded-lg border border-border px-4 py-2 text-center text-white transition-colors hover:border-primary ${
+                          uploadingAvatar ? 'pointer-events-none opacity-50' : ''
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={handleAvatarFile}
+                          disabled={uploadingAvatar}
+                        />
+                        {uploadingAvatar ? 'Uploading…' : 'Upload'}
+                      </label>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Left empty it uses the picture attached to your email, then your initials.
+                      Upload a photo (2 MB max) or paste a link. Left empty it uses the picture attached to your email, then your initials.
                     </p>
                   </div>
                 </div>

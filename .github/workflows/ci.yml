@@ -44,3 +44,30 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # The Flutter suite lives in mobile_flutter and the web job cannot see it, so
+  # its tests never ran in CI. Android/iOS builds stay out of scope: this job
+  # only needs the Dart toolchain.
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile_flutter
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
