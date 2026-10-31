@@ -1,0 +1,11 @@
+{
+  "//": "High/critical advisories that CI is allowed to ignore, each with a reason and the date it was reviewed. Nothing goes here because a build was red; it goes here when there is no fix and the risk is understood.",
+  "allowed": [
+    {
+      "package": "xlsx",
+      "severity": "high",
+      "reason": "SheetJS stopped publishing to npm at 0.18.5; the prototype-pollution and ReDoS fixes only ship in 0.20.x from the vendor CDN. The package is used only to parse broker spreadsheets the signed-in user uploads themselves, never third-party input, so both advisories need a malicious file the owner chose to import. Migrate to the 0.20.x tarball or swap to a maintained reader before letting anyone else upload files.",
+      "reviewed": "2026-11-01"
+    }
+  ]
+}

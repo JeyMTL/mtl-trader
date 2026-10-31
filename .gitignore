@@ -60,6 +60,9 @@ trade_data.json
 trades_clean.csv
 ReportHistory-*.json
 
+# One-off MT5 → JSON converter, kept on disk for personal use only
+/convert.js
+
 # Ship the example env file (placeholders only) despite the .env* rule above
 !.env.example
 

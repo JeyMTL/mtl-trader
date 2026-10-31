@@ -1,0 +1,124 @@
+# Operations
+
+What runs by itself, what wakes you up, and what to do when it does.
+
+## Health
+
+`GET /api/health` is the single source of truth for "is this deployment wired
+up". It answers 200 only when the Supabase URL and anon key are present and the
+database answers a query; otherwise 503. It reports whether each variable is
+*present*, never any part of its value, so the endpoint is safe to leave public.
+
+```bash
+node scripts/check-deploy.mjs https://your-domain
+```
+
+That script is the same probe used by the deploy gate and the uptime monitor.
+
+## Uptime monitoring
+
+`.github/workflows/uptime.yml` runs every 15 minutes:
+
+1. probes `/api/health` up to three times, 30 seconds apart, so one cold start
+   does not page anyone;
+2. files **one** GitHub issue titled *Production health check is failing* on a
+   real outage, and comments on it instead of opening duplicates;
+3. closes that issue and notes the recovery when the probe goes green again.
+
+**Setup (once):** add a repository *variable* named `PRODUCTION_URL` under
+Settings → Secrets and variables → Actions → **Variables** (not Secrets — it is
+a public URL). Without it the workflow fails loudly rather than pretending the
+site is up.
+
+There is no third-party monitor, deliberately: the extra account would watch the
+same endpoint this workflow already polls, and the token is one you already
+have.
+
+### When the alert fires
+
+1. Open the linked run; read which line failed (status, database, keys).
+2. Run `node scripts/check-deploy.mjs <url>` locally to confirm.
+3. `status: degraded` with `database: unreachable` → Supabase project paused,
+   paused billing, or a bad URL. Check the Supabase dashboard first.
+4. `config.*: false` → an environment variable is missing in Vercel. This has
+   broken production before; the fix is redeploying with the variable set, not
+   editing the app.
+5. Wrong domain in `PRODUCTION_URL` → update the variable.
+
+## Deploy gate
+
+`.github/workflows/deploy-gate.yml` smokes the freshly deployed environment on
+every successful Vercel deployment. A deployment that builds but cannot reach
+its database therefore fails visibly instead of quietly serving errors.
+
+## Crons
+
+`vercel.json` schedules two jobs: billing reconciliation (03:00) and
+notification delivery (07:00). A cron that stops running does **not** fail the
+uptime probe — it only proves the app is reachable. The reconciliation cron is
+idempotent, so the safe response to a suspected missed run is triggering it
+manually from the Vercel dashboard and checking the logs for the period.
+
+## Dependency security
+
+* `.github/workflows/security.yml` runs on every push, every PR and weekly:
+  secret scanning over the **full** git history, a check that no real `.env`
+  file is tracked, the dependency gate below, and a Flutter outdated report.
+* `scripts/audit-gate.mjs` (`npm run check:audit`) fails on any high or critical
+  advisory in production dependencies **unless** the package is listed in
+  `.github/audit-allowlist.json` with a reason and a review date.
+
+The allowlist exists because one unfixable advisory would otherwise make the job
+permanently red, and the usual response to that is to disable the check. Adding
+an entry is a decision with a name and a date on it, reviewed by a person;
+anything untriaged still fails the build.
+
+Currently allowlisted: `xlsx` (see the file for why and what to migrate to).
+
+* Dependabot (`.github/dependabot.yml`) opens grouped weekly PRs for npm and
+  pub, and monthly for Actions. Patch/minor bumps arrive as one PR so review
+  stays focused on majors.
+
+## Accessibility rules
+
+These are the invariants the UI is expected to keep:
+
+* A label someone has to read is never smaller than `kMinLabelSize` (11 px,
+  `lib/ui/theme.dart`). Chart axis ticks are the one exception.
+* Profit and loss never rely on colour alone: every amount carries a sign, and
+  the main screens add a ▲/▼ glyph (`PnlText` in `lib/ui/a11y.dart`) plus a
+  spoken label such as "Profit of $1,204.10".
+* Painted charts are wrapped in `ChartSemantics` so a screen reader gets one
+  sentence instead of unlabelled pixels.
+* Icon-only buttons have a tooltip, which doubles as the accessibility label.
+* A repeated animation (the brand mark pulse) stops when the device asks for
+  reduced motion.
+
+These are enforced, not just written down. `mobile_flutter/test/a11y_test.dart`
+renders the shared widgets and the login screen at a **2x text scale** and fails
+on any overflow, walks every rendered `Text` to prove nothing is drawn below
+`kMinLabelSize`, and checks that a loss is announced as "Loss of …" rather than
+as a bare number. That suite is what caught the overflowing Sign in / Create
+account row on login.
+
+## Languages
+
+English and French ship today. Adding a third:
+
+1. copy `mobile_flutter/lib/l10n/app_en.arb` to `app_XX.arb` and translate the
+   values (never the keys);
+2. add `Locale('xx')` to `LocaleController.supported` in
+   `mobile_flutter/lib/core/locale.dart`;
+3. add its native name to `LocaleController.nativeNames`;
+4. run `flutter gen-l10n` and `flutter test` — `test/l10n_test.dart` fails if a
+   language resolves no strings.
+
+Strings live in code as `AppLocalizations.of(context).key`. Translated today:
+login, the five-tab shell, Desk, Journal, Analytics and the language picker
+itself. Still English: Calendar, the Account page body, Plans and billing, the
+trade form and the chart — they keep inline literals until they are migrated the
+same way.
+
+The picker lives under Account → Language, and
+`mobile_flutter/test/language_picker_test.dart` covers listing the languages,
+switching to French, and switching back to the device language.

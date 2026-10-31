@@ -1,0 +1,94 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, so a new advisory against an unchanged dependency still surfaces.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a secret that was committed and later deleted is
+          # still a leaked secret.
+          fetch-depth: 0
+
+      - name: Scan the history for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A belt-and-braces check: the service-role key must never sit in the
+      # client or in any committed env file.
+      - name: No real env files are tracked
+        run: |
+          tracked=$(git ls-files | grep -E '(^|/)\.env(\..*)?$' | grep -v '\.env\.example$' || true)
+          if [ -n "$tracked" ]; then
+            echo "::error::env files are committed: $tracked"
+            exit 1
+          fi
+
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # High and critical advisories in anything shipped to production fail the
+      # build unless .github/audit-allowlist.json names them, with a reason and
+      # a review date. A plain `npm audit --audit-level=high` cannot be used:
+      # one unfixable advisory would make this job permanently red.
+      - name: Audit production dependencies
+        run: node scripts/audit-gate.mjs
+
+      - name: Audit dev dependencies (report only)
+        if: always()
+        run: npm audit --audit-level=high || true
+
+  pub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile_flutter
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # Discontinued or badly out-of-date packages are the common way a Flutter
+      # app rots without a single failing test. Informational: `pub outdated`
+      # has no failing exit code, it prints the table into the job log.
+      - name: Report outdated packages
+        run: flutter pub outdated --no-dev-dependencies

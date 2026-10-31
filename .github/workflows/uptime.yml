@@ -1,0 +1,98 @@
+name: Uptime
+
+# Polls the production deployment and raises a GitHub issue when it goes bad.
+#
+# There is no third-party monitor in this project on purpose: `/api/health`
+# already answers the only question that matters (are the env vars present and
+# can the app reach its database), and the deploy gate uses the same probe. This
+# job turns that probe into an alert without another account to maintain.
+#
+# Required setup: a repository *variable* named PRODUCTION_URL
+# (Settings → Secrets and variables → Actions → Variables tab), e.g.
+# https://app.example.com — a variable, not a secret, because it is public.
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub may delay scheduled runs under load, which is
+    # fine: this is a "is it down" check, not a latency SLO.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: URL to probe (defaults to the PRODUCTION_URL variable)
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TARGET: ${{ github.event.inputs.target || vars.PRODUCTION_URL }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ALERT_TITLE: Production health check is failing
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check that a target is configured
+        run: |
+          if [ -z "$TARGET" ]; then
+            echo "::error title=PRODUCTION_URL is not set::Add a repository variable named PRODUCTION_URL (Settings → Secrets and variables → Actions → Variables) so this monitor knows which deployment to probe."
+            exit 1
+          fi
+
+      # Three attempts, 30s apart, so a single cold start or a transient CDN
+      # blip does not wake anyone up. A real outage still fails all three.
+      - name: Probe the deployment
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::Attempt $attempt"
+            if node scripts/check-deploy.mjs "$TARGET"; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" != "3" ]; then
+              echo "Retrying in 30s…"
+              sleep 30
+            fi
+          done
+          echo "::error title=Health check failed::$TARGET did not report healthy after 3 attempts."
+          exit 1
+
+      # One open issue per problem: later failures become comments instead of a
+      # new issue every 15 minutes.
+      - name: Raise or update the alert issue
+        if: failure()
+        run: |
+          body=$(printf '`%s` is not healthy as of %s.\n\nFailed run: %s\n\nReproduce locally:\n\n```bash\nnode scripts/check-deploy.mjs %s\n```\n\nThe probe checks `/api/health`, which reports missing Supabase credentials and an unreachable database. It does not check page rendering.\n' \
+            "$TARGET" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$RUN_URL" "$TARGET")
+          existing=$(gh issue list --state open --search "in:title \"$ALERT_TITLE\"" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$ALERT_TITLE" --body "$body"
+          fi
+
+      - name: Close the alert once it recovers
+        if: success()
+        run: |
+          existing=$(gh issue list --state open --search "in:title \"$ALERT_TITLE\"" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Recovered at $(date -u +%Y-%m-%dT%H:%M:%SZ): \`$TARGET\` reports healthy again. Run: $RUN_URL"
+            gh issue close "$existing"
+          fi
