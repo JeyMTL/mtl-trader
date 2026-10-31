@@ -265,8 +265,10 @@ export function DashboardView({
 
   const month = {
     trades: Number(summary.month_trades) || 0,
+    wins: Number(summary.month_wins) || 0,
     winningDays: Number(summary.month_winning_days) || 0,
   }
+  const monthWinRate = month.trades > 0 ? (month.wins / month.trades) * 100 : 0
 
   const monthTotals = useMemo(
     () =>
@@ -303,8 +305,8 @@ export function DashboardView({
     <div className="space-y-4 lg:space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="eyebrow">Desk overview</p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-white lg:text-2xl">Dashboard</h1>
+          <p className="eyebrow">MTL Trader</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-white lg:text-2xl">Desk</h1>
           <p className="mt-1 text-xs text-gray-500">
             {today.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
@@ -475,11 +477,29 @@ export function DashboardView({
             )}
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
-            <SmallStat label="This month" value={`${formatCurrency(monthTotals.pnl)}`} tone={monthTotals.pnl >= 0 ? 'pos' : 'neg'} />
-            <SmallStat label="Trades" value={String(month.trades)} />
-            <SmallStat label="Winning days" value={String(month.winningDays)} />
-          </div>
+          {/* Honours the "Monthly trade overview" switch in settings, which
+              previously changed nothing on this page. */}
+          {preferences.notifications_monthly_overview && (
+            <div className="border-t border-border">
+              <div className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
+                <SmallStat label="This month" value={`${formatCurrency(monthTotals.pnl)}`} tone={monthTotals.pnl >= 0 ? 'pos' : 'neg'} />
+                <SmallStat label="Trades" value={String(month.trades)} />
+                <SmallStat label="Winning days" value={String(month.winningDays)} />
+                <SmallStat label="Win rate" value={month.trades > 0 ? formatPercent(monthWinRate) : '—'} />
+              </div>
+              <div className="px-4 pb-3">
+                <div className="h-1 w-full overflow-hidden rounded-full bg-surface-light">
+                  <div
+                    className={cn(
+                      'h-1 rounded-full transition-all',
+                      monthTotals.pnl >= 0 ? 'bg-success' : 'bg-danger'
+                    )}
+                    style={{ width: `${Math.max(0, Math.min(100, monthWinRate))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="panel flex flex-col overflow-hidden">

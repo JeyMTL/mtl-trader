@@ -50,12 +50,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Desk'),
+            Row(
+              children: [
+                Text(
+                  'MTL',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.8,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
             Text(
               longDay(DateTime.now()),
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.faint,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w500,
@@ -67,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             onPressed: _refresh,
             tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh, size: 20, color: AppColors.muted),
+            icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
           ),
         ],
       ),
@@ -131,13 +153,13 @@ class _DashboardBody extends StatelessWidget {
           const SizedBox(height: 10),
         ],
         FlatCard(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'ACCOUNT BALANCE',
                       style: TextStyle(
@@ -172,13 +194,13 @@ class _DashboardBody extends StatelessWidget {
               Text(
                 '${signedMoney(summary.totalPnl)} net · ${summary.totalTrades} closed · '
                 '${summary.wins}W / ${summary.losses}L',
-                style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
+                style: TextStyle(color: AppColors.muted, fontSize: 11.5),
               ),
               const SizedBox(height: 10),
               SizedBox(
                 height: 116,
                 child: data.equity.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'Import history to plot the curve',
                           style: TextStyle(
@@ -191,6 +213,43 @@ class _DashboardBody extends StatelessWidget {
                         points: data.equity,
                         deposits: data.deposits,
                       ),
+              ),
+              const SizedBox(height: 12),
+              const ListDivider(),
+              const SizedBox(height: 11),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniStat(
+                      label: 'Deposits',
+                      value: money(data.deposits),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MiniStat(
+                      label: 'Best trade',
+                      value: summary.totalTrades > 0
+                          ? signedMoney(summary.bestTrade)
+                          : '—',
+                      tone: summary.totalTrades > 0
+                          ? Tone.positive
+                          : Tone.muted,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MiniStat(
+                      label: 'Worst trade',
+                      value: summary.totalTrades > 0
+                          ? signedMoney(summary.worstTrade)
+                          : '—',
+                      tone: summary.totalTrades > 0
+                          ? Tone.negative
+                          : Tone.muted,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -236,6 +295,8 @@ class _DashboardBody extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        _MonthCard(summary: summary),
         const SizedBox(height: 10),
         FlatCard(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
@@ -287,7 +348,7 @@ class _DashboardBody extends StatelessWidget {
                 const SizedBox(height: 8),
                 SizedBox(height: 84, child: _HourChart(hours: hours)),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Hours with fewer than 3 trades are left out of the best/worst call.',
                   style: TextStyle(
                     color: AppColors.faint,
@@ -373,7 +434,7 @@ class _DashboardBody extends StatelessWidget {
                                   children: [
                                     Text(
                                       trade.symbol,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.text,
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
@@ -381,7 +442,7 @@ class _DashboardBody extends StatelessWidget {
                                     ),
                                     Text(
                                       dayOf(trade.tradedAt),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.faint,
                                         fontSize: 10,
                                       ),
@@ -454,7 +515,7 @@ class _EquityChart extends StatelessWidget {
               reservedSize: 42,
               getTitlesWidget: (value, meta) => Text(
                 compactMoney(value),
-                style: const TextStyle(color: AppColors.faint, fontSize: 9),
+                style: TextStyle(color: AppColors.faint, fontSize: 9),
               ),
             ),
           ),
@@ -472,7 +533,7 @@ class _EquityChart extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     isoDayLabel(points[index].day),
-                    style: const TextStyle(color: AppColors.faint, fontSize: 9),
+                    style: TextStyle(color: AppColors.faint, fontSize: 9),
                   ),
                 );
               },
@@ -534,7 +595,7 @@ class _HourChart extends StatelessWidget {
               interval: 6,
               getTitlesWidget: (value, meta) => Text(
                 '${value.toInt()}h',
-                style: const TextStyle(color: AppColors.faint, fontSize: 8.5),
+                style: TextStyle(color: AppColors.faint, fontSize: 8.5),
               ),
             ),
           ),
@@ -584,7 +645,7 @@ class _EdgeRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.faint,
                     fontSize: 9.5,
                     fontWeight: FontWeight.w600,
@@ -594,7 +655,7 @@ class _EdgeRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   period?.label ?? 'Needs 3+ trades',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.text,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
@@ -619,7 +680,7 @@ class _EdgeRow extends StatelessWidget {
                 period == null
                     ? '—'
                     : '${period!.trades} trades · ${percent(period!.winRate)} win',
-                style: const TextStyle(color: AppColors.faint, fontSize: 9.5),
+                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
               ),
             ],
           ),
@@ -654,7 +715,7 @@ class _JournalRow extends StatelessWidget {
                 Expanded(
                   child: Text(
                     entry.symbol,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.text,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -678,7 +739,7 @@ class _JournalRow extends StatelessWidget {
                 entry.notes!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 11,
                   height: 1.4,
@@ -689,7 +750,7 @@ class _JournalRow extends StatelessWidget {
             Row(
               children: [
                 if (entry.imageCount > 0) ...[
-                  const Icon(
+                  Icon(
                     Icons.image_outlined,
                     size: 11,
                     color: AppColors.primary,
@@ -697,7 +758,7 @@ class _JournalRow extends StatelessWidget {
                   const SizedBox(width: 2),
                   Text(
                     '${entry.imageCount}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 9.5,
                     ),
@@ -705,7 +766,7 @@ class _JournalRow extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 if (entry.audioCount > 0) ...[
-                  const Icon(
+                  Icon(
                     Icons.mic_none,
                     size: 11,
                     color: AppColors.primary,
@@ -713,7 +774,7 @@ class _JournalRow extends StatelessWidget {
                   const SizedBox(width: 2),
                   Text(
                     '${entry.audioCount}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 9.5,
                     ),
@@ -730,7 +791,7 @@ class _JournalRow extends StatelessWidget {
                     ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.faint,
                       fontSize: 9.5,
                     ),
@@ -757,7 +818,7 @@ class _StartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'START HERE',
             style: TextStyle(
               color: AppColors.primary,
@@ -767,7 +828,7 @@ class _StartCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Three steps to a journal that pays you back.',
             style: TextStyle(
               color: AppColors.text,
@@ -824,7 +885,7 @@ class _StartStep extends StatelessWidget {
             ),
             child: Text(
               number,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontSize: 8.5,
                 fontWeight: FontWeight.w700,
@@ -835,7 +896,7 @@ class _StartStep extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.muted,
                 fontSize: 11,
                 height: 1.4,
@@ -862,9 +923,9 @@ class _LoadError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: AppColors.danger, size: 26),
+            Icon(Icons.error_outline, color: AppColors.danger, size: 26),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Could not load the desk',
               style: TextStyle(
                 color: AppColors.text,
@@ -878,7 +939,7 @@ class _LoadError extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.faint,
                 fontSize: 11,
                 height: 1.4,
@@ -888,6 +949,168 @@ class _LoadError extends StatelessWidget {
             OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// One column of the statement strip under the equity curve.
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    this.tone = Tone.neutral,
+  });
+
+  final String label;
+  final String value;
+  final Tone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: AppColors.faint,
+            fontSize: 8.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 3),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: tabular.copyWith(
+              color: toneColor(tone),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Current-month scoreboard: the desk shows the month you are trading in, not
+/// only the all-time totals.
+class _MonthCard extends StatelessWidget {
+  const _MonthCard({required this.summary});
+
+  final TradeSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTrades = summary.monthTrades > 0;
+    final positive = summary.monthPnl >= 0;
+    final losses = math.max(0, summary.monthTrades - summary.monthWins);
+    final rate = (summary.monthWinRate / 100).clamp(0.0, 1.0).toDouble();
+
+    return FlatCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'THIS MONTH',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              Pill(text: '${summary.monthTrades} trades', tone: Tone.muted),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    hasTrades ? signedMoney(summary.monthPnl) : '—',
+                    style: tabular.copyWith(
+                      color: !hasTrades
+                          ? AppColors.faint
+                          : positive
+                              ? AppColors.success
+                              : AppColors.danger,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.8,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${summary.monthWins} W / $losses L',
+                    style: tabular.copyWith(
+                      color: AppColors.text,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${summary.monthWinningDays} green days',
+                    style: TextStyle(color: AppColors.faint, fontSize: 10),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Month win rate',
+                  style: TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+              ),
+              Text(
+                percent(summary.monthWinRate),
+                style: tabular.copyWith(
+                  color: AppColors.text,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: rate,
+              minHeight: 5,
+              backgroundColor: AppColors.surfaceAlt,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                hasTrades && !positive ? AppColors.danger : AppColors.success,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
