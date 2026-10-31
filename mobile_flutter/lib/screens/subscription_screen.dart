@@ -95,7 +95,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           IconButton(
             tooltip: 'Refresh',
             onPressed: _refresh,
-            icon: const Icon(Icons.refresh, size: 20, color: AppColors.muted),
+            icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
           ),
         ],
       ),
@@ -144,7 +144,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.error_outline,
                           size: 14,
                           color: AppColors.danger,
@@ -153,7 +153,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         Expanded(
                           child: Text(
                             _error!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.muted,
                               fontSize: 11,
                               height: 1.45,
@@ -180,7 +180,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                   const SizedBox(height: 10),
                 ],
-                const FlatCard(
+                FlatCard(
                   padding: EdgeInsets.all(12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +240,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Current plan',
                   style: TextStyle(
@@ -280,20 +280,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           const SizedBox(height: 4),
           Text(
             maxTrades <= 0 ? 'Unlimited trades' : '$maxTrades trades / month',
-            style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
+            style: TextStyle(color: AppColors.muted, fontSize: 11.5),
           ),
           if (trial && trialEnd != null) ...[
             const SizedBox(height: 2),
             Text(
               'Trial ends ${DateFormat('d MMM yyyy').format(trialEnd)}',
-              style: const TextStyle(color: AppColors.faint, fontSize: 10.5),
+              style: TextStyle(color: AppColors.faint, fontSize: 10.5),
             ),
           ],
           if (active && periodEnd != null) ...[
             const SizedBox(height: 2),
             Text(
               'Paid through ${DateFormat('d MMM yyyy').format(periodEnd)}',
-              style: const TextStyle(color: AppColors.faint, fontSize: 10.5),
+              style: TextStyle(color: AppColors.faint, fontSize: 10.5),
             ),
           ],
         ],
@@ -318,7 +318,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             children: [
               Text(
                 plan.name,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.text,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -338,7 +338,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const Text(
+              Text(
                 '/mo',
                 style: TextStyle(color: AppColors.faint, fontSize: 10.5),
               ),
@@ -347,7 +347,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           const SizedBox(height: 3),
           Text(
             plan.allowance,
-            style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
+            style: TextStyle(color: AppColors.muted, fontSize: 11.5),
           ),
           const SizedBox(height: 10),
           for (final feature in plan.features)
@@ -355,7 +355,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               padding: const EdgeInsets.only(bottom: 5),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.check,
                     size: 12,
                     color: AppColors.success,
@@ -364,7 +364,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Expanded(
                     child: Text(
                       feature,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.muted,
                         fontSize: 11,
                         height: 1.3,
@@ -378,7 +378,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ElevatedButton(
             onPressed: current || !enabled ? null : () => _subscribe(plan.id),
             child: busy
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(

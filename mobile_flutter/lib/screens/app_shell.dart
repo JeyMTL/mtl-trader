@@ -129,7 +129,7 @@ class _AppShellState extends State<AppShell> {
         child: const Icon(Icons.add, size: 24),
       ),
       bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: NavigationBar(

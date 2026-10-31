@@ -63,7 +63,7 @@ class SectionTitle extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.text,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -74,7 +74,7 @@ class SectionTitle extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   subtitle!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.faint,
                     fontSize: 11.5,
                     height: 1.4,
@@ -118,7 +118,7 @@ class MetricCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.muted,
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,
@@ -149,7 +149,7 @@ class MetricCard extends StatelessWidget {
               foot!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.faint, fontSize: 10),
+              style: TextStyle(color: AppColors.faint, fontSize: 10),
             ),
           ],
         ],
@@ -237,7 +237,7 @@ class EmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.text,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -248,7 +248,7 @@ class EmptyState extends StatelessWidget {
             Text(
               body!,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.faint,
                 fontSize: 11.5,
                 height: 1.4,
@@ -287,7 +287,7 @@ class LabelValue extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
+              style: TextStyle(color: AppColors.muted, fontSize: 12.5),
             ),
           ),
           Flexible(

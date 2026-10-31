@@ -64,7 +64,7 @@ class _SymbolSheetState extends State<_SymbolSheet> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.82,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         border: Border(top: BorderSide(color: AppColors.border)),
@@ -90,7 +90,7 @@ class _SymbolSheetState extends State<_SymbolSheet> {
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   hintText: 'Search pairs, metals, indices, crypto',
-                  prefixIcon: const Icon(
+                  prefixIcon: Icon(
                     Icons.search,
                     size: 18,
                     color: AppColors.faint,
@@ -98,7 +98,7 @@ class _SymbolSheetState extends State<_SymbolSheet> {
                   suffixIcon: _query.isEmpty
                       ? null
                       : IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.close,
                             size: 16,
                             color: AppColors.faint,
@@ -127,7 +127,7 @@ class _SymbolSheetState extends State<_SymbolSheet> {
               child: Text(
                 '${instrumentCatalog.length} instruments · forex and crypto are live, exchange-traded charts are delayed',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.faint, fontSize: 9.5),
+                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
               ),
             ),
           ],
@@ -148,7 +148,7 @@ class _GroupHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.primary,
           fontSize: 9.5,
           fontWeight: FontWeight.w800,
@@ -176,7 +176,7 @@ class _InstrumentTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
         child: Row(
@@ -185,7 +185,7 @@ class _InstrumentTile extends StatelessWidget {
               width: 74,
               child: Text(
                 instrument.symbol,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.text,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
@@ -197,7 +197,7 @@ class _InstrumentTile extends StatelessWidget {
                 instrument.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
+                style: TextStyle(color: AppColors.muted, fontSize: 11.5),
               ),
             ),
             Padding(
@@ -208,7 +208,7 @@ class _InstrumentTile extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Icon(Icons.check, size: 15, color: AppColors.primary),
+              Icon(Icons.check, size: 15, color: AppColors.primary),
           ],
         ),
       ),

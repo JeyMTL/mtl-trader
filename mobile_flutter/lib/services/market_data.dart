@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/config.dart';
 import '../core/instruments.dart';
 
-/// Raised when the delayed chart feed cannot be read. The message is shown to
-/// the trader as-is, so keep it short and actionable.
+/// Raised when the candle feed cannot be read. The message is shown to the
+/// trader as-is, so keep it short and actionable.
 class MarketDataException implements Exception {
   MarketDataException(this.message);
 
@@ -45,17 +48,23 @@ enum ChartRange {
   final String label;
 }
 
-/// Reads delayed OHLC candles used to pin entry, stop, target and exit levels.
+/// Reads mid-price candles used to pin entry, stop, target and exit levels.
 ///
-/// This uses the public chart feed (no API key, no cost) and is only meant to
-/// help a trader locate their levels. It is not a live execution feed.
+/// The app never calls a market data provider directly: candles come from this
+/// deployment's `/api/market/candles` route, which holds the market-data key.
+/// That keeps the credential out of the binary and lets the server fall back to
+/// the delayed public feed for instruments OANDA does not quote.
 class MarketDataService {
-  MarketDataService({HttpClient? client}) : _client = client;
+  MarketDataService({HttpClient? client, String? Function()? accessToken})
+      : _client = client,
+        _accessToken = accessToken ?? _sessionToken;
 
   /// Process-wide cache so reopening the chart paints instantly instead of
   /// going blank while another request runs.
   static final Map<String, _CachedCandles> _cache = {};
   static const int _maxEntries = 30;
+
+  final String? Function() _accessToken;
 
   HttpClient? _client;
 
@@ -66,8 +75,27 @@ class MarketDataService {
   DateTime? cachedAt(Instrument instrument, ChartRange range) =>
       _cache[_cacheKey(instrument, range)]?.at;
 
-  static String _cacheKey(Instrument instrument, ChartRange range) =>
-      '${instrument.yahoo}|${range.interval}|${range.range}';
+  static String _cacheKey(
+    Instrument instrument,
+    ChartRange range, {
+    int? fromMs,
+    int? toMs,
+  }) {
+    // Historical windows are cached separately from the live tail: both hold
+    // the same instrument and range but never the same candles.
+    final suffix = fromMs == null || toMs == null ? '' : '|$fromMs-$toMs';
+    return '${instrument.symbol}|${range.range}$suffix';
+  }
+
+  /// The signed-in session's token, or null when there is none (widget tests
+  /// and the parser never start Supabase).
+  static String? _sessionToken() {
+    try {
+      return Supabase.instance.client.auth.currentSession?.accessToken;
+    } catch (_) {
+      return null;
+    }
+  }
 
   HttpClient get _http {
     final existing = _client;
@@ -83,26 +111,41 @@ class MarketDataService {
     _client = null;
   }
 
+  /// Candles for [range]. With [from] and [to] the server serves that historical
+  /// window instead of the newest candles, which is what replay's jump-to-date
+  /// and load-earlier use.
   Future<List<Candle>> candles(
     Instrument instrument,
     ChartRange range, {
     bool force = false,
+    DateTime? from,
+    DateTime? to,
   }) async {
-    final key = _cacheKey(instrument, range);
+    final fromMs = from?.toUtc().millisecondsSinceEpoch;
+    final toMs = to?.toUtc().millisecondsSinceEpoch;
+    final hasWindow = fromMs != null && toMs != null;
+
+    final key = _cacheKey(instrument, range, fromMs: fromMs, toMs: toMs);
     final entry = _cache[key];
-    // Live spot feeds move faster than delayed exchange feeds, so they expire
-    // sooner. Cached candles are returned without touching the network.
-    final ttl = instrument.isLive
-        ? const Duration(seconds: 45)
-        : const Duration(minutes: 10);
+    // A past window never changes, so it is kept far longer than the live tail.
+    // Live spot feeds move faster than delayed exchange feeds.
+    final ttl = hasWindow
+        ? const Duration(minutes: 30)
+        : instrument.isLive
+            ? const Duration(seconds: 45)
+            : const Duration(minutes: 10);
     if (!force && entry != null && DateTime.now().difference(entry.at) < ttl) {
       return entry.candles;
     }
 
-    final uri = Uri.parse(
-      'https://query1.finance.yahoo.com/v8/finance/chart/'
-      '${Uri.encodeComponent(instrument.yahoo)}'
-      '?interval=${range.interval}&range=${range.range}&includePrePost=false',
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/market/candles').replace(
+      queryParameters: {
+        'symbol': instrument.symbol,
+        'range': range.range,
+        'ticker': instrument.yahoo,
+        if (hasWindow) 'from': '$fromMs',
+        if (hasWindow) 'to': '$toMs',
+      },
     );
 
     final String body;
@@ -127,7 +170,7 @@ class MarketDataService {
       throw MarketDataException('The chart feed returned an unreadable reply.');
     }
 
-    final candles = parseChartPayload(decoded);
+    final candles = parseCandlePayload(decoded);
     if (candles.isEmpty) {
       throw MarketDataException('No candles came back for this instrument.');
     }
@@ -145,7 +188,19 @@ class MarketDataService {
       'Mozilla/5.0 (compatible; MTLTrader/1.0)',
     );
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    final token = _accessToken();
+    if (token != null && token.isNotEmpty) {
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $token',
+      );
+    }
     final response = await request.close();
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      await response.drain<void>();
+      throw MarketDataException('Your session expired. Sign in again.');
+    }
     if (response.statusCode == 429) {
       await response.drain<void>();
       throw MarketDataException(
@@ -153,78 +208,58 @@ class MarketDataService {
       );
     }
     if (response.statusCode != 200) {
-      await response.drain<void>();
+      final body = await response.transform(utf8.decoder).join();
       throw MarketDataException(
-        'The chart feed answered ${response.statusCode}. Try another range.',
+        _errorMessage(body) ??
+            'The chart feed answered ${response.statusCode}. Try another range.',
       );
     }
     return response.transform(utf8.decoder).join();
   }
 }
 
-/// Parses the chart feed payload into candles sorted oldest → newest.
-/// Null quotes (market closures) are dropped.
-List<Candle> parseChartPayload(dynamic payload) {
+/// Parses the normalised candle payload served by `/api/market/candles`.
+/// Rows with a missing or non-numeric field are dropped, oldest first.
+List<Candle> parseCandlePayload(dynamic payload) {
   if (payload is! Map) {
     throw MarketDataException('Unexpected chart data.');
   }
-  final chart = payload['chart'];
-  if (chart is! Map) {
+
+  final error = payload['error'];
+  if (error is String && error.trim().isNotEmpty) {
+    throw MarketDataException(error);
+  }
+
+  final rows = payload['candles'];
+  if (rows is! List) {
     throw MarketDataException('Unexpected chart data.');
   }
 
-  final error = chart['error'];
-  if (error is Map && error['description'] != null) {
-    throw MarketDataException(error['description'].toString());
-  }
-
-  final results = chart['result'];
-  if (results is! List || results.isEmpty) {
-    throw MarketDataException('No chart data for that symbol.');
-  }
-  final result = results.first;
-  if (result is! Map) {
-    throw MarketDataException('No chart data for that symbol.');
-  }
-
-  final timestamps = result['timestamp'];
-  if (timestamps is! List || timestamps.isEmpty) {
-    throw MarketDataException('No chart data for that symbol.');
-  }
-
-  final indicators = result['indicators'];
-  final quotes = indicators is Map ? indicators['quote'] : null;
-  final quote = quotes is List && quotes.isNotEmpty ? quotes.first : null;
-  if (quote is! Map) {
-    throw MarketDataException('No chart data for that symbol.');
-  }
-
-  final opens = quote['open'];
-  final highs = quote['high'];
-  final lows = quote['low'];
-  final closes = quote['close'];
-
   final candles = <Candle>[];
-  for (var i = 0; i < timestamps.length; i++) {
-    final stamp = timestamps[i];
-    final open = _numAt(opens, i);
-    final high = _numAt(highs, i);
-    final low = _numAt(lows, i);
-    final close = _numAt(closes, i);
-    if (stamp is! num || open == null || high == null || low == null) {
+  for (final row in rows) {
+    if (row is! Map) continue;
+    final stamp = row['t'];
+    final open = row['o'];
+    final high = row['h'];
+    final low = row['l'];
+    final close = row['c'];
+    if (stamp is! num ||
+        open is! num ||
+        high is! num ||
+        low is! num ||
+        close is! num) {
       continue;
     }
-    if (close == null) continue;
     candles.add(
       Candle(
         time: DateTime.fromMillisecondsSinceEpoch(
-          (stamp * 1000).round(),
+          stamp.round(),
           isUtc: true,
         ),
-        open: open,
-        high: high,
-        low: low,
-        close: close,
+        open: open.toDouble(),
+        high: high.toDouble(),
+        low: low.toDouble(),
+        close: close.toDouble(),
       ),
     );
   }
@@ -233,16 +268,23 @@ List<Candle> parseChartPayload(dynamic payload) {
   return candles;
 }
 
+/// The `error` string a refused request carried, if any.
+String? _errorMessage(String body) {
+  try {
+    final decoded = jsonDecode(body);
+    if (decoded is Map && decoded['error'] is String) {
+      final message = (decoded['error'] as String).trim();
+      return message.isEmpty ? null : message;
+    }
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
+
 class _CachedCandles {
   _CachedCandles(this.candles, this.at);
 
   final List<Candle> candles;
   final DateTime at;
-}
-
-double? _numAt(dynamic values, int index) {
-  if (values is! List || index >= values.length) return null;
-  final value = values[index];
-  if (value is num) return value.toDouble();
-  return null;
 }

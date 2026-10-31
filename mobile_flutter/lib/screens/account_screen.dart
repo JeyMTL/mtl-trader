@@ -96,7 +96,7 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sign out?'),
-        content: const Text(
+        content: Text(
           'Your journal stays on the server. Sign back in any time.',
           style: TextStyle(
             color: AppColors.muted,
@@ -141,13 +141,13 @@ class _AccountScreenState extends State<AccountScreen> {
                   dense: true,
                   title: Text(
                     zone,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.text,
                       fontSize: 12.5,
                     ),
                   ),
                   trailing: zone == current
-                      ? const Icon(
+                      ? Icon(
                           Icons.check,
                           size: 16,
                           color: AppColors.primary,
@@ -194,7 +194,7 @@ class _AccountScreenState extends State<AccountScreen> {
           IconButton(
             onPressed: _refresh,
             tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh, size: 20, color: AppColors.muted),
+            icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
           ),
         ],
       ),
@@ -245,7 +245,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Could not load your subscription',
                           style: TextStyle(
                             color: AppColors.danger,
@@ -258,7 +258,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           snapshot.error.toString(),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.muted,
                             fontSize: 10.5,
                             height: 1.4,
@@ -295,7 +295,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         ),
                         child: Text(
                           _initials(name, email),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryLight,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -311,7 +311,7 @@ class _AccountScreenState extends State<AccountScreen> {
                               name ?? email,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.text,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -321,7 +321,7 @@ class _AccountScreenState extends State<AccountScreen> {
                               email,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.faint,
                                 fontSize: 10.5,
                               ),
@@ -424,7 +424,30 @@ class _AccountScreenState extends State<AccountScreen> {
                   label: const Text('View plans & billing'),
                 ),
                 const SizedBox(height: 10),
-                const FlatCard(
+                FlatCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'Appearance',
+                        subtitle:
+                            'Dark, light, or follow the device setting. Saved on this phone.',
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          for (final mode in ThemeMode.values) ...[
+                            _ThemeChoice(mode: mode),
+                            if (mode != ThemeMode.values.last)
+                              const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FlatCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -455,12 +478,12 @@ class _AccountScreenState extends State<AccountScreen> {
                   onPressed: _signOut,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.danger,
-                    side: const BorderSide(color: AppColors.danger),
+                    side: BorderSide(color: AppColors.danger),
                   ),
                   child: const Text('Sign out'),
                 ),
                 const SizedBox(height: 14),
-                const Text(
+                Text(
                   'MTL Trader · flat mobile journal\nTrades, notes and media stay on your Supabase project.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -490,5 +513,65 @@ class _AccountScreenState extends State<AccountScreen> {
     return source.length >= 2
         ? source.substring(0, 2).toUpperCase()
         : source.toUpperCase();
+  }
+}
+
+/// One of the three appearance options. The root rebuilds the tree when the
+/// mode changes, so this needs no local state.
+class _ThemeChoice extends StatelessWidget {
+  const _ThemeChoice({required this.mode});
+
+  final ThemeMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = ThemeController.instance.mode == mode;
+    final label = switch (mode) {
+      ThemeMode.dark => 'Dark',
+      ThemeMode.light => 'Light',
+      ThemeMode.system => 'System',
+    };
+    final icon = switch (mode) {
+      ThemeMode.dark => Icons.dark_mode_outlined,
+      ThemeMode.light => Icons.light_mode_outlined,
+      ThemeMode.system => Icons.brightness_auto_outlined,
+    };
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => ThemeController.instance.setMode(mode),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color:
+                active ? AppColors.primary.withAlpha(20) : AppColors.surfaceAlt,
+            border: Border.all(
+              color: active ? AppColors.primary : AppColors.border,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: active ? AppColors.primary : AppColors.muted,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? AppColors.primary : AppColors.muted,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

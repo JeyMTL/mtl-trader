@@ -47,7 +47,7 @@ class _EdgeScreenState extends State<EdgeScreen> {
           IconButton(
             onPressed: _refresh,
             tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh, size: 20, color: AppColors.muted),
+            icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
           ),
         ],
       ),
@@ -67,13 +67,13 @@ class _EdgeScreenState extends State<EdgeScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.error_outline,
                       color: AppColors.danger,
                       size: 26,
                     ),
                     const SizedBox(height: 10),
-                    const Text(
+                    Text(
                       'Could not load the edge report',
                       style: TextStyle(
                         color: AppColors.text,
@@ -87,7 +87,7 @@ class _EdgeScreenState extends State<EdgeScreen> {
                       textAlign: TextAlign.center,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.faint,
                         fontSize: 11,
                         height: 1.4,
@@ -120,7 +120,7 @@ class _EdgeScreenState extends State<EdgeScreen> {
                 FlatCard(
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -207,7 +207,7 @@ class _EdgeScreenState extends State<EdgeScreen> {
                         Text(
                           'Windows with fewer than ${edge.minTrades} trades are excluded from best/worst. '
                           'Median hold ${durationText(stats.medianMinutes)} across ${stats.holdTrades} timed trades.',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 9.5,
                             height: 1.45,
@@ -280,7 +280,7 @@ class _EdgeCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.muted,
                     fontSize: 8.5,
                     fontWeight: FontWeight.w700,
@@ -300,7 +300,7 @@ class _EdgeCard extends StatelessWidget {
             period?.label ?? 'Need 3+ trades',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.text,
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
@@ -322,7 +322,7 @@ class _EdgeCard extends StatelessWidget {
                 : '${period!.trades} trades · ${percent(period!.winRate)} win',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.faint, fontSize: 9),
+            style: TextStyle(color: AppColors.faint, fontSize: 9),
           ),
         ],
       ),
@@ -362,7 +362,7 @@ class _HourChart extends StatelessWidget {
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(
                 '${group.x}:00\n${signedMoney(rod.toY)}',
-                const TextStyle(color: AppColors.text, fontSize: 10),
+                TextStyle(color: AppColors.text, fontSize: 10),
               );
             },
           ),
@@ -376,7 +376,7 @@ class _HourChart extends StatelessWidget {
               reservedSize: 42,
               getTitlesWidget: (value, meta) => Text(
                 compactMoney(value),
-                style: const TextStyle(color: AppColors.faint, fontSize: 8.5),
+                style: TextStyle(color: AppColors.faint, fontSize: 8.5),
               ),
             ),
           ),
@@ -387,7 +387,7 @@ class _HourChart extends StatelessWidget {
               interval: 3,
               getTitlesWidget: (value, meta) => Text(
                 '${value.toInt()}h',
-                style: const TextStyle(color: AppColors.faint, fontSize: 8.5),
+                style: TextStyle(color: AppColors.faint, fontSize: 8.5),
               ),
             ),
           ),
@@ -441,7 +441,7 @@ class _SessionRow extends StatelessWidget {
                         period.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.text,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -461,7 +461,7 @@ class _SessionRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${period.trades} trades · ${percent(period.winRate)} win rate',
-                  style: const TextStyle(color: AppColors.faint, fontSize: 9.5),
+                  style: TextStyle(color: AppColors.faint, fontSize: 9.5),
                 ),
               ],
             ),

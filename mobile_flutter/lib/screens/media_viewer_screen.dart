@@ -43,7 +43,7 @@ class MediaViewerScreen extends StatelessWidget {
                 ),
               );
             },
-            errorBuilder: (context, error, stack) => const Center(
+            errorBuilder: (context, error, stack) => Center(
               child: Text(
                 'Could not load this screenshot.',
                 style: TextStyle(color: AppColors.muted, fontSize: 12),

@@ -103,12 +103,18 @@ class JournalApi {
   }
 
   Future<List<TradeRow>> recentTrades({int limit = 5}) async {
+    // Reading `userId!` here threw a null-check error straight out of the
+    // dashboard load when the session had expired; say what happened instead.
+    final id = userId;
+    if (id == null) {
+      throw Exception('Your session expired. Sign in again.');
+    }
     final data = await _db
         .from('trades')
         .select(
           'id, symbol, type, pnl, entry_price, exit_price, lot_size, commission, swap, open_time, close_time, strategy, notes, tags, created_at',
         )
-        .eq('user_id', userId!)
+        .eq('user_id', id)
         .order('created_at', ascending: false)
         .limit(limit);
     return asList(data).map((row) => TradeRow.fromMap(asMap(row))).toList();

@@ -115,7 +115,7 @@ class _JournalScreenState extends State<JournalScreen> {
         title: const Text('Delete this trade?'),
         content: Text(
           '${trade.symbol} and its photos or voice notes will be removed. This cannot be undone.',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.muted,
             fontSize: 12.5,
             height: 1.45,
@@ -128,7 +128,7 @@ class _JournalScreenState extends State<JournalScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
+            child: Text(
               'Delete',
               style: TextStyle(color: AppColors.danger),
             ),
@@ -165,7 +165,7 @@ class _JournalScreenState extends State<JournalScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear the journal?'),
-        content: const Text(
+        content: Text(
           'Every trade, photo and voice note in this account is removed. This cannot be undone.',
           style: TextStyle(
             color: AppColors.muted,
@@ -180,7 +180,7 @@ class _JournalScreenState extends State<JournalScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
+            child: Text(
               'Clear all',
               style: TextStyle(color: AppColors.danger),
             ),
@@ -215,12 +215,12 @@ class _JournalScreenState extends State<JournalScreen> {
         title: const Text('Journal'),
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, size: 20, color: AppColors.muted),
+            icon: Icon(Icons.more_vert, size: 20, color: AppColors.muted),
             color: AppColors.surfaceAlt,
             onSelected: (value) {
               if (value == 'clear') _clearJournal();
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'clear',
                 child: Text(
@@ -246,7 +246,7 @@ class _JournalScreenState extends State<JournalScreen> {
                         _loading && _items.isEmpty
                             ? 'Loading…'
                             : '$_total trades · ${signedMoney(_totalPnl)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.muted,
                           fontSize: 11.5,
                         ),
@@ -266,7 +266,7 @@ class _JournalScreenState extends State<JournalScreen> {
                   onChanged: _onSearchChanged,
                   decoration: InputDecoration(
                     hintText: 'Search symbol, strategy or tag',
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.search,
                       size: 18,
                       color: AppColors.faint,
@@ -279,7 +279,7 @@ class _JournalScreenState extends State<JournalScreen> {
                               _load(reset: true);
                               setState(() {});
                             },
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.close,
                               size: 16,
                               color: AppColors.faint,
@@ -418,7 +418,7 @@ class _TradeCard extends StatelessWidget {
               children: [
                 Text(
                   trade.symbol,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.text,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -444,7 +444,7 @@ class _TradeCard extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               '${dayOf(trade.tradedAt)} · ${trade.entryPrice} → ${trade.exitPrice} · ${trade.lotSize} lots',
-              style: const TextStyle(color: AppColors.muted, fontSize: 10.5),
+              style: TextStyle(color: AppColors.muted, fontSize: 10.5),
             ),
             if (trade.timeWindow != null) ...[
               const SizedBox(height: 2),
@@ -462,7 +462,7 @@ class _TradeCard extends StatelessWidget {
                   if (trade.strategy != null)
                     Text(
                       trade.strategy!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.muted,
                         fontSize: 9.5,
                       ),
@@ -470,7 +470,7 @@ class _TradeCard extends StatelessWidget {
                   for (final tag in trade.tags.take(3))
                     Text(
                       '#$tag',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.faint,
                         fontSize: 9.5,
                       ),
@@ -482,7 +482,7 @@ class _TradeCard extends StatelessWidget {
             Row(
               children: [
                 if (trade.imageCount > 0) ...[
-                  const Icon(
+                  Icon(
                     Icons.image_outlined,
                     size: 11,
                     color: AppColors.primary,
@@ -490,7 +490,7 @@ class _TradeCard extends StatelessWidget {
                   const SizedBox(width: 2),
                   Text(
                     '${trade.imageCount}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 9.5,
                     ),
@@ -498,7 +498,7 @@ class _TradeCard extends StatelessWidget {
                   const SizedBox(width: 7),
                 ],
                 if (trade.audioCount > 0) ...[
-                  const Icon(
+                  Icon(
                     Icons.mic_none,
                     size: 11,
                     color: AppColors.primary,
@@ -506,7 +506,7 @@ class _TradeCard extends StatelessWidget {
                   const SizedBox(width: 2),
                   Text(
                     '${trade.audioCount}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 9.5,
                     ),
@@ -518,7 +518,7 @@ class _TradeCard extends StatelessWidget {
                   InkWell(
                     onTap: onDelete,
                     borderRadius: BorderRadius.circular(4),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.all(4),
                       child: Icon(
                         Icons.delete_outline,
@@ -528,7 +528,7 @@ class _TradeCard extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(width: 2),
-                const Icon(
+                Icon(
                   Icons.chevron_right,
                   size: 16,
                   color: AppColors.faint,

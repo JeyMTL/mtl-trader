@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/chart_theme.dart';
 import 'core/config.dart';
 import 'screens/auth_gate.dart';
 import 'ui/theme.dart';
@@ -18,6 +19,10 @@ Future<void> main() async {
     publishableKey: AppConfig.supabaseAnonKey,
   );
 
+  // The saved chart style, read once so the first chart already looks right.
+  await ChartStyle.restore();
+  await ThemeController.restore();
+
   runApp(const MtlTraderApp());
 }
 
@@ -26,11 +31,24 @@ class MtlTraderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MTL Trader',
-      debugShowCheckedModeBanner: false,
-      theme: buildFlatTheme(),
-      home: const AuthGate(),
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        final mode = ThemeController.instance.mode;
+        return MaterialApp(
+          title: 'MTL Trader',
+          debugShowCheckedModeBanner: false,
+          theme: buildFlatTheme(AppColors.palette),
+          // The palette is read through `AppColors` getters rather than an
+          // InheritedWidget, so a switch has to rebuild the tree. The key makes
+          // Flutter discard the subtree instead of keeping const widgets that
+          // still hold the old colours.
+          home: KeyedSubtree(
+            key: ValueKey<String>('theme-${mode.name}'),
+            child: const AuthGate(),
+          ),
+        );
+      },
     );
   }
 }
@@ -42,13 +60,13 @@ class _ConfigMissingApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: buildFlatTheme(),
+      theme: buildFlatTheme(AppPalette.dark),
       home: Scaffold(
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              const Text(
+              Text(
                 'MTL Trader',
                 style: TextStyle(
                   color: AppColors.text,
@@ -57,12 +75,12 @@ class _ConfigMissingApp extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Supabase credentials are missing from this build.',
                 style: TextStyle(color: AppColors.muted, fontSize: 13),
               ),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                 'Run the app with:',
                 style: TextStyle(
                   color: AppColors.text,
@@ -83,7 +101,7 @@ class _ConfigMissingApp extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'Use the same URL and anon key as the web app (.env.local). The mobile app reads the same journal and storage bucket.',
                 style: TextStyle(
                   color: AppColors.faint,

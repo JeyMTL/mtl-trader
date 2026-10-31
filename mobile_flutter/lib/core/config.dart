@@ -23,6 +23,14 @@ class AppConfig {
     defaultValue: 'https://mtl-trader.vercel.app',
   );
 
+  /// Deep link Supabase returns the Google sign-in to. It must match the scheme
+  /// registered for the app (Android intent filter / iOS URL scheme) and be
+  /// allow-listed under Authentication → URL Configuration in Supabase.
+  static const String oauthRedirect = String.fromEnvironment(
+    'OAUTH_REDIRECT',
+    defaultValue: 'com.mtltrader.app://login-callback',
+  );
+
   static bool get isConfigured =>
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 }

@@ -478,7 +478,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Remove this file?'),
-        content: const Text(
+        content: Text(
           'It is deleted from storage as well as from this entry.',
           style: TextStyle(color: AppColors.muted, fontSize: 12.5),
         ),
@@ -489,7 +489,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
+            child: Text(
               'Remove',
               style: TextStyle(color: AppColors.danger),
             ),
@@ -711,7 +711,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       suffixIcon: IconButton(
                         tooltip: 'Pick an instrument',
                         onPressed: _pickSymbol,
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.expand_more,
                           size: 20,
                           color: AppColors.faint,
@@ -891,13 +891,13 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.timer_outlined,
                         size: 13,
                         color: AppColors.faint,
                       ),
                       const SizedBox(width: 5),
-                      const Text(
+                      Text(
                         'Time in market',
                         style: TextStyle(
                           color: AppColors.muted,
@@ -1009,7 +1009,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   ),
                   if (_uploading) ...[
                     const SizedBox(height: 8),
-                    const Row(
+                    Row(
                       children: [
                         SizedBox(
                           width: 12,
@@ -1041,7 +1041,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   const SectionTitle(title: 'Tags'),
                   const SizedBox(height: 6),
                   if (_tags.isEmpty)
-                    const Text(
+                    Text(
                       'No tags yet — they drive the edge report.',
                       style: TextStyle(color: AppColors.faint, fontSize: 10.5),
                     )
@@ -1065,7 +1065,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                               children: [
                                 Text(
                                   tag,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppColors.primaryLight,
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w600,
@@ -1077,7 +1077,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                                         .where((item) => item != tag)
                                         .toList(),
                                   ),
-                                  child: const Padding(
+                                  child: Padding(
                                     padding: EdgeInsets.all(5),
                                     child: Icon(
                                       Icons.close,
@@ -1135,7 +1135,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'ESTIMATED P&L',
                               style: TextStyle(
                                 color: AppColors.muted,
@@ -1193,7 +1193,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
             ElevatedButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -1329,7 +1329,7 @@ class _WindowRow extends StatelessWidget {
               width: 52,
               child: Text(
                 label,
-                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                style: TextStyle(color: AppColors.muted, fontSize: 11),
               ),
             ),
             Expanded(
@@ -1341,12 +1341,12 @@ class _WindowRow extends StatelessWidget {
             if (onClear != null)
               InkWell(
                 onTap: onClear,
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.all(3),
                   child: Icon(Icons.close, size: 13, color: AppColors.faint),
                 ),
               ),
-            const Icon(Icons.chevron_right, size: 16, color: AppColors.faint),
+            Icon(Icons.chevron_right, size: 16, color: AppColors.faint),
           ],
         ),
       ),
@@ -1380,7 +1380,7 @@ class _MediaGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (images.isNotEmpty || existingImages.isNotEmpty) ...[
-          const Text(
+          Text(
             'SCREENSHOTS',
             style: TextStyle(
               color: AppColors.muted,
@@ -1410,7 +1410,7 @@ class _MediaGrid extends StatelessWidget {
           const SizedBox(height: 10),
         ],
         if (audio.isNotEmpty || existingAudio.isNotEmpty) ...[
-          const Text(
+          Text(
             'VOICE NOTES',
             style: TextStyle(
               color: AppColors.muted,
@@ -1457,7 +1457,7 @@ class _ImageThumb extends StatelessWidget {
     return _ThumbFrame(
       onRemove: onRemove,
       child: bytes == null
-          ? const Icon(Icons.image_outlined, color: AppColors.faint, size: 20)
+          ? Icon(Icons.image_outlined, color: AppColors.faint, size: 20)
           : Image.memory(
               bytes!,
               fit: BoxFit.cover,
@@ -1512,7 +1512,7 @@ class _RemoteImageThumbState extends State<_RemoteImageThumb> {
     if (path == null) {
       return _ThumbFrame(
         onRemove: widget.onRemove,
-        child: const Icon(
+        child: Icon(
           Icons.image_outlined,
           color: AppColors.faint,
           size: 20,
@@ -1546,7 +1546,7 @@ class _RemoteImageThumbState extends State<_RemoteImageThumb> {
                   ),
                 )
               : url == null
-                  ? const Icon(
+                  ? Icon(
                       Icons.broken_image_outlined,
                       color: AppColors.faint,
                       size: 20,
@@ -1556,7 +1556,7 @@ class _RemoteImageThumbState extends State<_RemoteImageThumb> {
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
-                      errorBuilder: (context, error, stack) => const Icon(
+                      errorBuilder: (context, error, stack) => Icon(
                         Icons.broken_image_outlined,
                         color: AppColors.faint,
                         size: 20,
@@ -1585,7 +1585,7 @@ class _ThumbFrame extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: AppColors.border),
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -1602,7 +1602,7 @@ class _ThumbFrame extends StatelessWidget {
                     color: AppColors.background.withAlpha(200),
                     borderRadius: BorderRadius.circular(3),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close,
                     size: 11,
                     color: AppColors.text,
@@ -1630,7 +1630,7 @@ class _PendingAudioRow extends StatelessWidget {
       meta:
           '${clockText(attachment.durationSeconds)} · ${fileSize(attachment.sizeBytes)} · uploads on save',
       onRemove: onRemove,
-      trailing: const Icon(
+      trailing: Icon(
         Icons.cloud_upload_outlined,
         size: 15,
         color: AppColors.faint,
@@ -1795,7 +1795,7 @@ class _AudioFrame extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.graphic_eq, size: 15, color: AppColors.primary),
+          Icon(Icons.graphic_eq, size: 15, color: AppColors.primary),
           const SizedBox(width: 7),
           Expanded(
             child: Column(
@@ -1805,7 +1805,7 @@ class _AudioFrame extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.text,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
@@ -1815,7 +1815,7 @@ class _AudioFrame extends StatelessWidget {
                   meta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.faint, fontSize: 9),
+                  style: TextStyle(color: AppColors.faint, fontSize: 9),
                 ),
               ],
             ),
@@ -1823,7 +1823,7 @@ class _AudioFrame extends StatelessWidget {
           trailing,
           InkWell(
             onTap: onRemove,
-            child: const Padding(
+            child: Padding(
               padding: EdgeInsets.all(3),
               child: Icon(
                 Icons.delete_outline,
@@ -1858,7 +1858,7 @@ class _ErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.danger,
                 fontSize: 11,
                 height: 1.4,
@@ -1867,7 +1867,7 @@ class _ErrorBanner extends StatelessWidget {
           ),
           InkWell(
             onTap: onDismiss,
-            child: const Padding(
+            child: Padding(
               padding: EdgeInsets.all(3),
               child: Icon(Icons.close, size: 13, color: AppColors.danger),
             ),

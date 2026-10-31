@@ -91,7 +91,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Analytics',
                       style: TextStyle(
@@ -105,7 +105,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   IconButton(
                     onPressed: _refresh,
                     tooltip: 'Refresh',
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.refresh,
                       size: 18,
                       color: AppColors.muted,
@@ -117,7 +117,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               if (snapshot.hasError)
                 _ErrorCard(onRetry: _refresh)
               else if (data == null)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 40),
                   child: Center(
                     child: SizedBox(
@@ -152,7 +152,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   onTap: widget.onOpenEdge,
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -176,7 +176,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right,
                         size: 18,
                         color: AppColors.faint,
@@ -204,7 +204,7 @@ class _ErrorCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Could not load analytics',
             style: TextStyle(
               color: AppColors.text,
@@ -213,7 +213,7 @@ class _ErrorCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Check your connection and try again.',
             style: TextStyle(color: AppColors.faint, fontSize: 11.5),
           ),
@@ -375,7 +375,7 @@ class _MonthlySection extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(
                             monthLabel(month.key),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.faint,
                               fontSize: 9.5,
                             ),
@@ -459,7 +459,7 @@ class _RecentSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
@@ -509,7 +509,7 @@ class _SymbolSection extends StatelessWidget {
                     child: Text(
                       symbols[index].symbol,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.text,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -520,7 +520,7 @@ class _SymbolSection extends StatelessWidget {
                     child: Text(
                       '${symbols[index].trades}T · '
                       '${percent(symbols[index].winRate)} win',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.faint,
                         fontSize: 11,
                       ),
@@ -580,7 +580,7 @@ class _TagSection extends StatelessWidget {
                         Text(
                           tags[index].tag,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.text,
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
@@ -591,7 +591,7 @@ class _TagSection extends StatelessWidget {
                           '${tags[index].trades}T · '
                           '${tags[index].wins}W ${tags[index].losses}L · '
                           '${percent(tags[index].winRate)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 10.5,
                           ),

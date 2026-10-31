@@ -46,26 +46,17 @@ void main() {
   });
 
   group('chart payload', () {
-    test('parses candles oldest first and drops empty quotes', () {
-      final candles = parseChartPayload({
-        'chart': {
-          'result': [
-            {
-              'timestamp': [1793369400, 1793369100, 1793369700],
-              'indicators': {
-                'quote': [
-                  {
-                    'open': [1.10, 1.20, null],
-                    'high': [1.15, 1.25, null],
-                    'low': [1.05, 1.15, null],
-                    'close': [1.12, 1.18, null],
-                  },
-                ],
-              },
-            },
-          ],
-          'error': null,
-        },
+    test('parses candles oldest first and drops unusable rows', () {
+      final candles = parseCandlePayload({
+        'symbol': 'EURUSD',
+        'range': '1d',
+        'interval': '5m',
+        'source': 'oanda',
+        'candles': [
+          {'t': 1793369400000, 'o': 1.10, 'h': 1.15, 'l': 1.05, 'c': 1.12},
+          {'t': 1793369100000, 'o': 1.20, 'h': 1.25, 'l': 1.15, 'c': 1.18},
+          {'t': 1793369700000, 'o': null, 'h': 1.25, 'l': 1.15, 'c': 1.18},
+        ],
       });
 
       expect(candles, hasLength(2));
@@ -75,29 +66,24 @@ void main() {
       expect(candles.last.close, 1.12);
     });
 
-    test('surfaces the feed error description', () {
+    test('surfaces the feed error message', () {
       expect(
-        () => parseChartPayload({
-          'chart': {
-            'result': null,
-            'error': {'description': 'No data found, symbol may be delisted'},
-          },
+        () => parseCandlePayload({
+          'error': 'No chart data for EURUSD right now.',
         }),
         throwsA(
           isA<MarketDataException>().having(
             (error) => error.message,
             'message',
-            contains('No data found'),
+            contains('No chart data'),
           ),
         ),
       );
     });
 
-    test('rejects an empty result set', () {
+    test('rejects a payload without a candle list', () {
       expect(
-        () => parseChartPayload({
-          'chart': {'result': [], 'error': null},
-        }),
+        () => parseCandlePayload({'candles': null}),
         throwsA(isA<MarketDataException>()),
       );
     });

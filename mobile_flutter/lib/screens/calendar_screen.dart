@@ -109,7 +109,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Calendar',
                       style: TextStyle(
@@ -144,7 +144,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         IconButton(
                           onPressed: () => _shiftMonth(-1),
                           tooltip: 'Previous month',
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.chevron_left,
                             size: 20,
                             color: AppColors.muted,
@@ -155,7 +155,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             children: [
                               Text(
                                 _monthTitle.format(_month),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppColors.text,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
@@ -187,7 +187,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         IconButton(
                           onPressed: () => _shiftMonth(1),
                           tooltip: 'Next month',
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.chevron_right,
                             size: 20,
                             color: AppColors.muted,
@@ -211,7 +211,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             child: Center(
                               child: Text(
                                 label,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppColors.faint,
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w600,
@@ -227,7 +227,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Column(
                           children: [
-                            const Text(
+                            Text(
                               'Could not load this month',
                               style: TextStyle(
                                 color: AppColors.faint,
@@ -354,7 +354,7 @@ class _Legend extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        const Text(
+        Text(
           'Winning day',
           style: TextStyle(color: AppColors.faint, fontSize: 10.5),
         ),
@@ -369,7 +369,7 @@ class _Legend extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        const Text(
+        Text(
           'Losing day',
           style: TextStyle(color: AppColors.faint, fontSize: 10.5),
         ),
@@ -405,7 +405,7 @@ class _DaySheet extends StatelessWidget {
                 Expanded(
                   child: Text(
                     longDay(day),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.text,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -426,7 +426,7 @@ class _DaySheet extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               '${point.trades} ${point.trades == 1 ? 'trade' : 'trades'}',
-              style: const TextStyle(color: AppColors.faint, fontSize: 11),
+              style: TextStyle(color: AppColors.faint, fontSize: 11),
             ),
             const SizedBox(height: 10),
             ConstrainedBox(
@@ -435,7 +435,7 @@ class _DaySheet extends StatelessWidget {
                 future: api.dayTrades(day),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
+                    return Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: Center(
                         child: SizedBox(
@@ -451,7 +451,7 @@ class _DaySheet extends StatelessWidget {
                   }
                   final trades = snapshot.data ?? const <TradeRow>[];
                   if (snapshot.hasError || trades.isEmpty) {
-                    return const Padding(
+                    return Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         'No trades loaded for this day.',
@@ -503,7 +503,7 @@ class _DaySheet extends StatelessWidget {
                                   children: [
                                     Text(
                                       trade.symbol,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.text,
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w600,
@@ -514,7 +514,7 @@ class _DaySheet extends StatelessWidget {
                                       trade.strategy?.isNotEmpty == true
                                           ? trade.strategy!
                                           : trade.timeWindow ?? '—',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.faint,
                                         fontSize: 10.5,
                                       ),
@@ -536,7 +536,7 @@ class _DaySheet extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Icon(
+                              Icon(
                                 Icons.chevron_right,
                                 size: 16,
                                 color: AppColors.faint,

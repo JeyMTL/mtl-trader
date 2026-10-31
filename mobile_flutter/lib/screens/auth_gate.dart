@@ -128,13 +128,13 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.mark_email_unread_outlined,
                       color: AppColors.primary,
                       size: 26,
                     ),
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       'Confirm your email',
                       style: TextStyle(
                         color: AppColors.text,
@@ -145,7 +145,7 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                     const SizedBox(height: 6),
                     Text(
                       'The journal opens once ${widget.email} is confirmed. Open the link Supabase emailed you, then return here.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.muted,
                         fontSize: 12.5,
                         height: 1.5,
@@ -155,7 +155,7 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                       const SizedBox(height: 12),
                       Text(
                         _message!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primaryLight,
                           fontSize: 12,
                           height: 1.4,
@@ -166,7 +166,7 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                     ElevatedButton(
                       onPressed: _checking ? null : _checkAgain,
                       child: _checking
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(

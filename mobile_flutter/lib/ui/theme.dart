@@ -1,23 +1,181 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+/// One concrete set of app colours.
+///
+/// Two palettes exist — [dark] and [light] — and [AppColors] reads whichever
+/// one [ThemeController] has activated. The chart keeps a separate palette
+/// (`ChartStyle`) on purpose: a light journal with a dark chart is a valid
+/// preference, and the canvas needs candle colours the UI never uses.
+@immutable
+class AppPalette {
+  const AppPalette({
+    required this.id,
+    required this.background,
+    required this.surface,
+    required this.surfaceAlt,
+    required this.border,
+    required this.borderStrong,
+    required this.primary,
+    required this.primaryLight,
+    required this.ink,
+    required this.success,
+    required this.danger,
+    required this.text,
+    required this.muted,
+    required this.faint,
+  });
+
+  final String id;
+  final Color background;
+  final Color surface;
+  final Color surfaceAlt;
+  final Color border;
+  final Color borderStrong;
+
+  /// Accent colour for buttons, pills and selection.
+  final Color primary;
+
+  /// Accent used for text on a dark background.
+  final Color primaryLight;
+
+  /// Text and icons drawn on top of [primary].
+  final Color ink;
+
+  final Color success;
+  final Color danger;
+  final Color text;
+  final Color muted;
+  final Color faint;
+
+  bool get isLight => background.computeLuminance() > 0.5;
+
+  static const AppPalette dark = AppPalette(
+    id: 'dark',
+    background: Color(0xFF080A0F),
+    surface: Color(0xFF0F1218),
+    surfaceAlt: Color(0xFF161A22),
+    border: Color(0xFF242A36),
+    borderStrong: Color(0xFF333B4B),
+    primary: Color(0xFFD5A44E),
+    primaryLight: Color(0xFFEBC57D),
+    ink: Color(0xFF14100A),
+    success: Color(0xFF45D29A),
+    danger: Color(0xFFF26B78),
+    text: Color(0xFFEDF0F5),
+    muted: Color(0xFF98A1B0),
+    faint: Color(0xFF6B7280),
+  );
+
+  /// Soft, low-contrast light theme: paper-grey background, white cards, and a
+  /// deeper gold so the accent stays readable on white.
+  static const AppPalette light = AppPalette(
+    id: 'light',
+    background: Color(0xFFF4F6F9),
+    surface: Color(0xFFFFFFFF),
+    surfaceAlt: Color(0xFFEDF0F5),
+    border: Color(0xFFDCE1E9),
+    borderStrong: Color(0xFFC2C9D6),
+    primary: Color(0xFF9A6E1F),
+    primaryLight: Color(0xFF7C5814),
+    ink: Color(0xFFFFFFFF),
+    success: Color(0xFF0F7A57),
+    danger: Color(0xFFB93441),
+    text: Color(0xFF12161F),
+    muted: Color(0xFF5A6372),
+    faint: Color(0xFF8A94A3),
+  );
+
+  static const List<AppPalette> all = <AppPalette>[dark, light];
+}
+
+/// The app palette, resolved at runtime.
+///
+/// Everything in the UI reads `AppColors.x`, which forwards to the active
+/// palette, so switching themes is a swap plus a rebuild — no call site needs a
+/// `BuildContext`.
 class AppColors {
   const AppColors._();
 
-  static const Color background = Color(0xFF080A0F);
-  static const Color surface = Color(0xFF0F1218);
-  static const Color surfaceAlt = Color(0xFF161A22);
-  static const Color border = Color(0xFF242A36);
-  static const Color borderStrong = Color(0xFF333B4B);
+  static AppPalette palette = AppPalette.dark;
 
-  static const Color primary = Color(0xFFD5A44E);
-  static const Color primaryLight = Color(0xFFEBC57D);
-  static const Color ink = Color(0xFF14100A);
+  static Color get background => palette.background;
+  static Color get surface => palette.surface;
+  static Color get surfaceAlt => palette.surfaceAlt;
+  static Color get border => palette.border;
+  static Color get borderStrong => palette.borderStrong;
+  static Color get primary => palette.primary;
+  static Color get primaryLight => palette.primaryLight;
+  static Color get ink => palette.ink;
+  static Color get success => palette.success;
+  static Color get danger => palette.danger;
+  static Color get text => palette.text;
+  static Color get muted => palette.muted;
+  static Color get faint => palette.faint;
+}
 
-  static const Color success = Color(0xFF45D29A);
-  static const Color danger = Color(0xFFF26B78);
-  static const Color text = Color(0xFFEDF0F5);
-  static const Color muted = Color(0xFF98A1B0);
-  static const Color faint = Color(0xFF6B7280);
+/// Dark / light / follow-the-device, remembered across launches.
+class ThemeController extends ChangeNotifier {
+  ThemeController._();
+
+  static final ThemeController instance = ThemeController._();
+
+  static const String storageKey = 'app.theme.v1';
+
+  ThemeMode _mode = ThemeMode.dark;
+
+  ThemeMode get mode => _mode;
+
+  bool get isLight => AppColors.palette.isLight;
+
+  /// Reads the saved preference. Called once from `main` before `runApp`.
+  static Future<void> restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      instance._apply(_parse(prefs.getString(storageKey)), notify: false);
+    } catch (_) {
+      // A missing or unreadable preference keeps the dark default.
+    }
+  }
+
+  /// Switches palette, notifies the root and stores the choice.
+  Future<void> setMode(ThemeMode mode) async {
+    if (mode == _mode) return;
+    _apply(mode, notify: true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(storageKey, mode.name);
+    } catch (_) {
+      // The switch still applies for this session.
+    }
+  }
+
+  void _apply(ThemeMode mode, {required bool notify}) {
+    _mode = mode;
+    AppColors.palette = _paletteFor(mode);
+    if (notify) notifyListeners();
+  }
+
+  /// `ThemeMode.system` is resolved once, because the getters have no
+  /// `BuildContext` to ask.
+  static AppPalette _paletteFor(ThemeMode mode) {
+    if (mode == ThemeMode.light) return AppPalette.light;
+    if (mode == ThemeMode.dark) return AppPalette.dark;
+    final brightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    return brightness == Brightness.light ? AppPalette.light : AppPalette.dark;
+  }
+
+  static ThemeMode _parse(String? value) {
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'system':
+        return ThemeMode.system;
+      default:
+        return ThemeMode.dark;
+    }
+  }
 }
 
 /// Shared corner radii, so cards, fields, chips and buttons stay in one
@@ -47,51 +205,51 @@ Color toneColor(Tone tone) {
   }
 }
 
-ThemeData buildFlatTheme() {
+ThemeData buildFlatTheme(AppPalette palette) {
   final scheme = ColorScheme.fromSeed(
-    seedColor: AppColors.primary,
-    brightness: Brightness.dark,
+    seedColor: palette.primary,
+    brightness: palette.isLight ? Brightness.light : Brightness.dark,
   ).copyWith(
-    primary: AppColors.primary,
-    onPrimary: AppColors.ink,
-    surface: AppColors.surface,
-    onSurface: AppColors.text,
-    surfaceContainerHighest: AppColors.surfaceAlt,
-    outline: AppColors.border,
-    error: AppColors.danger,
+    primary: palette.primary,
+    onPrimary: palette.ink,
+    surface: palette.surface,
+    onSurface: palette.text,
+    surfaceContainerHighest: palette.surfaceAlt,
+    outline: palette.border,
+    error: palette.danger,
   );
 
   final fieldBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(AppRadius.field),
-    borderSide: const BorderSide(color: AppColors.border),
+    borderSide: BorderSide(color: palette.border),
   );
   final fieldFocused = OutlineInputBorder(
     borderRadius: BorderRadius.circular(AppRadius.field),
-    borderSide: const BorderSide(color: AppColors.primary, width: 1.3),
+    borderSide: BorderSide(color: palette.primary, width: 1.3),
   );
   final fieldError = OutlineInputBorder(
     borderRadius: BorderRadius.circular(AppRadius.field),
-    borderSide: const BorderSide(color: AppColors.danger),
+    borderSide: BorderSide(color: palette.danger),
   );
 
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: palette.isLight ? Brightness.light : Brightness.dark,
     colorScheme: scheme,
-    scaffoldBackgroundColor: AppColors.background,
-    dividerColor: AppColors.border,
+    scaffoldBackgroundColor: palette.background,
+    dividerColor: palette.border,
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.background,
-      foregroundColor: AppColors.text,
+    appBarTheme: AppBarTheme(
+      backgroundColor: palette.background,
+      foregroundColor: palette.text,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
       toolbarHeight: 58,
       titleTextStyle: TextStyle(
-        color: AppColors.text,
+        color: palette.text,
         fontSize: 21,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.6,
@@ -99,12 +257,12 @@ ThemeData buildFlatTheme() {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surfaceAlt,
+      fillColor: palette.surfaceAlt,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-      hintStyle: const TextStyle(color: AppColors.faint, fontSize: 13.5),
-      labelStyle: const TextStyle(color: AppColors.muted, fontSize: 12.5),
-      floatingLabelStyle: const TextStyle(
-        color: AppColors.primaryLight,
+      hintStyle: TextStyle(color: palette.faint, fontSize: 13.5),
+      labelStyle: TextStyle(color: palette.muted, fontSize: 12.5),
+      floatingLabelStyle: TextStyle(
+        color: palette.primaryLight,
         fontSize: 12.5,
         fontWeight: FontWeight.w600,
       ),
@@ -113,14 +271,14 @@ ThemeData buildFlatTheme() {
       focusedBorder: fieldFocused,
       errorBorder: fieldError,
       focusedErrorBorder: fieldError,
-      errorStyle: const TextStyle(color: AppColors.danger, fontSize: 11),
+      errorStyle: TextStyle(color: palette.danger, fontSize: 11),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.ink,
-        disabledBackgroundColor: AppColors.surfaceAlt,
-        disabledForegroundColor: AppColors.faint,
+        backgroundColor: palette.primary,
+        foregroundColor: palette.ink,
+        disabledBackgroundColor: palette.surfaceAlt,
+        disabledForegroundColor: palette.faint,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.button),
@@ -131,8 +289,8 @@ ThemeData buildFlatTheme() {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.text,
-        side: const BorderSide(color: AppColors.borderStrong),
+        foregroundColor: palette.text,
+        side: BorderSide(color: palette.borderStrong),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.button),
@@ -143,27 +301,33 @@ ThemeData buildFlatTheme() {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.primary,
+        foregroundColor: palette.primary,
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: AppColors.surface,
-      indicatorColor: AppColors.primary.withAlpha(30),
+      backgroundColor: palette.surface,
+      indicatorColor: palette.primary.withAlpha(30),
       elevation: 0,
       height: 74,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      labelTextStyle: const WidgetStatePropertyAll(
-        TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      labelTextStyle: WidgetStatePropertyAll(
+        TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: palette.muted,
+        ),
       ),
-      iconTheme: const WidgetStatePropertyAll(IconThemeData(size: 22)),
+      iconTheme: WidgetStatePropertyAll(
+        IconThemeData(size: 22, color: palette.muted),
+      ),
       indicatorShape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: AppColors.primary,
-      foregroundColor: AppColors.ink,
+      backgroundColor: palette.primary,
+      foregroundColor: palette.ink,
       elevation: 0,
       focusElevation: 0,
       hoverElevation: 0,
@@ -173,8 +337,8 @@ ThemeData buildFlatTheme() {
       ),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: AppColors.surfaceAlt,
-      contentTextStyle: const TextStyle(color: AppColors.text, fontSize: 13),
+      backgroundColor: palette.surfaceAlt,
+      contentTextStyle: TextStyle(color: palette.text, fontSize: 13),
       behavior: SnackBarBehavior.floating,
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -182,16 +346,16 @@ ThemeData buildFlatTheme() {
       ),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: AppColors.surface,
+      backgroundColor: palette.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: palette.border),
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: AppColors.surface,
+      backgroundColor: palette.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: const RoundedRectangleBorder(
