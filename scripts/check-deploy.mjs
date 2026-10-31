@@ -57,6 +57,17 @@ async function main() {
       ? ''
       : 'profile creation and the cron routes will fail'
   )
+  if (body.features?.avatars) {
+    line(
+      'avatars bucket',
+      body.features.avatars === 'ready',
+      body.features.avatars === 'ready'
+        ? ''
+        : body.features.avatars === 'missing'
+          ? 'migration not applied — uploads will fail'
+          : 'could not be determined'
+    )
+  }
   if (body.commit) console.log(`  commit ${body.commit}`)
 
   return response.ok && body.status === 'ok' ? 0 : 1

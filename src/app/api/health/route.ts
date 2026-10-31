@@ -47,6 +47,8 @@ export async function GET() {
     }
   }
 
+  const avatars = await checkAvatarsBucket(supabaseUrl)
+
   const healthy =
     config.supabaseUrl && config.supabaseAnonKey && database === 'ok'
 
@@ -59,6 +61,10 @@ export async function GET() {
         null,
       database,
       config,
+      // Reported, but deliberately not part of `status`: a missing bucket breaks
+      // avatar uploads while the journal itself keeps working, so it must not
+      // page anyone. The deploy gate surfaces it instead.
+      features: { avatars },
       checkedAt: new Date().toISOString(),
     },
     {
@@ -66,6 +72,30 @@ export async function GET() {
       headers: { 'Cache-Control': 'no-store' },
     }
   )
+}
+
+/**
+ * Proves the `avatars` bucket exists without a key: a public-bucket request
+ * answers "Object not found" when the bucket is there and "Bucket not found"
+ * when the migration has not been applied. That is the difference between a
+ * half-rolled-out feature and a healthy deployment.
+ */
+async function checkAvatarsBucket(
+  supabaseUrl: string | undefined
+): Promise<'ready' | 'missing' | 'unknown'> {
+  if (!supabaseUrl) return 'unknown'
+  try {
+    const response = await fetch(
+      `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/avatars/__health-probe__`,
+      { cache: 'no-store', signal: AbortSignal.timeout(5000) }
+    )
+    const body = await response.text()
+    if (/bucket not found/i.test(body)) return 'missing'
+    if (/object not found/i.test(body) || response.ok) return 'ready'
+    return 'unknown'
+  } catch {
+    return 'unknown'
+  }
 }
 
 /** A failed request looks different from a refused query; only the former is down. */
