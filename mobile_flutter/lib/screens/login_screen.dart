@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -27,6 +30,56 @@ class _LoginScreenState extends State<LoginScreen> {
     _email.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  Future<void> _google() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      // Opens Google in the system browser and returns through the app's deep
+      // link, so the password never passes through this screen.
+      final launched = await Supabase.instance.client.auth
+          .signInWithOAuth(
+            OAuthProvider.google,
+            redirectTo: AppConfig.oauthRedirect,
+            authScreenLaunchMode: LaunchMode.externalApplication,
+          )
+          .timeout(const Duration(seconds: 20));
+      if (!mounted) return;
+      if (!launched) {
+        setState(
+          () => _error =
+              'Could not open Google sign-in. Check that a browser is available, then try again.',
+        );
+        return;
+      }
+      // Nothing returns from the browser here: the deep link carries the
+      // session back and AuthGate swaps this screen out on the auth change.
+      // Without this line the form looks idle and the user assumes it failed.
+      setState(
+        () => _notice =
+            'Finish signing in with Google, then return here — the journal opens on its own.',
+      );
+    } on TimeoutException {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Google sign-in timed out. Check your connection and try again.',
+        );
+      }
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not start Google sign-in. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -91,11 +144,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 38,
                         height: 38,
                         alignment: Alignment.center,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: AppColors.primary,
                           borderRadius: BorderRadius.all(Radius.circular(6)),
                         ),
-                        child: const Text(
+                        child: Text(
                           'MTL',
                           style: TextStyle(
                             color: AppColors.ink,
@@ -106,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Text(
+                      Text(
                         'MTL TRADER',
                         style: TextStyle(
                           color: AppColors.text,
@@ -118,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 34),
-                  const Text(
+                  Text(
                     'The journal that\nreads you back.',
                     style: TextStyle(
                       color: AppColors.text,
@@ -129,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Log the fill, the screenshot and the voice note. Find the hours that pay.',
                     style: TextStyle(
                       color: AppColors.muted,
@@ -145,6 +198,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          OutlinedButton.icon(
+                            onPressed: _loading ? null : _google,
+                            icon: const Text(
+                              'G',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            label: const Text('Continue with Google'),
+                          ),
+                          const SizedBox(height: 12),
                           Row(
                             children: [
                               _ModeTab(
@@ -214,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 12),
                             Text(
                               _error!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.danger,
                                 fontSize: 12,
                                 height: 1.4,
@@ -225,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 12),
                             Text(
                               _notice!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.success,
                                 fontSize: 12,
                                 height: 1.4,
@@ -236,7 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ElevatedButton(
                             onPressed: _loading ? null : _submit,
                             child: _loading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 18,
                                     height: 18,
                                     child: CircularProgressIndicator(
@@ -251,8 +316,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    'Confirm your email before the journal opens. Photos and voice notes stay private to your account.',
+                  Text(
+                    'Google sign-in needs no email confirmation. Email sign-ups must confirm the address before the journal opens.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.faint,

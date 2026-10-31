@@ -16,6 +16,10 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with
 - **Entry/Exit Time Window** - `open_time`/`close_time` are surfaced as a dedicated section with pickers, duration, and an exit-before-entry check; the trade log shows the clock window and time in market
 - **Time Edge Report** - `time_stats()` buckets trades by entry hour in the user's timezone and by session (Asian / London / overlap / New York / late). Analytics and the dashboard show most-profitable/most-losing hours and sessions, a 24-hour P&L chart, session win rates and median hold time. Pure helpers live in `src/lib/edge-window.ts` (unit tested)
 - **Flutter Mobile App** - `mobile_flutter/` is a native Flutter client with the same Supabase project: flat design, desk KPIs + equity chart, paged journal, photo/voice-note capture, entry/exit time window, time edge report and account/plan screen. It replaces the Capacitor shell for phones; platform folders are generated with `flutter create`
+- **Light & Dark Themes** - The Flutter app has two palettes (`AppPalette.dark` / `AppPalette.light`) and a "follow the device" mode, switchable in Account → Appearance and remembered via `shared_preferences` (`app.theme.v1`). `AppColors` forwards to the active palette so every screen follows; switching rebuilds the subtree (keyed by mode) because widgets read colours through getters, not an inherited context
+- **Google Sign-In** - Web login/signup and the Flutter login screen offer Google OAuth through Supabase (`signInWithOAuth`). `/auth/callback` exchanges the PKCE code, creates the profile through `/api/auth/signup`, then routes to the dashboard. Email/password stays available; only Google accounts skip the verification email, because Google has already verified the address
+- **Interactive Chart Canvas** - The level-pinning chart has a fullscreen mode (immersive system UI, back exits it) and a chart-style sheet: four presets (Ink/Slate/Paper/Mono), per-side candle colours from a palette, and grid/crosshair/watermark toggles. `ChartStyle` in `mobile_flutter/lib/core/chart_theme.dart` (unit tested) owns the canvas palette, so a light or monochrome chart never repaints the journal around it; level lines keep the app palette because they match the level rows. The choice is restored at startup from `shared_preferences` (key `chart.style.v1`)
+- **Market Replay** - The chart can replay history bar by bar: it starts two thirds into the loaded series, steps forward/back, auto-plays, and hides every candle after the cursor so pinning entry/stop/target behaves as it would live (entry/exit timestamps come from the replayed bar). `ReplayCursor` in `mobile_flutter/lib/core/chart_replay.dart` (unit tested) owns the stepping rules; live refresh pauses while replaying and resumes on exit. The strip also cycles replay speed (1×/2×/4×/8×), jumps to a chosen date, and at the first loaded bar turns the back button into "load earlier candles". Both use `from`/`to` on `/api/market/candles` (epoch ms or ISO, 62-day cap, validated server-side, translated to `start_date`/`end_date`, `from`/`to` and `period1`/`period2` per vendor) and historical windows are cached for 30 minutes because they never change
 - **Export Trades** - Download filtered trades as CSV from trade history page
 - **Dark/Light Mode** - Toggle in Settings > Appearance, saved to localStorage. Light mode uses soft muted tones for eye comfort
 - **Settings** - Profile, Balance (deposits/withdrawals), Appearance, Subscription, Notifications, Security
@@ -33,6 +37,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with
 - **Manual Payment Check** - `scripts/check-payments.mjs` audits payment env vars (folds in the old `check-paypal.mjs`); `--verify` validates the PayPal credentials against the API and `--reconcile` calls the reconcile cron and prints its result
 - **AI Journal Review** - `/api/ai/review` returns a structured, grounded review: deterministic edge stats (`src/lib/ai/edge-stats.ts`) are narrated by the model, over the trader's own notes via TF-IDF retrieval. Reviews persist to `ai_reviews`, cache for 24h, guard against tiny samples, and support OpenAI/Anthropic/OpenAI-compatible providers, chart images, and token streaming. `/api/ai/autotag` suggests tags with no model call. Inert without an AI key (returns 503). See `docs/AI.md`; fine-tuning is intentionally not implemented
 - **Bank Details API** - `/api/bank-details` serves bank transfer details from `BANK_*` env vars so they are no longer hardcoded in the client
+- **Market Chart Feed** - The Flutter level-pinning chart reads candles from `/api/market/candles` (Supabase-authenticated, rate-limited, shared server cache). The route proxies a vendor feed for forex, metals, indices and crypto — the market a broker actually quotes, instead of Yahoo's composite spot feed — and falls back to the delayed public feed for anything the vendor does not quote. `candleProviderChain()` in `src/lib/market-candles.ts` sets the order: **Twelve Data** when `TWELVE_DATA_API_KEY` is set, **OANDA v20** when `OANDA_API_TOKEN` is, then the delayed feed. Pin one with `MARKET_DATA_PROVIDER`. Cache TTL is per source (Twelve Data 60s, OANDA 20s, delayed 300s) because the free Twelve Data plan has a daily call budget. Mapping and normalisation are unit tested; keys stay server-side
 
 ## Database Tables (Supabase)
 - `users` - User profiles with subscription info, `agent_token`, `is_admin`
@@ -57,7 +62,7 @@ Runs on http://localhost:3000 (or 3001 if port is taken)
 ```bash
 npm test
 ```
-Vitest covers the import parser, P&L/point-value math, the plan/trial/quota rules, payment idempotency, summary rendering, and the auth/bank guards.
+Vitest covers the import parser, P&L/point-value math, the plan/trial/quota rules, payment idempotency, summary rendering, the auth/bank guards, and the market-data mapping/normalisation.
 
 ## PayPal Setup
 To enable payments:
@@ -82,10 +87,54 @@ CRON_SECRET=<random-string>
 3. Without these the app still runs; summary sends and the notifications cron are skipped
 4. Optionally configure Supabase Auth to send through Resend SMTP so verification emails aren't rate-limited
 
+## Google Sign-In Setup (optional)
+
+Code status: the web login/signup pages and the hero on `/` all call `signInWithOAuth`, and the Flutter deep link scheme is registered on both platforms. Everything below is **dashboard work** — no further code changes are needed to complete the flow.
+
+1. Google Cloud Console → APIs & Services → Credentials → create an **OAuth client ID** (Web application). Authorised redirect URI: `https://<your-project-ref>.supabase.co/auth/v1/callback`. The **Client ID** it hands you is the `000000-xxxx.apps.googleusercontent.com` string — that exact value goes in Supabase, never the anon key.
+2. Configure the OAuth consent screen first, and add your own Google account under **Test users**. Until the app is published, only those accounts can sign in.
+3. Supabase → Authentication → Providers → **Google**: enable it, paste the client ID + secret from step 1, leave **Allow users without an email** off.
+4. Supabase → Authentication → URL Configuration:
+   - Site URL: your deployed domain
+   - Additional redirect URLs: `https://your-domain/auth/callback`, `http://localhost:3000/auth/callback`, and `com.mtltrader.app://login-callback` for the phone app
+   - Google must only ever redirect to the Supabase `/auth/v1/callback` URL; Supabase then forwards to the `/auth/callback` values listed here
+5. Flutter deep link (already committed, listed for reference): the scheme is registered so the browser can hand the session back
+   - Android `android/app/src/main/AndroidManifest.xml`, inside the main activity:
+     ```xml
+     <intent-filter>
+       <action android:name="android.intent.action.VIEW" />
+       <category android:name="android.intent.category.DEFAULT" />
+       <category android:name="android.intent.category.BROWSABLE" />
+       <data android:scheme="com.mtltrader.app" android:host="login-callback" />
+     </intent-filter>
+     ```
+   - iOS `ios/Runner/Info.plist`: a `CFBundleURLTypes` entry with `CFBundleURLSchemes` = `com.mtltrader.app`
+   - Different scheme? Pass `--dart-define=OAUTH_REDIRECT=your.scheme://login-callback` and add that exact URL to Supabase
+
+Without the provider enabled, every Google button surfaces Supabase's error and email/password keeps working.
+
+## Email Verification Setup
+
+The "no wrong emails" control is **Authentication → Sign In / Providers → Email → Confirm email**. Turn it on.
+
+The app already assumes it is on: `/auth/login` and the Flutter `AuthGate` refuse a session whose `email_confirmed_at` is null and show a verify screen, and signup signs the user back out and says to check the inbox. With the toggle off, `signUp` returns a live session and those guards never fire, so unverified addresses walk straight into the dashboard.
+
+Google accounts skip this by design — Google has already verified the address.
+
+Checklist:
+- [ ] Confirm email = on
+- [ ] Site URL and redirect allows set (see above)
+- [ ] Supabase SMTP configured, or Resend wired as the SMTP provider, so verification mail is not rate-limited
+- [ ] One signup with a deliberately wrong address confirms the mail gates the dashboard
+
 ## Bank Transfer Setup (optional)
 Set `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, and `BANK_BRANCH` in `.env.local`; the payment page fetches them from `/api/bank-details`.
 
 ## Known Issues
+- Toggling Light/Dark rebuilds the app subtree (`KeyedSubtree` keyed by mode), so navigation returns to the Desk tab and that screen refetches. Per-widget palette lookups through the context would avoid that, but they touch every screen
+- The chart's live/delayed labels still key off asset class (`Instrument.isLive`). With a market-data key set, metals and indices are real-time too, so those labels are conservative rather than wrong
+- Twelve Data's free plan is for display in your own products' testing; a published app that sells access needs their Business plan. OANDA's API licence covers your own account's trading, not redistributing its feed — either way, clear the vendor terms before charging for charts
+- On Twelve Data's free plan only forex, metals and crypto are served: index data (NAS100/SPX500) needs their Grow or Venture plan, so those two fall through to the delayed feed and the chart shows `source: "yahoo"`. Verified 2026-10-31: EUR/USD, XAU/USD and BTC/USD return live candles; `GDAXI`/`DJI` are not valid Twelve Data tickers
 - Apply `supabase/migrations/20261028_journal_media_and_time_stats.sql` before using media, the time edge report or the redesigned dashboard; the RPCs and storage bucket live there
 - Flutter is not installed in every dev environment. `mobile_flutter/` ships Dart source only: run `flutter create --platforms=android,ios --project-name mtl_trader_mobile .` once from that folder to generate `android/` and `ios/`, then `flutter pub get`
 - `@next/swc-win32-x64-msvc` not a valid Win32 app (uses WASM fallback, works fine)
@@ -126,6 +175,7 @@ src/app/
   api/admin/payments/route.ts # Admin approve/reject of payment requests
   api/admin/reconcile/route.ts # Replay captured-but-unapplied payments (admin or cron)
   api/bank-details/route.ts   # Bank details (from BANK_* env vars)
+  api/market/candles/route.ts # Market-data proxy for the Flutter chart
   api/cron/notifications/route.ts # Daily/weekly/monthly summary emails (cron)
   api/plans/route.ts          # Plans API
 src/components/
@@ -136,8 +186,8 @@ supabase/migrations/20261028_journal_media_and_time_stats.sql
 src/lib/
   supabase.ts                 # Browser Supabase client
   server-auth.ts              # Bearer auth + admin client (service role)
-  subscription.ts             # Single source of truth for plan/trial/quota rules
-  import-parser.ts            # CSV/XLSX/SpreadsheetML trade parser (unit tested)
+  subscription.ts             # Single source of truth for plan/trial/quota rules  import-parser.ts             # CSV/XLSX/SpreadsheetML trade parser (unit tested)
+  market-candles.ts            # Provider chain, symbol mapping + candle normalisation
   rate-limit.ts               # Shared (Postgres-backed) per-user rate limiter
   payments.ts                 # PayPal helpers + idempotent applyPaidOrder
   email.ts                    # Resend wrapper (no-ops when unconfigured)

@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 import { BarChart3, TrendingUp, Shield, Zap, ArrowRight, Check } from 'lucide-react'
 import { PLANS } from '@/lib/plans'
 import { formatCurrency } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 
 const features = [
@@ -34,6 +36,28 @@ const features = [
 ]
 
 export default function HomePage() {
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [authError, setAuthError] = useState('')
+
+  const signInWithGoogle = async () => {
+    setGoogleLoading(true)
+    setAuthError('')
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+
+    // On success the browser leaves for Google, so nothing below runs.
+    if (error) {
+      setAuthError(error.message)
+      setGoogleLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -85,6 +109,20 @@ export default function HomePage() {
               View Pricing
             </Link>
           </div>
+          <div className="fade-up-3 mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
+              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-sm font-semibold text-gray-200 transition-colors hover:border-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="text-[15px] font-extrabold leading-none">G</span>
+              {googleLoading ? 'Opening Google…' : 'Sign in with Google'}
+            </button>
+          </div>
+          {authError && (
+            <p className="mt-3 text-sm text-danger">{authError}</p>
+          )}
           <p className="fade-up-3 text-gray-500 mt-5 text-sm">No credit card required • Unlimited access for 30 days</p>
         </div>
       </section>

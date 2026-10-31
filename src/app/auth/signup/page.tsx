@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Mail, Lock, User } from 'lucide-react'
+import { Lock, Mail, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 
@@ -29,6 +29,26 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  const signUpWithGoogle = async () => {
+    setLoading(true)
+    setError('')
+    setSuccess('')
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+
+    // On success the browser leaves for Google, so nothing below runs.
+    if (oauthError) {
+      setError(oauthError.message)
+      setLoading(false)
+    }
+  }
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,15 +77,27 @@ export default function SignupPage() {
         return
       }
 
-      const profileResponse = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: data.user.id,
-          email: data.user.email || email,
-          fullName,
-        }),
-      })
+      // The auth account already exists at this point, so a thrown fetch must
+      // not read as "signup failed" — the user would retry and hit
+      // "user already registered" instead of fixing the server.
+      let profileResponse: Response
+      try {
+        profileResponse = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: data.user.id,
+            email: data.user.email || email,
+            fullName,
+          }),
+        })
+      } catch {
+        setError(
+          'Your account was created, but the server could not be reached to finish setting up your profile. Try logging in — if the journal reads as expired, the server is missing SUPABASE_SERVICE_ROLE_KEY.'
+        )
+        setLoading(false)
+        return
+      }
 
       if (!profileResponse.ok) {
         const profileError = await profileResponse.json().catch(() => null)
@@ -110,6 +142,27 @@ export default function SignupPage() {
               {success}
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={signUpWithGoogle}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-background border border-border hover:border-primary text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="text-[15px] font-extrabold leading-none">G</span>
+            Continue with Google
+          </button>
+
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] uppercase tracking-wider text-gray-500">or with email</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <p className="text-center text-gray-500 text-xs leading-relaxed">
+            Google sign-in needs no email verification step, because Google has
+            already verified the address.
+          </p>
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
