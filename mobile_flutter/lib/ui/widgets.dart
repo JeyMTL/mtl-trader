@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
+/// Every price, balance and percentage uses the mono face, so digits line up
+/// in columns instead of shifting as values change.
 const TextStyle tabular = TextStyle(
+  fontFamily: 'JetBrainsMono',
   fontFeatures: [FontFeature.tabularFigures()],
-  letterSpacing: -0.1,
+  letterSpacing: -0.2,
+  height: 1.15,
 );
 
-class FlatCard extends StatelessWidget {
+class FlatCard extends StatefulWidget {
   const FlatCard({
     super.key,
     required this.child,
@@ -24,17 +28,50 @@ class FlatCard extends StatelessWidget {
   final Color? borderColor;
 
   @override
+  State<FlatCard> createState() => _FlatCardState();
+}
+
+class _FlatCardState extends State<FlatCard> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color ?? AppColors.surface,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(AppRadius.card)),
-        side: BorderSide(color: borderColor ?? AppColors.border),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
+    final radius = BorderRadius.circular(AppRadius.card);
+    return AnimatedScale(
+      scale: _pressed ? 0.985 : 1,
+      duration: const Duration(milliseconds: 110),
+      curve: Curves.easeOut,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          // A soft drop shadow lifts the card off the near-black background;
+          // the border alone made the surface read flat.
+          boxShadow: [
+            BoxShadow(
+              color:
+                  Colors.black.withAlpha(AppColors.palette.isLight ? 14 : 70),
+              blurRadius: 18,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Material(
+          color: widget.color ?? AppColors.surface,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: radius,
+            side: BorderSide(
+              color: widget.borderColor ?? AppColors.border,
+            ),
+          ),
+          child: InkWell(
+            onTap: widget.onTap,
+            onHighlightChanged: widget.onTap == null
+                ? null
+                : (value) => setState(() => _pressed = value),
+            child: Padding(padding: widget.padding, child: widget.child),
+          ),
+        ),
       ),
     );
   }
@@ -98,6 +135,7 @@ class MetricCard extends StatelessWidget {
     this.foot,
     this.tone = Tone.neutral,
     this.icon,
+    this.semanticValue,
   });
 
   final String label;
@@ -105,6 +143,10 @@ class MetricCard extends StatelessWidget {
   final String? foot;
   final Tone tone;
   final IconData? icon;
+
+  /// Spoken form of the number when it has a meaning colour and a sign cannot
+  /// carry, e.g. "Profit of $1,204.10" for an average trade.
+  final String? semanticValue;
 
   @override
   Widget build(BuildContext context) {
@@ -118,11 +160,13 @@ class MetricCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: AppColors.muted,
-                    fontSize: 9.5,
+                    fontSize: kMinLabelSize,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
+                    letterSpacing: 0.8,
                   ),
                 ),
               ),
@@ -133,13 +177,17 @@ class MetricCard extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: tabular.copyWith(
-                color: toneColor(tone),
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.4,
+            child: Semantics(
+              label: semanticValue ?? '$label $value',
+              excludeSemantics: true,
+              child: Text(
+                value,
+                style: tabular.copyWith(
+                  color: toneColor(tone),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
               ),
             ),
           ),
@@ -149,7 +197,10 @@ class MetricCard extends StatelessWidget {
               foot!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: AppColors.faint, fontSize: 10),
+              style: TextStyle(
+                color: AppColors.faint,
+                fontSize: kMinLabelSize,
+              ),
             ),
           ],
         ],
@@ -174,7 +225,7 @@ class Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = toneColor(tone);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: color.withAlpha(20),
         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -187,13 +238,19 @@ class Pill extends StatelessWidget {
             Icon(icon, size: 10, color: color),
             const SizedBox(width: 3),
           ],
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 9.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
+          // Flexible so a long label (“EN DRAWDOWN” at a 2x text scale)
+          // ellipsises instead of pushing its row past the card edge.
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: kMinLabelSize,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ],
@@ -222,18 +279,52 @@ class EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
       child: Column(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border),
+          SizedBox(
+            width: 128,
+            height: 72,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.primary.withAlpha(38),
+                        AppColors.primary.withAlpha(0),
+                      ],
+                    ),
+                  ),
+                ),
+                CustomPaint(
+                  size: const Size(112, 56),
+                  painter: _EmptyChartPainter(
+                    line: AppColors.primary.withAlpha(150),
+                    grid: AppColors.border,
+                    fill: AppColors.primary.withAlpha(26),
+                  ),
+                ),
+                Positioned(
+                  right: 18,
+                  bottom: 8,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Icon(icon, size: 13, color: AppColors.muted),
+                  ),
+                ),
+              ],
             ),
-            child: Icon(icon, size: 20, color: AppColors.muted),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           Text(
             title,
             textAlign: TextAlign.center,
@@ -260,6 +351,71 @@ class EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A tiny dashed chart behind the empty-state icon: enough to suggest the
+/// screen will fill with data without needing an illustration asset.
+class _EmptyChartPainter extends CustomPainter {
+  const _EmptyChartPainter({
+    required this.line,
+    required this.grid,
+    required this.fill,
+  });
+
+  final Color line;
+  final Color grid;
+  final Color fill;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = grid
+      ..strokeWidth = 0.7;
+    for (var i = 1; i < 3; i++) {
+      final y = size.height * i / 3;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final points = <Offset>[
+      Offset(size.width * 0.04, size.height * 0.78),
+      Offset(size.width * 0.3, size.height * 0.55),
+      Offset(size.width * 0.55, size.height * 0.66),
+      Offset(size.width * 0.96, size.height * 0.18),
+    ];
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    final area = Path.from(path)
+      ..lineTo(size.width * 0.96, size.height)
+      ..lineTo(size.width * 0.04, size.height)
+      ..close();
+    canvas.drawPath(
+      area,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [fill, fill.withAlpha(0)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = line
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+    for (final point in points) {
+      canvas.drawCircle(point, 2.2, Paint()..color = line);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EmptyChartPainter oldDelegate) =>
+      oldDelegate.line != line || oldDelegate.grid != grid;
 }
 
 class LabelValue extends StatelessWidget {
@@ -290,20 +446,32 @@ class LabelValue extends StatelessWidget {
               style: TextStyle(color: AppColors.muted, fontSize: 12.5),
             ),
           ),
+          // The value and whatever trails it share one flexible slot, so a
+          // small badge or a long amount cannot overrun the row.
           Flexible(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: tabular.copyWith(
-                color: valueColor ?? AppColors.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: tabular.copyWith(
+                      color: valueColor ?? AppColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 6),
+                  Flexible(child: trailing!),
+                ],
+              ],
             ),
           ),
-          if (trailing != null) ...[const SizedBox(width: 6), trailing!],
         ],
       ),
     );

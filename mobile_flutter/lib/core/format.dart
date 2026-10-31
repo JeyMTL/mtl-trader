@@ -1,5 +1,10 @@
 import 'package:intl/intl.dart';
 
+// Money is deliberately fixed to en_US/USD. The account is denominated in
+// dollars, so "$1,240.50" stays correct in every translation, keeps the mono
+// columns aligned, and does not change the width of a chart axis label when the
+// language switches. Dates do localise: month names are the part a reader
+// actually expects to see in their own language.
 final NumberFormat _money = NumberFormat.currency(
   locale: 'en_US',
   symbol: r'$',
@@ -12,9 +17,15 @@ final NumberFormat _compact = NumberFormat.compactCurrency(
   decimalDigits: 0,
 );
 
-final DateFormat _time = DateFormat('HH:mm');
-final DateFormat _day = DateFormat('d MMM');
-final DateFormat _longDay = DateFormat('EEE, d MMM yyyy');
+/// Date formatters are cached per language rather than built once, so a
+/// language switch re-renders "12 Mar" as "12 mars" without rebuilding them on
+/// every row of a long list.
+final Map<String, DateFormat> _dates = <String, DateFormat>{};
+
+DateFormat _date(String pattern) {
+  final key = '${Intl.getCurrentLocale()}|$pattern';
+  return _dates.putIfAbsent(key, () => DateFormat(pattern));
+}
 
 String money(num value) => _money.format(value);
 
@@ -25,11 +36,13 @@ String compactMoney(num value) => _compact.format(value);
 
 String percent(num value) => '${value.toStringAsFixed(1)}%';
 
-String timeOf(DateTime? value) => value == null ? '—' : _time.format(value);
+String timeOf(DateTime? value) =>
+    value == null ? '—' : _date('HH:mm').format(value);
 
-String dayOf(DateTime? value) => value == null ? '—' : _day.format(value);
+String dayOf(DateTime? value) =>
+    value == null ? '—' : _date('d MMM').format(value);
 
-String longDay(DateTime date) => _longDay.format(date);
+String longDay(DateTime date) => _date('EEE, d MMM yyyy').format(date);
 
 /// Minutes → `2h 15m`.
 String durationText(num? minutes) {

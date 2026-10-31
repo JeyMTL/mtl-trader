@@ -1,0 +1,405 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "MTL Trader",
+
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "refresh": "Refresh",
+  "language": "Language",
+  "languageSystem": "System",
+
+  "navDesk": "Desk",
+  "navJournal": "Journal",
+  "navAnalytics": "Analytics",
+  "navCalendar": "Calendar",
+  "navAccount": "Account",
+  "newTrade": "Journal a trade",
+  "timeEdge": "Time edge",
+
+  "brandName": "MTL Trader",
+  "brandOpenPlans": "MTL Trader — open payment plans",
+
+  "loginHeadline": "The journal that\nreads you back.",
+  "loginTagline": "Log the fill, the screenshot and the voice note. Find the hours that pay.",
+  "continueWithGoogle": "Continue with Google",
+  "signIn": "Sign in",
+  "createAccount": "Create account",
+  "emailLabel": "Email",
+  "emailHint": "you@example.com",
+  "passwordLabel": "Password",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
+  "emailInvalid": "Enter a valid email address.",
+  "passwordTooShort": "Use at least 6 characters.",
+  "loginFootnote": "Google sign-in needs no email confirmation. Email sign-ups must confirm the address before the journal opens.",
+  "googleOpenFailed": "Could not open Google sign-in. Check that a browser is available, then try again.",
+  "googleTimedOut": "Google sign-in timed out. Check your connection and try again.",
+  "googleStartFailed": "Could not start Google sign-in. Try again.",
+  "signInUnreachable": "Could not reach the journal. Check your connection and try again.",
+  "googleFinishNotice": "Finish signing in with Google, then return here — the journal opens on its own.",
+  "confirmEmailNotice": "Account created. Open the confirmation link in {email}, then sign in here.",
+  "@confirmEmailNotice": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+
+  "accountBalance": "Account balance",
+  "inProfit": "In profit",
+  "inDrawdown": "In drawdown",
+  "deposits": "Deposits",
+  "bestTrade": "Best trade",
+  "worstTrade": "Worst trade",
+  "netSummary": "{pnl} net · {closed} closed · {wins}W / {losses}L",
+  "@netSummary": {
+    "placeholders": {
+      "pnl": {
+        "type": "String"
+      },
+      "closed": {
+        "type": "int"
+      },
+      "wins": {
+        "type": "int"
+      },
+      "losses": {
+        "type": "int"
+      }
+    }
+  },
+  "importHistoryHint": "Import history to plot the curve",
+
+  "winRate": "Win rate",
+  "profitFactor": "Profit factor",
+  "maxDrawdown": "Max drawdown",
+  "avgPerTrade": "Avg / trade",
+  "winnersCount": "{count} winners",
+  "@winnersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "peakToTrough": "Peak to trough",
+  "expectancy": "Expectancy",
+
+  "thisMonth": "This month",
+  "monthTrades": "{count} trades",
+  "@monthTrades": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "greenDays": "{count} green days",
+  "@greenDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "monthWinRate": "Month win rate",
+
+  "timeEdgeSubtitle": "Entry hours in {timezone}; sessions in UTC. Median hold {hold}.",
+  "@timeEdgeSubtitle": {
+    "placeholders": {
+      "timezone": {
+        "type": "String"
+      },
+      "hold": {
+        "type": "String"
+      }
+    }
+  },
+  "report": "Report",
+  "noTimedTradesTitle": "No timed trades yet",
+  "noTimedTradesBody": "Set the entry and exit time on a trade. The hour and session report builds itself from that window.",
+  "mostProfitableHour": "Most profitable hour",
+  "mostLosses": "Most losses",
+  "bestSession": "Best session",
+  "weakestSession": "Weakest session",
+  "needsMoreTrades": "Needs 3+ trades",
+  "periodStats": "{trades} trades · {winRate} win",
+  "@periodStats": {
+    "placeholders": {
+      "trades": {
+        "type": "int"
+      },
+      "winRate": {
+        "type": "String"
+      }
+    }
+  },
+  "thinSampleNote": "Hours with fewer than 3 trades are left out of the best/worst call.",
+
+  "journalSectionTitle": "Journal",
+  "journalSectionSubtitle": "The notes, screenshots and voice notes behind the fills.",
+  "nothingJournaledTitle": "Nothing journaled yet",
+  "nothingJournaledBody": "Open a trade and add a screenshot or a voice note — it becomes the entry you read later.",
+  "recentFills": "Recent fills",
+  "noFillsTitle": "No fills recorded",
+
+  "startHere": "Start here",
+  "startHeadline": "Three steps to a journal that pays you back.",
+  "startStep1": "Import MT5 history or log your first fill.",
+  "startStep2": "Add the entry and exit time — that powers the edge report.",
+  "startStep3": "Attach the chart screenshot and a voice note.",
+  "seeTimeReport": "See the time report →",
+
+  "couldNotLoadDesk": "Could not load the desk",
+
+  "a11yProfit": "Profit of {amount}",
+  "@a11yProfit": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yLoss": "Loss of {amount}",
+  "@a11yLoss": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yBreakEven": "Break even, {amount}",
+  "@a11yBreakEven": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yEquityCurve": "Equity curve. {change} since the first recorded day.",
+  "@a11yEquityCurve": {
+    "placeholders": {
+      "change": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yHourChart": "Profit and loss by entry hour.",
+  "a11yScreenshots": "{count} screenshots attached",
+  "@a11yScreenshots": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "a11yVoiceNotes": "{count} voice notes attached",
+  "@a11yVoiceNotes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "languageSubtitle": "App labels, month names and dates follow this choice. Saved on this phone.",
+
+  "journalTitle": "Journal",
+  "journalSearchHint": "Search symbol, strategy or tag",
+  "journalFilterAll": "All",
+  "journalFilterWins": "Wins",
+  "journalFilterLosses": "Losses",
+  "journalLoading": "Loading…",
+  "journalCountSummary": "{count} trades · {pnl}",
+  "@journalCountSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "pnl": {
+        "type": "String"
+      }
+    }
+  },
+  "journalLoadMore": "Load more",
+  "journalClearMenu": "Clear journal",
+  "journalEmptyTitle": "No trades found",
+  "journalEmptyBody": "Tap + to journal a fill, or import your MT5 history on the web desk.",
+  "journalErrorTitle": "Could not load the journal",
+  "deleteTradeTitle": "Delete this trade?",
+  "deleteTradeBody": "{symbol} and its photos or voice notes will be removed. This cannot be undone.",
+  "@deleteTradeBody": {
+    "placeholders": {
+      "symbol": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAction": "Delete",
+  "deleteDone": "Trade deleted.",
+  "deleteFailed": "Could not delete the trade: {error}",
+  "@deleteFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "clearJournalTitle": "Clear the journal?",
+  "clearJournalBody": "Every trade, photo and voice note in this account is removed. This cannot be undone.",
+  "clearAllAction": "Clear all",
+  "clearFailed": "Could not clear the journal: {error}",
+  "@clearFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "analyticsEmptyTitle": "No trades to analyse yet",
+  "analyticsEmptyBody": "Journal a few entries and the breakdowns fill in automatically.",
+  "analyticsErrorTitle": "Could not load analytics",
+  "analyticsErrorBody": "Check your connection and try again.",
+  "timeEdgeDescription": "Best and worst entry hour, sessions and the 24-hour curve.",
+  "performanceSummaryTitle": "Performance summary",
+  "performanceSummarySubtitle": "Every closed trade in your journal.",
+  "summaryTrades": "Trades",
+  "summaryTradesFoot": "{count} this month",
+  "@summaryTradesFoot": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "summaryWinLoss": "{wins}W · {losses}L",
+  "@summaryWinLoss": {
+    "placeholders": {
+      "wins": {
+        "type": "int"
+      },
+      "losses": {
+        "type": "int"
+      }
+    }
+  },
+  "summaryGrossFoot": "Gross {profit} / {loss}",
+  "@summaryGrossFoot": {
+    "placeholders": {
+      "profit": {
+        "type": "String"
+      },
+      "loss": {
+        "type": "String"
+      }
+    }
+  },
+  "summaryAverageTrade": "Average trade",
+  "summaryNetFoot": "Net {net}",
+  "@summaryNetFoot": {
+    "placeholders": {
+      "net": {
+        "type": "String"
+      }
+    }
+  },
+  "summaryBestTradeFoot": "Worst {worst}",
+  "@summaryBestTradeFoot": {
+    "placeholders": {
+      "worst": {
+        "type": "String"
+      }
+    }
+  },
+  "summaryMonthFoot": "{count} winning days",
+  "@summaryMonthFoot": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "monthlyPnlTitle": "Monthly P&L",
+  "monthlyPnlSubtitle": "Last six months",
+  "pnlByDayTitle": "P&L by day",
+  "pnlByDayRecent": "Last 30 days",
+  "pnlByDayBestWorst": "Best {bestDay} {bestPnl} · Worst {worstDay} {worstPnl}",
+  "@pnlByDayBestWorst": {
+    "placeholders": {
+      "bestDay": {
+        "type": "String"
+      },
+      "bestPnl": {
+        "type": "String"
+      },
+      "worstDay": {
+        "type": "String"
+      },
+      "worstPnl": {
+        "type": "String"
+      }
+    }
+  },
+  "legendLoss": "Loss",
+  "legendNoTrades": "No trades",
+  "legendProfit": "Profit",
+  "tapADay": "Tap a day",
+  "performanceBySymbol": "Performance by symbol",
+  "performanceBySymbolSubtitle": "Sorted by net P&L",
+  "performanceByTag": "Performance by tag",
+  "performanceByTagSubtitle": "Tags you add to a trade, rolled up.",
+  "symbolStats": "{trades}T · {winRate} win",
+  "@symbolStats": {
+    "placeholders": {
+      "trades": {
+        "type": "int"
+      },
+      "winRate": {
+        "type": "String"
+      }
+    }
+  },
+  "tagStats": "{trades}T · {wins}W {losses}L · {winRate}",
+  "@tagStats": {
+    "placeholders": {
+      "trades": {
+        "type": "int"
+      },
+      "wins": {
+        "type": "int"
+      },
+      "losses": {
+        "type": "int"
+      },
+      "winRate": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yRunningCurve": "Running profit and loss for the last 30 days.",
+  "a11yHeatmapDay": "{day}: {pnl}, {trades} trades",
+  "@a11yHeatmapDay": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "pnl": {
+        "type": "String"
+      },
+      "trades": {
+        "type": "int"
+      }
+    }
+  },
+  "a11yHeatmapEmpty": "{day}: no trades",
+  "@a11yHeatmapEmpty": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  }
+}

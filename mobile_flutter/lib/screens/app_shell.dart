@@ -1,5 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
 import 'account_screen.dart';
@@ -17,8 +20,17 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell>
+    with SingleTickerProviderStateMixin {
   final JournalApi _api = JournalApi();
+
+  /// Quick fade whenever the tab changes, so the shell feels like one surface
+  /// rather than five screens snapping in place.
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 160),
+    value: 1,
+  );
 
   int _index = 0;
   int _reload = 0;
@@ -28,6 +40,19 @@ class _AppShellState extends State<AppShell> {
   /// firing five sets of queries) on launch is what made the first frames
   /// stutter.
   final Map<int, Widget> _built = {};
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    super.dispose();
+  }
+
+  void _select(int index) {
+    if (index == _index) return;
+    setState(() => _index = index);
+    _fade.value = 0.45;
+    _fade.forward();
+  }
 
   void _invalidate() {
     setState(() {
@@ -56,7 +81,7 @@ class _AppShellState extends State<AppShell> {
           backgroundColor: AppColors.background,
           appBar: AppBar(
             backgroundColor: AppColors.background,
-            title: const Text('Time edge'),
+            title: Text(AppLocalizations.of(context).timeEdge),
           ),
           body: EdgeScreen(api: _api),
         ),
@@ -115,6 +140,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     _built.putIfAbsent(_index, () => _create(_index));
     final screens = List<Widget>.generate(
       5,
@@ -122,46 +148,62 @@ class _AppShellState extends State<AppShell> {
     );
 
     return Scaffold(
-      body: IndexedStack(index: _index, children: screens),
+      body: FadeTransition(
+        opacity: _fade,
+        child: IndexedStack(index: _index, children: screens),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openTrade(),
-        tooltip: 'Journal a trade',
+        tooltip: l10n.newTrade,
         child: const Icon(Icons.add, size: 24),
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (index) => setState(() => _index = index),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.space_dashboard_outlined),
-              selectedIcon: Icon(Icons.space_dashboard),
-              label: 'Desk',
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.border)),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppColors.primary.withAlpha(16),
+                  Colors.transparent,
+                ],
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.menu_book_outlined),
-              selectedIcon: Icon(Icons.menu_book),
-              label: 'Journal',
+            child: NavigationBar(
+              selectedIndex: _index,
+              onDestinationSelected: _select,
+              destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.space_dashboard_outlined),
+                  selectedIcon: const Icon(Icons.space_dashboard),
+                  label: l10n.navDesk,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.menu_book_outlined),
+                  selectedIcon: const Icon(Icons.menu_book),
+                  label: l10n.navJournal,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.insights_outlined),
+                  selectedIcon: const Icon(Icons.insights),
+                  label: l10n.navAnalytics,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  selectedIcon: const Icon(Icons.calendar_month),
+                  label: l10n.navCalendar,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.person_outline),
+                  selectedIcon: const Icon(Icons.person),
+                  label: l10n.navAccount,
+                ),
+              ],
             ),
-            NavigationDestination(
-              icon: Icon(Icons.insights_outlined),
-              selectedIcon: Icon(Icons.insights),
-              label: 'Analytics',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.calendar_month_outlined),
-              selectedIcon: Icon(Icons.calendar_month),
-              label: 'Calendar',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Account',
-            ),
-          ],
+          ),
         ),
       ),
     );

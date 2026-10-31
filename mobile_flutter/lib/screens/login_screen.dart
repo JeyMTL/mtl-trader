@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config.dart';
+import '../l10n/gen/app_localizations.dart';
+import '../ui/brand.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -52,8 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       if (!launched) {
         setState(
-          () => _error =
-              'Could not open Google sign-in. Check that a browser is available, then try again.',
+          () => _error = AppLocalizations.of(context).googleOpenFailed,
         );
         return;
       }
@@ -61,21 +62,21 @@ class _LoginScreenState extends State<LoginScreen> {
       // session back and AuthGate swaps this screen out on the auth change.
       // Without this line the form looks idle and the user assumes it failed.
       setState(
-        () => _notice =
-            'Finish signing in with Google, then return here — the journal opens on its own.',
+        () => _notice = AppLocalizations.of(context).googleFinishNotice,
       );
     } on TimeoutException {
       if (mounted) {
         setState(
-          () => _error =
-              'Google sign-in timed out. Check your connection and try again.',
+          () => _error = AppLocalizations.of(context).googleTimedOut,
         );
       }
     } on AuthException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not start Google sign-in. Try again.');
+        setState(
+          () => _error = AppLocalizations.of(context).googleStartFailed,
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -101,8 +102,9 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         if (response.session == null) {
           setState(() {
-            _notice =
-                'Account created. Open the confirmation link in ${_email.text.trim()}, then sign in here.';
+            _notice = AppLocalizations.of(
+              context,
+            ).confirmEmailNotice(_email.text.trim());
             _signUp = false;
           });
         }
@@ -117,8 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _error =
-              'Could not reach the journal. Check your connection and try again.',
+          () => _error = AppLocalizations.of(context).signInUnreachable,
         );
       }
     } finally {
@@ -128,6 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -138,41 +140,57 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.all(Radius.circular(6)),
+                  // A minimum height, not a fixed one: at a 2x text scale the
+                  // wordmark is twice as tall and a fixed box would clip it.
+                  Container(
+                    constraints: const BoxConstraints(minHeight: 148),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 20,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.surface, AppColors.background],
+                      ),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withAlpha(30),
+                          blurRadius: 34,
+                          spreadRadius: 2,
                         ),
-                        child: Text(
-                          'MTL',
-                          style: TextStyle(
-                            color: AppColors.ink,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.4,
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        Positioned(
+                          right: -34,
+                          top: -54,
+                          child: Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  AppColors.primary.withAlpha(62),
+                                  AppColors.primary.withAlpha(0),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'MTL TRADER',
-                        style: TextStyle(
-                          color: AppColors.text,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
+                        const BrandMark(fontSize: 30, showDate: false),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 34),
+                  const SizedBox(height: 24),
                   Text(
-                    'The journal that\nreads you back.',
+                    l10n.loginHeadline,
                     style: TextStyle(
                       color: AppColors.text,
                       fontSize: 30,
@@ -183,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Log the fill, the screenshot and the voice note. Find the hours that pay.',
+                    l10n.loginTagline,
                     style: TextStyle(
                       color: AppColors.muted,
                       fontSize: 13,
@@ -207,43 +225,58 @@ class _LoginScreenState extends State<LoginScreen> {
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            label: const Text('Continue with Google'),
+                            label: Text(l10n.continueWithGoogle),
                           ),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _ModeTab(
-                                label: 'Sign in',
-                                active: !_signUp,
-                                onTap: () => setState(() {
-                                  _signUp = false;
-                                  _error = null;
-                                }),
-                              ),
-                              const SizedBox(width: 8),
-                              _ModeTab(
-                                label: 'Create account',
-                                active: _signUp,
-                                onTap: () => setState(() {
-                                  _signUp = true;
-                                  _error = null;
-                                }),
-                              ),
-                            ],
+                          // Each tab takes half the width and wraps onto a
+                          // second line instead of pushing the other one off
+                          // the card: "Créer un compte" at 2x is wider than
+                          // the space two side-by-side tabs used to have.
+                          // IntrinsicHeight, not a bare stretch: the Row sits
+                          // in a Column with unbounded height, so stretching
+                          // without a bounded box throws. This keeps the two
+                          // tabs the same height even when one wraps.
+                          IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: _ModeTab(
+                                    label: l10n.signIn,
+                                    active: !_signUp,
+                                    onTap: () => setState(() {
+                                      _signUp = false;
+                                      _error = null;
+                                    }),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _ModeTab(
+                                    label: l10n.createAccount,
+                                    active: _signUp,
+                                    onTap: () => setState(() {
+                                      _signUp = true;
+                                      _error = null;
+                                    }),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 18),
                           TextFormField(
                             controller: _email,
                             keyboardType: TextInputType.emailAddress,
                             autofillHints: const [AutofillHints.email],
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              hintText: 'you@example.com',
+                            decoration: InputDecoration(
+                              labelText: l10n.emailLabel,
+                              hintText: l10n.emailHint,
                             ),
                             validator: (value) {
                               final text = value?.trim() ?? '';
                               if (text.isEmpty || !text.contains('@')) {
-                                return 'Enter a valid email address.';
+                                return l10n.emailInvalid;
                               }
                               return null;
                             },
@@ -254,8 +287,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             obscureText: _obscure,
                             autofillHints: const [AutofillHints.password],
                             decoration: InputDecoration(
-                              labelText: 'Password',
+                              labelText: l10n.passwordLabel,
                               suffixIcon: IconButton(
+                                tooltip: _obscure
+                                    ? l10n.showPassword
+                                    : l10n.hidePassword,
                                 onPressed: () =>
                                     setState(() => _obscure = !_obscure),
                                 icon: Icon(
@@ -269,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             validator: (value) {
                               if ((value ?? '').length < 6) {
-                                return 'Use at least 6 characters.';
+                                return l10n.passwordTooShort;
                               }
                               return null;
                             },
@@ -309,7 +345,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                       color: AppColors.ink,
                                     ),
                                   )
-                                : Text(_signUp ? 'Create account' : 'Sign in'),
+                                : Text(
+                                    _signUp ? l10n.createAccount : l10n.signIn,
+                                  ),
                           ),
                         ],
                       ),
@@ -317,11 +355,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Google sign-in needs no email confirmation. Email sign-ups must confirm the address before the journal opens.',
+                    l10n.loginFootnote,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.faint,
-                      fontSize: 10.5,
+                      fontSize: kMinLabelSize,
                       height: 1.45,
                     ),
                   ),
@@ -353,6 +391,7 @@ class _ModeTab extends StatelessWidget {
       borderRadius: BorderRadius.circular(4),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: active ? AppColors.primary.withAlpha(26) : Colors.transparent,
           border: Border.all(
@@ -362,6 +401,7 @@ class _ModeTab extends StatelessWidget {
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: active ? AppColors.primaryLight : AppColors.muted,
             fontSize: 11.5,

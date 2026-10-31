@@ -5,11 +5,16 @@ import 'package:flutter/material.dart';
 
 import '../core/edge.dart';
 import '../core/format.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../ui/a11y.dart';
+import '../ui/brand.dart';
+import '../ui/motion.dart';
+import '../ui/shimmer.dart';
 import '../ui/theme.dart';
-import 'subscription_screen.dart';
 import '../ui/widgets.dart';
+import 'subscription_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -51,7 +56,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: _BrandMark(
+        toolbarHeight: 64,
+        title: BrandMark(
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => SubscriptionScreen(api: widget.api),
@@ -61,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             onPressed: _refresh,
-            tooltip: 'Refresh',
+            tooltip: AppLocalizations.of(context).refresh,
             icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
           ),
         ],
@@ -71,9 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            );
+            return const _DashboardSkeleton();
           }
           if (snapshot.hasError) {
             return _LoadError(
@@ -99,106 +103,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-/// The centred MTL wordmark. It breathes slowly so the header has a focal
-/// point, and tapping it is the shortcut to the payment plans.
-class _BrandMark extends StatefulWidget {
-  const _BrandMark({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  State<_BrandMark> createState() => _BrandMarkState();
-}
-
-class _BrandMarkState extends State<_BrandMark>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  )..repeat(reverse: true);
-
-  late final Animation<double> _pulse = CurvedAnimation(
-    parent: _controller,
-    curve: Curves.easeInOut,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'MTL Trader — open payment plans',
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedBuilder(
-          animation: _pulse,
-          builder: (context, _) {
-            final t = _pulse.value;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Transform.scale(
-                        scale: 1 + t * 0.05,
-                        child: Text(
-                          'MTL',
-                          style: TextStyle(
-                            color: AppColors.text,
-                            fontSize: 21,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.8 + t * 1.4,
-                            shadows: [
-                              Shadow(
-                                color: AppColors.primary.withAlpha(
-                                  (36 + 54 * t).round(),
-                                ),
-                                blurRadius: 8 + 10 * t,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withAlpha(
-                            (120 + 135 * t).round(),
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    longDay(DateTime.now()),
-                    style: TextStyle(
-                      color: AppColors.faint,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
     required this.data,
@@ -212,6 +116,7 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final summary = data.summary;
     final edge = timeEdgeReport(data.timeStats);
     final hours = hourlySeries(data.timeStats);
@@ -225,148 +130,59 @@ class _DashboardBody extends StatelessWidget {
           _StartCard(onOpenEdge: onOpenEdge),
           const SizedBox(height: 10),
         ],
-        FlatCard(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Reveal(
+          index: 0,
+          child: _BalanceHero(data: data, summary: summary),
+        ),
+        const SizedBox(height: 10),
+        Reveal(
+          index: 1,
+          child: GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            // Taller cards as the system text size grows: two columns of
+            // 11 px labels turn into four wrapped lines at 2x.
+            childAspectRatio: 1.72 /
+                MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'ACCOUNT BALANCE',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                  ),
-                  Pill(
-                    text: summary.totalPnl >= 0 ? 'IN PROFIT' : 'IN DRAWDOWN',
-                    tone: summary.totalPnl >= 0 ? Tone.positive : Tone.negative,
-                  ),
-                ],
+              MetricCard(
+                label: l10n.winRate,
+                value: percent(summary.winRate),
+                foot: l10n.winnersCount(summary.wins),
+                icon: Icons.track_changes,
               ),
-              const SizedBox(height: 6),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  money(data.balance),
-                  style: tabular.copyWith(
-                    color: AppColors.text,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1,
-                  ),
-                ),
+              MetricCard(
+                label: l10n.profitFactor,
+                value: summary.profitFactor > 0
+                    ? summary.profitFactor.toStringAsFixed(2)
+                    : '—',
+                foot:
+                    '${money(summary.grossProfit)} / ${money(summary.grossLoss)}',
+                icon: Icons.balance,
               ),
-              const SizedBox(height: 3),
-              Text(
-                '${signedMoney(summary.totalPnl)} net · ${summary.totalTrades} closed · '
-                '${summary.wins}W / ${summary.losses}L',
-                style: TextStyle(color: AppColors.muted, fontSize: 11.5),
+              MetricCard(
+                label: l10n.maxDrawdown,
+                value: '${drawdown.toStringAsFixed(1)}%',
+                foot: l10n.peakToTrough,
+                tone: drawdown >= 10 ? Tone.negative : Tone.neutral,
+                icon: Icons.trending_down,
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 116,
-                child: data.equity.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Import history to plot the curve',
-                          style: TextStyle(
-                            color: AppColors.faint,
-                            fontSize: 11,
-                          ),
-                        ),
-                      )
-                    : _EquityChart(
-                        points: data.equity,
-                        deposits: data.deposits,
-                      ),
-              ),
-              const SizedBox(height: 12),
-              const ListDivider(),
-              const SizedBox(height: 11),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MiniStat(
-                      label: 'Deposits',
-                      value: money(data.deposits),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _MiniStat(
-                      label: 'Best trade',
-                      value: summary.totalTrades > 0
-                          ? signedMoney(summary.bestTrade)
-                          : '—',
-                      tone: summary.totalTrades > 0
-                          ? Tone.positive
-                          : Tone.muted,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _MiniStat(
-                      label: 'Worst trade',
-                      value: summary.totalTrades > 0
-                          ? signedMoney(summary.worstTrade)
-                          : '—',
-                      tone: summary.totalTrades > 0
-                          ? Tone.negative
-                          : Tone.muted,
-                    ),
-                  ),
-                ],
+              MetricCard(
+                label: l10n.avgPerTrade,
+                value:
+                    summary.totalTrades > 0 ? money(summary.averageTrade) : '—',
+                foot: l10n.expectancy,
+                tone: summary.averageTrade >= 0 ? Tone.positive : Tone.negative,
+                semanticValue: summary.totalTrades > 0
+                    ? pnlLabel(context, summary.averageTrade)
+                    : null,
+                icon: Icons.functions,
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 10),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 1.72,
-          children: [
-            MetricCard(
-              label: 'Win rate',
-              value: percent(summary.winRate),
-              foot: '${summary.wins} winners',
-              icon: Icons.track_changes,
-            ),
-            MetricCard(
-              label: 'Profit factor',
-              value: summary.profitFactor > 0
-                  ? summary.profitFactor.toStringAsFixed(2)
-                  : '—',
-              foot:
-                  '${money(summary.grossProfit)} / ${money(summary.grossLoss)}',
-              icon: Icons.balance,
-            ),
-            MetricCard(
-              label: 'Max drawdown',
-              value: '${drawdown.toStringAsFixed(1)}%',
-              foot: 'Peak to trough',
-              tone: drawdown >= 10 ? Tone.negative : Tone.neutral,
-              icon: Icons.trending_down,
-            ),
-            MetricCard(
-              label: 'Avg / trade',
-              value:
-                  summary.totalTrades > 0 ? money(summary.averageTrade) : '—',
-              foot: 'Expectancy',
-              tone: summary.averageTrade >= 0 ? Tone.positive : Tone.negative,
-              icon: Icons.functions,
-            ),
-          ],
         ),
         const SizedBox(height: 10),
         _MonthCard(summary: summary),
@@ -377,55 +193,57 @@ class _DashboardBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SectionTitle(
-                title: 'Time edge',
-                subtitle:
-                    'Entry hours in ${data.timeStats.timezone}; sessions in UTC. '
-                    'Median hold ${durationText(data.timeStats.medianMinutes)}.',
+                title: l10n.timeEdge,
+                subtitle: l10n.timeEdgeSubtitle(
+                  data.timeStats.timezone,
+                  durationText(data.timeStats.medianMinutes),
+                ),
                 trailing: TextButton(
                   onPressed: onOpenEdge,
-                  child: const Text('Report'),
+                  child: Text(l10n.report),
                 ),
               ),
               const SizedBox(height: 4),
               if (!hasHours)
-                const EmptyState(
+                EmptyState(
                   icon: Icons.schedule,
-                  title: 'No timed trades yet',
-                  body:
-                      'Set the entry and exit time on a trade. The hour and session report builds itself from that window.',
+                  title: l10n.noTimedTradesTitle,
+                  body: l10n.noTimedTradesBody,
                 )
               else ...[
                 _EdgeRow(
-                  label: 'Most profitable hour',
+                  label: l10n.mostProfitableHour,
                   period: edge.bestHour,
-                  positive: true,
                 ),
                 const ListDivider(),
                 _EdgeRow(
-                  label: 'Most losses',
+                  label: l10n.mostLosses,
                   period: edge.worstHour,
-                  positive: false,
                 ),
                 const ListDivider(),
                 _EdgeRow(
-                  label: 'Best session',
+                  label: l10n.bestSession,
                   period: edge.bestSession,
-                  positive: true,
                 ),
                 const ListDivider(),
                 _EdgeRow(
-                  label: 'Weakest session',
+                  label: l10n.weakestSession,
                   period: edge.worstSession,
-                  positive: false,
                 ),
                 const SizedBox(height: 8),
-                SizedBox(height: 84, child: _HourChart(hours: hours)),
+                SizedBox(
+                  height: 84,
+                  child: ChartSemantics(
+                    label: l10n.a11yHourChart,
+                    child: _HourChart(hours: hours),
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
-                  'Hours with fewer than 3 trades are left out of the best/worst call.',
+                  l10n.thinSampleNote,
                   style: TextStyle(
                     color: AppColors.faint,
-                    fontSize: 9.5,
+                    fontSize: kMinLabelSize,
                     height: 1.4,
                   ),
                 ),
@@ -439,20 +257,18 @@ class _DashboardBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(14, 14, 14, 6),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
                 child: SectionTitle(
-                  title: 'Journal',
-                  subtitle:
-                      'The notes, screenshots and voice notes behind the fills.',
+                  title: l10n.journalSectionTitle,
+                  subtitle: l10n.journalSectionSubtitle,
                 ),
               ),
               if (data.journalFeed.isEmpty)
-                const EmptyState(
+                EmptyState(
                   icon: Icons.menu_book_outlined,
-                  title: 'Nothing journaled yet',
-                  body:
-                      'Open a trade and add a screenshot or a voice note — it becomes the entry you read later.',
+                  title: l10n.nothingJournaledTitle,
+                  body: l10n.nothingJournaledBody,
                 )
               else
                 ...data.journalFeed.map(
@@ -472,14 +288,14 @@ class _DashboardBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(14, 14, 14, 6),
-                child: SectionTitle(title: 'Recent fills'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+                child: SectionTitle(title: l10n.recentFills),
               ),
               if (data.recentTrades.isEmpty)
-                const EmptyState(
+                EmptyState(
                   icon: Icons.show_chart,
-                  title: 'No fills recorded',
+                  title: l10n.noFillsTitle,
                 )
               else
                 ...data.recentTrades.map(
@@ -523,12 +339,9 @@ class _DashboardBody extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              Text(
-                                signedMoney(trade.pnl),
+                              PnlText(
+                                value: trade.pnl,
                                 style: tabular.copyWith(
-                                  color: trade.pnl >= 0
-                                      ? AppColors.success
-                                      : AppColors.danger,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -541,6 +354,231 @@ class _DashboardBody extends StatelessWidget {
                     ],
                   ),
                 ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The balance is the screen's hero: a counting number over a gradient equity
+/// curve, with a soft gold bloom bleeding in from the corner.
+class _BalanceHero extends StatelessWidget {
+  const _BalanceHero({required this.data, required this.summary});
+
+  final DashboardData data;
+  final TradeSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return FlatCard(
+      padding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          Positioned(
+            top: -54,
+            right: -42,
+            child: IgnorePointer(
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.primary.withAlpha(58),
+                      AppColors.primary.withAlpha(0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.accountBalance.toUpperCase(),
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: kMinLabelSize,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    // Flexible, because a Pill is an intrinsic-width box:
+                    // in a plain Row it gets unbounded width and cannot clip
+                    // its own label.
+                    Flexible(
+                      child: Pill(
+                        text: (summary.totalPnl >= 0
+                                ? l10n.inProfit
+                                : l10n.inDrawdown)
+                            .toUpperCase(),
+                        tone: summary.totalPnl >= 0
+                            ? Tone.positive
+                            : Tone.negative,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: _CountUp(
+                    value: data.balance,
+                    style: tabular.copyWith(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  l10n.netSummary(
+                    signedMoney(summary.totalPnl),
+                    summary.totalTrades,
+                    summary.wins,
+                    summary.losses,
+                  ),
+                  style: TextStyle(color: AppColors.muted, fontSize: 11.5),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 116,
+                  child: data.equity.isEmpty
+                      ? Center(
+                          child: Text(
+                            l10n.importHistoryHint,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.faint,
+                              fontSize: kMinLabelSize,
+                            ),
+                          ),
+                        )
+                      : ChartSemantics(
+                          label: l10n.a11yEquityCurve(
+                            signedMoney(data.equity.last.cumulative),
+                          ),
+                          child: _EquityChart(
+                            points: data.equity,
+                            deposits: data.deposits,
+                          ),
+                        ),
+                ),
+                const SizedBox(height: 12),
+                const ListDivider(),
+                const SizedBox(height: 11),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MiniStat(
+                        label: l10n.deposits,
+                        value: money(data.deposits),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _MiniStat(
+                        label: l10n.bestTrade,
+                        value: summary.totalTrades > 0
+                            ? signedMoney(summary.bestTrade)
+                            : '—',
+                        tone: summary.totalTrades > 0
+                            ? Tone.positive
+                            : Tone.muted,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _MiniStat(
+                        label: l10n.worstTrade,
+                        value: summary.totalTrades > 0
+                            ? signedMoney(summary.worstTrade)
+                            : '—',
+                        tone: summary.totalTrades > 0
+                            ? Tone.negative
+                            : Tone.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Counts the balance up on first paint and fills it with a gold gradient.
+class _CountUp extends StatelessWidget {
+  const _CountUp({required this.value, required this.style});
+
+  final double value;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: value),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (context, animated, _) {
+        return ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (rect) => LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.text, AppColors.primaryLight],
+          ).createShader(rect),
+          child: Text(
+            money(animated),
+            style: style.copyWith(color: Colors.white),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DashboardSkeleton extends StatelessWidget {
+  const _DashboardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 110),
+      children: const [
+        Shimmer(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonCard(height: 292),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: SkeletonCard(height: 82)),
+                  SizedBox(width: 8),
+                  Expanded(child: SkeletonCard(height: 82)),
+                ],
+              ),
+              SizedBox(height: 10),
+              SkeletonCard(height: 132),
+              SizedBox(height: 10),
+              SkeletonCard(height: 108),
             ],
           ),
         ),
@@ -588,7 +626,7 @@ class _EquityChart extends StatelessWidget {
               reservedSize: 42,
               getTitlesWidget: (value, meta) => Text(
                 compactMoney(value),
-                style: TextStyle(color: AppColors.faint, fontSize: 9),
+                style: TextStyle(color: AppColors.faint, fontSize: 10.5),
               ),
             ),
           ),
@@ -606,7 +644,7 @@ class _EquityChart extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     isoDayLabel(points[index].day),
-                    style: TextStyle(color: AppColors.faint, fontSize: 9),
+                    style: TextStyle(color: AppColors.faint, fontSize: 10.5),
                   ),
                 );
               },
@@ -621,9 +659,17 @@ class _EquityChart extends StatelessWidget {
             isCurved: true,
             curveSmoothness: 0.2,
             color: color,
-            barWidth: 2,
+            barWidth: 2.2,
             dotData: FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: color.withAlpha(18)),
+            shadow: Shadow(color: color.withAlpha(80), blurRadius: 12),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [color.withAlpha(64), color.withAlpha(0)],
+              ),
+            ),
           ),
         ],
       ),
@@ -668,7 +714,7 @@ class _HourChart extends StatelessWidget {
               interval: 6,
               getTitlesWidget: (value, meta) => Text(
                 '${value.toInt()}h',
-                style: TextStyle(color: AppColors.faint, fontSize: 8.5),
+                style: TextStyle(color: AppColors.faint, fontSize: 10.5),
               ),
             ),
           ),
@@ -695,19 +741,15 @@ class _HourChart extends StatelessWidget {
 }
 
 class _EdgeRow extends StatelessWidget {
-  const _EdgeRow({
-    required this.label,
-    required this.period,
-    required this.positive,
-  });
+  const _EdgeRow({required this.label, required this.period});
 
   final String label;
+
+  /// Null when the period has too few trades to call.
   final EdgePeriod? period;
-  final bool positive;
 
   @override
   Widget build(BuildContext context) {
-    final color = positive ? AppColors.success : AppColors.danger;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
@@ -720,14 +762,14 @@ class _EdgeRow extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: AppColors.faint,
-                    fontSize: 9.5,
+                    fontSize: kMinLabelSize,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
+                    letterSpacing: 0.2,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  period?.label ?? 'Needs 3+ trades',
+                  period?.label ?? AppLocalizations.of(context).needsMoreTrades,
                   style: TextStyle(
                     color: AppColors.text,
                     fontSize: 12.5,
@@ -741,19 +783,36 @@ class _EdgeRow extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                period == null ? '—' : signedMoney(period!.pnl),
-                style: tabular.copyWith(
-                  color: period == null ? AppColors.faint : color,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
+              if (period == null)
+                Text(
+                  '—',
+                  style: tabular.copyWith(
+                    color: AppColors.faint,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              else
+                // The sign, not just the colour, says which way this period
+                // went: the "most losses" row can still be green on a lucky
+                // day, and colour alone would mislead.
+                PnlText(
+                  value: period!.pnl,
+                  style: tabular.copyWith(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
               Text(
                 period == null
                     ? '—'
-                    : '${period!.trades} trades · ${percent(period!.winRate)} win',
-                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
+                    : AppLocalizations.of(
+                        context,
+                      ).periodStats(period!.trades, percent(period!.winRate)),
+                style: TextStyle(
+                  color: AppColors.faint,
+                  fontSize: kMinLabelSize,
+                ),
               ),
             ],
           ),
@@ -795,11 +854,9 @@ class _JournalRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  signedMoney(entry.pnl),
+                PnlText(
+                  value: entry.pnl,
                   style: tabular.copyWith(
-                    color:
-                        entry.pnl >= 0 ? AppColors.success : AppColors.danger,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                   ),
@@ -822,35 +879,25 @@ class _JournalRow extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
+                // A bare "3" next to an icon tells a screen reader nothing,
+                // so each counter carries its own sentence.
                 if (entry.imageCount > 0) ...[
-                  Icon(
-                    Icons.image_outlined,
-                    size: 11,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${entry.imageCount}',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 9.5,
-                    ),
+                  CountBadge(
+                    icon: Icons.image_outlined,
+                    label: AppLocalizations.of(
+                      context,
+                    ).a11yScreenshots(entry.imageCount),
+                    count: entry.imageCount,
                   ),
                   const SizedBox(width: 8),
                 ],
                 if (entry.audioCount > 0) ...[
-                  Icon(
-                    Icons.mic_none,
-                    size: 11,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${entry.audioCount}',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 9.5,
-                    ),
+                  CountBadge(
+                    icon: Icons.mic_none,
+                    label: AppLocalizations.of(
+                      context,
+                    ).a11yVoiceNotes(entry.audioCount),
+                    count: entry.audioCount,
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -886,23 +933,24 @@ class _StartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FlatCard(
       borderColor: AppColors.primary.withAlpha(80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'START HERE',
+            l10n.startHere.toUpperCase(),
             style: TextStyle(
               color: AppColors.primary,
-              fontSize: 9.5,
+              fontSize: kMinLabelSize,
               fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
+              letterSpacing: 1,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Three steps to a journal that pays you back.',
+            l10n.startHeadline,
             style: TextStyle(
               color: AppColors.text,
               fontSize: 15,
@@ -911,23 +959,14 @@ class _StartCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          const _StartStep(
-            number: '1',
-            text: 'Import MT5 history or log your first fill.',
-          ),
-          const _StartStep(
-            number: '2',
-            text: 'Add the entry and exit time — that powers the edge report.',
-          ),
-          const _StartStep(
-            number: '3',
-            text: 'Attach the chart screenshot and a voice note.',
-          ),
+          _StartStep(number: '1', text: l10n.startStep1),
+          _StartStep(number: '2', text: l10n.startStep2),
+          _StartStep(number: '3', text: l10n.startStep3),
           const SizedBox(height: 8),
           TextButton(
             onPressed: onOpenEdge,
             style: TextButton.styleFrom(padding: EdgeInsets.zero),
-            child: const Text('See the time report →'),
+            child: Text(l10n.seeTimeReport),
           ),
         ],
       ),
@@ -949,8 +988,8 @@ class _StartStep extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 16,
-            height: 16,
+            width: 18,
+            height: 18,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.primary.withAlpha(90)),
@@ -960,7 +999,7 @@ class _StartStep extends StatelessWidget {
               number,
               style: TextStyle(
                 color: AppColors.primary,
-                fontSize: 8.5,
+                fontSize: kMinLabelSize,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -999,7 +1038,7 @@ class _LoadError extends StatelessWidget {
             Icon(Icons.error_outline, color: AppColors.danger, size: 26),
             const SizedBox(height: 10),
             Text(
-              'Could not load the desk',
+              AppLocalizations.of(context).couldNotLoadDesk,
               style: TextStyle(
                 color: AppColors.text,
                 fontSize: 15,
@@ -1019,7 +1058,10 @@ class _LoadError extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: Text(AppLocalizations.of(context).retry),
+            ),
           ],
         ),
       ),
@@ -1050,9 +1092,9 @@ class _MiniStat extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: AppColors.faint,
-            fontSize: 8.5,
+            fontSize: kMinLabelSize,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
+            letterSpacing: 0.3,
           ),
         ),
         const SizedBox(height: 3),
@@ -1082,6 +1124,7 @@ class _MonthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final hasTrades = summary.monthTrades > 0;
     final positive = summary.monthPnl >= 0;
     final losses = math.max(0, summary.monthTrades - summary.monthWins);
@@ -1096,16 +1139,19 @@ class _MonthCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'THIS MONTH',
+                  l10n.thisMonth.toUpperCase(),
                   style: TextStyle(
                     color: AppColors.muted,
-                    fontSize: 9.5,
+                    fontSize: kMinLabelSize,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
+                    letterSpacing: 0.8,
                   ),
                 ),
               ),
-              Pill(text: '${summary.monthTrades} trades', tone: Tone.muted),
+              Pill(
+                text: l10n.monthTrades(summary.monthTrades),
+                tone: Tone.muted,
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -1145,8 +1191,11 @@ class _MonthCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${summary.monthWinningDays} green days',
-                    style: TextStyle(color: AppColors.faint, fontSize: 10),
+                    l10n.greenDays(summary.monthWinningDays),
+                    style: TextStyle(
+                      color: AppColors.faint,
+                      fontSize: kMinLabelSize,
+                    ),
                   ),
                 ],
               ),
@@ -1157,8 +1206,11 @@ class _MonthCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Month win rate',
-                  style: TextStyle(color: AppColors.muted, fontSize: 11),
+                  l10n.monthWinRate,
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: kMinLabelSize,
+                  ),
                 ),
               ),
               Text(

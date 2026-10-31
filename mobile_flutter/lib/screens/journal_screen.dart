@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/format.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../ui/a11y.dart';
+import '../ui/shimmer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -111,30 +114,33 @@ class _JournalScreenState extends State<JournalScreen> {
   Future<void> _deleteTrade(TradeRow trade) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this trade?'),
-        content: Text(
-          '${trade.symbol} and its photos or voice notes will be removed. This cannot be undone.',
-          style: TextStyle(
-            color: AppColors.muted,
-            fontSize: 12.5,
-            height: 1.45,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Delete',
-              style: TextStyle(color: AppColors.danger),
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return AlertDialog(
+          title: Text(l10n.deleteTradeTitle),
+          content: Text(
+            l10n.deleteTradeBody(trade.symbol),
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 12.5,
+              height: 1.45,
             ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                l10n.deleteAction,
+                style: TextStyle(color: AppColors.danger),
+              ),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
 
@@ -145,13 +151,16 @@ class _JournalScreenState extends State<JournalScreen> {
       setState(() => _deleting = false);
       await _load(reset: true);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Trade deleted.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).deleteDone)),
+      );
       widget.onDataChanged?.call();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete the trade: $error')),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).deleteFailed('$error')),
+        ),
       );
     } finally {
       if (mounted) setState(() => _deleting = false);
@@ -163,30 +172,33 @@ class _JournalScreenState extends State<JournalScreen> {
     if (userId == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear the journal?'),
-        content: Text(
-          'Every trade, photo and voice note in this account is removed. This cannot be undone.',
-          style: TextStyle(
-            color: AppColors.muted,
-            fontSize: 12.5,
-            height: 1.45,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Clear all',
-              style: TextStyle(color: AppColors.danger),
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return AlertDialog(
+          title: Text(l10n.clearJournalTitle),
+          content: Text(
+            l10n.clearJournalBody,
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 12.5,
+              height: 1.45,
             ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                l10n.clearAllAction,
+                style: TextStyle(color: AppColors.danger),
+              ),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
 
@@ -201,7 +213,9 @@ class _JournalScreenState extends State<JournalScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not clear the journal: $error')),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).clearFailed('$error')),
+        ),
       );
     } finally {
       if (mounted) setState(() => _deleting = false);
@@ -210,13 +224,15 @@ class _JournalScreenState extends State<JournalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Journal'),
+        title: Text(l10n.journalTitle),
         actions: [
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert, size: 20, color: AppColors.muted),
             color: AppColors.surfaceAlt,
+            tooltip: l10n.journalClearMenu,
             onSelected: (value) {
               if (value == 'clear') _clearJournal();
             },
@@ -224,7 +240,7 @@ class _JournalScreenState extends State<JournalScreen> {
               PopupMenuItem(
                 value: 'clear',
                 child: Text(
-                  'Clear journal',
+                  l10n.journalClearMenu,
                   style: TextStyle(color: AppColors.danger),
                 ),
               ),
@@ -244,8 +260,11 @@ class _JournalScreenState extends State<JournalScreen> {
                     Expanded(
                       child: Text(
                         _loading && _items.isEmpty
-                            ? 'Loading…'
-                            : '$_total trades · ${signedMoney(_totalPnl)}',
+                            ? l10n.journalLoading
+                            : l10n.journalCountSummary(
+                                _total,
+                                signedMoney(_totalPnl),
+                              ),
                         style: TextStyle(
                           color: AppColors.muted,
                           fontSize: 11.5,
@@ -265,7 +284,7 @@ class _JournalScreenState extends State<JournalScreen> {
                   controller: _search,
                   onChanged: _onSearchChanged,
                   decoration: InputDecoration(
-                    hintText: 'Search symbol, strategy or tag',
+                    hintText: l10n.journalSearchHint,
                     prefixIcon: Icon(
                       Icons.search,
                       size: 18,
@@ -290,10 +309,10 @@ class _JournalScreenState extends State<JournalScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    for (final option in const [
-                      ('all', 'All'),
-                      ('wins', 'Wins'),
-                      ('losses', 'Losses'),
+                    for (final option in [
+                      ('all', l10n.journalFilterAll),
+                      ('wins', l10n.journalFilterWins),
+                      ('losses', l10n.journalFilterLosses),
                     ])
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
@@ -327,7 +346,7 @@ class _JournalScreenState extends State<JournalScreen> {
 
   Widget _body() {
     if (_loading && _items.isEmpty) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const _JournalSkeleton();
     }
     if (_error != null && _items.isEmpty) {
       return ListView(
@@ -335,11 +354,11 @@ class _JournalScreenState extends State<JournalScreen> {
         children: [
           EmptyState(
             icon: Icons.cloud_off_outlined,
-            title: 'Could not load the journal',
+            title: AppLocalizations.of(context).journalErrorTitle,
             body: _error,
             action: OutlinedButton(
               onPressed: () => _load(reset: true),
-              child: const Text('Retry'),
+              child: Text(AppLocalizations.of(context).retry),
             ),
           ),
         ],
@@ -348,12 +367,11 @@ class _JournalScreenState extends State<JournalScreen> {
     if (_items.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
+        children: [
           EmptyState(
             icon: Icons.menu_book_outlined,
-            title: 'No trades found',
-            body:
-                'Tap + to journal a fill, or import your MT5 history on the web desk.',
+            title: AppLocalizations.of(context).journalEmptyTitle,
+            body: AppLocalizations.of(context).journalEmptyBody,
           ),
         ],
       );
@@ -375,7 +393,7 @@ class _JournalScreenState extends State<JournalScreen> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Load more'),
+                  : Text(AppLocalizations.of(context).journalLoadMore),
             ),
           );
         }
@@ -416,27 +434,45 @@ class _TradeCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  trade.symbol,
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Hero(
+                    tag: 'trade-${trade.id}',
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Text(
+                        trade.symbol,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),
-                Pill(
-                  text: trade.type,
-                  tone: trade.type == 'BUY' ? Tone.positive : Tone.negative,
+                Flexible(
+                  child: Pill(
+                    text: trade.type,
+                    tone: trade.type == 'BUY' ? Tone.positive : Tone.negative,
+                  ),
                 ),
-                const Spacer(),
-                Text(
-                  signedMoney(trade.pnl),
-                  style: tabular.copyWith(
-                    color:
-                        trade.pnl >= 0 ? AppColors.success : AppColors.danger,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 8),
+                // Takes the remaining width and shrinks instead of pushing the
+                // symbol off the card at a large text size.
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: PnlText(
+                      value: trade.pnl,
+                      style: tabular.copyWith(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -444,13 +480,19 @@ class _TradeCard extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               '${dayOf(trade.tradedAt)} · ${trade.entryPrice} → ${trade.exitPrice} · ${trade.lotSize} lots',
-              style: TextStyle(color: AppColors.muted, fontSize: 10.5),
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: kMinLabelSize,
+              ),
             ),
             if (trade.timeWindow != null) ...[
               const SizedBox(height: 2),
               Text(
                 trade.timeWindow!,
-                style: tabular.copyWith(color: AppColors.faint, fontSize: 10),
+                style: tabular.copyWith(
+                  color: AppColors.faint,
+                  fontSize: kMinLabelSize,
+                ),
               ),
             ],
             if (trade.strategy != null || trade.tags.isNotEmpty) ...[
@@ -464,7 +506,7 @@ class _TradeCard extends StatelessWidget {
                       trade.strategy!,
                       style: TextStyle(
                         color: AppColors.muted,
-                        fontSize: 9.5,
+                        fontSize: kMinLabelSize,
                       ),
                     ),
                   for (final tag in trade.tags.take(3))
@@ -472,7 +514,7 @@ class _TradeCard extends StatelessWidget {
                       '#$tag',
                       style: TextStyle(
                         color: AppColors.faint,
-                        fontSize: 9.5,
+                        fontSize: kMinLabelSize,
                       ),
                     ),
                 ],
@@ -482,37 +524,37 @@ class _TradeCard extends StatelessWidget {
             Row(
               children: [
                 if (trade.imageCount > 0) ...[
-                  Icon(
-                    Icons.image_outlined,
-                    size: 11,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${trade.imageCount}',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 9.5,
-                    ),
+                  CountBadge(
+                    icon: Icons.image_outlined,
+                    label: AppLocalizations.of(
+                      context,
+                    ).a11yScreenshots(trade.imageCount),
+                    count: trade.imageCount,
                   ),
                   const SizedBox(width: 7),
                 ],
                 if (trade.audioCount > 0) ...[
-                  Icon(
-                    Icons.mic_none,
-                    size: 11,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${trade.audioCount}',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 9.5,
-                    ),
+                  CountBadge(
+                    icon: Icons.mic_none,
+                    label: AppLocalizations.of(
+                      context,
+                    ).a11yVoiceNotes(trade.audioCount),
+                    count: trade.audioCount,
                   ),
                   const SizedBox(width: 7),
                 ],
+                SizedBox(
+                  width: 56,
+                  height: 18,
+                  child: CustomPaint(
+                    painter: _TradeSparkPainter(
+                      entry: trade.entryPrice,
+                      exit: trade.exitPrice,
+                      color:
+                          trade.pnl >= 0 ? AppColors.success : AppColors.danger,
+                    ),
+                  ),
+                ),
                 const Spacer(),
                 if (onDelete != null)
                   InkWell(
@@ -540,6 +582,95 @@ class _TradeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _JournalSkeleton extends StatelessWidget {
+  const _JournalSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 110),
+      children: const [
+        Shimmer(
+          child: Column(
+            children: [
+              SkeletonCard(height: 102),
+              SizedBox(height: 8),
+              SkeletonCard(height: 102),
+              SizedBox(height: 8),
+              SkeletonCard(height: 102),
+              SizedBox(height: 8),
+              SkeletonCard(height: 102),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The entry-to-exit move, drawn at card scale. Gives a row a visual shape even
+/// when the trade has no screenshot attached to the list query.
+class _TradeSparkPainter extends CustomPainter {
+  const _TradeSparkPainter({
+    required this.entry,
+    required this.exit,
+    required this.color,
+  });
+
+  final double entry;
+  final double exit;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final high = entry > exit ? entry : exit;
+    final low = entry > exit ? exit : entry;
+    final range = (high - low).abs() < 1e-9 ? 1.0 : high - low;
+    double y(double value) =>
+        size.height - 2 - ((value - low) / range) * (size.height - 4);
+    final start = Offset(0, y(entry));
+    final end = Offset(size.width, y(exit));
+    final path = Path()
+      ..moveTo(start.dx, start.dy)
+      ..cubicTo(
+        size.width * 0.35,
+        start.dy,
+        size.width * 0.65,
+        end.dy,
+        end.dx,
+        end.dy,
+      );
+    final area = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      area,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withAlpha(46), color.withAlpha(0)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(end, 1.8, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TradeSparkPainter oldDelegate) =>
+      oldDelegate.entry != entry ||
+      oldDelegate.exit != exit ||
+      oldDelegate.color != color;
 }
 
 class _FilterTab extends StatelessWidget {
@@ -571,7 +702,7 @@ class _FilterTab extends StatelessWidget {
           label,
           style: TextStyle(
             color: active ? AppColors.primaryLight : AppColors.muted,
-            fontSize: 11,
+            fontSize: kMinLabelSize,
             fontWeight: FontWeight.w600,
           ),
         ),

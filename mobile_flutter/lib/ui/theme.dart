@@ -190,6 +190,13 @@ class AppRadius {
   static const double sheet = 20;
 }
 
+/// Smallest font size used for a label a person has to read.
+///
+/// Anything below this was unreadable on a phone at arm's length and vanished
+/// entirely under a system text-size bump. Chart axis ticks are allowed below
+/// it: they are data, and the line's shape carries the meaning.
+const double kMinLabelSize = 11;
+
 enum Tone { positive, negative, neutral, muted }
 
 Color toneColor(Tone tone) {
@@ -234,6 +241,17 @@ ThemeData buildFlatTheme(AppPalette palette) {
 
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Sora',
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: <TargetPlatform, PageTransitionsBuilder>{
+        TargetPlatform.android: _FadeSlidePageTransitionsBuilder(),
+        TargetPlatform.iOS: _FadeSlidePageTransitionsBuilder(),
+        TargetPlatform.windows: _FadeSlidePageTransitionsBuilder(),
+        TargetPlatform.macOS: _FadeSlidePageTransitionsBuilder(),
+        TargetPlatform.linux: _FadeSlidePageTransitionsBuilder(),
+        TargetPlatform.fuchsia: _FadeSlidePageTransitionsBuilder(),
+      },
+    ),
     brightness: palette.isLight ? Brightness.light : Brightness.dark,
     colorScheme: scheme,
     scaffoldBackgroundColor: palette.background,
@@ -250,6 +268,7 @@ ThemeData buildFlatTheme(AppPalette palette) {
       toolbarHeight: 58,
       titleTextStyle: TextStyle(
         color: palette.text,
+        fontFamily: 'Sora',
         fontSize: 21,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.6,
@@ -306,7 +325,8 @@ ThemeData buildFlatTheme(AppPalette palette) {
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: palette.surface,
+      // Translucent so the shell can frost whatever is scrolling behind it.
+      backgroundColor: palette.surface.withAlpha(palette.isLight ? 226 : 208),
       indicatorColor: palette.primary.withAlpha(30),
       elevation: 0,
       height: 74,
@@ -364,4 +384,37 @@ ThemeData buildFlatTheme(AppPalette palette) {
       ),
     ),
   );
+}
+
+/// A short fade with a few pixels of upward travel, applied to every pushed
+/// route. It reads as one continuous surface instead of a lateral slide, and
+/// falls back to no motion when the device asks for reduced animation.
+class _FadeSlidePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _FadeSlidePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return child;
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.035),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
+      ),
+    );
+  }
 }

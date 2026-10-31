@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../ui/language_picker.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'subscription_screen.dart';
@@ -523,6 +524,8 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                const LanguagePicker(),
+                const SizedBox(height: 10),
                 FlatCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,9 +534,9 @@ class _AccountScreenState extends State<AccountScreen> {
                         'PRIVATE MEDIA',
                         style: TextStyle(
                           color: AppColors.primary,
-                          fontSize: 9.5,
+                          fontSize: kMinLabelSize,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: 1.1,
+                          letterSpacing: 0.8,
                         ),
                       ),
                       SizedBox(height: 5),
@@ -564,7 +567,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.faint,
-                    fontSize: 9.5,
+                    fontSize: kMinLabelSize,
                     height: 1.5,
                   ),
                 ),
@@ -691,7 +694,7 @@ class _ThemeChoice extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: active ? AppColors.primary : AppColors.muted,
-                  fontSize: 10.5,
+                  fontSize: kMinLabelSize,
                   fontWeight: FontWeight.w700,
                 ),
               ),

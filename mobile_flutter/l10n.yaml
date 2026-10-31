@@ -1,0 +1,7 @@
+# Localisation is generated at build time from the ARB files in lib/l10n.
+# Nothing is downloaded at runtime, so the app works offline in every language.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-dir: lib/l10n/gen
+nullable-getter: false

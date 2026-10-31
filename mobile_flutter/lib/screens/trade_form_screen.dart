@@ -669,7 +669,17 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Edit entry' : 'New entry'),
+        title: _isEdit
+            ? Hero(
+                tag: 'trade-${widget.tradeId}',
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Text(
+                    _symbol.text.isEmpty ? 'Edit entry' : _symbol.text,
+                  ),
+                ),
+              )
+            : const Text('New entry'),
         actions: [
           TextButton(
             onPressed: _saving || _uploading || _recording ? null : _save,

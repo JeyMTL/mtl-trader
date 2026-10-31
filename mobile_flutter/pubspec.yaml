@@ -10,9 +10,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   supabase_flutter: ^2.10.0
   fl_chart: ^0.69.2
-  intl: ^0.19.0
+  # Pinned by flutter_localizations; gen-l10n generates against this version.
+  intl: ^0.20.3
   image_picker: ^1.1.2
   file_picker: ^8.1.7
   record: ^7.1.2
@@ -28,3 +31,22 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Regenerates lib/l10n/gen from the ARB files on every build.
+  generate: true
+  fonts:
+    # Sora for the interface, JetBrains Mono for every number. Both are
+    # bundled so the first frame never waits on a font download.
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Sora-Bold.ttf
+          weight: 700
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700

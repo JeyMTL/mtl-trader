@@ -98,7 +98,8 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
     if (picked == null || !mounted) return;
     _replace(
       start,
-      DateTime(picked.year, picked.month, picked.day, current.hour, current.minute),
+      DateTime(
+          picked.year, picked.month, picked.day, current.hour, current.minute),
     );
   }
 
@@ -112,7 +113,8 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
     if (picked == null || !mounted) return;
     _replace(
       start,
-      DateTime(current.year, current.month, current.day, picked.hour, picked.minute),
+      DateTime(
+          current.year, current.month, current.day, picked.hour, picked.minute),
     );
   }
 
@@ -158,9 +160,15 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
           ),
         ),
         const SizedBox(width: 8),
-        OutlinedButton(
-          onPressed: () => _pickTime(start: start),
-          child: Text(DateFormat('HH:mm').format(value)),
+        // The app theme makes outlined buttons full-width, so a button in a
+        // Row needs an explicit width or its infinite minimum size crashes
+        // layout.
+        SizedBox(
+          width: 88,
+          child: OutlinedButton(
+            onPressed: () => _pickTime(start: start),
+            child: Text(DateFormat('HH:mm').format(value)),
+          ),
         ),
       ],
     );
@@ -210,9 +218,12 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
               runSpacing: 8,
               children: [
                 for (final shortcut in _shortcuts.entries)
-                  OutlinedButton(
-                    onPressed: () => _applyShortcut(shortcut.value),
-                    child: Text(shortcut.key),
+                  SizedBox(
+                    width: 108,
+                    child: OutlinedButton(
+                      onPressed: () => _applyShortcut(shortcut.value),
+                      child: Text(shortcut.key),
+                    ),
                   ),
               ],
             ),
@@ -324,7 +335,8 @@ class _IntervalChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
+          color:
+              selected ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
           borderRadius: BorderRadius.circular(AppRadius.chip),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,

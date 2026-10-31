@@ -1,9 +1,13 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../core/analytics.dart';
 import '../core/format.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../ui/a11y.dart';
+import '../ui/shimmer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -81,6 +85,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return FutureBuilder<_AnalyticsData>(
       future: _future,
       builder: (context, snapshot) {
+        final l10n = AppLocalizations.of(context);
         final data = snapshot.data;
         return RefreshIndicator(
           onRefresh: _refresh,
@@ -93,7 +98,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Analytics',
+                      l10n.navAnalytics,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 20,
@@ -104,7 +109,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ),
                   IconButton(
                     onPressed: _refresh,
-                    tooltip: 'Refresh',
+                    tooltip: l10n.refresh,
                     icon: Icon(
                       Icons.refresh,
                       size: 18,
@@ -117,24 +122,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               if (snapshot.hasError)
                 _ErrorCard(onRetry: _refresh)
               else if (data == null)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child: Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                )
+                const _AnalyticsSkeleton()
               else if (data.summary.totalTrades == 0)
-                const EmptyState(
-                  title: 'No trades to analyse yet',
-                  body:
-                      'Journal a few entries and the breakdowns fill in automatically.',
+                EmptyState(
+                  title: l10n.analyticsEmptyTitle,
+                  body: l10n.analyticsEmptyBody,
                   icon: Icons.insights_outlined,
                 )
               else ...[
@@ -157,7 +149,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Time edge',
+                              l10n.timeEdge,
                               style: TextStyle(
                                 color: AppColors.text,
                                 fontSize: 14,
@@ -166,10 +158,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'Best and worst entry hour, sessions and the 24-hour curve.',
+                              l10n.timeEdgeDescription,
                               style: TextStyle(
                                 color: AppColors.faint,
-                                fontSize: 11,
+                                fontSize: kMinLabelSize,
                                 height: 1.4,
                               ),
                             ),
@@ -205,7 +197,7 @@ class _ErrorCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Could not load analytics',
+            AppLocalizations.of(context).analyticsErrorTitle,
             style: TextStyle(
               color: AppColors.text,
               fontSize: 13,
@@ -214,7 +206,7 @@ class _ErrorCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Check your connection and try again.',
+            AppLocalizations.of(context).analyticsErrorBody,
             style: TextStyle(color: AppColors.faint, fontSize: 11.5),
           ),
           const SizedBox(height: 10),
@@ -225,7 +217,7 @@ class _ErrorCard extends StatelessWidget {
               minimumSize: const Size(0, 32),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text('Retry'),
+            child: Text(AppLocalizations.of(context).retry),
           ),
         ],
       ),
@@ -240,41 +232,50 @@ class _SummaryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    // Taller cards at larger text sizes, so a two-column grid never clips its
+    // labels when the system text size is turned up.
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     final cards = [
       (
-        'Trades',
+        l10n.summaryTrades,
         '${summary.totalTrades}',
-        summary.monthTrades > 0 ? '${summary.monthTrades} this month' : null,
+        summary.monthTrades > 0
+            ? l10n.summaryTradesFoot(summary.monthTrades)
+            : null,
         Tone.neutral,
       ),
       (
-        'Win rate',
+        l10n.winRate,
         percent(summary.winRate),
-        '${summary.wins}W · ${summary.losses}L',
+        l10n.summaryWinLoss(summary.wins, summary.losses),
         Tone.neutral,
       ),
       (
-        'Profit factor',
+        l10n.profitFactor,
         summary.grossLoss > 0 ? summary.profitFactor.toStringAsFixed(2) : '—',
-        'Gross ${money(summary.grossProfit)} / ${money(summary.grossLoss)}',
+        l10n.summaryGrossFoot(
+          money(summary.grossProfit),
+          money(summary.grossLoss),
+        ),
         Tone.neutral,
       ),
       (
-        'Average trade',
+        l10n.summaryAverageTrade,
         signedMoney(summary.averageTrade),
-        'Net ${signedMoney(summary.totalPnl)}',
+        l10n.summaryNetFoot(signedMoney(summary.totalPnl)),
         summary.averageTrade >= 0 ? Tone.positive : Tone.negative,
       ),
       (
-        'Best trade',
+        l10n.bestTrade,
         signedMoney(summary.bestTrade),
-        'Worst ${signedMoney(summary.worstTrade)}',
+        l10n.summaryBestTradeFoot(signedMoney(summary.worstTrade)),
         Tone.positive,
       ),
       (
-        'This month',
+        l10n.thisMonth,
         signedMoney(summary.monthPnl),
-        '${summary.monthWinningDays} winning days',
+        l10n.summaryMonthFoot(summary.monthWinningDays),
         summary.monthPnl >= 0 ? Tone.positive : Tone.negative,
       ),
     ];
@@ -282,9 +283,9 @@ class _SummaryGrid extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionTitle(
-          title: 'Performance summary',
-          subtitle: 'Every closed trade in your journal.',
+        SectionTitle(
+          title: l10n.performanceSummaryTitle,
+          subtitle: l10n.performanceSummarySubtitle,
         ),
         const SizedBox(height: 8),
         GridView.count(
@@ -293,7 +294,7 @@ class _SummaryGrid extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 8,
           mainAxisSpacing: 8,
-          childAspectRatio: 1.55,
+          childAspectRatio: 1.55 / scale,
           children: [
             for (final card in cards)
               MetricCard(
@@ -316,6 +317,7 @@ class _MonthlySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final months = monthTotals(daily, months: 6);
     final maxAbs = months.fold<double>(
       0,
@@ -326,7 +328,10 @@ class _MonthlySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle(title: 'Monthly P&L', subtitle: 'Last six months'),
+          SectionTitle(
+            title: l10n.monthlyPnlTitle,
+            subtitle: l10n.monthlyPnlSubtitle,
+          ),
           const SizedBox(height: 14),
           SizedBox(
             height: 128,
@@ -340,44 +345,60 @@ class _MonthlySection extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Text(
-                            month.isEmpty
-                                ? '—'
-                                : compactMoney(month.pnl.abs()),
-                            style: TextStyle(
-                              color: month.isEmpty
-                                  ? AppColors.faint
-                                  : (month.pnl >= 0
-                                      ? AppColors.success
-                                      : AppColors.danger),
-                              fontSize: 9,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
+                          // Six columns in a phone width: the value scales
+                          // down rather than overflowing its bar.
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              month.isEmpty
+                                  ? '—'
+                                  : compactMoney(month.pnl.abs()),
+                              style: TextStyle(
+                                color: month.isEmpty
+                                    ? AppColors.faint
+                                    : (month.pnl >= 0
+                                        ? AppColors.success
+                                        : AppColors.danger),
+                                fontSize: kMinLabelSize,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Container(
-                            height: maxAbs == 0
-                                ? 2
-                                : (month.pnl.abs() / maxAbs) * 78 + 2,
-                            decoration: BoxDecoration(
-                              color: month.isEmpty
-                                  ? AppColors.border
-                                  : (month.pnl >= 0
-                                      ? AppColors.success
-                                      : AppColors.danger),
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(2),
+                          TweenAnimationBuilder<double>(
+                            tween: Tween<double>(
+                              begin: 0,
+                              end: maxAbs == 0
+                                  ? 2
+                                  : (month.pnl.abs() / maxAbs) * 78 + 2,
+                            ),
+                            duration: const Duration(milliseconds: 650),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, height, _) => Container(
+                              height: height,
+                              decoration: BoxDecoration(
+                                color: month.isEmpty
+                                    ? AppColors.border
+                                    : (month.pnl >= 0
+                                        ? AppColors.success
+                                        : AppColors.danger),
+                                borderRadius: const BorderRadius.all(
+                                  Radius.circular(2),
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            monthLabel(month.key),
-                            style: TextStyle(
-                              color: AppColors.faint,
-                              fontSize: 9.5,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              monthLabel(month.key),
+                              style: TextStyle(
+                                color: AppColors.faint,
+                                fontSize: kMinLabelSize,
+                              ),
                             ),
                           ),
                         ],
@@ -401,77 +422,251 @@ class _RecentSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final days = recentDays(daily, days: 30);
     final best = bestDay(days);
     final worst = worstDay(days);
-    final maxAbs = days.fold<double>(
-      0,
-      (max, day) => day.pnl.abs() > max ? day.pnl.abs() : max,
-    );
 
     return FlatCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionTitle(
-            title: 'P&L by day',
+            title: l10n.pnlByDayTitle,
             subtitle: best == null
-                ? 'Last 30 days'
-                : 'Best ${isoDayLabel(best.day)} ${signedMoney(best.pnl)} · '
-                    'Worst ${isoDayLabel(worst!.day)} ${signedMoney(worst.pnl)}',
+                ? l10n.pnlByDayRecent
+                : l10n.pnlByDayBestWorst(
+                    isoDayLabel(best.day),
+                    signedMoney(best.pnl),
+                    isoDayLabel(worst!.day),
+                    signedMoney(worst.pnl),
+                  ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 56,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                for (final day in days)
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: day.trades == 0
-                          ? null
-                          : () => onOpenDay(parseDay(day.day) ?? DateTime.now()),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 0.8),
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: Container(
-                            height: maxAbs == 0
-                                ? 2
-                                : (day.pnl.abs() / maxAbs) * 44 + 2,
-                            decoration: BoxDecoration(
-                              color: day.trades == 0
-                                  ? AppColors.border
-                                  : (day.pnl >= 0
-                                      ? AppColors.success
-                                      : AppColors.danger),
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(1.5),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+          ChartSemantics(
+            label: l10n.a11yRunningCurve,
+            child: _DailyCurve(days: days),
           ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const SizedBox(height: 12),
+          _PnlHeatmap(days: days, onOpenDay: onOpenDay),
+          const SizedBox(height: 9),
+          // Wrapped, not a row: three legend entries plus the hint do not fit
+          // one line in French at a 2x text scale.
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              _LegendDot(
+                  color: AppColors.danger.withAlpha(190),
+                  label: l10n.legendLoss),
+              _LegendDot(
+                  color: AppColors.surfaceAlt, label: l10n.legendNoTrades),
+              _LegendDot(
+                  color: AppColors.success.withAlpha(190),
+                  label: l10n.legendProfit),
               Text(
-                '30 days ago',
-                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
-              ),
-              Text(
-                'Today',
-                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
+                l10n.tapADay,
+                style: TextStyle(
+                  color: AppColors.faint,
+                  fontSize: kMinLabelSize,
+                ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Running P&L over the last 30 days, drawn as a filled curve so the shape of
+/// the month is readable before the numbers are.
+class _DailyCurve extends StatelessWidget {
+  const _DailyCurve({required this.days});
+
+  final List<DailyPnlPoint> days;
+
+  @override
+  Widget build(BuildContext context) {
+    if (days.isEmpty) return const SizedBox.shrink();
+    final spots = <FlSpot>[];
+    var running = 0.0;
+    for (var index = 0; index < days.length; index++) {
+      running += days[index].pnl;
+      spots.add(FlSpot(index.toDouble(), running));
+    }
+    var minY = spots.first.y;
+    var maxY = spots.first.y;
+    for (final spot in spots) {
+      if (spot.y < minY) minY = spot.y;
+      if (spot.y > maxY) maxY = spot.y;
+    }
+    final pad = (maxY - minY).abs() < 1 ? 1.0 : (maxY - minY) * 0.12;
+
+    return SizedBox(
+      height: 92,
+      child: LineChart(
+        LineChartData(
+          minY: minY - pad,
+          maxY: maxY + pad,
+          gridData: const FlGridData(show: false),
+          titlesData: const FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
+          lineTouchData: const LineTouchData(enabled: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.22,
+              barWidth: 2.2,
+              color: AppColors.primary,
+              dotData: const FlDotData(show: false),
+              shadow: Shadow(
+                color: AppColors.primary.withAlpha(70),
+                blurRadius: 10,
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.primary.withAlpha(56),
+                    AppColors.primary.withAlpha(0),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A calendar of the last 30 days: green for profit, red for loss, intensity
+/// by size. Tapping a day with trades opens it in the calendar tab.
+class _PnlHeatmap extends StatelessWidget {
+  const _PnlHeatmap({required this.days, required this.onOpenDay});
+
+  final List<DailyPnlPoint> days;
+  final ValueChanged<DateTime> onOpenDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final maxAbs = days.fold<double>(
+      0,
+      (max, day) => day.pnl.abs() > max ? day.pnl.abs() : max,
+    );
+    return GridView.count(
+      crossAxisCount: 7,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 4,
+      crossAxisSpacing: 4,
+      childAspectRatio: 1.45,
+      children: [
+        for (final day in days)
+          // A colour-only cell is invisible to a screen reader and to anyone
+          // who cannot separate the greens from the reds, so each day states
+          // its own date and amount.
+          Semantics(
+            button: day.trades > 0,
+            label: day.trades == 0
+                ? l10n.a11yHeatmapEmpty(isoDayLabel(day.day))
+                : l10n.a11yHeatmapDay(
+                    isoDayLabel(day.day),
+                    signedMoney(day.pnl),
+                    day.trades,
+                  ),
+            excludeSemantics: true,
+            child: Tooltip(
+              message: day.trades == 0
+                  ? l10n.a11yHeatmapEmpty(isoDayLabel(day.day))
+                  : l10n.a11yHeatmapDay(
+                      isoDayLabel(day.day),
+                      signedMoney(day.pnl),
+                      day.trades,
+                    ),
+              child: GestureDetector(
+                onTap: day.trades == 0
+                    ? null
+                    : () {
+                        final parsed = parseDay(day.day);
+                        if (parsed != null) onOpenDay(parsed);
+                      },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _heatColor(day, maxAbs),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: AppColors.border.withAlpha(90)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Color _heatColor(DailyPnlPoint day, double maxAbs) {
+    if (day.trades == 0) return AppColors.surfaceAlt;
+    if (maxAbs <= 0) return AppColors.surfaceAlt;
+    final intensity = (day.pnl.abs() / maxAbs).clamp(0.0, 1.0);
+    final base = day.pnl >= 0 ? AppColors.success : AppColors.danger;
+    return base.withAlpha((34 + 150 * intensity).round());
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.faint,
+            fontSize: kMinLabelSize,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnalyticsSkeleton extends StatelessWidget {
+  const _AnalyticsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Shimmer(
+      child: Column(
+        children: [
+          SkeletonCard(height: 128),
+          SizedBox(height: 10),
+          SkeletonCard(height: 168),
+          SizedBox(height: 10),
+          SkeletonCard(height: 178),
+          SizedBox(height: 10),
+          SkeletonCard(height: 108),
         ],
       ),
     );
@@ -488,14 +683,15 @@ class _SymbolSection extends StatelessWidget {
     if (symbols.isEmpty) {
       return const SizedBox.shrink();
     }
+    final l10n = AppLocalizations.of(context);
     return FlatCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle(
-            title: 'Performance by symbol',
-            subtitle: 'Sorted by net P&L',
+          SectionTitle(
+            title: l10n.performanceBySymbol,
+            subtitle: l10n.performanceBySymbolSubtitle,
           ),
           const SizedBox(height: 10),
           for (var index = 0; index < symbols.length; index++) ...[
@@ -518,20 +714,20 @@ class _SymbolSection extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      '${symbols[index].trades}T · '
-                      '${percent(symbols[index].winRate)} win',
+                      l10n.symbolStats(
+                        symbols[index].trades,
+                        percent(symbols[index].winRate),
+                      ),
                       style: TextStyle(
                         color: AppColors.faint,
-                        fontSize: 11,
+                        fontSize: kMinLabelSize,
                       ),
                     ),
                   ),
-                  Text(
-                    signedMoney(symbols[index].pnl),
+                  PnlText(
+                    value: symbols[index].pnl,
+                    glyph: false,
                     style: TextStyle(
-                      color: symbols[index].pnl >= 0
-                          ? AppColors.success
-                          : AppColors.danger,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       fontFeatures: const [FontFeature.tabularFigures()],
@@ -557,14 +753,15 @@ class _TagSection extends StatelessWidget {
     if (tags.isEmpty) {
       return const SizedBox.shrink();
     }
+    final l10n = AppLocalizations.of(context);
     return FlatCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle(
-            title: 'Performance by tag',
-            subtitle: 'Tags you add to a trade, rolled up.',
+          SectionTitle(
+            title: l10n.performanceByTag,
+            subtitle: l10n.performanceByTagSubtitle,
           ),
           const SizedBox(height: 10),
           for (var index = 0; index < tags.length; index++) ...[
@@ -588,23 +785,24 @@ class _TagSection extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${tags[index].trades}T · '
-                          '${tags[index].wins}W ${tags[index].losses}L · '
-                          '${percent(tags[index].winRate)}',
+                          l10n.tagStats(
+                            tags[index].trades,
+                            tags[index].wins,
+                            tags[index].losses,
+                            percent(tags[index].winRate),
+                          ),
                           style: TextStyle(
                             color: AppColors.faint,
-                            fontSize: 10.5,
+                            fontSize: kMinLabelSize,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Text(
-                    signedMoney(tags[index].pnl),
+                  PnlText(
+                    value: tags[index].pnl,
+                    glyph: false,
                     style: TextStyle(
-                      color: tags[index].pnl >= 0
-                          ? AppColors.success
-                          : AppColors.danger,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       fontFeatures: const [FontFeature.tabularFigures()],

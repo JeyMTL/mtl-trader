@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/chart_theme.dart';
 import 'core/config.dart';
+import 'core/locale.dart';
+import 'l10n/gen/app_localizations.dart';
 import 'screens/auth_gate.dart';
 import 'ui/theme.dart';
 
@@ -19,9 +22,16 @@ Future<void> main() async {
     publishableKey: AppConfig.supabaseAnonKey,
   );
 
-  // The saved chart style, read once so the first chart already looks right.
+  // Month names come from intl's own locale data, which is empty until it is
+  // loaded. Doing it here means no date format can run before the data exists,
+  // whatever order the widget tree resolves languages in.
+  await initializeDateFormatting();
+
+  // The saved chart style and language, read once so the first frame is
+  // already in the right palette and language.
   await ChartStyle.restore();
   await ThemeController.restore();
+  await LocaleController.restore();
 
   runApp(const MtlTraderApp());
 }
@@ -32,19 +42,28 @@ class MtlTraderApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: ThemeController.instance,
+      listenable: Listenable.merge(<Listenable>[
+        ThemeController.instance,
+        LocaleController.instance,
+      ]),
       builder: (context, _) {
         final mode = ThemeController.instance.mode;
+        final language = LocaleController.instance.code ?? 'system';
         return MaterialApp(
           title: 'MTL Trader',
           debugShowCheckedModeBanner: false,
           theme: buildFlatTheme(AppColors.palette),
+          // Null locale means "follow the device", resolved against the
+          // generated list, which falls back to English for anything else.
+          locale: LocaleController.instance.locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           // The palette is read through `AppColors` getters rather than an
           // InheritedWidget, so a switch has to rebuild the tree. The key makes
           // Flutter discard the subtree instead of keeping const widgets that
-          // still hold the old colours.
+          // still hold the old colours or the old strings.
           home: KeyedSubtree(
-            key: ValueKey<String>('theme-${mode.name}'),
+            key: ValueKey<String>('theme-${mode.name}-$language'),
             child: const AuthGate(),
           ),
         );
