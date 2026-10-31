@@ -125,3 +125,27 @@ same way.
 The picker lives under Account → Language, and
 `mobile_flutter/test/language_picker_test.dart` covers listing the languages,
 switching to French, and switching back to the device language.
+
+## Vercel projects
+
+Two projects were building this repo on every push, which doubled build minutes
+and deploy-gate runs:
+
+| Project | Role |
+| --- | --- |
+| `mtl-trader` | Owns `mtl-trader.vercel.app`, the production domain. Keep its GitHub integration connected. |
+| `mtl-trader-bumx` | Older project (first deployment August 2026). Its deployments are only reachable at team-scoped URLs, so nothing user-facing points at it. Git was disconnected; the project is kept for its history. |
+
+Exactly one project should have the GitHub integration enabled. After any project
+change, prove it with a push rather than assuming:
+
+```bash
+git commit --allow-empty -m "check which project deploys"   # or any real change
+git push
+curl -s https://mtl-trader.vercel.app/api/health            # commit must advance
+```
+
+If `commit` stops advancing after a push, the Git integration is on a project
+that does not own the domain. Reconnect it (Project → Settings → Git) instead of
+debugging the app — and note that `Redeploy` in the dashboard is *not* a valid
+test of this, because it rebuilds the same SHA without changing `commit`.
