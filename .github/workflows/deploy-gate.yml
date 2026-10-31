@@ -1,0 +1,31 @@
+name: Deploy gate
+
+# Fires when Vercel (or any integration) reports a deployment through the
+# GitHub Deployments API. The gate only runs on success: a failed build has
+# nothing to smoke, and its own status is already the signal.
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  smoke:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No install step: the script only uses the global fetch, so this stays
+      # fast enough to run on every deployment.
+      - name: Smoke the deployed environment
+        env:
+          TARGET: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+        run: node scripts/check-deploy.mjs "$TARGET"
