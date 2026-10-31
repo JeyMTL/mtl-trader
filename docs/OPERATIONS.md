@@ -25,10 +25,13 @@ That script is the same probe used by the deploy gate and the uptime monitor.
    real outage, and comments on it instead of opening duplicates;
 3. closes that issue and notes the recovery when the probe goes green again.
 
-**Setup (once):** add a repository *variable* named `PRODUCTION_URL` under
-Settings → Secrets and variables → Actions → **Variables** (not Secrets — it is
-a public URL). Without it the workflow fails loudly rather than pretending the
-site is up.
+**Setup:** none. The probe defaults to `https://mtl-trader.vercel.app`, the same
+domain the app itself falls back to (`src/app/layout.tsx`,
+`mobile_flutter/lib/core/config.dart`), so the monitor is green from the first
+scheduled run. If the app moves to a custom domain, add a repository *variable*
+named `PRODUCTION_URL` under Settings → Secrets and variables → Actions →
+**Variables** (not Secrets — it is a public URL); it takes precedence over the
+default.
 
 There is no third-party monitor, deliberately: the extra account would watch the
 same endpoint this workflow already polls, and the token is one you already

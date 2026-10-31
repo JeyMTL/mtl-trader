@@ -25,7 +25,26 @@ jobs:
 
       # No install step: the script only uses the global fetch, so this stays
       # fast enough to run on every deployment.
+      # A deployment is reported "success" a moment before every edge serves
+      # the new build, so the first probe can still hit the previous one. Three
+      # attempts thirty seconds apart separates a real regression from that
+      # race: this job failed exactly that way on af154f2 while the same URL was
+      # healthy when probed by hand a minute later.
       - name: Smoke the deployed environment
         env:
           TARGET: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
-        run: node scripts/check-deploy.mjs "$TARGET"
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::Attempt $attempt"
+            if node scripts/check-deploy.mjs "$TARGET"; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" != "3" ]; then
+              echo "Retrying in 30s…"
+              sleep 30
+            fi
+          done
+          echo "::error title=Deploy smoke check failed::$TARGET did not report healthy after 3 attempts."
+          exit 1

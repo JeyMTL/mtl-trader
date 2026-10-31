@@ -7,9 +7,10 @@ name: Uptime
 # can the app reach its database), and the deploy gate uses the same probe. This
 # job turns that probe into an alert without another account to maintain.
 #
-# Required setup: a repository *variable* named PRODUCTION_URL
-# (Settings → Secrets and variables → Actions → Variables tab), e.g.
-# https://app.example.com — a variable, not a secret, because it is public.
+# Optional: a repository *variable* named PRODUCTION_URL (Settings → Secrets
+# and variables → Actions → Variables) overrides the default below — set one if
+# the app ever moves to a custom domain. It is a variable, not a secret, because
+# it is public.
 
 on:
   schedule:
@@ -36,7 +37,10 @@ jobs:
     timeout-minutes: 10
 
     env:
-      TARGET: ${{ github.event.inputs.target || vars.PRODUCTION_URL }}
+      # The default is the same domain the app itself falls back to (see
+      # src/app/layout.tsx and mobile_flutter/lib/core/config.dart), so the
+      # monitor works without a manual setup step that someone has to remember.
+      TARGET: ${{ github.event.inputs.target || vars.PRODUCTION_URL || 'https://mtl-trader.vercel.app' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ALERT_TITLE: Production health check is failing
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -48,12 +52,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check that a target is configured
-        run: |
-          if [ -z "$TARGET" ]; then
-            echo "::error title=PRODUCTION_URL is not set::Add a repository variable named PRODUCTION_URL (Settings → Secrets and variables → Actions → Variables) so this monitor knows which deployment to probe."
-            exit 1
-          fi
+      - name: Show which deployment is being probed
+        run: echo "Probing $TARGET"
 
       # Three attempts, 30s apart, so a single cold start or a transient CDN
       # blip does not wake anyone up. A real outage still fails all three.
