@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { User, CreditCard, Bell, Shield, Save, Wallet, Trash2, Palette, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
@@ -37,7 +37,11 @@ export default function SettingsPage() {
   const { theme, toggle } = useTheme()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('profile')
-  const [saved, setSaved] = useState(false)
+  // Which section most recently saved; a single boolean made both sections
+  // flash "Saved!" whenever either one was stored.
+  const [saved, setSaved] = useState<'profile' | 'notifications' | null>(null)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [savingNotifications, setSavingNotifications] = useState(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [depAmount, setDepAmount] = useState('')
   const [depType, setDepType] = useState('deposit')
@@ -82,7 +86,7 @@ export default function SettingsPage() {
     { id: 'security', name: 'Security', icon: Shield },
   ]
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
@@ -124,58 +128,18 @@ export default function SettingsPage() {
       .order('created_at', { ascending: false })
     setDeposits(depData || [])
     setProfileLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      setUserId(user.id)
-
-      const { data: userData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      if (userData) {
-        setProfile({
-          full_name: userData.full_name || '',
-          email: userData.email || user.email || '',
-          timezone: userData.timezone || 'UTC',
-          currency: userData.currency || 'USD',
-          notifications_email: userData.notifications_email ?? true,
-          notifications_daily: userData.notifications_daily ?? true,
-          notifications_weekly: userData.notifications_weekly ?? false,
-          notifications_marketing: userData.notifications_marketing ?? false,
-          notifications_journal_reminders: userData.notifications_journal_reminders ?? true,
-          notifications_monthly_overview: userData.notifications_monthly_overview ?? true,
-          notifications_monthly_email: userData.notifications_monthly_email ?? true,
-        })
-        setUserPlan({
-          tier: userData.subscription_tier || 'free',
-          status: userData.subscription_status || 'trial',
-          stripeCustomerId: userData.stripe_customer_id,
-          currentPeriodEnd: userData.current_period_end ?? null,
-          cancelAtPeriodEnd: userData.cancel_at_period_end === true,
-        })
-      } else {
-        setProfile(prev => ({ ...prev, email: user.email || '' }))
-      }
-
-      const { data: depData } = await supabase
-        .from('deposits')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-      setDeposits(depData || [])
-      setProfileLoading(false)
+      await fetchData()
     }
-    load()
-  }, [])
+    void load()
+  }, [fetchData])
 
   const handleSaveProfile = async () => {
     if (!userId) return
-    setSaved(true)
+    setSavingProfile(true)
     const { error } = await supabase
       .from('users')
       .update({
@@ -184,15 +148,18 @@ export default function SettingsPage() {
         currency: profile.currency,
       })
       .eq('id', userId)
+    setSavingProfile(false)
     if (error) {
       toast('Could not save your profile: ' + error.message, { tone: 'error' })
+      return
     }
-    setTimeout(() => setSaved(false), 2000)
+    setSaved('profile')
+    setTimeout(() => setSaved(null), 2000)
   }
 
   const handleSaveNotifications = async () => {
     if (!userId) return
-    setSaved(true)
+    setSavingNotifications(true)
     const { error } = await supabase
       .from('users')
       .update({
@@ -205,10 +172,13 @@ export default function SettingsPage() {
         notifications_monthly_email: profile.notifications_monthly_email,
       })
       .eq('id', userId)
+    setSavingNotifications(false)
     if (error) {
       toast('Could not save your notification settings: ' + error.message, { tone: 'error' })
+      return
     }
-    setTimeout(() => setSaved(false), 2000)
+    setSaved('notifications')
+    setTimeout(() => setSaved(null), 2000)
   }
 
   const handleChangePassword = async () => {
@@ -341,7 +311,7 @@ export default function SettingsPage() {
       })
       const data = await res.json()
       if (data.url) {
-        window.location.href = data.url
+        window.location.assign(data.url)
       } else {
         toast(data.error || 'Could not start checkout.', { tone: 'error' })
       }
@@ -494,11 +464,11 @@ export default function SettingsPage() {
 
               <button
                 onClick={handleSaveProfile}
-                disabled={profileLoading}
+                disabled={profileLoading || savingProfile}
                 className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                {saved ? 'Saved!' : 'Save Changes'}
+                {saved === 'profile' ? 'Saved!' : savingProfile ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           )}
@@ -771,10 +741,11 @@ export default function SettingsPage() {
 
               <button
                 onClick={handleSaveNotifications}
-                className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
+                disabled={savingNotifications}
+                className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                {saved ? 'Saved!' : 'Save Changes'}
+                {saved === 'notifications' ? 'Saved!' : savingNotifications ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           )}

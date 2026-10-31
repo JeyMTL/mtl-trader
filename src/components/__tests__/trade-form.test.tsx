@@ -46,7 +46,6 @@ vi.mock('@/lib/supabase', () => {
 
     const chain = {
       eq: () => chain,
-      gte: async () => ({ count: db.tradeCount, error: null }),
       single: async () => ({ data: db.editRow, error: null }),
     }
 
@@ -64,7 +63,8 @@ vi.mock('@/lib/supabase', () => {
       },
       update: (payload: Row) => {
         db.updated = payload
-        return { eq: async () => ({ error: null }) }
+        // The form scopes the write to both the id and the owner.
+        return { eq: () => ({ eq: async () => ({ error: null }) }) }
       },
     }
   }
@@ -76,6 +76,8 @@ vi.mock('@/lib/supabase', () => {
         getSession: async () => ({ data: { session: { access_token: 'token' } } }),
       },
       from,
+      // Quota pre-check: the same count the insert trigger uses.
+      rpc: async () => ({ data: db.tradeCount, error: null }),
     },
   }
 })

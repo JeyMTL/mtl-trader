@@ -1,0 +1,12 @@
+# Only the Next.js app is deployed. The native clients, build output and local
+# tooling must never be uploaded: they are hundreds of megabytes and the CLI
+# upload is what times out when they are included.
+mobile/
+mobile_flutter/
+docs/
+scripts/
+.tooling/
+.vercel/
+.env*
+*.md
+*.log

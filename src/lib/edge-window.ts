@@ -1,4 +1,5 @@
 import type { HourStat, SessionStat, TimeStats } from '@/types/journal'
+import { formatDuration } from '@/lib/utils'
 
 /**
  * The "when do I actually make money" report.
@@ -112,12 +113,8 @@ export function timeEdgeReport(stats: TimeStats, minTrades = 3): {
   }
 }
 
-/** Minutes → `1h 24m`, used by the hold-time line. */
-export function formatMinutes(minutes: number | null | undefined): string {
-  if (minutes === null || minutes === undefined || !Number.isFinite(minutes)) return '—'
-  const total = Math.round(Number(minutes))
-  if (total < 60) return `${total}m`
-  const hours = Math.floor(total / 60)
-  const rest = total % 60
-  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
-}
+/**
+ * Minutes → `1h 24m`, used by the hold-time line.
+ * Delegates to `formatDuration` so the same number never renders two ways.
+ */
+export const formatMinutes = formatDuration

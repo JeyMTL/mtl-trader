@@ -33,12 +33,21 @@ export function parseOpenDate(trade: TradeRecord): Date | null {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-/** Coarse trading session from the open hour (UTC). */
-export function sessionOf(date: Date): 'Asian' | 'London' | 'New York' | 'Late' {
+/**
+ * Coarse trading session from the open hour (UTC).
+ *
+ * The boundaries and labels mirror `time_stats()` in SQL exactly — the review
+ * and the analytics report must not classify the same trade differently:
+ * Asian 00–08, London 08–13, overlap 13–16, New York 16–21, late 21–24.
+ */
+export function sessionOf(
+  date: Date
+): 'Asian' | 'London' | 'London / New York' | 'New York' | 'Late' {
   const hour = date.getUTCHours()
-  if (hour < 7) return 'Asian'
-  if (hour < 12) return 'London'
-  if (hour < 20) return 'New York'
+  if (hour < 8) return 'Asian'
+  if (hour < 13) return 'London'
+  if (hour < 16) return 'London / New York'
+  if (hour < 21) return 'New York'
   return 'Late'
 }
 

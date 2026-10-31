@@ -1,10 +1,13 @@
 -- Give trial users unlimited access for 30 days, then require a paid plan.
+-- Only trials that have never been dated (or have already lapsed) are stamped:
+-- re-running this migration must not silently extend a running trial.
 UPDATE users
 SET max_trades = -1,
     trades_remaining = -1,
   trial_ends_at = NOW() + INTERVAL '30 days'
 WHERE subscription_tier = 'free'
-  AND subscription_status = 'trial';
+  AND subscription_status = 'trial'
+  AND (trial_ends_at IS NULL OR trial_ends_at < NOW());
 
 ALTER TABLE users ALTER COLUMN max_trades SET DEFAULT -1;
 ALTER TABLE users ALTER COLUMN trades_remaining SET DEFAULT -1;

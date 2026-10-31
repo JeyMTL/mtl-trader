@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Mail, Lock } from 'lucide-react'
+import { Lock, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 
@@ -37,7 +37,33 @@ export default function LoginPage() {
       return
     }
 
-    window.location.href = '/dashboard'
+    // Continue to wherever the guard sent the user before signing in. Only a
+    // same-origin absolute path is honoured, so `?next=` cannot be an open redirect.
+    const requested = new URLSearchParams(window.location.search).get('next')
+    const target = requested && requested.startsWith('/') && !requested.startsWith('//')
+      ? requested
+      : '/dashboard'
+    window.location.assign(target)
+  }
+
+  const signInWithGoogle = async () => {
+    setLoading(true)
+    setError('')
+    setSuccess('')
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+
+    // On success the browser leaves for Google, so nothing below runs.
+    if (oauthError) {
+      setError(oauthError.message)
+      setLoading(false)
+    }
   }
 
   const resendVerification = async () => {
@@ -78,6 +104,22 @@ export default function LoginPage() {
               {success}
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={signInWithGoogle}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-background border border-border hover:border-primary text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="text-[15px] font-extrabold leading-none">G</span>
+            Continue with Google
+          </button>
+
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] uppercase tracking-wider text-gray-500">or with email</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
@@ -134,6 +176,11 @@ export default function LoginPage() {
           >
             Resend verification email
           </button>
+
+          <p className="text-center text-gray-500 text-xs leading-relaxed">
+            Google accounts skip the verification email: Google has already
+            confirmed the address.
+          </p>
 
           <p className="text-center text-gray-400 text-sm">
             Don&apos;t have an account?{' '}

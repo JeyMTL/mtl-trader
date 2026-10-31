@@ -12,7 +12,6 @@ import {
   dueSummaryWindows,
   shouldSendJournalReminder,
   zonedDayKey,
-  type Window,
 } from '@/lib/notification-schedule'
 import { apiError, logEvent } from '@/lib/log'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -63,12 +62,6 @@ interface SummaryRun {
   failed: number
   pages: number
   hasMore: boolean
-}
-
-function kindOf(window: Window): 'daily' | 'weekly' | 'monthly' {
-  if (window.label.toLowerCase().includes('weekly')) return 'weekly'
-  if (window.label.toLowerCase().includes('monthly')) return 'monthly'
-  return 'daily'
 }
 
 /** Claims a send so a second cron run cannot duplicate it. */
@@ -190,7 +183,7 @@ async function processUser(
     const sent = await sendClaimed(
       supabase,
       user.id,
-      kindOf(window),
+      window.kind,
       zonedDayKey(window.until, user.timezone),
       { to: user.email, subject, html }
     )

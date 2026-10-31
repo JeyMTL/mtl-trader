@@ -211,20 +211,33 @@ export async function deleteJournalMedia(attachment: JournalAttachment | Pending
   }
 }
 
-/**
- * Best-effort storage cleanup when a trade or the whole journal is deleted.
- * The database rows cascade, but storage objects do not.
- */
-export async function deleteTradeMedia(tradeIds: string[]): Promise<void> {
-  if (tradeIds.length === 0) return
+/** Storage paths of a set of trades' attachments. */
+export async function journalMediaPaths(tradeIds: string[]): Promise<string[]> {
+  if (tradeIds.length === 0) return []
   const { data } = await supabase
     .from('trade_attachments')
     .select('storage_path')
     .in('trade_id', tradeIds)
-  const paths = ((data ?? []) as Array<{ storage_path: string }>)
+  return ((data ?? []) as Array<{ storage_path: string }>)
     .map((row) => row.storage_path)
     .filter(Boolean)
-  if (paths.length > 0) {
-    await supabase.storage.from(JOURNAL_MEDIA_BUCKET).remove(paths)
-  }
+}
+
+/** Removes storage objects that have already been resolved to paths. */
+export async function removeStoredMedia(paths: string[]): Promise<void> {
+  if (paths.length === 0) return
+  await supabase.storage.from(JOURNAL_MEDIA_BUCKET).remove(paths)
+}
+
+/**
+ * Best-effort storage cleanup when a trade or the whole journal is deleted.
+ * The database rows cascade, but storage objects do not.
+ *
+ * Callers that still have the rows should read `journalMediaPaths` *before*
+ * deleting and call `removeStoredMedia` after: the attachment rows cascade with
+ * the trade, so a list taken afterwards comes back empty and the files are
+ * orphaned forever.
+ */
+export async function deleteTradeMedia(tradeIds: string[]): Promise<void> {
+  await removeStoredMedia(await journalMediaPaths(tradeIds))
 }

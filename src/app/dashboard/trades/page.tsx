@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Search, Trash2, TrendingUp, TrendingDown, Pencil, Download, Loader2, ChevronLeft, ChevronRight, Image as ImageIcon, Mic } from 'lucide-react'
 import { cn, formatCurrency, formatDuration } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import { deleteTradeMedia } from '@/lib/journal-media'
+import { journalMediaPaths, removeStoredMedia } from '@/lib/journal-media'
 import Link from 'next/link'
 import type { TradePageResult, TradeRow } from '@/types/journal'
 
@@ -89,13 +89,17 @@ export default function TradesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this trade?')) return
-    // Storage objects do not cascade with the row, so remove them first.
-    await deleteTradeMedia([id])
+    // Resolve the storage paths *before* the row goes: the attachment rows
+    // cascade with the trade, so listing afterwards returns nothing, and the
+    // files would be orphaned. Objects are removed only once the row is gone,
+    // so a failed delete never leaves a trade pointing at deleted files.
+    const mediaPaths = await journalMediaPaths([id]).catch(() => [] as string[])
     const { error: deleteError } = await supabase.from('trades').delete().eq('id', id)
     if (deleteError) {
       setError('Could not delete the trade: ' + deleteError.message)
       return
     }
+    await removeStoredMedia(mediaPaths).catch(() => {})
     const nextPage = trades.length === 1 && page > 0 ? page - 1 : page
     setLoading(true)
     if (nextPage !== page) setPage(nextPage)
@@ -113,11 +117,13 @@ export default function TradesPage() {
       return
     }
     const { data: idRows } = await supabase.from('trades').select('id').eq('user_id', user.id)
-    await deleteTradeMedia(((idRows ?? []) as Array<{ id: string }>).map((row) => row.id))
+    const ids = ((idRows ?? []) as Array<{ id: string }>).map((row) => row.id)
+    const mediaPaths = await journalMediaPaths(ids).catch(() => [] as string[])
     const { error: deleteError } = await supabase.from('trades').delete().eq('user_id', user.id)
     if (deleteError) {
       setError('Could not clear the journal: ' + deleteError.message)
     } else {
+      await removeStoredMedia(mediaPaths).catch(() => {})
       setPage(0)
       await loadPage(0, debouncedSearch, filter)
     }
@@ -129,6 +135,7 @@ export default function TradesPage() {
     setError('')
     try {
       const rows: TradeRow[] = []
+      let capped = false
       for (let index = 0; index < MAX_EXPORT_PAGES; index++) {
         const { data, error: rpcError } = await supabase.rpc('trade_page', {
           p_limit: EXPORT_PAGE_SIZE,
@@ -140,6 +147,7 @@ export default function TradesPage() {
         const result = data as unknown as TradePageResult
         rows.push(...(result?.trades ?? []))
         if (rows.length >= Number(result?.total ?? 0) || (result?.trades ?? []).length === 0) break
+        if (index === MAX_EXPORT_PAGES - 1) capped = true
       }
 
       const escapeCSV = (val: string) => {
@@ -170,6 +178,13 @@ export default function TradesPage() {
       a.download = `trades_${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
+
+      // Never hand back a partial file that looks complete.
+      if (capped) {
+        setError(
+          `Only the first ${rows.length.toLocaleString()} matching trades were exported. Narrow the search or filter to export the rest.`
+        )
+      }
     } catch (exportError: unknown) {
       setError('Could not export trades: ' + (exportError instanceof Error ? exportError.message : 'Unknown error'))
     }

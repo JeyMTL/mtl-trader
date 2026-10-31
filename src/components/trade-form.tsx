@@ -280,7 +280,18 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
     }
 
     if (mode === 'edit' && tradeId) {
-      const { error: updateError } = await supabase.from('trades').update(payload).eq('id', tradeId)
+      // RLS already restricts this row, but the read path filters on the owner
+      // explicitly and the write path should not depend on a single layer.
+      if (!userId) {
+        setError('Your session expired. Sign in again to save this trade.')
+        setSaving(false)
+        return
+      }
+      const { error: updateError } = await supabase
+        .from('trades')
+        .update(payload)
+        .eq('id', tradeId)
+        .eq('user_id', userId)
       if (updateError) {
         setError(updateError.message)
         setSaving(false)
@@ -307,15 +318,11 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
       .single()
     const effectiveMax = effectiveMaxTrades(userRow ?? {})
     if (effectiveMax !== UNLIMITED) {
-      const startOfMonth = new Date()
-      startOfMonth.setDate(1)
-      startOfMonth.setHours(0, 0, 0, 0)
-      const { count } = await supabase
-        .from('trades')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', startOfMonth.toISOString())
-      if ((count ?? 0) >= effectiveMax) {
+      // `month_trade_count` uses the trigger's own definition of "this month";
+      // counting by `created_at` here used to disagree with the database.
+      const { data: monthCount } = await supabase.rpc('month_trade_count')
+      const used = typeof monthCount === 'number' ? monthCount : Number(monthCount ?? 0)
+      if (used >= effectiveMax) {
         setQuotaHit(effectiveMax)
         setSaving(false)
         return

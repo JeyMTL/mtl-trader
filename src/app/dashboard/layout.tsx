@@ -21,7 +21,7 @@ import {
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import { effectiveMaxTrades, maxTradesForPlan, trialEndsAtFrom } from '@/lib/subscription'
+import { effectiveMaxTrades } from '@/lib/subscription'
 import { Logo } from '@/components/logo'
 import { useBackButton, useHaptics } from '@/hooks/useCapacitor'
 
@@ -89,35 +89,33 @@ export default function DashboardLayout({
         .single()
 
       if (!data) {
+        // No profile row: report "no plan" instead of inventing a trial the
+        // database does not know about. A fabricated trial would show days left
+        // that `enforce_trade_quota` has never agreed to.
         data = {
           full_name: null,
           email: authUser.email ?? null,
           subscription_tier: 'free',
-          subscription_status: 'trial',
-          max_trades: maxTradesForPlan('free'),
-          trial_ends_at: trialEndsAtFrom(),
+          subscription_status: 'expired',
+          max_trades: 0,
+          trial_ends_at: null,
           current_period_end: null,
           cancel_at_period_end: false,
           is_admin: false,
         }
       }
 
-      // Trades used this month (drives the quota display)
-      const startOfMonth = new Date()
-      startOfMonth.setDate(1)
-      startOfMonth.setHours(0, 0, 0, 0)
-      const { count } = await supabase
-        .from('trades')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', authUser.id)
-        .gte('created_at', startOfMonth.toISOString())
+      // Counted by the same definition of "this month" as the insert trigger,
+      // so the meter cannot promise room the database will refuse.
+      const { data: monthCount } = await supabase.rpc('month_trade_count')
+      const count = typeof monthCount === 'number' ? monthCount : Number(monthCount ?? 0)
 
       setUser({
         tier: data.subscription_tier || 'free',
         status: data.subscription_status || 'trial',
         isAdmin: data.is_admin === true,
         maxTrades: effectiveMaxTrades(data),
-        tradesUsed: count ?? 0,
+        tradesUsed: count,
         trialEndsAt: data.trial_ends_at,
         fullName: data.full_name ?? null,
         email: data.email ?? authUser.email ?? null,

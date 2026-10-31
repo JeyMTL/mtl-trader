@@ -5,6 +5,10 @@ import { Upload, FileText, CheckCircle, AlertCircle, X, Trash2, Clock } from 'lu
 import { supabase } from '@/lib/supabase'
 import { extractTrades, parseFileToRows, type ParsedTrade } from '@/lib/import-parser'
 import { effectiveMaxTrades, monthlyRemaining, UNLIMITED } from '@/lib/subscription'
+import { journalMediaPaths, removeStoredMedia } from '@/lib/journal-media'
+
+/** Refuse absurd uploads before handing them to the spreadsheet parser. */
+const MAX_IMPORT_BYTES = 20 * 1024 * 1024
 
 interface ImportRecord {
   id: string
@@ -24,13 +28,6 @@ function getImports(): ImportRecord[] {
 
 function saveImports(imports: ImportRecord[]) {
   localStorage.setItem('mtl_imports', JSON.stringify(imports))
-}
-
-function startOfCurrentMonth(): Date {
-  const d = new Date()
-  d.setDate(1)
-  d.setHours(0, 0, 0, 0)
-  return d
 }
 
 export default function ImportPage() {
@@ -57,6 +54,11 @@ export default function ImportPage() {
     setLoading(true)
     setError('')
     setNotice('')
+    if (selectedFile.size > MAX_IMPORT_BYTES) {
+      setError(`That file is ${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB. Imports are limited to 20 MB — split the report and import it in parts.`)
+      setLoading(false)
+      return
+    }
     try {
       const rows = await parseFileToRows(selectedFile)
       if (!rows || rows.length === 0) {
@@ -127,12 +129,11 @@ export default function ImportPage() {
     let toImport = parsedData
     const effectiveMax = effectiveMaxTrades(userRow ?? {})
     if (effectiveMax !== UNLIMITED) {
-      const { count } = await supabase
-        .from('trades')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .gte('created_at', startOfCurrentMonth().toISOString())
-      const remaining = monthlyRemaining(userRow ?? {}, count ?? 0)
+      // Same definition of "this month" as the database trigger, so the notice
+      // below matches what will actually be accepted on insert.
+      const { data: monthCount } = await supabase.rpc('month_trade_count')
+      const used = typeof monthCount === 'number' ? monthCount : Number(monthCount ?? 0)
+      const remaining = monthlyRemaining(userRow ?? {}, used)
       if (remaining === 0) {
         setError(`You have reached your monthly limit of ${effectiveMax} trades. Upgrade your plan for more.`)
         setLoading(false)
@@ -250,9 +251,34 @@ export default function ImportPage() {
     setDeleteLoading(imp.id)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setError('You must be logged in to delete trades.')
+      setDeleteLoading(null)
+      return
+    }
 
-    await supabase.from('trades').delete().eq('user_id', user.id).eq('import_id', imp.id)
+    // Resolve the attachment paths first: the attachment rows cascade with the
+    // trade, so a list taken after the delete would be empty and the files
+    // would stay in the bucket forever.
+    const { data: idRows } = await supabase
+      .from('trades')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('import_id', imp.id)
+    const ids = ((idRows ?? []) as Array<{ id: string }>).map((row) => row.id)
+    const mediaPaths = await journalMediaPaths(ids).catch(() => [] as string[])
+
+    const { error: deleteError } = await supabase
+      .from('trades')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('import_id', imp.id)
+    if (deleteError) {
+      setError('Could not delete those trades: ' + deleteError.message)
+      setDeleteLoading(null)
+      return
+    }
+    await removeStoredMedia(mediaPaths).catch(() => {})
 
     const updatedImports = imports.filter(i => i.id !== imp.id)
     saveImports(updatedImports)
@@ -265,12 +291,17 @@ export default function ImportPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setDeleteLoading('all')
+    const { data: idRows } = await supabase.from('trades').select('id').eq('user_id', user.id)
+    const ids = ((idRows ?? []) as Array<{ id: string }>).map((row) => row.id)
+    const mediaPaths = await journalMediaPaths(ids).catch(() => [] as string[])
     const { error: deleteError } = await supabase.from('trades').delete().eq('user_id', user.id)
     if (deleteError) {
       setError('Could not clear the journal: ' + deleteError.message)
       setDeleteLoading(null)
       return
     }
+    // Photos and voice notes do not cascade with the rows.
+    await removeStoredMedia(mediaPaths).catch(() => {})
     saveImports([])
     setImports([])
     setDeleteLoading(null)

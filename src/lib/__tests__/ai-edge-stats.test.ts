@@ -18,9 +18,11 @@ function group(groups: GroupStat[], key: string): GroupStat | undefined {
 
 describe('sessionOf', () => {
   it('maps UTC hours to sessions', () => {
+    // Boundaries and labels match `time_stats()` in SQL.
     expect(sessionOf(new Date('2026-06-01T02:00:00Z'))).toBe('Asian')
     expect(sessionOf(new Date('2026-06-01T08:00:00Z'))).toBe('London')
-    expect(sessionOf(new Date('2026-06-01T14:00:00Z'))).toBe('New York')
+    expect(sessionOf(new Date('2026-06-01T14:00:00Z'))).toBe('London / New York')
+    expect(sessionOf(new Date('2026-06-01T17:00:00Z'))).toBe('New York')
     expect(sessionOf(new Date('2026-06-01T22:00:00Z'))).toBe('Late')
   })
 })
@@ -77,14 +79,14 @@ describe('computeEdgeStats', () => {
         trade({ pnl: 5, open_time: '2026-06-01T08:00:00Z', close_time: '2026-06-01T08:10:00Z' }),
         trade({ pnl: 5, open_time: '2026-06-01T02:00:00Z', close_time: '2026-06-01T02:30:00Z' }),
         trade({ pnl: 5, open_time: '2026-06-01T14:00:00Z', close_time: '2026-06-01T16:00:00Z' }),
-        trade({ pnl: 5, open_time: '2026-06-01T20:00:00Z', close_time: '2026-06-02T02:00:00Z' }),
+        trade({ pnl: 5, open_time: '2026-06-01T17:00:00Z', close_time: '2026-06-02T02:00:00Z' }),
       ],
       2
     )
     expect(group(stats.bySession, 'London')?.trades).toBe(1)
     expect(group(stats.bySession, 'Asian')?.trades).toBe(1)
+    expect(group(stats.bySession, 'London / New York')?.trades).toBe(1)
     expect(group(stats.bySession, 'New York')?.trades).toBe(1)
-    expect(group(stats.bySession, 'Late')?.trades).toBe(1)
     expect(group(stats.byHoldTime, '<15m')?.trades).toBe(1)
     expect(group(stats.byHoldTime, '15-60m')?.trades).toBe(1)
     expect(group(stats.byHoldTime, '1-4h')?.trades).toBe(1)

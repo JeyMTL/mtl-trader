@@ -132,10 +132,12 @@ async function handleCancellation(event: FlutterwaveEvent) {
   }
 
   const admin = getAdminClient()
+  // `eq`, not `ilike`: an address containing `_` or `%` must not act as a
+  // wildcard here, or a cancellation could land on another account.
   const { data: user } = await admin
     .from('users')
     .select('id')
-    .ilike('email', email)
+    .eq('email', email)
     .maybeSingle()
 
   if (!user?.id) {

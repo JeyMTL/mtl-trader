@@ -492,15 +492,15 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
             <AreaChart data={equityData}>
               <defs>
                 <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={totalPnl >= 0 ? '#22c55e' : '#ef4444'} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={totalPnl >= 0 ? '#22c55e' : '#ef4444'} stopOpacity={0} />
+                  <stop offset="5%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
-              <XAxis dataKey="day" stroke="#4b5563" tick={{ fontSize: 12 }} tickFormatter={(value: string) => value.slice(5)} />
-              <YAxis stroke="#4b5563" tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="balance" stroke={totalPnl >= 0 ? '#22c55e' : '#ef4444'} fill="url(#eqFill)" strokeWidth={2} name="Balance" />
+              <CartesianGrid {...gridProps(palette)} />
+              <XAxis {...axisProps(palette)} dataKey="day" tickFormatter={(value: string) => value.slice(5)} />
+              <YAxis {...axisProps(palette)} tickFormatter={(v) => `$${v}`} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: palette.grid }} />
+              <Area type="monotone" dataKey="balance" stroke={totalPnl >= 0 ? palette.profit : palette.loss} fill="url(#eqFill)" strokeWidth={2} name="Balance" />
             </AreaChart>
           </ResponsiveContainer>
           </div>
@@ -535,13 +535,13 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
             <div className="h-[220px] w-full sm:h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dayData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
-                <XAxis dataKey="day" stroke="#4b5563" tick={{ fontSize: 12 }} />
-                <YAxis stroke="#4b5563" tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
+                <CartesianGrid {...gridProps(palette)} />
+                <XAxis {...axisProps(palette)} dataKey="day" />
+                <YAxis {...axisProps(palette)} tickFormatter={(v) => `$${v}`} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="pnl" name="P&L" radius={[4, 4, 0, 0]}>
                   {dayData.map((entry, index) => (
-                    <Cell key={index} fill={entry.pnl >= 0 ? '#22c55e' : '#ef4444'} />
+                    <Cell key={index} fill={entry.pnl >= 0 ? palette.profit : palette.loss} />
                   ))}
                 </Bar>
               </BarChart>
@@ -559,13 +559,13 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           <div className="h-[220px] w-full sm:h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
-              <XAxis dataKey="month" stroke="#4b5563" tick={{ fontSize: 12 }} />
-              <YAxis stroke="#4b5563" tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
+              <CartesianGrid {...gridProps(palette)} />
+              <XAxis {...axisProps(palette)} dataKey="month" />
+              <YAxis {...axisProps(palette)} tickFormatter={(v) => `$${v}`} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="pnl" name="P&L" radius={[4, 4, 0, 0]}>
                 {monthlyData.map((entry, index) => (
-                  <Cell key={index} fill={entry.pnl >= 0 ? '#22c55e' : '#ef4444'} />
+                  <Cell key={index} fill={entry.pnl >= 0 ? palette.profit : palette.loss} />
                 ))}
               </Bar>
             </BarChart>

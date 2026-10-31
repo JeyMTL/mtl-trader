@@ -93,7 +93,10 @@ function zonedStartOfDay(year: number, month: number, day: number, timeZone: str
   return refined === offset ? candidate : new Date(naiveUtc - refined)
 }
 
+export type SummaryWindowKind = 'daily' | 'weekly' | 'monthly'
+
 export interface Window {
+  kind: SummaryWindowKind
   label: string
   since: Date
   until: Date
@@ -117,9 +120,20 @@ export function buildWindows(
   const { year, month, day } = localParts(now, tz)
   const startOfToday = zonedStartOfDay(year, month, day, tz)
   return {
-    daily: { label: 'Your daily summary', since: new Date(startOfToday.getTime() - DAY_MS), until: startOfToday },
-    weekly: { label: 'Your weekly report', since: new Date(startOfToday.getTime() - 7 * DAY_MS), until: startOfToday },
+    daily: {
+      kind: 'daily',
+      label: 'Your daily summary',
+      since: new Date(startOfToday.getTime() - DAY_MS),
+      until: startOfToday,
+    },
+    weekly: {
+      kind: 'weekly',
+      label: 'Your weekly report',
+      since: new Date(startOfToday.getTime() - 7 * DAY_MS),
+      until: startOfToday,
+    },
     monthly: {
+      kind: 'monthly',
       label: 'Your monthly overview',
       since: zonedStartOfDay(year, month - 1, 1, tz),
       until: zonedStartOfDay(year, month, 1, tz),

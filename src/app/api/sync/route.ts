@@ -50,21 +50,25 @@ export async function POST(req: Request) {
       .from('users')
       .select('id, agent_token')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
 
-    if (userError || !user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    // One response for "no such account" and "wrong token": distinguishing them
+    // let anyone probe whether a user id exists without holding a token.
+    const storedToken = Buffer.from(user?.agent_token || '')
+    const suppliedToken = Buffer.from(token)
+    const tokenValid =
+      !userError &&
+      Boolean(user) &&
+      storedToken.length === suppliedToken.length &&
+      timingSafeEqual(storedToken, suppliedToken)
+
+    if (!tokenValid) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     const { data: authData } = await getAdminClient().auth.admin.getUserById(userId)
     if (!authData.user?.email_confirmed_at) {
       return NextResponse.json({ error: 'Email verification is required before syncing trades' }, { status: 403 })
-    }
-
-    const storedToken = Buffer.from(user.agent_token || '')
-    const suppliedToken = Buffer.from(token)
-    if (storedToken.length !== suppliedToken.length || !timingSafeEqual(storedToken, suppliedToken)) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     if (!trades.every(isValidTrade)) {

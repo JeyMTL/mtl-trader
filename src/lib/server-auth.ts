@@ -4,10 +4,18 @@ let adminClient: SupabaseClient | null = null
 
 export function getAdminClient(): SupabaseClient {
   if (adminClient) return adminClient
-  adminClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+
+  // Fail with the missing variable named, instead of a provider error that
+  // says nothing about configuration.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceRoleKey) {
+    throw new Error(
+      'Supabase admin client is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+    )
+  }
+
+  adminClient = createClient(url, serviceRoleKey)
   return adminClient
 }
 

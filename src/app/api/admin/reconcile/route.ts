@@ -23,13 +23,6 @@ import { apiError, logEvent } from '@/lib/log'
  */
 
 async function runReconciliation() {
-  if (!process.env.PAYPAL_WEBHOOK_ID) {
-    return NextResponse.json(
-      { error: 'Reconciliation requires PAYPAL_WEBHOOK_ID (PayPal stores webhook events per webhook)' },
-      { status: 503 }
-    )
-  }
-
   try {
     let expired = 0
     let ratesSwept = 0
@@ -47,8 +40,15 @@ async function runReconciliation() {
       logEvent('error', 'reconcile.rate_sweep', { error })
     }
 
-    const { orders, scanned } = await fetchRecentCompletedCaptures()
+    // The expiry sweep and the rate-limit sweep are independent of PayPal: a
+    // deployment that only sells card or bank must still let paid periods lapse.
+    // PayPal event recovery is skipped, not fatal, when it is not configured.
+    const paypalConfigured = Boolean(process.env.PAYPAL_WEBHOOK_ID)
+    const { orders, scanned } = paypalConfigured
+      ? await fetchRecentCompletedCaptures()
+      : { orders: [], scanned: 0 }
     const summary = {
+      paypal: paypalConfigured ? 'checked' : 'not_configured',
       scannedEvents: scanned,
       captureCandidates: orders.length,
       applied: 0,

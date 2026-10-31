@@ -68,7 +68,9 @@ export default function PricingPage() {
       })
       const data = await res.json()
       if (data.url) {
-        window.location.href = data.url
+        // `assign` rather than a `location.href` write: the write is flagged by
+        // react-hooks/immutability, and both navigate identically.
+        window.location.assign(data.url)
       } else {
         toast(data.error || 'Could not start the card checkout.', { tone: 'error' })
       }

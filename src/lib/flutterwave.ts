@@ -259,13 +259,15 @@ export async function resolveChargeTarget(
   let userId = charge.meta?.userId ?? null
   let planId = isPaidPlanId(charge.meta?.planId) ? (charge.meta!.planId as string) : null
   let email = charge.customerEmail
-  let remotePlanId = charge.remotePlanId
+  const remotePlanId = charge.remotePlanId
 
   if (!userId && email) {
+    // Equality, not ILIKE: `_` and `%` in an address are wildcards, and a
+    // multi-row match would throw (or worse, resolve a different account).
     const { data } = await admin
       .from('users')
       .select('id, email, subscription_tier')
-      .ilike('email', email)
+      .eq('email', email)
       .maybeSingle()
     if (data?.id) {
       userId = String(data.id)
@@ -344,7 +346,7 @@ export async function cancelRemoteSubscription(email: string): Promise<boolean> 
     .from('billing_subscriptions')
     .update({ status: 'cancelled', updated_at: new Date().toISOString() })
     .eq('provider', 'flutterwave')
-    .ilike('email', email)
+    .eq('email', email.trim().toLowerCase())
 
   return true
 }
