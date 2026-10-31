@@ -20,17 +20,6 @@ void main() {
       expect(findInstrument('GOLD'), isNull);
     });
 
-    test('splits live spot feeds from delayed exchange feeds', () {
-      expect(findInstrument('EURUSD')?.isLive, isTrue);
-      expect(findInstrument('GBPJPY')?.isLive, isTrue);
-      expect(findInstrument('BTCUSD')?.isLive, isTrue);
-      expect(findInstrument('NAS100')?.isLive, isFalse);
-      expect(findInstrument('NAS100')?.isDelayed, isTrue);
-      expect(findInstrument('EURUSD')?.isDelayed, isFalse);
-      expect(findInstrument('XAUUSD')?.isDelayed, isTrue);
-      expect(findInstrument('USOIL')?.isDelayed, isTrue);
-    });
-
     test('infers a chart for a hand-typed forex pair', () {
       final inferred = inferInstrument('gbpusd');
       expect(inferred?.yahoo, 'GBPUSD=X');
@@ -42,6 +31,38 @@ void main() {
     test('formats prices with the instrument decimals', () {
       expect(chartPrice(1.084234, findInstrument('EURUSD')!), '1.08423');
       expect(chartPrice(28419.62, findInstrument('NAS100')!), '28419.6');
+    });
+  });
+
+  group('chart time frame', () {
+    test('counts candles and refuses windows past the request cap', () {
+      expect(
+        candleCountFor(const Duration(days: 1), ChartInterval.fiveMinutes),
+        288,
+      );
+      expect(
+        candleCountFor(const Duration(days: 1), ChartInterval.oneMinute),
+        1440,
+      );
+      expect(
+        candleCountFor(const Duration(days: 30), ChartInterval.oneMinute),
+        isNull,
+      );
+      expect(
+        candleCountFor(const Duration(days: 30), ChartInterval.oneHour),
+        720,
+      );
+    });
+
+    test('suggests a candle size for the window length', () {
+      expect(defaultIntervalFor(const Duration(hours: 2)), ChartInterval.oneMinute);
+      expect(defaultIntervalFor(const Duration(days: 1)), ChartInterval.fiveMinutes);
+      expect(
+        defaultIntervalFor(const Duration(days: 5)),
+        ChartInterval.fifteenMinutes,
+      );
+      expect(defaultIntervalFor(const Duration(days: 20)), ChartInterval.oneHour);
+      expect(defaultIntervalFor(const Duration(days: 60)), ChartInterval.fourHours);
     });
   });
 
@@ -64,6 +85,17 @@ void main() {
       expect(candles.first.time.isUtc, isTrue);
       expect(candles.first.open, 1.20);
       expect(candles.last.close, 1.12);
+    });
+
+    test('reads the bar volume, defaulting to zero when absent', () {
+      final candles = parseCandlePayload({
+        'candles': [
+          {'t': 1793369400000, 'o': 1.1, 'h': 1.15, 'l': 1.05, 'c': 1.12, 'v': 420},
+          {'t': 1793369700000, 'o': 1.1, 'h': 1.15, 'l': 1.05, 'c': 1.12},
+        ],
+      });
+      expect(candles.first.volume, 420);
+      expect(candles.last.volume, 0);
     });
 
     test('surfaces the feed error message', () {

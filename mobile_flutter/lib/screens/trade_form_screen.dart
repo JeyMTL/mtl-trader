@@ -519,7 +519,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     setState(() => _symbol.text = picked);
   }
 
-  /// Opens the delayed chart so the trader can pin the four levels instead of
+  /// Opens the live chart so the trader can pin the four levels instead of
   /// typing four prices and two timestamps.
   Future<void> _openChart() async {
     final instrument = inferInstrument(_symbol.text);

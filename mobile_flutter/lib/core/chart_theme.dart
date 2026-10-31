@@ -3,6 +3,40 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'indicators.dart';
+
+/// How the price series is drawn.
+enum ChartType { candles, line, area }
+
+/// A lower-pane indicator drawn under the price.
+enum Oscillator { none, rsi, macd }
+
+extension OscillatorLabel on Oscillator {
+  String get label {
+    switch (this) {
+      case Oscillator.none:
+        return 'None';
+      case Oscillator.rsi:
+        return 'RSI';
+      case Oscillator.macd:
+        return 'MACD';
+    }
+  }
+}
+
+extension ChartTypeLabel on ChartType {
+  String get label {
+    switch (this) {
+      case ChartType.candles:
+        return 'Candles';
+      case ChartType.line:
+        return 'Line';
+      case ChartType.area:
+        return 'Area';
+    }
+  }
+}
+
 /// Colours and overlays for the price canvas.
 ///
 /// The chart keeps its own palette instead of borrowing `AppColors`, so a
@@ -29,6 +63,16 @@ class ChartStyle {
     this.showGrid = true,
     this.showCrosshair = true,
     this.showWatermark = true,
+    this.chartType = ChartType.candles,
+    this.studies = const <OverlayStudy>{},
+    this.studyPeriods = const <String, int>{},
+    this.showVolume = true,
+    this.oscillator = Oscillator.none,
+    this.logScale = false,
+    this.rsiPeriod = 14,
+    this.macdFast = 12,
+    this.macdSlow = 26,
+    this.macdSignal = 9,
   });
 
   /// Stable key for the preset, used for selection state.
@@ -50,6 +94,35 @@ class ChartStyle {
   final bool showCrosshair;
   final bool showWatermark;
 
+  /// Candles, a close line, or a filled area.
+  final ChartType chartType;
+
+  /// Moving averages drawn over the price.
+  final Set<OverlayStudy> studies;
+
+  /// Period overrides keyed by study name; missing means the study default.
+  final Map<String, int> studyPeriods;
+
+  /// Volume histogram under the price.
+  final bool showVolume;
+
+  /// Lower-pane indicator, if any.
+  final Oscillator oscillator;
+
+  /// Logarithmic price axis instead of a linear one.
+  final bool logScale;
+
+  /// RSI period when the oscillator is RSI.
+  final int rsiPeriod;
+
+  /// MACD lengths, in candles.
+  final int macdFast;
+  final int macdSlow;
+  final int macdSignal;
+
+  /// The period this study is drawn with.
+  int periodFor(OverlayStudy study) => studyPeriods[study.name] ?? study.period;
+
   /// Whether the canvas is a light one — used to fade the watermark and pick
   /// the chip palette that sits on top of the chart.
   bool get isLight => background.computeLuminance() > 0.5;
@@ -60,6 +133,16 @@ class ChartStyle {
     bool? showGrid,
     bool? showCrosshair,
     bool? showWatermark,
+    ChartType? chartType,
+    Set<OverlayStudy>? studies,
+    Map<String, int>? studyPeriods,
+    bool? showVolume,
+    Oscillator? oscillator,
+    bool? logScale,
+    int? rsiPeriod,
+    int? macdFast,
+    int? macdSlow,
+    int? macdSignal,
   }) {
     return ChartStyle(
       id: id,
@@ -75,6 +158,16 @@ class ChartStyle {
       showGrid: showGrid ?? this.showGrid,
       showCrosshair: showCrosshair ?? this.showCrosshair,
       showWatermark: showWatermark ?? this.showWatermark,
+      chartType: chartType ?? this.chartType,
+      studies: studies ?? this.studies,
+      studyPeriods: studyPeriods ?? this.studyPeriods,
+      showVolume: showVolume ?? this.showVolume,
+      oscillator: oscillator ?? this.oscillator,
+      logScale: logScale ?? this.logScale,
+      rsiPeriod: rsiPeriod ?? this.rsiPeriod,
+      macdFast: macdFast ?? this.macdFast,
+      macdSlow: macdSlow ?? this.macdSlow,
+      macdSignal: macdSignal ?? this.macdSignal,
     );
   }
 
@@ -156,11 +249,73 @@ class ChartStyle {
     Color(0xFFEDF0F5),
   ];
 
-  /// Storage key for the single saved style.
+  /// Storage key for the global style.
   static const String storageKey = 'chart.style.v1';
 
   /// The style chart screens open with, and what the style sheet edits.
   static ChartStyle current = ink;
+
+  /// JSON for this style; shared by the global theme and per-instrument layouts.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'preset': id,
+        'bull': bull.toARGB32(),
+        'bear': bear.toARGB32(),
+        'grid': showGrid,
+        'crosshair': showCrosshair,
+        'watermark': showWatermark,
+        'chartType': chartType.name,
+        'studies': studies.map((study) => study.name).toList(),
+        'studyPeriods': studyPeriods,
+        'volume': showVolume,
+        'oscillator': oscillator.name,
+        'logScale': logScale,
+        'rsiPeriod': rsiPeriod,
+        'macdFast': macdFast,
+        'macdSlow': macdSlow,
+        'macdSignal': macdSignal,
+      };
+
+  static String encode(ChartStyle style) => jsonEncode(style.toJson());
+
+  static ChartStyle decode(String? raw, {ChartStyle fallback = ink}) {
+    if (raw == null || raw.isEmpty) return fallback;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return fallback;
+      return fromJson(decoded, fallback: fallback);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// Unknown preset ids (a removed theme, an edited file) fall back to
+  /// [fallback] while keeping any custom values that are still readable.
+  static ChartStyle fromJson(
+    Map<Object?, Object?> decoded, {
+    ChartStyle fallback = ink,
+  }) {
+    final preset = presets.firstWhere(
+      (style) => style.id == decoded['preset'],
+      orElse: () => fallback,
+    );
+    return preset.copyWith(
+      bull: _readColor(decoded['bull']) ?? preset.bull,
+      bear: _readColor(decoded['bear']) ?? preset.bear,
+      showGrid: _readFlag(decoded['grid']),
+      showCrosshair: _readFlag(decoded['crosshair']),
+      showWatermark: _readFlag(decoded['watermark']),
+      chartType: _readChartType(decoded['chartType']),
+      studies: _readStudies(decoded['studies']),
+      studyPeriods: _readPeriods(decoded['studyPeriods']),
+      showVolume: _readFlag(decoded['volume']),
+      oscillator: _readOscillator(decoded['oscillator']),
+      logScale: _readFlag(decoded['logScale']),
+      rsiPeriod: _readInt(decoded['rsiPeriod']),
+      macdFast: _readInt(decoded['macdFast']),
+      macdSlow: _readInt(decoded['macdSlow']),
+      macdSignal: _readInt(decoded['macdSignal']),
+    );
+  }
 
   /// Rebuilds the saved style. Called once at startup; a fresh install, a
   /// corrupt value or unavailable storage all leave the default in place,
@@ -170,50 +325,81 @@ class ChartStyle {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(storageKey);
       if (raw == null) return;
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return;
-
-      // Unknown preset ids (a removed theme, an edited file) fall back to Ink
-      // while keeping any custom candle colours that are still readable.
-      final preset = presets.firstWhere(
-        (style) => style.id == decoded['preset'],
-        orElse: () => ink,
-      );
-      current = preset.copyWith(
-        bull: _readColor(decoded['bull']) ?? preset.bull,
-        bear: _readColor(decoded['bear']) ?? preset.bear,
-        showGrid: _readFlag(decoded['grid']),
-        showCrosshair: _readFlag(decoded['crosshair']),
-        showWatermark: _readFlag(decoded['watermark']),
-      );
+      current = decode(raw);
     } catch (_) {
       // Keep the default style.
     }
   }
 
-  /// Writes the current choice. Fire-and-forget from the style sheet: the
-  /// sheet repaints immediately and the write lands in the background.
+  /// Writes the global choice. Fire-and-forget from the style sheet.
   static Future<void> save() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        storageKey,
-        jsonEncode(<String, Object>{
-          'preset': current.id,
-          'bull': current.bull.toARGB32(),
-          'bear': current.bear.toARGB32(),
-          'grid': current.showGrid,
-          'crosshair': current.showCrosshair,
-          'watermark': current.showWatermark,
-        }),
-      );
+      await prefs.setString(storageKey, encode(current));
     } catch (_) {
       // Ignored for the same reason restore() is defensive.
     }
   }
 
-  static Color? _readColor(Object? value) =>
-      value is int ? Color(value) : null;
+  /// Storage key for one instrument's chart layout.
+  static String layoutKey(String symbol) => 'chart.layout.v1.$symbol';
+
+  /// The layout this instrument had last time, or the global style.
+  static Future<ChartStyle> loadLayout(String symbol) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return decode(prefs.getString(layoutKey(symbol)), fallback: current);
+    } catch (_) {
+      return current;
+    }
+  }
+
+  static Future<void> saveLayout(String symbol, ChartStyle style) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(layoutKey(symbol), encode(style));
+    } catch (_) {
+      // Ignored: the chart keeps its in-memory layout either way.
+    }
+  }
+
+  static Color? _readColor(Object? value) => value is int ? Color(value) : null;
 
   static bool? _readFlag(Object? value) => value is bool ? value : null;
+
+  static int? _readInt(Object? value) => value is int ? value : null;
+
+  static ChartType? _readChartType(Object? value) {
+    if (value is! String) return null;
+    for (final type in ChartType.values) {
+      if (type.name == value) return type;
+    }
+    return null;
+  }
+
+  static Oscillator? _readOscillator(Object? value) {
+    if (value is! String) return null;
+    for (final oscillator in Oscillator.values) {
+      if (oscillator.name == value) return oscillator;
+    }
+    return null;
+  }
+
+  static Set<OverlayStudy>? _readStudies(Object? value) {
+    if (value is! List) return null;
+    final names = value.whereType<String>().toSet();
+    return <OverlayStudy>{
+      for (final study in OverlayStudy.values)
+        if (names.contains(study.name)) study,
+    };
+  }
+
+  static Map<String, int>? _readPeriods(Object? value) {
+    if (value is! Map) return null;
+    final periods = <String, int>{};
+    value.forEach((key, raw) {
+      if (key is String && raw is int) periods[key] = raw;
+    });
+    return periods;
+  }
 }

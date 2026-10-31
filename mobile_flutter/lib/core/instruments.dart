@@ -2,7 +2,7 @@ import 'pnl.dart' show normalizeSymbol;
 
 /// The instruments the journal ships with, so a trader never has to type a
 /// ticker by hand. `symbol` is what is stored on the trade; `yahoo` is the
-/// ticker used by the delayed chart feed that pins the levels.
+/// exchange ticker, no longer read by the OANDA-backed chart feed.
 enum InstrumentKind {
   forex('Forex'),
   metal('Metals'),
@@ -29,7 +29,7 @@ class Instrument {
   /// Human label, e.g. `Nasdaq 100`.
   final String name;
 
-  /// Ticker for the chart feed.
+  /// Exchange ticker; the chart feed resolves OANDA instruments from `symbol`.
   final String yahoo;
 
   final InstrumentKind kind;
@@ -38,14 +38,6 @@ class Instrument {
   final int decimals;
 
   bool get isIndex => kind == InstrumentKind.indices;
-
-  /// Spot forex and crypto come from free, live feeds. Exchange-traded
-  /// instruments (indices and futures) need a paid licence for real time, so
-  /// the free feed is delayed for them.
-  bool get isLive =>
-      kind == InstrumentKind.forex || kind == InstrumentKind.crypto;
-
-  bool get isDelayed => !isLive;
 }
 
 const List<Instrument> instrumentCatalog = [

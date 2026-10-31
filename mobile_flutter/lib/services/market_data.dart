@@ -25,6 +25,7 @@ class Candle {
     required this.high,
     required this.low,
     required this.close,
+    this.volume = 0,
   });
 
   final DateTime time;
@@ -33,27 +34,62 @@ class Candle {
   final double low;
   final double close;
 
+  /// Tick volume for the bar; 0 for feeds that do not report it.
+  final double volume;
+
   bool get isUp => close >= open;
 }
 
-enum ChartRange {
-  oneDay('5m', '1d', '1D'),
-  fiveDays('15m', '5d', '5D'),
-  oneMonth('1h', '1mo', '1M');
+/// Longest request OANDA will answer. A window that needs more bars has to use
+/// a larger candle size.
+const int maxCandlesPerRequest = 5000;
 
-  const ChartRange(this.interval, this.range, this.label);
+/// Candle sizes the candle route understands. The trader picks one; the server
+/// maps it onto the vendor's granularity code.
+enum ChartInterval {
+  oneMinute('1m', '1-min candles', Duration(minutes: 1)),
+  fiveMinutes('5m', '5-min candles', Duration(minutes: 5)),
+  fifteenMinutes('15m', '15-min candles', Duration(minutes: 15)),
+  thirtyMinutes('30m', '30-min candles', Duration(minutes: 30)),
+  oneHour('1h', '1-hour candles', Duration(hours: 1)),
+  fourHours('4h', '4-hour candles', Duration(hours: 4)),
+  oneDay('1d', 'daily candles', Duration(days: 1));
 
-  final String interval;
-  final String range;
-  final String label;
+  const ChartInterval(this.key, this.detail, this.size);
+
+  /// Query value sent as `?interval=`, e.g. `15m`.
+  final String key;
+
+  /// Candle size in words, e.g. `15-min candles`.
+  final String detail;
+
+  /// Length of one candle.
+  final Duration size;
+}
+
+/// Bars a window needs at this size, or null when it is past the vendor cap.
+int? candleCountFor(Duration span, ChartInterval interval) {
+  if (span <= Duration.zero) return 0;
+  final bars = (span.inMilliseconds / interval.size.inMilliseconds).ceil();
+  return bars > maxCandlesPerRequest ? null : bars;
+}
+
+/// A sensible starting size for a window this long.
+ChartInterval defaultIntervalFor(Duration span) {
+  if (span <= const Duration(hours: 3)) return ChartInterval.oneMinute;
+  if (span <= const Duration(days: 2)) return ChartInterval.fiveMinutes;
+  if (span <= const Duration(days: 7)) return ChartInterval.fifteenMinutes;
+  if (span <= const Duration(days: 30)) return ChartInterval.oneHour;
+  if (span <= const Duration(days: 90)) return ChartInterval.fourHours;
+  return ChartInterval.oneDay;
 }
 
 /// Reads mid-price candles used to pin entry, stop, target and exit levels.
 ///
 /// The app never calls a market data provider directly: candles come from this
-/// deployment's `/api/market/candles` route, which holds the market-data key.
-/// That keeps the credential out of the binary and lets the server fall back to
-/// the delayed public feed for instruments OANDA does not quote.
+/// deployment's `/api/market/candles` route, which holds the OANDA token. That
+/// keeps the credential out of the binary; the server refuses symbols OANDA
+/// cannot quote rather than substituting another feed.
 class MarketDataService {
   MarketDataService({HttpClient? client, String? Function()? accessToken})
       : _client = client,
@@ -68,23 +104,46 @@ class MarketDataService {
 
   HttpClient? _client;
 
-  /// Candles already fetched for this instrument and range, even when stale.
-  List<Candle>? cached(Instrument instrument, ChartRange range) =>
-      _cache[_cacheKey(instrument, range)]?.candles;
+  /// Candles already fetched for this instrument, resolution and window, even
+  /// when stale. A null window means the live tail.
+  List<Candle>? cached(
+    Instrument instrument,
+    ChartInterval interval, {
+    DateTime? from,
+    DateTime? to,
+  }) =>
+      _cache[_cacheKey(
+        instrument,
+        interval,
+        fromMs: from?.toUtc().millisecondsSinceEpoch,
+        toMs: to?.toUtc().millisecondsSinceEpoch,
+      )]
+          ?.candles;
 
-  DateTime? cachedAt(Instrument instrument, ChartRange range) =>
-      _cache[_cacheKey(instrument, range)]?.at;
+  DateTime? cachedAt(
+    Instrument instrument,
+    ChartInterval interval, {
+    DateTime? from,
+    DateTime? to,
+  }) =>
+      _cache[_cacheKey(
+        instrument,
+        interval,
+        fromMs: from?.toUtc().millisecondsSinceEpoch,
+        toMs: to?.toUtc().millisecondsSinceEpoch,
+      )]
+          ?.at;
 
   static String _cacheKey(
     Instrument instrument,
-    ChartRange range, {
+    ChartInterval interval, {
     int? fromMs,
     int? toMs,
   }) {
     // Historical windows are cached separately from the live tail: both hold
-    // the same instrument and range but never the same candles.
+    // the same instrument and size but never the same candles.
     final suffix = fromMs == null || toMs == null ? '' : '|$fromMs-$toMs';
-    return '${instrument.symbol}|${range.range}$suffix';
+    return '${instrument.symbol}|${interval.key}$suffix';
   }
 
   /// The signed-in session's token, or null when there is none (widget tests
@@ -111,12 +170,12 @@ class MarketDataService {
     _client = null;
   }
 
-  /// Candles for [range]. With [from] and [to] the server serves that historical
-  /// window instead of the newest candles, which is what replay's jump-to-date
-  /// and load-earlier use.
+  /// Candles for [interval]. With [from] and [to] the server serves that
+  /// historical window instead of the newest candles, which is what the
+  /// time-frame picker, replay's jump-to-date and load-earlier use.
   Future<List<Candle>> candles(
     Instrument instrument,
-    ChartRange range, {
+    ChartInterval interval, {
     bool force = false,
     DateTime? from,
     DateTime? to,
@@ -125,15 +184,14 @@ class MarketDataService {
     final toMs = to?.toUtc().millisecondsSinceEpoch;
     final hasWindow = fromMs != null && toMs != null;
 
-    final key = _cacheKey(instrument, range, fromMs: fromMs, toMs: toMs);
+    final key = _cacheKey(instrument, interval, fromMs: fromMs, toMs: toMs);
     final entry = _cache[key];
     // A past window never changes, so it is kept far longer than the live tail.
-    // Live spot feeds move faster than delayed exchange feeds.
+    // Every instrument is real-time OANDA data now, so one short TTL applies to
+    // all of them instead of a 10-minute window for the exchange-traded classes.
     final ttl = hasWindow
         ? const Duration(minutes: 30)
-        : instrument.isLive
-            ? const Duration(seconds: 45)
-            : const Duration(minutes: 10);
+        : const Duration(seconds: 45);
     if (!force && entry != null && DateTime.now().difference(entry.at) < ttl) {
       return entry.candles;
     }
@@ -141,7 +199,7 @@ class MarketDataService {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/market/candles').replace(
       queryParameters: {
         'symbol': instrument.symbol,
-        'range': range.range,
+        'interval': interval.key,
         'ticker': instrument.yahoo,
         if (hasWindow) 'from': '$fromMs',
         if (hasWindow) 'to': '$toMs',
@@ -243,6 +301,7 @@ List<Candle> parseCandlePayload(dynamic payload) {
     final high = row['h'];
     final low = row['l'];
     final close = row['c'];
+    final volume = row['v'];
     if (stamp is! num ||
         open is! num ||
         high is! num ||
@@ -260,6 +319,7 @@ List<Candle> parseCandlePayload(dynamic payload) {
         high: high.toDouble(),
         low: low.toDouble(),
         close: close.toDouble(),
+        volume: volume is num ? volume.toDouble() : 0,
       ),
     );
   }

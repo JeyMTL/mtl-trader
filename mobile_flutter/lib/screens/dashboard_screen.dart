@@ -8,6 +8,7 @@ import '../core/format.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
+import 'subscription_screen.dart';
 import '../ui/widgets.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -49,41 +50,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  'MTL',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.8,
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
+        centerTitle: true,
+        title: _BrandMark(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => SubscriptionScreen(api: widget.api),
             ),
-            Text(
-              longDay(DateTime.now()),
-              style: TextStyle(
-                color: AppColors.faint,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+          ),
         ),
         actions: [
           IconButton(
@@ -121,6 +94,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The centred MTL wordmark. It breathes slowly so the header has a focal
+/// point, and tapping it is the shortcut to the payment plans.
+class _BrandMark extends StatefulWidget {
+  const _BrandMark({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_BrandMark> createState() => _BrandMarkState();
+}
+
+class _BrandMarkState extends State<_BrandMark>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat(reverse: true);
+
+  late final Animation<double> _pulse = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOut,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'MTL Trader — open payment plans',
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedBuilder(
+          animation: _pulse,
+          builder: (context, _) {
+            final t = _pulse.value;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Transform.scale(
+                        scale: 1 + t * 0.05,
+                        child: Text(
+                          'MTL',
+                          style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.8 + t * 1.4,
+                            shadows: [
+                              Shadow(
+                                color: AppColors.primary.withAlpha(
+                                  (36 + 54 * t).round(),
+                                ),
+                                blurRadius: 8 + 10 * t,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withAlpha(
+                            (120 + 135 * t).round(),
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    longDay(DateTime.now()),
+                    style: TextStyle(
+                      color: AppColors.faint,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

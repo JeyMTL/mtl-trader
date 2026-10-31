@@ -1,13 +1,18 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
 import '../core/chart_replay.dart';
+import 'time_frame_sheet.dart';
+import '../core/chart_drawings.dart';
+import '../core/chart_scale.dart';
 import '../core/chart_theme.dart';
 import '../core/chart_view.dart';
+import '../core/indicators.dart';
 import '../core/instruments.dart';
 import '../services/market_data.dart';
 import '../ui/theme.dart';
@@ -65,7 +70,22 @@ class ChartPickerScreen extends StatefulWidget {
 class _ChartPickerScreenState extends State<ChartPickerScreen> {
   final _market = MarketDataService();
 
-  ChartRange _range = ChartRange.oneDay;
+  ChartInterval _interval = ChartInterval.fiveMinutes;
+
+  /// Drawing tools: trend lines and horizontal rays.
+  DrawingTool _drawingTool = DrawingTool.none;
+  List<ChartDrawing> _drawings = const [];
+  DrawingDraft? _draftStart;
+
+  /// Drawing under the trader's finger, selected for drag or delete.
+  int? _selectedDrawing;
+
+  /// Window the trader entered. Both null means the live tail.
+  DateTime? _windowFrom;
+  DateTime? _windowTo;
+
+  bool get _customWindow => _windowFrom != null && _windowTo != null;
+
   List<Candle> _candles = const [];
   bool _loading = true;
   String? _error;
@@ -89,17 +109,13 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   Duration get _tick => Duration(milliseconds: (550 / _speed).round());
 
-  /// How much history one range-sized request covers, and therefore how far a
-  /// jump or a page-back reaches.
+  /// How much history one request covers, and therefore how far a jump or a
+  /// page-back reaches. A window the trader set keeps its own length.
   Duration get _rangeSpan {
-    switch (_range) {
-      case ChartRange.oneDay:
-        return const Duration(days: 1);
-      case ChartRange.fiveDays:
-        return const Duration(days: 5);
-      case ChartRange.oneMonth:
-        return const Duration(days: 30);
-    }
+    final from = _windowFrom;
+    final to = _windowTo;
+    if (from != null && to != null) return to.difference(from);
+    return const Duration(days: 1);
   }
 
   _Marker _active = _Marker.entry;
@@ -164,19 +180,54 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     _take = widget.take;
 
     // Paint whatever the cache already holds, then refresh in the background.
-    final cached = _market.cached(widget.instrument, _range);
+    final cached = _market.cached(widget.instrument, _interval);
     if (cached != null && cached.isNotEmpty) {
       _candles = cached;
       _loading = false;
-    }
-    _load(silent: _candles.isNotEmpty, force: true);
+    }    _load(silent: _candles.isNotEmpty, force: true);
+    _startRefreshTimer();
+    _restoreDrawings();
+    _restoreLayout();
+  }
 
-    if (widget.instrument.isLive) {
-      _refreshTimer = Timer.periodic(
-        const Duration(seconds: 60),
-        (_) => _load(silent: true),
-      );
-    }
+  /// Every instrument remembers its own studies, panes and scale.
+  Future<void> _restoreLayout() async {
+    final layout = await ChartStyle.loadLayout(widget.instrument.symbol);
+    if (!mounted) return;
+    setState(() => _style = layout);
+  }
+
+  Future<void> _restoreDrawings() async {
+    final loaded = await ChartDrawingStore.load(widget.instrument.symbol);
+    if (!mounted || loaded.isEmpty) return;
+    setState(() => _drawings = loaded);
+  }
+
+  /// Persists on every change so a back gesture cannot lose the trader's work.
+  void _commitDrawings(List<ChartDrawing> next) {
+    setState(() {
+      _drawings = next;
+      _selectedDrawing = null;
+    });
+    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+  }
+
+  /// Repaints a drawing while it is being dragged; the write waits for the
+  /// finger to lift so a pan does not queue dozens of disk writes.
+  void _moveDrawing(int index, ChartDrawing drawing) {
+    if (index < 0 || index >= _drawings.length) return;
+    final next = [..._drawings];
+    next[index] = drawing;
+    setState(() => _drawings = next);
+  }
+
+  void _finishDrawingMove() {
+    unawaited(ChartDrawingStore.save(widget.instrument.symbol, _drawings));
+  }
+
+  void _deleteDrawing(int index) {
+    if (index < 0 || index >= _drawings.length) return;
+    _commitDrawings([..._drawings]..removeAt(index));
   }
 
   @override
@@ -191,11 +242,28 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     super.dispose();
   }
 
+  /// Polls while the chart shows the live tail.
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _load(silent: true),
+    );
+  }
+
+  /// A past window never changes, so it is fetched once and not polled.
+  void _stopRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+
   Future<void> _load({bool silent = false, bool force = false}) async {
     try {
       final candles = await _market.candles(
         widget.instrument,
-        _range,
+        _interval,
+        from: _windowFrom,
+        to: _windowTo,
         force: force,
       );
       if (!mounted) return;
@@ -224,20 +292,51 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     _load(force: true);
   }
 
-  void _pickRange(ChartRange range) {
-    if (range == _range) return;
-    // Replay belongs to the candles it started on; a new range starts clean.
+  /// Loads exactly the span the trader entered and stops polling, because a past
+  /// window never changes.
+  Future<void> _applyWindow(
+    DateTime from,
+    DateTime to,
+    ChartInterval interval,
+  ) async {
     _stopPlay();
-    final cached = _market.cached(widget.instrument, range);
+    final cached =
+        _market.cached(widget.instrument, interval, from: from, to: to);
+    _stopRefreshTimer();
     setState(() {
-      _range = range;
+      _interval = interval;
+      _windowFrom = from;
+      _windowTo = to;
       _replay = null;
       _error = null;
       _candles = cached ?? const [];
       _loading = cached == null || cached.isEmpty;
     });
-    _load(silent: cached != null && cached.isNotEmpty);
+    final loaded = await _loadWindow(start: from, end: to);
+    if (!mounted || loaded == null) return;
+    if (loaded.isEmpty) {
+      setState(
+        () => _error = 'No candles in that time frame. Try a wider window.',
+      );
+    }
   }
+
+  /// Back to the live tail, with polling.
+  void _setLive() {
+    if (!_customWindow) return;
+    _stopPlay();
+    setState(() {
+      _windowFrom = null;
+      _windowTo = null;
+      _replay = null;
+      _error = null;
+    });
+    _startRefreshTimer();
+    _load(force: true);
+  }
+
+  String _stamp(DateTime value) =>
+      DateFormat('d MMM HH:mm').format(value.toLocal());
 
   void _setLevel(_Marker marker, double price) {
     switch (marker) {
@@ -334,6 +433,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         title: Text('${instrument.symbol} · chart'),
         actions: [
           IconButton(
+            tooltip: 'Drawing tools',
+            onPressed: _openDrawingSheet,
+            icon: const Icon(Icons.draw_outlined, size: 20),
+          ),
+          IconButton(
             tooltip: 'Market replay',
             onPressed: _candles.length < 12 ? null : _toggleReplayMode,
             icon: const Icon(Icons.replay, size: 20),
@@ -363,7 +467,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               children: [
                 _header(instrument),
                 const SizedBox(height: 8),
-                _ranges(),
+                _timeFrame(),
+                if (_drawingTool != DrawingTool.none) ...[
+                  const SizedBox(height: 6),
+                  _drawingBanner(),
+                ],
                 if (_replay != null) ...[
                   const SizedBox(height: 6),
                   _replayStrip(),
@@ -380,7 +488,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _disclaimer(instrument),
+                _disclaimer(),
                 const SizedBox(height: 10),
                 _levelsCard(),
                 if (_timeInvalid) ...[
@@ -453,8 +561,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 ),
                 Text(
                   parts.isEmpty
-                      ? '${instrument.name} · ${_range.interval}'
-                      : '${parts.join('  ')}  · ${_range.interval}',
+                      ? '${instrument.name} · ${_interval.key}'
+                      : '${parts.join('  ')}  · ${_interval.key}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: tabular.copyWith(
@@ -465,6 +573,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 ),
               ],
             ),
+          ),
+          IconButton(
+            tooltip: 'Drawing tools',
+            onPressed: _openDrawingSheet,
+            icon: Icon(Icons.draw_outlined, size: 20, color: _style.muted),
           ),
           IconButton(
             tooltip: 'Market replay',
@@ -495,7 +608,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             _replayStrip(overlay: true),
             const SizedBox(height: 6),
           ],
-          _ranges(overlay: true),
+          _timeFrame(overlay: true),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -535,7 +648,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     if (_error != null) return _chartError(expand: expand);
     return _ChartCanvas(
       candles: _visibleCandles,
-      range: _range,
+      interval: _interval,
       decimals: instrument.decimals,
       symbol: instrument.symbol,
       style: _style,
@@ -552,6 +665,15 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       onSelect: (marker) => setState(() => _active = marker),
       onPin: _pin,
       onLevelMoved: _levelMoved,
+      drawTool: _drawingTool,
+      drawings: _drawings,
+      draftStart: _draftStart,
+      onDraw: _onDraw,
+      selectedDrawing: _selectedDrawing,
+      onDrawingSelected: (index) =>
+          setState(() => _selectedDrawing = index),
+      onDrawingMoved: _moveDrawing,
+      onDrawingMoveEnd: _finishDrawingMove,
     );
   }
 
@@ -575,7 +697,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     final start = DateTime(picked.year, picked.month, picked.day);
     final loaded = await _loadWindow(start: start, end: start.add(_rangeSpan));
     if (!mounted) return;
-    if (!loaded) {
+    if (loaded == null || loaded.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -593,9 +715,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     setState(() => _replay = ReplayCursor.start(count: _candles.length));
   }
 
-  /// Replaces the series with one range-sized window. False means the range has
-  /// no candles there (a weekend, a holiday, before the instrument existed).
-  Future<bool> _loadWindow({
+  /// Replaces the series with the requested window. Null means the request
+  /// failed (the error has already been shown); an empty list means the window
+  /// simply has no candles — a weekend, a holiday, or before the instrument
+  /// existed.
+  Future<List<Candle>?> _loadWindow({
     required DateTime start,
     required DateTime end,
   }) async {
@@ -603,25 +727,25 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     try {
       final candles = await _market.candles(
         widget.instrument,
-        _range,
+        _interval,
         from: start,
         to: end,
         force: true,
       );
-      if (!mounted) return false;
+      if (!mounted) return null;
       setState(() {
         _candles = candles;
         _loading = false;
         _error = null;
       });
-      return candles.isNotEmpty;
+      return candles;
     } catch (error) {
-      if (!mounted) return false;
+      if (!mounted) return null;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString())),
       );
-      return false;
+      return null;
     }
   }
 
@@ -636,7 +760,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     try {
       final older = await _market.candles(
         widget.instrument,
-        _range,
+        _interval,
         from: oldest.subtract(_rangeSpan),
         to: oldest,
         force: true,
@@ -700,12 +824,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       _replay = null;
       _loadingOlder = false;
     });
-    if (widget.instrument.isLive && _refreshTimer == null) {
-      _refreshTimer = Timer.periodic(
-        const Duration(seconds: 60),
-        (_) => _load(silent: true),
-      );
-    }
+    if (!_customWindow) _startRefreshTimer();
     _load(silent: _candles.isNotEmpty);
   }
 
@@ -856,6 +975,152 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     );
   }
 
+  Widget _drawingBanner() {
+    final hint = _drawingTool == DrawingTool.trend
+        ? (_draftStart == null
+            ? 'Tap the first point of the trend line.'
+            : 'Tap the second point to finish the line.')
+        : 'Tap a price for the horizontal ray.';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withAlpha(20),
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        border: Border.all(color: AppColors.primary.withAlpha(70)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.draw_outlined, size: 14, color: AppColors.primaryLight),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              hint,
+              style: TextStyle(
+                color: AppColors.primaryLight,
+                fontSize: 10.5,
+                height: 1.35,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              _drawingTool = DrawingTool.none;
+              _draftStart = null;
+            }),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openDrawingSheet() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.timeline, size: 20),
+              title: const Text('Trend line'),
+              subtitle: const Text('Tap two points on the chart'),
+              onTap: () => Navigator.of(sheetContext).pop('trend'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.horizontal_rule, size: 20),
+              title: const Text('Horizontal ray'),
+              subtitle: const Text('Tap a price on the chart'),
+              onTap: () => Navigator.of(sheetContext).pop('ray'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.undo, size: 20),
+              title: const Text('Undo last drawing'),
+              enabled: _drawings.isNotEmpty,
+              onTap: () => Navigator.of(sheetContext).pop('undo'),
+            ),
+            if (_selectedDrawing != null)
+              ListTile(
+                leading: const Icon(Icons.delete_forever, size: 20),
+                title: const Text('Delete selected drawing'),
+                subtitle: const Text('Long-press a line to select it'),
+                onTap: () => Navigator.of(sheetContext).pop('delete'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, size: 20),
+              title: const Text('Clear drawings'),
+              enabled: _drawings.isNotEmpty,
+              onTap: () => Navigator.of(sheetContext).pop('clear'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close, size: 20),
+              title: const Text('Turn off drawing'),
+              onTap: () => Navigator.of(sheetContext).pop('off'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'trend' || action == 'ray') {
+      setState(() {
+        _drawingTool =
+            action == 'trend' ? DrawingTool.trend : DrawingTool.ray;
+        _draftStart = null;
+      });
+      return;
+    }
+    if (action == 'delete') {
+      final index = _selectedDrawing;
+      if (index != null) _deleteDrawing(index);
+      return;
+    }
+    if (action == 'undo' && _drawings.isNotEmpty) {
+      _commitDrawings(_drawings.sublist(0, _drawings.length - 1));
+      return;
+    }
+    if (action == 'clear') {
+      setState(() => _draftStart = null);
+      _commitDrawings(const []);
+      return;
+    }
+    if (action == 'off') {
+      setState(() {
+        _drawingTool = DrawingTool.none;
+        _draftStart = null;
+      });
+    }
+  }
+
+  /// A tap in drawing mode: rays are immediate, trend lines take two taps. The
+  /// point is stored as a candle time so it survives a new window or session.
+  void _onDraw(double index, double price) {
+    if (_candles.isEmpty) return;
+    final candle = _candles[index.round().clamp(0, _candles.length - 1)];
+    final timeMs = candle.time.millisecondsSinceEpoch;
+    if (_drawingTool == DrawingTool.ray) {
+      _commitDrawings([..._drawings, ChartDrawing.ray(price: price)]);
+      return;
+    }
+    if (_drawingTool != DrawingTool.trend) return;
+    final start = _draftStart;
+    if (start == null) {
+      setState(() => _draftStart = DrawingDraft(timeMs: timeMs, price: price));
+      return;
+    }
+    _commitDrawings([
+      ..._drawings,
+      ChartDrawing.trend(
+        startMs: start.timeMs,
+        startPrice: start.price,
+        endMs: timeMs,
+        endPrice: price,
+      ),
+    ]);
+    setState(() => _draftStart = null);
+  }
+
   void _toggleFullscreen() {
     final next = !_fullscreen;
     setState(() => _fullscreen = next);
@@ -874,8 +1139,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           builder: (context, setSheetState) {
             return _styleSheet(_style, (next) {
               ChartStyle.current = next;
-              // Persist in the background; the sheet repaints immediately.
+              // Persist in the background; the sheet repaints immediately. The
+              // per-instrument layout is what reopening this symbol restores.
               unawaited(ChartStyle.save());
+              unawaited(
+                ChartStyle.saveLayout(widget.instrument.symbol, next),
+              );
               if (!mounted) return;
               _style = next;
               setSheetState(() {});
@@ -938,6 +1207,134 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            Text('CHART TYPE', style: label),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (final type in ChartType.values)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _ChartTypeChip(
+                        label: type.label,
+                        selected: style.chartType == type,
+                        onTap: () => onChanged(style.copyWith(chartType: type)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('STUDIES', style: label),
+            for (final study in OverlayStudy.values) ...[
+              _switchRow(
+                studyLabel(study, period: style.periodFor(study)),
+                style.studies.contains(study),
+                (value) => onChanged(
+                  style.copyWith(
+                    studies: value
+                        ? {...style.studies, study}
+                        : ({...style.studies}..remove(study)),
+                  ),
+                ),
+              ),
+              if (style.studies.contains(study))
+                Padding(
+                  padding: const EdgeInsets.only(left: 2),
+                  child: _stepperRow(
+                    'Period',
+                    style.periodFor(study),
+                    2,
+                    400,
+                    (value) => onChanged(
+                      style.copyWith(
+                        studyPeriods: {
+                          ...style.studyPeriods,
+                          study.name: value,
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+            const SizedBox(height: 16),
+            Text('PANES', style: label),
+            _switchRow(
+              'Volume',
+              style.showVolume,
+              (value) => onChanged(style.copyWith(showVolume: value)),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (final oscillator in Oscillator.values)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _ChartTypeChip(
+                        label: oscillator.label,
+                        selected: style.oscillator == oscillator,
+                        onTap: () => onChanged(
+                          style.copyWith(oscillator: oscillator),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (style.oscillator == Oscillator.rsi) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'RSI period',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  for (final period in const [7, 14, 21])
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: _ChartTypeChip(
+                        label: '$period',
+                        selected: style.rsiPeriod == period,
+                        onTap: () => onChanged(
+                          style.copyWith(rsiPeriod: period),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            if (style.oscillator == Oscillator.macd) ...[
+              const SizedBox(height: 4),
+              _stepperRow(
+                'Fast',
+                style.macdFast,
+                2,
+                60,
+                (value) => onChanged(style.copyWith(macdFast: value)),
+              ),
+              _stepperRow(
+                'Slow',
+                style.macdSlow,
+                3,
+                120,
+                (value) => onChanged(style.copyWith(macdSlow: value)),
+              ),
+              _stepperRow(
+                'Signal',
+                style.macdSignal,
+                2,
+                60,
+                (value) => onChanged(style.copyWith(macdSignal: value)),
+              ),
+            ],
+            const SizedBox(height: 16),
             Text('CANDLES', style: label),
             _colorRow('Up', style.bull, (color) {
               onChanged(style.copyWith(bull: color));
@@ -962,9 +1359,59 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               style.showWatermark,
               (value) => onChanged(style.copyWith(showWatermark: value)),
             ),
+            _switchRow(
+              'Log scale',
+              style.logScale,
+              (value) => onChanged(style.copyWith(logScale: value)),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _stepperRow(
+    String title,
+    int value,
+    int min,
+    int max,
+    ValueChanged<int> onChanged,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: value > min ? () => onChanged(value - 1) : null,
+          icon: const Icon(Icons.remove, size: 16),
+          visualDensity: VisualDensity.compact,
+        ),
+        SizedBox(
+          width: 26,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: value < max ? () => onChanged(value + 1) : null,
+          icon: const Icon(Icons.add, size: 16),
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
     );
   }
 
@@ -1126,8 +1573,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               ),
               const SizedBox(width: 6),
               Pill(
-                text: instrument.isLive ? 'LIVE' : 'DELAYED',
-                tone: instrument.isLive ? Tone.positive : Tone.muted,
+                text: 'LIVE',
+                tone: Tone.positive,
               ),
               const Spacer(),
               if (_updated != null)
@@ -1145,51 +1592,115 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     );
   }
 
-  Widget _ranges({bool overlay = false}) {
-    // On the fullscreen canvas the chips sit on the chart itself, so they take
+  String get _windowLabel {
+    final from = _windowFrom;
+    final to = _windowTo;
+    if (from == null || to == null) return 'Live · newest candles';
+    return '${_stamp(from)} → ${_stamp(to)}';
+  }
+
+  Future<void> _openTimeFrameSheet() async {
+    final now = DateTime.now();
+    final choice = await showChartTimeFrameSheet(
+      context: context,
+      from: _windowFrom ?? now.subtract(const Duration(days: 1)),
+      to: _windowTo ?? now,
+      interval: _interval,
+    );
+    if (choice == null || !mounted) return;
+    if (choice.isLive) {
+      _setLive();
+      return;
+    }
+    await _applyWindow(choice.from!, choice.to!, choice.interval!);
+  }
+
+  Widget _timeFrame({bool overlay = false}) {
+    // On the fullscreen canvas the control sits on the chart itself, so it takes
     // the chart's palette instead of the app's surface colour.
-    final chipBackground = overlay ? _style.background : AppColors.surface;
-    final chipBorder = overlay ? _style.axis : AppColors.border;
-    final activeFill =
-        overlay ? _style.text.withAlpha(26) : AppColors.primary.withAlpha(30);
-    final activeInk = overlay ? _style.text : AppColors.primaryLight;
+    final surface = overlay ? _style.background : AppColors.surface;
+    final border = overlay ? _style.axis : AppColors.border;
+    final accent = overlay ? _style.text : AppColors.primaryLight;
     final idleInk = overlay ? _style.muted : AppColors.muted;
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: chipBackground,
-        borderRadius: BorderRadius.circular(AppRadius.field),
-        border: Border.all(color: chipBorder),
-      ),
-      child: Row(
-        children: [
-          for (final range in ChartRange.values)
-            Expanded(
-              child: InkWell(
-                onTap: () => _pickRange(range),
-                borderRadius: BorderRadius.circular(9),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: range == _range ? activeFill : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    range.label,
-                    style: TextStyle(
-                      color: range == _range ? activeInk : idleInk,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'TIME FRAME',
+              style: TextStyle(
+                color: idleInk,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const Spacer(),
+            if (_customWindow)
+              GestureDetector(
+                onTap: _setLive,
+                behavior: HitTestBehavior.opaque,
+                child: Text(
+                  'Back to live',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _openTimeFrameSheet,
+          borderRadius: BorderRadius.circular(AppRadius.field),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(AppRadius.field),
+              border: Border.all(color: border),
             ),
-        ],
-      ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_month_outlined, size: 15, color: accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _windowLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tabular.copyWith(
+                          color: overlay ? _style.text : AppColors.text,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '${_interval.detail} · tap to change',
+                        style: TextStyle(
+                          color: idleInk,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 16, color: idleInk),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1232,31 +1743,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     }
   }
 
-  Widget _disclaimer(Instrument instrument) {
-    final strong = instrument.isIndex;
-    final live = instrument.isLive;
-    final accent = live
-        ? AppColors.success
-        : strong
-            ? AppColors.primary
-            : AppColors.faint;
+  Widget _disclaimer() {
     return FlatCard(
       padding: const EdgeInsets.all(12),
-      borderColor: accent.withAlpha(live || strong ? 70 : 34),
+      borderColor: AppColors.success.withAlpha(70),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 14, color: accent),
+          Icon(Icons.info_outline, size: 14, color: AppColors.success),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              live
-                  ? 'Free live feed for spot forex and crypto, refreshed every minute. The broker price still decides the fill — confirm it before you act.'
-                  : strong
-                      ? 'Index charts are delayed. They are here so you can pin your levels quickly — not to time an entry or judge live price.'
-                      : 'This instrument is exchange-traded, so its free chart is delayed. Use it to pin levels, not to read live price.',
+              'Live OANDA CFD quotes, refreshed every minute. The broker price still decides the fill — confirm it before you act.',
               style: TextStyle(
-                color: live || strong ? AppColors.muted : AppColors.faint,
+                color: AppColors.muted,
                 fontSize: 10.5,
                 height: 1.45,
               ),
@@ -1500,7 +2000,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 class _ChartCanvas extends StatefulWidget {
   const _ChartCanvas({
     required this.candles,
-    required this.range,
+    required this.interval,
     required this.decimals,
     required this.symbol,
     required this.style,
@@ -1514,11 +2014,19 @@ class _ChartCanvas extends StatefulWidget {
     required this.onSelect,
     required this.onPin,
     required this.onLevelMoved,
+    required this.drawTool,
+    required this.drawings,
+    required this.draftStart,
+    required this.selectedDrawing,
+    required this.onDrawingSelected,
+    required this.onDrawingMoved,
+    required this.onDrawingMoveEnd,
+    required this.onDraw,
     this.height,
   });
 
   final List<Candle> candles;
-  final ChartRange range;
+  final ChartInterval interval;
   final int decimals;
   final String symbol;
   final ChartStyle style;
@@ -1536,6 +2044,14 @@ class _ChartCanvas extends StatefulWidget {
   final ValueChanged<_Marker> onSelect;
   final void Function(_Marker marker, double price, DateTime time) onPin;
   final void Function(_Marker marker, double price, DateTime? time) onLevelMoved;
+  final DrawingTool drawTool;
+  final List<ChartDrawing> drawings;
+  final DrawingDraft? draftStart;
+  final int? selectedDrawing;
+  final ValueChanged<int?> onDrawingSelected;
+  final void Function(int index, ChartDrawing drawing) onDrawingMoved;
+  final VoidCallback onDrawingMoveEnd;
+  final void Function(double index, double price) onDraw;
 
   @override
   State<_ChartCanvas> createState() => _ChartCanvasState();
@@ -1553,7 +2069,13 @@ class _ChartCanvasState extends State<_ChartCanvas> {
 
   Size _size = Size.zero;
   Offset? _crosshair;
+
+  /// Study series aligned with the candles, rebuilt when either changes.
+  Map<OverlayStudy, List<double?>> _studies = const {};
   _Marker? _dragging;
+  int? _drawingIndex;
+  ChartDrawing? _drawingOriginal;
+  Offset _dragOrigin = Offset.zero;
   double _baseSpan = 0;
   double _baseStart = 0;
 
@@ -1562,20 +2084,46 @@ class _ChartCanvasState extends State<_ChartCanvas> {
     super.initState();
     _syncLevels();
     _view.fit(widget.candles.length);
+    _rebuildStudies();
   }
 
   @override
   void didUpdateWidget(covariant _ChartCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.candles, widget.candles) ||
-        oldWidget.range != widget.range) {
-      if (oldWidget.candles.isEmpty || oldWidget.range != widget.range) {
+        oldWidget.interval != widget.interval) {
+      if (oldWidget.candles.isEmpty || oldWidget.interval != widget.interval) {
         _view.fit(widget.candles.length);
       } else {
         _view.clampTo(widget.candles.length);
       }
     }
+    if (!identical(oldWidget.candles, widget.candles) ||
+        !setEquals(oldWidget.style.studies, widget.style.studies) ||
+        !mapEquals(
+          oldWidget.style.studyPeriods,
+          widget.style.studyPeriods,
+        )) {
+      _rebuildStudies();
+    }
     if (_dragging == null) _syncLevels();
+  }
+
+  void _rebuildStudies() {
+    final studies = widget.style.studies;
+    if (studies.isEmpty || widget.candles.isEmpty) {
+      _studies = const {};
+      return;
+    }
+    final closes = [for (final candle in widget.candles) candle.close];
+    _studies = {
+      for (final study in studies)
+        study: studySeries(
+          study,
+          closes,
+          period: widget.style.periodFor(study),
+        ),
+    };
   }
 
   void _syncLevels() {
@@ -1596,6 +2144,14 @@ class _ChartCanvasState extends State<_ChartCanvas> {
         ..add(widget.candles[i].high)
         ..add(widget.candles[i].low);
     }
+    // A moving average can sit outside the candles' range, so the axis has to
+    // widen for it the way a charting platform does.
+    for (final series in _studies.values) {
+      for (var i = visible.first; i < visible.last && i < series.length; i++) {
+        final value = series[i];
+        if (value != null) values.add(value);
+      }
+    }
     if (values.isEmpty) {
       for (final candle in widget.candles) {
         values
@@ -1615,14 +2171,18 @@ class _ChartCanvasState extends State<_ChartCanvas> {
 
   double _priceFor(Offset local) {
     final bounds = _bounds();
-    final plotH = _size.height -
-        _TradingChartPainter.topPad -
-        _TradingChartPainter.bottomPad;
-    if (plotH <= 0) return bounds.max;
-    final ratio = ((local.dy - _TradingChartPainter.topPad) / plotH)
+    final panes =
+        _TradingChartPainter.paneLayout(_size.height, widget.style);
+    if (panes.priceH <= 0) return bounds.max;
+    final ratio = ((local.dy - panes.priceTop) / panes.priceH)
         .clamp(0.0, 1.0)
         .toDouble();
-    return bounds.max - ratio * (bounds.max - bounds.min);
+    return priceForRatio(
+      ratio: ratio,
+      min: bounds.min,
+      max: bounds.max,
+      logScale: widget.style.logScale,
+    );
   }
 
   /// Candle time under [local]'s x. Null when the canvas has no width yet.
@@ -1637,11 +2197,16 @@ class _ChartCanvasState extends State<_ChartCanvas> {
 
   double _yFor(double price) {
     final bounds = _bounds();
-    final plotH = _size.height -
-        _TradingChartPainter.topPad -
-        _TradingChartPainter.bottomPad;
-    final spread = math.max(1e-9, bounds.max - bounds.min);
-    return _TradingChartPainter.topPad + (bounds.max - price) / spread * plotH;
+    final panes =
+        _TradingChartPainter.paneLayout(_size.height, widget.style);
+    return panes.priceTop +
+        ratioForPrice(
+          price: price,
+          min: bounds.min,
+          max: bounds.max,
+          logScale: widget.style.logScale,
+        ) *
+            panes.priceH;
   }
 
   void _setDraft(_Marker marker, double price) {
@@ -1665,6 +2230,21 @@ class _ChartCanvasState extends State<_ChartCanvas> {
     if (widget.candles.isEmpty) return;
     final plotW = _size.width - _TradingChartPainter.axisWidth;
     if (plotW <= 0 || local.dx > plotW) return;
+    if (widget.drawTool == DrawingTool.none &&
+        widget.selectedDrawing != null) {
+      widget.onDrawingSelected(null);
+    }
+    if (widget.drawTool != DrawingTool.none) {
+      final panes =
+          _TradingChartPainter.paneLayout(_size.height, widget.style);
+      if (local.dy < panes.priceTop ||
+          local.dy > panes.priceTop + panes.priceH) {
+        return;
+      }
+      final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
+      widget.onDraw(_view.start + ratio * _view.span, _priceFor(local));
+      return;
+    }
     final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
     final index = _view.indexAt(ratio, widget.candles.length);
     final time = widget.candles[index].time.toLocal();
@@ -1724,7 +2304,111 @@ class _ChartCanvasState extends State<_ChartCanvas> {
     return best;
   }
 
+  /// Nearest candle index for an epoch-millisecond time, or null when the
+  /// drawing sits outside the loaded series.
+  double? _indexForTime(int ms) {
+    final candles = widget.candles;
+    if (candles.isEmpty) return null;
+    final first = candles.first.time.millisecondsSinceEpoch;
+    final last = candles.last.time.millisecondsSinceEpoch;
+    if (ms < first || ms > last) return null;
+    var low = 0;
+    var high = candles.length - 1;
+    while (low < high) {
+      final mid = (low + high) ~/ 2;
+      if (candles[mid].time.millisecondsSinceEpoch < ms) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low.toDouble();
+  }
+
+  double _xForIndex(double index, double plotW) =>
+      ((index + 0.5 - _view.start) / _view.span) * plotW;
+
+  double? _drawingDistance(ChartDrawing drawing, Offset local, double plotW) {
+    if (drawing.kind == DrawingKind.ray) {
+      final price = drawing.price;
+      if (price == null) return null;
+      return (_yFor(price) - local.dy).abs();
+    }
+    final start = _indexForTime(drawing.startMs);
+    final end = _indexForTime(drawing.endMs);
+    if (start == null || end == null) return null;
+    return _distanceToSegment(
+      local,
+      Offset(_xForIndex(start, plotW), _yFor(drawing.startPrice)),
+      Offset(_xForIndex(end, plotW), _yFor(drawing.endPrice)),
+    );
+  }
+
+  static double _distanceToSegment(Offset point, Offset a, Offset b) {
+    final dx = b.dx - a.dx;
+    final dy = b.dy - a.dy;
+    final lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared <= 1e-9) return (point - a).distance;
+    final t = (((point.dx - a.dx) * dx + (point.dy - a.dy) * dy) /
+            lengthSquared)
+        .clamp(0.0, 1.0);
+    return (point - Offset(a.dx + t * dx, a.dy + t * dy)).distance;
+  }
+
+  int? _nearestDrawing(Offset local) {
+    final plotW = _size.width - _TradingChartPainter.axisWidth;
+    if (plotW <= 0) return null;
+    int? best;
+    var bestDistance = 14.0;
+    for (var i = 0; i < widget.drawings.length; i++) {
+      final distance = _drawingDistance(widget.drawings[i], local, plotW);
+      if (distance != null && distance < bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  /// Moves a drawing with the finger: prices follow vertically, and a trend
+  /// line's times follow horizontally so its slope stays put.
+  ChartDrawing _movedDrawing(ChartDrawing original, Offset local) {
+    final priceDelta = _priceFor(_dragOrigin) - _priceFor(local);
+    if (original.kind == DrawingKind.ray) {
+      return ChartDrawing.ray(price: (original.price ?? 0) + priceDelta);
+    }
+    final plotW = _size.width - _TradingChartPainter.axisWidth;
+    final shift = plotW <= 0
+        ? 0.0
+        : (local.dx - _dragOrigin.dx) / plotW * _view.span;
+    final candles = widget.candles;
+    int shiftTime(int ms) {
+      final index = _indexForTime(ms);
+      if (index == null) return ms;
+      final moved = (index + shift).round().clamp(0, candles.length - 1);
+      return candles[moved].time.millisecondsSinceEpoch;
+    }
+
+    return ChartDrawing.trend(
+      startMs: shiftTime(original.startMs),
+      startPrice: original.startPrice + priceDelta,
+      endMs: shiftTime(original.endMs),
+      endPrice: original.endPrice + priceDelta,
+    );
+  }
+
   void _startDrag(Offset local) {
+    final drawing = _nearestDrawing(local);
+    if (drawing != null) {
+      setState(() {
+        _crosshair = null;
+        _drawingIndex = drawing;
+        _drawingOriginal = widget.drawings[drawing];
+        _dragOrigin = local;
+      });
+      widget.onDrawingSelected(drawing);
+      return;
+    }
     final marker = _nearestLevel(local);
     setState(() {
       _crosshair = local;
@@ -1732,10 +2416,21 @@ class _ChartCanvasState extends State<_ChartCanvas> {
         _dragging = marker;
       }
     });
-    if (marker != null) widget.onSelect(marker);
+    if (marker != null) {
+      widget.onSelect(marker);
+    } else {
+      widget.onDrawingSelected(null);
+    }
   }
 
   void _updateDrag(Offset local) {
+    final drawing = _drawingOriginal;
+    final index = _drawingIndex;
+    if (drawing != null && index != null) {
+      setState(() => _crosshair = null);
+      widget.onDrawingMoved(index, _movedDrawing(drawing, local));
+      return;
+    }
     final marker = _dragging;
     if (marker == null) {
       setState(() => _crosshair = local);
@@ -1754,6 +2449,14 @@ class _ChartCanvasState extends State<_ChartCanvas> {
   }
 
   void _endDrag(Offset local) {
+    if (_drawingIndex != null) {
+      setState(() {
+        _drawingIndex = null;
+        _drawingOriginal = null;
+      });
+      widget.onDrawingMoveEnd();
+      return;
+    }
     final marker = _dragging;
     setState(() {
       _dragging = null;
@@ -1829,7 +2532,12 @@ class _ChartCanvasState extends State<_ChartCanvas> {
                       crosshair: _crosshair,
                       dragging: _dragging,
                       decimals: widget.decimals,
-                      range: widget.range,
+                      interval: widget.interval,
+                      chartType: widget.style.chartType,
+                      studies: _studies,
+                      drawings: widget.drawings,
+                      draftStart: widget.draftStart,
+                      selectedDrawing: widget.selectedDrawing,
                       style: widget.style,
                       symbol: widget.symbol,
                     ),
@@ -1868,7 +2576,7 @@ class _ChartCanvasState extends State<_ChartCanvas> {
         TextSpan(
           children: [
             TextSpan(
-              text: '· ${widget.range.interval}  ',
+              text: '· ${widget.interval.key}  ',
               style: TextStyle(
                 color: widget.style.muted,
                 fontSize: 9,
@@ -1886,10 +2594,60 @@ class _ChartCanvasState extends State<_ChartCanvas> {
                 fontWeight: FontWeight.w600,
               ),
             ),
+            for (final entry in _studies.entries)
+              if (entry.value.length > index && entry.value[index] != null)
+                TextSpan(
+                  text:
+                      '   ${studyLabel(entry.key, period: widget.style.periodFor(entry.key))} ${entry.value[index]!.toStringAsFixed(widget.decimals)}',
+                  style: TextStyle(
+                    color: entry.key.color,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
           ],
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+/// One option in the chart-type row.
+class _ChartTypeChip extends StatelessWidget {
+  const _ChartTypeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
+          borderRadius: BorderRadius.circular(AppRadius.field),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppColors.primaryLight : AppColors.muted,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -2033,15 +2791,67 @@ class _TradingChartPainter extends CustomPainter {
     required this.crosshair,
     required this.dragging,
     required this.decimals,
-    required this.range,
+    required this.interval,
+    required this.chartType,
+    required this.studies,
+    required this.drawings,
+    required this.draftStart,
     required this.style,
     required this.symbol,
+    required this.selectedDrawing,
   });
 
   static const double height = 380;
   static const double axisWidth = 58;
   static const double topPad = 10;
   static const double bottomPad = 20;
+  static const double paneGap = 8;
+
+  /// Vertical layout of the price pane plus the optional volume and oscillator
+  /// panes. Shares always add up to 1, so the panes fill the canvas exactly.
+  static ({
+    double priceTop,
+    double priceH,
+    double volumeTop,
+    double volumeH,
+    double oscTop,
+    double oscH,
+  }) paneLayout(double height, ChartStyle style) {
+    final hasVolume = style.showVolume;
+    final hasOscillator = style.oscillator != Oscillator.none;
+    final total = height - topPad - bottomPad;
+    final gaps = (hasVolume ? paneGap : 0.0) + (hasOscillator ? paneGap : 0.0);
+    final usable = math.max(0.0, total - gaps);
+    var priceShare = 1.0;
+    if (hasVolume && hasOscillator) {
+      priceShare = 0.58;
+    } else if (hasVolume || hasOscillator) {
+      priceShare = 0.76;
+    }
+    final priceH = usable * priceShare;
+    var volumeTop = 0.0;
+    var volumeH = 0.0;
+    var oscTop = 0.0;
+    var oscH = 0.0;
+    var cursor = topPad + priceH;
+    if (hasVolume) {
+      volumeTop = cursor + paneGap;
+      volumeH = usable * (hasOscillator ? 0.16 : 0.24);
+      cursor = volumeTop + volumeH;
+    }
+    if (hasOscillator) {
+      oscTop = cursor + paneGap;
+      oscH = usable * 0.26;
+    }
+    return (
+      priceTop: topPad,
+      priceH: priceH,
+      volumeTop: volumeTop,
+      volumeH: volumeH,
+      oscTop: oscTop,
+      oscH: oscH,
+    );
+  }
 
   final List<Candle> candles;
   final double start;
@@ -2057,22 +2867,54 @@ class _TradingChartPainter extends CustomPainter {
   final Offset? crosshair;
   final _Marker? dragging;
   final int decimals;
-  final ChartRange range;
+  final ChartInterval interval;
+  final ChartType chartType;
+  final Map<OverlayStudy, List<double?>> studies;
+  final List<ChartDrawing> drawings;
+  final DrawingDraft? draftStart;
   final ChartStyle style;
   final String symbol;
+  final int? selectedDrawing;
+
+  /// Nearest candle x for an epoch-millisecond time, or null when the drawing
+  /// sits outside the loaded series (then it is simply not drawn).
+  double? _xForTime(int ms, double plotW) {
+    if (candles.isEmpty) return null;
+    final first = candles.first.time.millisecondsSinceEpoch;
+    final last = candles.last.time.millisecondsSinceEpoch;
+    if (ms < first || ms > last) return null;
+    var low = 0;
+    var high = candles.length - 1;
+    while (low < high) {
+      final mid = (low + high) ~/ 2;
+      if (candles[mid].time.millisecondsSinceEpoch < ms) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return ((low + 0.5 - start) / span) * plotW;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = style.background);
     final plotW = size.width - axisWidth;
-    final plotH = size.height - topPad - bottomPad;
+    final panes = paneLayout(size.height, style);
+    final plotH = panes.priceH;
     if (candles.isEmpty || plotW <= 0 || plotH <= 0) return;
 
     if (style.showWatermark) _watermark(canvas, plotW, plotH);
 
-    final spread =
-        (maxPrice - minPrice).abs() < 1e-9 ? 1.0 : maxPrice - minPrice;
-    double y(double price) => topPad + (maxPrice - price) / spread * plotH;
+    double y(double price) =>
+        panes.priceTop +
+        ratioForPrice(
+          price: price,
+          min: minPrice,
+          max: maxPrice,
+          logScale: style.logScale,
+        ) *
+            plotH;
     double x(double index) => ((index + 0.5 - start) / span) * plotW;
 
     final grid = Paint()
@@ -2083,7 +2925,12 @@ class _TradingChartPainter extends CustomPainter {
       if (style.showGrid) {
         canvas.drawLine(Offset(0, gy), Offset(plotW, gy), grid);
       }
-      final price = maxPrice - spread * i / 4;
+      final price = priceForRatio(
+        ratio: i / 4,
+        min: minPrice,
+        max: maxPrice,
+        logScale: style.logScale,
+      );
       _label(
         canvas,
         price.toStringAsFixed(decimals),
@@ -2105,27 +2952,324 @@ class _TradingChartPainter extends CustomPainter {
 
     final slot = plotW / span;
     final bodyWidth = math.max(1.2, slot * 0.66);
-    for (var i = 0; i < candles.length; i++) {
-      final candle = candles[i];
-      final cx = x(i.toDouble());
-      if (cx < -slot || cx > plotW + slot) continue;
-      final color = candle.isUp ? style.bull : style.bear;
+    if (chartType == ChartType.candles) {
+      for (var i = 0; i < candles.length; i++) {
+        final candle = candles[i];
+        final cx = x(i.toDouble());
+        if (cx < -slot || cx > plotW + slot) continue;
+        final color = candle.isUp ? style.bull : style.bear;
+        canvas.drawLine(
+          Offset(cx, y(candle.high)),
+          Offset(cx, y(candle.low)),
+          Paint()
+            ..color = color
+            ..strokeWidth = 1,
+        );
+        final openY = y(candle.open);
+        final closeY = y(candle.close);
+        final body = Rect.fromLTRB(
+          cx - bodyWidth / 2,
+          math.min(openY, closeY),
+          cx + bodyWidth / 2,
+          math.max(openY, closeY) + 0.8,
+        );
+        canvas.drawRect(body, Paint()..color = color.withAlpha(210));
+      }
+    } else {
+      final line = Path();
+      var started = false;
+      for (var i = 0; i < candles.length; i++) {
+        final cx = x(i.toDouble());
+        if (cx < -slot || cx > plotW + slot) continue;
+        final cy = y(candles[i].close);
+        if (!started) {
+          line.moveTo(cx, cy);
+          started = true;
+        } else {
+          line.lineTo(cx, cy);
+        }
+      }
+      if (started) {
+        if (chartType == ChartType.area) {
+          final bounds = line.getBounds();
+          final fill = Path.from(line)
+            ..lineTo(bounds.right, topPad + plotH)
+            ..lineTo(bounds.left, topPad + plotH)
+            ..close();
+          canvas.drawPath(
+            fill,
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [style.bull.withAlpha(70), style.bull.withAlpha(0)],
+              ).createShader(Rect.fromLTWH(0, topPad, plotW, plotH)),
+          );
+        }
+        canvas.drawPath(
+          line,
+          Paint()
+            ..color = style.text.withAlpha(230)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6,
+        );
+      }
+    }
+
+    // Moving averages sit on top of whichever series is drawn.
+    for (final entry in studies.entries) {
+      final paint = Paint()
+        ..color = entry.key.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3;
+      final series = entry.value;
+      Path? run;
+      for (var i = 0; i < series.length && i < candles.length; i++) {
+        final value = series[i];
+        final px = x(i.toDouble());
+        if (value == null || px < -slot || px > plotW + slot) {
+          if (run != null) {
+            canvas.drawPath(run, paint);
+            run = null;
+          }
+          continue;
+        }
+        final py = y(value);
+        if (run == null) {
+          run = Path()..moveTo(px, py);
+        } else {
+          run.lineTo(px, py);
+        }
+      }
+      if (run != null) canvas.drawPath(run, paint);
+    }
+
+    // Volume pane: bars scaled to the busiest visible bar.
+    if (panes.volumeH > 6) {
+      final bottom = panes.volumeTop + panes.volumeH;
+      final firstVisible = start.floor().clamp(0, candles.length - 1);
+      final lastVisible =
+          (start + span).ceil().clamp(firstVisible + 1, candles.length);
+      var maxVolume = 0.0;
+      for (var i = firstVisible; i < lastVisible; i++) {
+        maxVolume = math.max(maxVolume, candles[i].volume);
+      }
       canvas.drawLine(
-        Offset(cx, y(candle.high)),
-        Offset(cx, y(candle.low)),
+        Offset(0, panes.volumeTop),
+        Offset(plotW, panes.volumeTop),
         Paint()
-          ..color = color
-          ..strokeWidth = 1,
+          ..color = style.axis
+          ..strokeWidth = 0.6,
       );
-      final openY = y(candle.open);
-      final closeY = y(candle.close);
-      final body = Rect.fromLTRB(
-        cx - bodyWidth / 2,
-        math.min(openY, closeY),
-        cx + bodyWidth / 2,
-        math.max(openY, closeY) + 0.8,
+      _label(
+        canvas,
+        'VOL',
+        Offset(4, panes.volumeTop + 2),
+        color: style.muted,
+        size: 8,
       );
-      canvas.drawRect(body, Paint()..color = color.withAlpha(210));
+      if (maxVolume > 0) {
+        for (var i = 0; i < candles.length; i++) {
+          final cx = x(i.toDouble());
+          if (cx < -slot || cx > plotW + slot) continue;
+          final height = candles[i].volume / maxVolume * (panes.volumeH - 12);
+          if (height <= 0) continue;
+          final color = candles[i].isUp ? style.bull : style.bear;
+          canvas.drawRect(
+            Rect.fromLTRB(
+              cx - bodyWidth / 2,
+              bottom - height,
+              cx + bodyWidth / 2,
+              bottom,
+            ),
+            Paint()..color = color.withAlpha(110),
+          );
+        }
+      }
+    }
+
+    // Oscillator pane: RSI with its 30/70 guides, or MACD with histogram.
+    if (panes.oscH > 6) {
+      final paneTop = panes.oscTop;
+      final paneBottom = paneTop + panes.oscH;
+      final closes = [for (final candle in candles) candle.close];
+      canvas.drawLine(
+        Offset(0, paneTop),
+        Offset(plotW, paneTop),
+        Paint()
+          ..color = style.axis
+          ..strokeWidth = 0.6,
+      );
+      if (style.oscillator == Oscillator.rsi) {
+        final series = rsi(closes, period: style.rsiPeriod.clamp(2, 100));
+        double oy(double value) =>
+            paneBottom - (value.clamp(0, 100) / 100) * (panes.oscH - 10) - 4;
+        for (final level in const [30.0, 70.0]) {
+          final gy = oy(level);
+          _dashed(canvas, Offset(0, gy), Offset(plotW, gy), style.grid);
+          _label(
+            canvas,
+            level.toStringAsFixed(0),
+            Offset(plotW + 6, gy - 5),
+            color: style.muted,
+            size: 8,
+          );
+        }
+        _label(
+          canvas,
+          'RSI ${style.rsiPeriod}',
+          Offset(4, paneTop + 2),
+          color: style.muted,
+          size: 8,
+        );
+        final paint = Paint()
+          ..color = const Color(0xFF9C8CFF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2;
+        Path? run;
+        for (var i = 0; i < series.length; i++) {
+          final value = series[i];
+          final px = i < candles.length ? x(i.toDouble()) : 0.0;
+          if (value == null || px < -slot || px > plotW + slot) {
+            if (run != null) {
+              canvas.drawPath(run, paint);
+              run = null;
+            }
+            continue;
+          }
+          final py = oy(value);
+          if (run == null) {
+            run = Path()..moveTo(px, py);
+          } else {
+            run.lineTo(px, py);
+          }
+        }
+        if (run != null) canvas.drawPath(run, paint);
+      } else if (style.oscillator == Oscillator.macd) {
+        final points = macd(
+          closes,
+          fast: style.macdFast.clamp(2, 100),
+          slow: style.macdSlow.clamp(3, 200),
+          signal: style.macdSignal.clamp(2, 100),
+        );
+        var maxAbs = 1e-9;
+        for (final point in points) {
+          if (point == null) continue;
+          maxAbs = math.max(maxAbs, point.macd.abs());
+          maxAbs = math.max(maxAbs, point.signal.abs());
+          maxAbs = math.max(maxAbs, point.histogram.abs());
+        }
+        double oy(double value) =>
+            paneBottom - (value + maxAbs) / (2 * maxAbs) * (panes.oscH - 10) - 4;
+        _dashed(canvas, Offset(0, oy(0)), Offset(plotW, oy(0)), style.grid);
+        _label(
+          canvas,
+          'MACD ${style.macdFast},${style.macdSlow},${style.macdSignal}',
+          Offset(4, paneTop + 2),
+          color: style.muted,
+          size: 8,
+        );
+        for (var i = 0; i < points.length; i++) {
+          final point = points[i];
+          if (point == null) continue;
+          final cx = x(i.toDouble());
+          if (cx < -slot || cx > plotW + slot) continue;
+          final zero = oy(0);
+          final value = oy(point.histogram);
+          canvas.drawRect(
+            Rect.fromLTRB(
+              cx - bodyWidth / 2,
+              math.min(zero, value),
+              cx + bodyWidth / 2,
+              math.max(zero, value),
+            ),
+            Paint()
+              ..color = (point.histogram >= 0 ? style.bull : style.bear)
+                  .withAlpha(120),
+          );
+        }
+        void line(Paint paint, double Function(MacdPoint) pick) {
+          Path? run;
+          for (var i = 0; i < points.length; i++) {
+            final point = points[i];
+            final px = x(i.toDouble());
+            if (point == null || px < -slot || px > plotW + slot) {
+              if (run != null) {
+                canvas.drawPath(run, paint);
+                run = null;
+              }
+              continue;
+            }
+            final py = oy(pick(point));
+            if (run == null) {
+              run = Path()..moveTo(px, py);
+            } else {
+              run.lineTo(px, py);
+            }
+          }
+          if (run != null) canvas.drawPath(run, paint);
+        }
+
+        line(
+          Paint()
+            ..color = const Color(0xFF4C9AFF)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2,
+          (point) => point.macd,
+        );
+        line(
+          Paint()
+            ..color = const Color(0xFFFF8A5C)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2,
+          (point) => point.signal,
+        );
+      }
+    }
+
+    // Trader drawings, then the half-finished trend line if one is in progress.
+    for (var d = 0; d < drawings.length; d++) {
+      final drawing = drawings[d];
+      final selected = d == selectedDrawing;
+      final paint = Paint()
+        ..color = drawingColor
+        ..strokeWidth = selected ? 2.4 : 1.3
+        ..style = PaintingStyle.stroke;
+      if (drawing.kind == DrawingKind.ray) {
+        final price = drawing.price;
+        if (price == null) continue;
+        final ly = y(price);
+        if (ly < panes.priceTop || ly > panes.priceTop + plotH) continue;
+        canvas.drawLine(Offset(0, ly), Offset(plotW, ly), paint);
+        if (selected) {
+          canvas.drawCircle(
+            Offset(plotW / 2, ly),
+            4,
+            Paint()..color = drawingColor,
+          );
+        }
+      } else {
+        final x1 = _xForTime(drawing.startMs, plotW);
+        final x2 = _xForTime(drawing.endMs, plotW);
+        if (x1 == null || x2 == null) continue;
+        final p1 = Offset(x1, y(drawing.startPrice));
+        final p2 = Offset(x2, y(drawing.endPrice));
+        canvas.drawLine(p1, p2, paint);
+        final handle = selected ? 4.0 : 2.5;
+        canvas.drawCircle(p1, handle, Paint()..color = drawingColor);
+        canvas.drawCircle(p2, handle, Paint()..color = drawingColor);
+      }
+    }
+    final draft = draftStart;
+    final draftX =
+        draft == null ? null : _xForTime(draft.timeMs, plotW);
+    if (draft != null && draftX != null && crosshair != null) {
+      _dashed(
+        canvas,
+        Offset(draftX, y(draft.price)),
+        crosshair!,
+        drawingColor,
+      );
     }
 
     final last = candles.last;
@@ -2223,7 +3367,7 @@ class _TradingChartPainter extends CustomPainter {
       _dashed(
         canvas,
         Offset(pointer.dx, topPad),
-        Offset(pointer.dx, topPad + plotH),
+        Offset(pointer.dx, size.height - bottomPad),
         style.crosshair,
       );
       _dashed(
@@ -2232,7 +3376,12 @@ class _TradingChartPainter extends CustomPainter {
         Offset(plotW, pointer.dy),
         style.crosshair,
       );
-      final price = maxPrice - (pointer.dy - topPad) / plotH * spread;
+      final price = priceForRatio(
+        ratio: (pointer.dy - topPad) / plotH,
+        min: minPrice,
+        max: maxPrice,
+        logScale: style.logScale,
+      );
       _axisTag(
         canvas,
         size,
@@ -2246,9 +3395,9 @@ class _TradingChartPainter extends CustomPainter {
       final index =
           (start + ratio * span).floor().clamp(0, candles.length - 1).toInt();
       final time = candles[index].time.toLocal();
-      final text = range == ChartRange.oneDay
+      final text = interval.size < const Duration(days: 1)
           ? DateFormat('HH:mm').format(time)
-          : DateFormat('d MMM HH:mm').format(time);
+          : DateFormat('d MMM').format(time);
       _bottomTag(canvas, size, pointer.dx, text);
     }
 
@@ -2256,7 +3405,7 @@ class _TradingChartPainter extends CustomPainter {
     for (final raw in picks) {
       final index = raw.floor().clamp(0, candles.length - 1);
       final time = candles[index].time.toLocal();
-      final text = range == ChartRange.oneDay
+      final text = interval.size < const Duration(days: 1)
           ? DateFormat('HH:mm').format(time)
           : DateFormat('d MMM').format(time);
       final painter = _painter(text, color: style.muted, size: 8.5);
@@ -2429,7 +3578,7 @@ class _TradingChartPainter extends CustomPainter {
         oldDelegate.dragging != dragging ||
         oldDelegate.minPrice != minPrice ||
         oldDelegate.maxPrice != maxPrice ||
-        oldDelegate.range != range ||
+        oldDelegate.interval != interval ||
         oldDelegate.style != style ||
         oldDelegate.symbol != symbol;
   }

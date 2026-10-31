@@ -125,7 +125,7 @@ class _SymbolSheetState extends State<_SymbolSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
               child: Text(
-                '${instrumentCatalog.length} instruments · forex and crypto are live, exchange-traded charts are delayed',
+                '${instrumentCatalog.length} instruments · every chart is a live OANDA CFD quote',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.faint, fontSize: 9.5),
               ),
@@ -203,8 +203,8 @@ class _InstrumentTile extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Pill(
-                text: instrument.isLive ? 'LIVE' : 'DELAYED',
-                tone: instrument.isLive ? Tone.positive : Tone.muted,
+                text: 'LIVE',
+                tone: Tone.positive,
               ),
             ),
             if (selected)
