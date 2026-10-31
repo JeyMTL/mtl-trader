@@ -1,8 +1,9 @@
 name: Deploy gate
 
 # Fires when Vercel (or any integration) reports a deployment through the
-# GitHub Deployments API. The gate only runs on success: a failed build has
-# nothing to smoke, and its own status is already the signal.
+# GitHub Deployments API. The gate runs on successful *production* deployments
+# only: a failed build has nothing to smoke, and a preview is behind Vercel
+# authentication, so probing it gets a login page rather than the app.
 on:
   deployment_status:
 
@@ -12,7 +13,9 @@ permissions:
 
 jobs:
   smoke:
-    if: github.event.deployment_status.state == 'success'
+    if: >
+      github.event.deployment_status.state == 'success' &&
+      !startsWith(github.event.deployment.environment, 'Preview')
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -25,14 +28,16 @@ jobs:
 
       # No install step: the script only uses the global fetch, so this stays
       # fast enough to run on every deployment.
-      # A deployment is reported "success" a moment before every edge serves
-      # the new build, so the first probe can still hit the previous one. Three
-      # attempts thirty seconds apart separates a real regression from that
-      # race: this job failed exactly that way on af154f2 while the same URL was
-      # healthy when probed by hand a minute later.
+      # The alias can trail the deployment by a moment, so a single probe may
+      # still reach the previous build. Three attempts thirty seconds apart tell
+      # that apart from a real regression.
+      #
+      # `environment_url` is deliberately not used: it is the per-deployment URL
+      # (…-<hash>-<team>.vercel.app), which is protected and is not what anyone
+      # visits. The stable production alias is.
       - name: Smoke the deployed environment
         env:
-          TARGET: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+          TARGET: ${{ vars.PRODUCTION_URL || 'https://mtl-trader.vercel.app' }}
         run: |
           for attempt in 1 2 3; do
             echo "::group::Attempt $attempt"
