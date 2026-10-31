@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { useTheme } from '@/lib/theme'
 import { useToast } from '@/components/toast'
+import { Avatar } from '@/components/avatar'
 import { PLANS } from '@/lib/plans'
 
 const BASIC_PRICE = PLANS.find(p => p.id === 'basic')?.price ?? 0
@@ -22,6 +23,7 @@ interface Deposit {
 interface UserProfile {
   full_name: string
   email: string
+  avatar_url: string
   timezone: string
   currency: string
   notifications_email: boolean
@@ -41,6 +43,7 @@ export default function SettingsPage() {
   // flash "Saved!" whenever either one was stored.
   const [saved, setSaved] = useState<'profile' | 'notifications' | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
+  const [savingAvatar, setSavingAvatar] = useState(false)
   const [savingNotifications, setSavingNotifications] = useState(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [depAmount, setDepAmount] = useState('')
@@ -60,6 +63,7 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<UserProfile>({
     full_name: '',
     email: '',
+    avatar_url: '',
     timezone: 'UTC',
     currency: 'USD',
     notifications_email: true,
@@ -109,6 +113,9 @@ export default function SettingsPage() {
         notifications_journal_reminders: userData.notifications_journal_reminders ?? true,
         notifications_monthly_overview: userData.notifications_monthly_overview ?? true,
         notifications_monthly_email: userData.notifications_monthly_email ?? true,
+        // Stored on the auth record: no schema change, and it survives a
+        // profile row being recreated by the signup route.
+        avatar_url: (user.user_metadata?.avatar_url as string | undefined) || '',
       })
       setUserPlan({
         tier: userData.subscription_tier || 'free',
@@ -155,6 +162,20 @@ export default function SettingsPage() {
     }
     setSaved('profile')
     setTimeout(() => setSaved(null), 2000)
+  }
+
+  const handleSaveAvatar = async () => {
+    setSavingAvatar(true)
+    const value = profile.avatar_url.trim()
+    const { error } = await supabase.auth.updateUser({
+      data: { avatar_url: value || null },
+    })
+    setSavingAvatar(false)
+    if (error) {
+      toast('Could not save the picture: ' + error.message, { tone: 'error' })
+      return
+    }
+    toast(value ? 'Profile picture updated' : 'Profile picture removed')
   }
 
   const handleSaveNotifications = async () => {
@@ -408,6 +429,39 @@ export default function SettingsPage() {
               {profileLoading ? (
                 <p className="text-gray-400">Loading profile...</p>
               ) : (
+                <>
+                <div className="flex flex-wrap items-center gap-4">
+                  <Avatar
+                    email={profile.email}
+                    name={profile.full_name}
+                    src={profile.avatar_url}
+                    size={64}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Profile picture</label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="url"
+                        value={profile.avatar_url}
+                        onChange={(e) => setProfile(p => ({ ...p, avatar_url: e.target.value }))}
+                        placeholder="https://example.com/me.jpg"
+                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveAvatar}
+                        disabled={savingAvatar}
+                        className="shrink-0 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {savingAvatar ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Left empty it uses the picture attached to your email, then your initials.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
@@ -460,6 +514,7 @@ export default function SettingsPage() {
                     </select>
                   </div>
                 </div>
+                </>
               )}
 
               <button

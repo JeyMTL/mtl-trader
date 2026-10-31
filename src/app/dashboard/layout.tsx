@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { effectiveMaxTrades } from '@/lib/subscription'
 import { Logo } from '@/components/logo'
+import { Avatar } from '@/components/avatar'
 import { useBackButton, useHaptics } from '@/hooks/useCapacitor'
 
 const navigation = [
@@ -44,14 +45,6 @@ const moreNavigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
-function initialsOf(name: string | null | undefined, email: string | null | undefined): string {
-  const source = (name || '').trim() || (email || '').trim()
-  if (!source) return 'MT'
-  const parts = source.split(/[\s@._-]+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return source.slice(0, 2).toUpperCase()
-}
-
 export default function DashboardLayout({
   children,
 }: {
@@ -71,6 +64,7 @@ export default function DashboardLayout({
     trialEndsAt: string | null
     fullName: string | null
     email: string | null
+    avatarUrl: string | null
   } | null>(null)
   const [trialDaysLeft, setTrialDaysLeft] = useState(0)
 
@@ -119,6 +113,12 @@ export default function DashboardLayout({
         trialEndsAt: data.trial_ends_at,
         fullName: data.full_name ?? null,
         email: data.email ?? authUser.email ?? null,
+        // Google sign-in puts the profile photo in the auth metadata; an email
+        // account has none, so the Avatar falls through to Gravatar/initials.
+        avatarUrl:
+          (authUser.user_metadata?.avatar_url as string | undefined) ??
+          (authUser.user_metadata?.picture as string | undefined) ??
+          null,
       })
       if (data.trial_ends_at) {
         setTrialDaysLeft(Math.max(0, Math.ceil((new Date(data.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))))
@@ -332,9 +332,14 @@ export default function DashboardLayout({
               type="button"
               onClick={openSheet}
               aria-label="Open menu"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface-light text-xs font-semibold text-white active:scale-95 transition-transform"
+              className="flex items-center justify-center rounded-full active:scale-95 transition-transform"
             >
-              {initialsOf(user?.fullName, user?.email)}
+              <Avatar
+                email={user?.email}
+                name={user?.fullName}
+                src={user?.avatarUrl}
+                size={36}
+              />
             </button>
           </div>
         </div>

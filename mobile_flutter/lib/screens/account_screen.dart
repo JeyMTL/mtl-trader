@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
@@ -185,6 +187,92 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
+  /// A picture the user chose, stored on the auth record so it needs no
+  /// migration and follows them across devices.
+  String? get _avatarUrl {
+    final metadata = Supabase.instance.client.auth.currentUser?.userMetadata;
+    final value = metadata?['avatar_url'];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  /// The picture tied to the address, resolved by the web API so no MD5
+  /// implementation ships in the app. Null when there is no usable address.
+  String? _emailAvatarUrl(String email) {
+    final address = email.trim();
+    if (address.isEmpty || !address.contains('@')) return null;
+    return '${AppConfig.apiBaseUrl}/api/avatar'
+        '?email=${Uri.encodeQueryComponent(address)}&s=96';
+  }
+
+  Future<void> _editAvatar(String? current) async {
+    final controller = TextEditingController(text: current ?? '');
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Profile picture',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Paste a link to an image. Leave it empty to use the picture tied to your email, or your initials when there is none.',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 11.5,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(hintText: 'https://…'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true || !mounted) return;
+
+    final value = controller.text.trim();
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {'avatar_url': value.isEmpty ? null : value}),
+      );
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value.isEmpty
+                ? 'Profile picture cleared.'
+                : 'Profile picture updated.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save the picture: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -282,24 +370,12 @@ class _AccountScreenState extends State<AccountScreen> {
                 FlatCard(
                   child: Row(
                     children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withAlpha(24),
-                          border: Border.all(
-                            color: AppColors.primary.withAlpha(80),
-                          ),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _initials(name, email),
-                          style: TextStyle(
-                            color: AppColors.primaryLight,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      GestureDetector(
+                        onTap: () => _editAvatar(_avatarUrl),
+                        child: _Avatar(
+                          url: _avatarUrl ?? _emailAvatarUrl(email),
+                          initials: _initials(name, email),
+                          size: 42,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -513,6 +589,57 @@ class _AccountScreenState extends State<AccountScreen> {
     return source.length >= 2
         ? source.substring(0, 2).toUpperCase()
         : source.toUpperCase();
+  }
+}
+
+/// Round profile picture with an initials fallback. A missing or unreachable
+/// image falls back to the same tile the old design used, so the row never
+/// collapses to a broken-image box.
+class _Avatar extends StatelessWidget {
+  const _Avatar({
+    required this.url,
+    required this.initials,
+    required this.size,
+  });
+
+  final String? url;
+  final String initials;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withAlpha(24),
+        border: Border.all(color: AppColors.primary.withAlpha(80)),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: AppColors.primaryLight,
+          fontSize: size * 0.33,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+
+    final source = url;
+    if (source == null || source.isEmpty) return placeholder;
+    return ClipOval(
+      child: Image.network(
+        source,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => placeholder,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : placeholder,
+      ),
+    );
   }
 }
 
