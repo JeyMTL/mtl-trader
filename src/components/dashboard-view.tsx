@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Area,
@@ -222,6 +222,12 @@ export function DashboardView({
   journalFeed,
 }: DashboardViewProps) {
   const palette = useChartPalette()
+  // Per-instance gradient id: a fixed one collides as soon as two equity charts
+  // are mounted together (dashboard plus preview, two dashboards side by side),
+  // and `url(#equityFill)` in the second then paints with the first's stops.
+  // useId is stable across the server render and hydration; colons are stripped
+  // because they are legal in an id but awkward inside an SVG `url(#…)`.
+  const equityFillId = `equityFill-${useId().replace(/:/g, '')}`
   const [chartMode, setChartMode] = useState<ChartMode>('equity')
 
   const totalPnl = Number(summary.total_pnl) || 0
@@ -418,7 +424,7 @@ export function DashboardView({
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={equityData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id={equityFillId} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0.22} />
                           <stop offset="100%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0} />
                         </linearGradient>
@@ -436,7 +442,7 @@ export function DashboardView({
                         name="Equity"
                         stroke={totalPnl >= 0 ? palette.profit : palette.loss}
                         strokeWidth={1.8}
-                        fill="url(#equityFill)"
+                        fill={`url(#${equityFillId})`}
                         dot={false}
                         activeDot={{ r: 3, strokeWidth: 0 }}
                       />

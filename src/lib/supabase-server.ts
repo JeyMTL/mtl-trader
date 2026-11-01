@@ -12,7 +12,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js'
  * win rate.
  *
  * Cookie writes are wrapped in try/catch because Server Components cannot set
- * cookies. Refreshing the session is the middleware's job; here a failed write
+ * cookies. Refreshing the session is `src/proxy.ts`'s job; here a failed write
  * simply means the current request keeps the session it already has.
  */
 
@@ -59,7 +59,7 @@ export async function getServerUser(): Promise<User | null> {
 /**
  * Redirects to the login page when there is no verified session. Used by the
  * server-rendered dashboard pages so an unauthenticated request never renders
- * account data (middleware is the first line of defence, this is the second).
+ * account data (the proxy refreshes the cookie, this is what actually gates).
  */
 export async function requireServerUser(): Promise<User> {
   const supabase = await createServerSupabase()

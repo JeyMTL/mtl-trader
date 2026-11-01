@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Target, DollarSign, AlertTriangle, Clock, Sparkles, Loader2, TrendingDown, TrendingUp } from 'lucide-react'
 import { formatCurrency, formatDuration, formatPercent } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -121,6 +121,13 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats }: AnalyticsViewProps) {
   const palette = useChartPalette()
+  // Unique per instance, and identical across the server render and the
+  // hydrating client. A fixed id collides whenever two of these charts are
+  // mounted at once: `url(#eqFill)` in the second chart resolves to the first
+  // chart's gradient, which silently paints it in the wrong direction or
+  // colour. Colons are stripped because they are legal in an id but awkward
+  // inside an SVG `url(#…)` reference.
+  const eqFillId = `eqFill-${useId().replace(/:/g, '')}`
   const [aiReview, setAiReview] = useState<AiReview | null>(null)
   const [aiMeta, setAiMeta] = useState<AiReviewMeta | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
@@ -491,7 +498,7 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={equityData}>
               <defs>
-                <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={eqFillId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0} />
                 </linearGradient>
@@ -500,7 +507,7 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
               <XAxis {...axisProps(palette)} dataKey="day" tickFormatter={(value: string) => value.slice(5)} />
               <YAxis {...axisProps(palette)} tickFormatter={(v) => `$${v}`} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: palette.grid }} />
-              <Area type="monotone" dataKey="balance" stroke={totalPnl >= 0 ? palette.profit : palette.loss} fill="url(#eqFill)" strokeWidth={2} name="Balance" />
+              <Area type="monotone" dataKey="balance" stroke={totalPnl >= 0 ? palette.profit : palette.loss} fill={`url(#${eqFillId})`} strokeWidth={2} name="Balance" />
             </AreaChart>
           </ResponsiveContainer>
           </div>
