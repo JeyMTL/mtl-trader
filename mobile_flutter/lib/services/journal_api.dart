@@ -8,6 +8,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config.dart';
 import '../models/models.dart';
 
+/// A decoded, already error-checked response from the web API.
+class _ApiResult {
+  const _ApiResult(this.body);
+
+  final Map<String, dynamic> body;
+}
+
 /// Every read and write the Flutter app performs, in one place.
 class JournalApi {
   JournalApi({SupabaseClient? client})
@@ -303,6 +310,92 @@ class JournalApi {
   }
 
   Future<void> signOut() => _db.auth.signOut();
+
+  /// Current hosted MT5 connection, or `{connected: false}` when there is none.
+  Future<Map<String, dynamic>> brokerConnection() async {
+    final result = await _api('GET', '/api/broker/connection');
+    return result.body;
+  }
+
+  /// Connects an MT5 account with its investor (read-only) password. The server
+  /// seals the password; nothing about it is kept on the device.
+  Future<Map<String, dynamic>> connectBroker({
+    required String broker,
+    required String server,
+    required String login,
+    required String investorPassword,
+  }) async {
+    final result = await _api('POST', '/api/broker/connection', {
+      'broker': broker,
+      'server': server,
+      'login': login,
+      'investorPassword': investorPassword,
+    });
+    return result.body;
+  }
+
+  /// Removes the connection and wipes the stored credential server-side.
+  Future<Map<String, dynamic>> disconnectBroker() async {
+    final result = await _api('DELETE', '/api/broker/connection');
+    return result.body;
+  }
+
+  /// Authenticated JSON call to the web API. Throws the server's message so the
+  /// UI can show something actionable instead of a status code.
+  Future<_ApiResult> _api(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) async {
+    final session = _db.auth.currentSession;
+    if (session == null) {
+      throw Exception('Your session expired. Sign in again.');
+    }
+
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
+    try {
+      final request = await client.openUrl(
+        method,
+        Uri.parse('${AppConfig.apiBaseUrl}$path'),
+      );
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer ${session.accessToken}',
+      );
+      if (body != null) {
+        request.headers.contentType = ContentType.json;
+        request.write(jsonEncode(body));
+      }
+
+      final response = await request.close().timeout(
+            const Duration(seconds: 25),
+          );
+      final text = await response.transform(utf8.decoder).join();
+
+      dynamic decoded;
+      try {
+        decoded = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
+      } catch (_) {
+        decoded = <String, dynamic>{};
+      }
+      final map = decoded is Map<String, dynamic>
+          ? decoded
+          : <String, dynamic>{};
+
+      if (response.statusCode >= 400) {
+        final message = map['error'];
+        throw Exception(
+          message is String && message.isNotEmpty
+              ? message
+              : 'Request failed (${response.statusCode}). Try again.',
+        );
+      }
+      return _ApiResult(map);
+    } finally {
+      client.close(force: true);
+    }
+  }
 
   /// Starts a Flutterwave card subscription and returns the hosted checkout
   /// URL. The app opens it in the browser; the webhook applies the payment, so

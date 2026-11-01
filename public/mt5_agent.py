@@ -1,225 +1,302 @@
 """
-MTL Trader - MT5 Sync Agent
-Connects to MetaTrader 5 and syncs closed trades to your MTL Trader account.
+MTL Trader - MT5 sync agent (position-keyed, resumable).
+
+Runs on a Windows machine with MetaTrader 5 installed and pushes closed trades to
+MTL Trader. Customers who only have a phone should use the app's "connect
+automatically" flow instead — this agent exists for traders who prefer their own
+PC.
+
+What changed from the first version, and why it matters:
+
+  * Trades are keyed on the MT5 **position id**, which is stable for the whole
+    life of a position. The old version keyed on a closing deal ticket, so a
+    position that scaled out inserted itself twice and doubled its P&L.
+  * A cursor is persisted next to the config and only advanced after the server
+    acknowledges a batch, so a poll sends the new closes instead of a year of
+    history every 60 seconds (which hit the 1000-trade cap on busy accounts).
+  * Timestamps are sent in UTC. The old version used the machine's local time,
+    which shifted every trade by the machine's timezone and quietly skewed the
+    time-edge report.
+  * Closing deals of type INOUT (2) and OUT_BY (3) are understood, so netting
+    accounts and "close by" orders are no longer invisible.
+  * Stop loss and take profit are read from the position's history orders rather
+    than hardcoded to zero.
+  * Permanent errors (401/403/400) stop with advice instead of retrying forever;
+    transient ones back off exponentially.
 
 Usage:
-    python mt5_agent.py <user_id> <token> [broker_name] [server] [login]
     python mt5_agent.py --config mtl-trader-config.json
-
-Or set environment variables: MTL_USER_ID, MTL_TOKEN, MT5_BROKER, MT5_SERVER, MT5_LOGIN, MT5_PASSWORD
-
-The agent prompts for your MT5 password interactively when it starts, so it
-never appears in shell history or in the copied command. Alternatively you
-can pass it as the 6th CLI argument or set MT5_PASSWORD.
+    python mt5_agent.py --config mtl-trader-config.json --once
 """
+
+import json
+import os
+import random
+import sys
+import time
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from getpass import getpass
 
 import MetaTrader5 as mt5
 import requests
-import json
-import time
-import sys
-import os
-from collections import defaultdict
-from datetime import datetime, timedelta
-from getpass import getpass
 
-# Default configuration
 DEFAULT_APP_URL = "https://mtl-trader.vercel.app"
 SYNC_INTERVAL = 60
+CHUNK = 200
+# Deals can land a little late on the broker's clock; re-read a short tail so a
+# late-arriving close is not skipped. The server ignores anything it already has.
+OVERLAP = timedelta(minutes=10)
+STATE_FILE = "mtl-trader-state.json"
+TIMEOUT = 30
 
 
 def load_config(path):
-    """Load the browser-downloaded setup file, if present."""
-    with open(path, "r", encoding="utf-8") as config_file:
-        return json.load(config_file)
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def load_state():
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_state(state):
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+    except OSError as error:
+        print(f"Warning: could not save progress ({error}); the next sync will resend.")
 
 
 def connect_to_mt5(broker_name, server, login, password):
-    """Initialize and connect to MT5 terminal."""
     if not password:
         password = getpass(f"Enter MT5 password for {login}: ")
 
     print(f"Connecting to {broker_name} - {server}...")
-
     if not mt5.initialize():
         print(f"MT5 initialization failed: {mt5.last_error()}")
         return False
 
-    # The server argument must be the MT5 server name (e.g. "MetaQuotes-Demo").
-    # Prefer the explicit server; fall back to "broker/server" style only when
-    # no server was provided.
-    server_arg = server if server else broker_name
-    authorized = mt5.login(
-        login=int(login),
-        password=password,
-        server=server_arg,
-    )
-
-    if not authorized:
+    if not mt5.login(login=int(login), password=password, server=server or broker_name):
         print(f"Login failed: {mt5.last_error()}")
         mt5.shutdown()
         return False
 
-    account_info = mt5.account_info()
-    print(f"Connected to {account_info.server} - Account: {account_info.login}")
+    info = mt5.account_info()
+    print(f"Connected to {info.server} - account {info.login}")
     return True
 
 
-def get_trades(days=365):
-    """Fetch CLOSED trades from MT5 by pairing opening/closing deals per position.
+def _weighted(deals):
+    """Volume-weighted price across several deals (scale-ins and partial closes)."""
+    total_volume = sum(d.volume for d in deals)
+    if total_volume <= 0:
+        return deals[-1].price if deals else 0.0
+    return sum(d.price * d.volume for d in deals) / total_volume
 
-    MT5's history deals are individual transactions, so we group them by
-    position_id: the entry==0 deal gives the entry price/time, the entry==1
-    deal gives the exit price/time, and P&L is the sum across all related deals
-    (including partial closes and their commissions/swaps).
+
+def _stop_and_target(position_id):
     """
-    to_date = datetime.now()
-    from_date = to_date - timedelta(days=days)
+    The opening order carries the SL/TP the trader set. `history_orders_get` is
+    the only place they survive after the position closes.
+    """
+    try:
+        orders = mt5.history_orders_get(position=int(position_id))
+    except Exception:  # noqa: BLE001 - a missing history must not abort the sync
+        return 0.0, 0.0
+    if not orders:
+        return 0.0, 0.0
+    for order in orders:
+        if order.sl:
+            return float(order.sl), float(order.tp or 0.0)
+    return float(orders[0].sl or 0.0), float(orders[0].tp or 0.0)
+
+
+def get_trades(since):
+    """
+    Closed positions changed since `since` (a UTC datetime), keyed by position id.
+
+    `since=None` reads a year, which is what the first run of a new install does.
+    """
+    to_date = datetime.now(timezone.utc)
+    from_date = since if since else to_date - timedelta(days=365)
 
     deals = mt5.history_deals_get(from_date, to_date)
     if deals is None:
-        print(f"Error getting trades: {mt5.last_error()}")
+        print(f"Could not read history: {mt5.last_error()}")
         return []
 
-    # Group deals by position id
-    positions = defaultdict(list)
+    by_position = defaultdict(list)
     for deal in deals:
-        if deal.position_id == 0:
-            # Deals without a position id (e.g. balance operations) are ignored
-            continue
-        positions[deal.position_id].append(deal)
+        if deal.position_id:
+            by_position[deal.position_id].append(deal)
 
-    formatted_trades = []
-    for pos_id, pos_deals in positions.items():
-        opening = [d for d in pos_deals if d.entry == 0]
-        closing = [d for d in pos_deals if d.entry == 1]
-
-        # Skip still-open positions (no closing deal yet)
-        if not opening or not closing:
+    trades = []
+    for position_id, group in by_position.items():
+        # entry: 0 = in, 1 = out, 2 = inout, 3 = out by. INOUT closes the running
+        # volume as part of a reversal, so it counts as an exit here.
+        opens = [d for d in group if d.entry == 0]
+        closes = [d for d in group if d.entry in (1, 2, 3)]
+        if not opens or not closes:
             continue
 
-        open_deal = opening[0]
-        # Final close (last closing deal, handles partial closes)
-        close_deal = closing[-1]
+        first_open = min(opens, key=lambda d: d.time)
+        last_close = max(closes, key=lambda d: d.time)
 
-        # 0 = Buy, 1 = Sell (same direction on both legs)
-        direction = open_deal.type
+        opened_volume = sum(d.volume for d in opens)
+        closed_volume = sum(d.volume for d in closes)
+        # What actually closed: a scale-out leaves part of the position to run,
+        # and a re-opened netting position has more open volume than closed.
+        lot = round(min(opened_volume, closed_volume), 2)
+        if lot <= 0:
+            continue
 
-        formatted_trades.append({
-            "ticket": close_deal.ticket,
-            "symbol": open_deal.symbol,
-            "type": "BUY" if direction == 0 else "SELL",
-            "entry_price": open_deal.price,
-            "exit_price": close_deal.price,
-            "lot_size": open_deal.volume,
-            "stop_loss": 0,
-            "take_profit": 0,
-            "pnl": round(sum(d.profit + d.commission + d.swap for d in pos_deals), 2),
-            "commission": round(sum(d.commission for d in pos_deals), 2),
-            "swap": round(sum(d.swap for d in pos_deals), 2),
-            "open_time": datetime.fromtimestamp(open_deal.time).isoformat(),
-            "close_time": datetime.fromtimestamp(close_deal.time).isoformat(),
+        stop_loss, take_profit = _stop_and_target(position_id)
+
+        trades.append({
+            "position_id": int(position_id),
+            # Kept for reference and for matching rows written by the old agent.
+            "ticket": int(last_close.ticket),
+            "symbol": first_open.symbol,
+            "type": "BUY" if first_open.type == 0 else "SELL",
+            "entry_price": float(_weighted(opens)),
+            "exit_price": float(_weighted(closes)),
+            "lot_size": lot,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "pnl": round(sum(d.profit + d.commission + d.swap for d in group), 2),
+            "commission": round(sum(d.commission for d in group), 2),
+            "swap": round(sum(d.swap for d in group), 2),
+            "open_time": datetime.fromtimestamp(first_open.time, timezone.utc).isoformat(),
+            "close_time": datetime.fromtimestamp(last_close.time, timezone.utc).isoformat(),
             "timeframe": "",
-            "strategy": ""
+            "strategy": "",
         })
 
-    return formatted_trades
+    trades.sort(key=lambda item: item["close_time"])
+    return trades
+
+
+def post_trades(app_url, user_id, token, trades):
+    url = f"{app_url.rstrip('/')}/api/sync"
+    payload = {"userId": user_id, "token": token, "trades": trades}
+    try:
+        return requests.post(url, json=payload, timeout=TIMEOUT)
+    except requests.RequestException as error:
+        print(f"Connection error: {error}")
+        return None
 
 
 def sync_trades(app_url, user_id, token, trades):
-    """Send trades to MTL Trader API."""
-    url = f"{app_url}/api/sync"
-    payload = {
-        "userId": user_id,
-        "token": token,
-        "trades": trades
-    }
+    """
+    Sends the batch in chunks and returns True only when every chunk landed.
 
-    try:
-        response = requests.post(url, json=payload, timeout=30)
-        result = response.json()
+    Retries transient failures (429, 5xx, network) with backoff; stops on a
+    permanent refusal, because a wrong token or an unverified email will never
+    succeed by being sent again.
+    """
+    if not trades:
+        return True
 
-        if response.status_code == 200:
-            print(f"Sync successful: {result.get('imported', 0)} trades imported")
-            return True
-        else:
-            print(f"Sync failed: {result.get('error', 'Unknown error')}")
-            return False
-    except requests.RequestException as e:
-        print(f"Connection error: {e}")
-        return False
+    total = 0
+    for start in range(0, len(trades), CHUNK):
+        chunk = trades[start:start + CHUNK]
+        attempt = 0
+        while True:
+            attempt += 1
+            response = post_trades(app_url, user_id, token, chunk)
+
+            if response is None:
+                if attempt >= 5:
+                    print("Giving up on this batch; progress was not advanced.")
+                    return False
+            elif response.status_code == 200 or response.status_code == 202:
+                body = response.json()
+                total += int(body.get("imported", 0))
+                break
+            elif response.status_code in (400, 401, 403):
+                detail = response.json().get("error", "request refused")
+                print(f"Sync refused ({response.status_code}): {detail}")
+                if response.status_code == 401:
+                    print("The token does not match. Rotate it on the MT5 Sync page and update the config.")
+                elif response.status_code == 403:
+                    print("Confirm your email address before syncing.")
+                return False
+            elif attempt >= 5:
+                print(f"Server kept failing (HTTP {response.status_code}); will retry next poll.")
+                return False
+            else:
+                wait = min(60, (2 ** attempt) + random.uniform(0, 1))
+                print(f"HTTP {response.status_code}; retrying in {wait:.0f}s...")
+                time.sleep(wait)
+
+    print(f"Synced {total} new trade(s) from {len(trades)} closed position(s)")
+    return True
 
 
 def main():
-    print("=" * 50)
-    print("MTL Trader - MT5 Sync Agent")
-    print("=" * 50)
+    print("=" * 52)
+    print("MTL Trader - MT5 sync agent")
+    print("=" * 52)
 
     config = {}
     if "--config" in sys.argv:
-        config_index = sys.argv.index("--config")
-        if len(sys.argv) <= config_index + 1:
-            print("Error: --config requires a JSON file path.")
-            sys.exit(1)
+        index = sys.argv.index("--config")
         try:
-            config = load_config(sys.argv[config_index + 1])
-        except (OSError, json.JSONDecodeError) as error:
-            print(f"Could not read setup file: {error}")
+            config = load_config(sys.argv[index + 1])
+        except (IndexError, OSError, json.JSONDecodeError) as error:
+            print(f"Could not read the setup file: {error}")
             sys.exit(1)
 
-    # Environment variables take priority, then the downloaded setup file.
     user_id = os.environ.get("MTL_USER_ID") or config.get("user_id")
     token = os.environ.get("MTL_TOKEN") or config.get("token")
     app_url = os.environ.get("MTL_APP_URL") or config.get("app_url", DEFAULT_APP_URL)
-
     broker_name = os.environ.get("MT5_BROKER") or config.get("broker_name")
     server = os.environ.get("MT5_SERVER") or config.get("server", "")
     login = os.environ.get("MT5_LOGIN") or config.get("login", "")
     password = os.environ.get("MT5_PASSWORD", "")
 
-    # Fallback to CLI arguments if env vars are missing
-    if not user_id or not token:
-        positional_args = [arg for arg in sys.argv[1:] if arg != "--config"]
-        if len(positional_args) < 2:
-            print("Usage: python mt5_agent.py <user_id> <token> [broker_name] [server] [login] [password]")
-            print("   Or: python mt5_agent.py --config mtl-trader-config.json")
-            print("\nOr set environment variables: MTL_USER_ID, MTL_TOKEN, MT5_BROKER, MT5_SERVER, MT5_LOGIN, MT5_PASSWORD")
-            sys.exit(1)
-        user_id = positional_args[0]
-        token = positional_args[1]
-        if len(positional_args) > 2: broker_name = positional_args[2]
-        if len(positional_args) > 3: server = positional_args[3]
-        if len(positional_args) > 4: login = positional_args[4]
-        if len(positional_args) > 5: password = positional_args[5]
-
-    if not broker_name or not login:
-        print("Error: Broker name and Login are required via CLI or environment variables.")
+    if not user_id or not token or not broker_name or not login:
+        print("Missing connection details. Download the setup file from the MT5 Sync page.")
         sys.exit(1)
 
     if not connect_to_mt5(broker_name, server, login, password):
         sys.exit(1)
 
-    print("\nFetching trades...")
-    trades = get_trades()
-    print(f"Found {len(trades)} closed trades")
+    state = load_state()
+    once = "--once" in sys.argv
+    backoff = 0
 
-    if trades:
-        print("\nSyncing trades to MTL Trader...")
-        sync_trades(app_url, user_id, token, trades)
+    while True:
+        since = None
+        cursor = state.get("last_close_time")
+        if cursor:
+            since = datetime.fromisoformat(cursor) - OVERLAP
 
-    print(f"\nSync complete! Next sync in {SYNC_INTERVAL} seconds...")
-    print("Press Ctrl+C to stop.\n")
+        trades = get_trades(since)
+        if trades:
+            print(f"{len(trades)} closed position(s) to consider")
+            if sync_trades(app_url, user_id, token, trades):
+                state["last_close_time"] = trades[-1]["close_time"]
+                save_state(state)
+                backoff = 0
+        elif since is None:
+            print("No closed trades found yet")
 
-    try:
-        while True:
-            time.sleep(SYNC_INTERVAL)
-            trades = get_trades()
-            if trades:
-                sync_trades(app_url, user_id, token, trades)
-    except KeyboardInterrupt:
-        print("\nStopping sync agent...")
-        mt5.shutdown()
-        print("Disconnected from MT5.")
+        if once:
+            break
+
+        interval = min(SYNC_INTERVAL * (2 ** backoff), 15 * 60)
+        time.sleep(interval)
+        if trades is None:
+            backoff = min(backoff + 1, 4)
+
+    mt5.shutdown()
+    print("Done.")
 
 
 if __name__ == "__main__":

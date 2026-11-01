@@ -5,6 +5,8 @@ mobile/
 mobile_flutter/
 docs/
 scripts/
+supervisor/
+mt5/
 .tooling/
 .vercel/
 .env*

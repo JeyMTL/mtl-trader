@@ -153,6 +153,20 @@ supervisor on our own Windows hosts logs in and streams closed trades to
 * **Never accept the master password.** The investor password cannot trade, which
   is what makes holding a credential defensible. The customer's revoke buttons
   are "Disconnect" in the app and changing the investor password in MT5.
+* **Running it:** `supervisor/mt5_supervisor.py` on a Windows host with MT5
+  installed. It needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `SYNC_CREDENTIAL_KEY` (the same value as the app) and `SYNC_SUPERVISOR_TOKEN`
+  (which `/api/sync` accepts in place of a customer's agent token). It logs in
+  sequentially — one terminal, one account at a time — so 40 connections cost a
+  few seconds each per cycle rather than 40 terminals. `--once` runs a single
+  pass, which is what a scheduled task should call.
+* **Sync identity:** trades are keyed on MT5's `position_id`, not a deal ticket.
+  Writes are idempotent upserts, and `sync_suppressions` (filled by a trigger on
+  `trades` deletes) stops a deleted trade coming back on the next poll. Retiring
+  any of those three brings back either doubled P&L or zombie trades.
+* **Desktop traders** can still run `public/mt5_agent.py` (position-keyed,
+  resumable, UTC timestamps) or the MQL5 expert advisor in `mt5/`, which pushes
+  on `OnTradeTransaction` instead of polling.
 
 ## Vercel projects
 

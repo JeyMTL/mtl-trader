@@ -68,7 +68,9 @@ export default function BrokerConnect() {
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [problem, setProblem] = useState('')
+  const [stalled, setStalled] = useState(false)
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSince = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -87,10 +89,21 @@ export default function BrokerConnect() {
   }, [load])
 
   // While a supervisor is picking the connection up, refresh so the customer
-  // sees it go live without reloading the page.
+  // sees it go live without reloading the page. After two minutes, stop: a row
+  // that never leaves `pending` is a stuck session, not a slow one, and an
+  // endlessly spinning card tells the customer nothing.
   useEffect(() => {
     const status = connection?.status
-    if (status !== 'pending' && status !== 'connecting') return
+    if (status !== 'pending' && status !== 'connecting') {
+      pendingSince.current = null
+      setStalled(false)
+      return
+    }
+    pendingSince.current ??= Date.now()
+    if (Date.now() - pendingSince.current > 120000) {
+      setStalled(true)
+      return
+    }
     pollTimer.current = setTimeout(load, 6000)
     return () => {
       if (pollTimer.current) clearTimeout(pollTimer.current)
@@ -198,12 +211,27 @@ export default function BrokerConnect() {
               <dd className="text-gray-300 font-mono">{connection?.account || '—'}</dd>
             </div>
           </dl>
-          {status !== 'connected' && (
-            <p className="text-xs text-gray-500">
-              This usually takes under a minute. If it stays here, check that the account number
-              and investor password are correct, then disconnect and connect again.
-            </p>
-          )}
+          {status !== 'connected' &&
+            (stalled ? (
+              <div className="flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3">
+                <XCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-yellow-200/90 space-y-1">
+                  <p>
+                    Still not connected after two minutes. That normally means the account number,
+                    server or investor password was rejected — or no sync session is available yet.
+                  </p>
+                  <p className="text-yellow-200/70">
+                    Disconnect below and enter the details again, or use the read-only investor
+                    password from MT5 → Settings → your account.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">
+                This usually takes under a minute. If it stays here, check that the account number
+                and investor password are correct, then disconnect and connect again.
+              </p>
+            ))}
           <button
             onClick={disconnect}
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border hover:border-red-500/50 text-sm text-gray-300 hover:text-white transition-colors"

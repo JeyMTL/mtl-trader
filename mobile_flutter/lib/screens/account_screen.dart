@@ -9,6 +9,7 @@ import '../ui/language_picker.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'subscription_screen.dart';
+import 'sync_screen.dart';
 
 /// IANA names that Postgres can resolve with `AT TIME ZONE`.
 const List<String> _timezoneOptions = [
@@ -88,6 +89,18 @@ class _AccountScreenState extends State<AccountScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SubscriptionScreen(api: widget.api),
+      ),
+    );
+    if (!mounted) return;
+    await _refresh();
+  }
+
+  /// The MT5 connection lives here rather than in the tab bar: it is set up once
+  /// and then forgotten, unlike the desk, journal and analytics.
+  Future<void> _openSync() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SyncScreen(api: widget.api),
       ),
     );
     if (!mounted) return;
@@ -499,6 +512,12 @@ class _AccountScreenState extends State<AccountScreen> {
                   onPressed: _openPlans,
                   icon: const Icon(Icons.credit_card, size: 16),
                   label: const Text('View plans & billing'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _openSync,
+                  icon: const Icon(Icons.sync, size: 16),
+                  label: const Text('Connect MT5 account'),
                 ),
                 const SizedBox(height: 10),
                 FlatCard(
