@@ -44,6 +44,18 @@ class _JournalScreenState extends State<JournalScreen> {
   bool _deleting = false;
   String _filter = 'all';
   String _session = 'all';
+
+  /// Trades and P&L per session, so the header answers "which session pays"
+  /// without four filter taps. Filled from the same RPC the list uses, so the
+  /// numbers are exactly what tapping the chip would show.
+  Map<String, ({int trades, double pnl})> _sessionSummary = const {};
+
+  static const List<String> _sessionKeys = [
+    'asian',
+    'london',
+    'newyork',
+    'sydney',
+  ];
   String? _error;
   int _requestId = 0;
 
@@ -102,6 +114,7 @@ class _JournalScreenState extends State<JournalScreen> {
         _hasMore = items.length < page.total;
         _loading = false;
       });
+      if (reset) unawaited(_loadSessionSummary());
     } catch (error) {
       if (!mounted || requestId != _requestId) return;
       setState(() {
@@ -112,6 +125,31 @@ class _JournalScreenState extends State<JournalScreen> {
   }
 
   Future<void> _refresh() => _load(reset: true);
+
+  /// Four counts, one request each. The list itself is untouched, so a slow or
+  /// failing summary never delays the trades the trader came for.
+  Future<void> _loadSessionSummary() async {
+    try {
+      final results = await Future.wait([
+        for (final key in _sessionKeys)
+          widget.api.tradePage(limit: 1, session: key, filter: _filter),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _sessionSummary = {
+          for (var i = 0; i < _sessionKeys.length; i++)
+            _sessionKeys[i]: (
+              trades: results[i].total,
+              pnl: results[i].totalPnl,
+            ),
+        };
+      });
+    } catch (_) {
+      // A database without the session migration cannot answer these. The strip
+      // stays hidden rather than showing four zeroes as if nothing was traded.
+      if (mounted) setState(() => _sessionSummary = const {});
+    }
+  }
 
   Future<void> _deleteTrade(TradeRow trade) async {
     final confirmed = await showDialog<bool>(
@@ -354,6 +392,24 @@ class _JournalScreenState extends State<JournalScreen> {
                       ),
                   ],
                 ),
+                if (_sessionSummary.isNotEmpty)
+                  _SessionSummaryRow(
+                    entries: [
+                      for (final key in _sessionKeys)
+                        if (_sessionSummary[key] != null)
+                          (
+                            key: key,
+                            label: _sessionLabel(l10n, key),
+                            trades: _sessionSummary[key]!.trades,
+                            pnl: _sessionSummary[key]!.pnl,
+                          ),
+                    ],
+                    active: _session,
+                    onTap: (key) {
+                      setState(() => _session = key);
+                      _load(reset: true);
+                    },
+                  ),
               ],
             ),
           ),
@@ -369,6 +425,21 @@ class _JournalScreenState extends State<JournalScreen> {
         ],
       ),
     );
+  }
+
+  String _sessionLabel(AppLocalizations l10n, String key) {
+    switch (key) {
+      case 'asian':
+        return l10n.journalSessionAsian;
+      case 'london':
+        return l10n.journalSessionLondon;
+      case 'newyork':
+        return l10n.journalSessionNewYork;
+      case 'sydney':
+        return l10n.journalSessionSydney;
+      default:
+        return key;
+    }
   }
 
   Widget _body() {
@@ -698,6 +769,85 @@ class _TradeSparkPainter extends CustomPainter {
       oldDelegate.entry != entry ||
       oldDelegate.exit != exit ||
       oldDelegate.color != color;
+}
+
+/// One compact card per session: what it produced, and a tap to filter to it.
+class _SessionSummaryRow extends StatelessWidget {
+  const _SessionSummaryRow({
+    required this.entries,
+    required this.active,
+    required this.onTap,
+  });
+
+  final List<({String key, String label, int trades, double pnl})> entries;
+  final String active;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(top: 6),
+        itemCount: entries.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final entry = entries[index];
+          final selected = active == entry.key;
+          final positive = entry.pnl >= 0;
+          return InkWell(
+            onTap: () => onTap(entry.key),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary.withAlpha(26)
+                    : AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primary.withAlpha(90)
+                      : AppColors.border,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    entry.label,
+                    style: TextStyle(
+                      color:
+                          selected ? AppColors.primaryLight : AppColors.muted,
+                      fontSize: kMinLabelSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${entry.trades} · ',
+                    style: TextStyle(
+                      color: AppColors.faint,
+                      fontSize: kMinLabelSize,
+                    ),
+                  ),
+                  Text(
+                    signedMoney(entry.pnl),
+                    style: TextStyle(
+                      color: positive ? AppColors.success : AppColors.danger,
+                      fontSize: kMinLabelSize,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _FilterTab extends StatelessWidget {

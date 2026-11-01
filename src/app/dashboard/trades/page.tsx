@@ -31,6 +31,7 @@ export default function TradesPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter] = useState('all')
+  const [session, setSession] = useState('all')
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [clearLoading, setClearLoading] = useState(false)
@@ -53,20 +54,37 @@ export default function TradesPage() {
   const fetchPage = useCallback(async (
     targetPage: number,
     term: string,
-    activeFilter: string
+    activeFilter: string,
+    activeSession: string
   ): Promise<{ result: TradePageResult | null; message: string | null }> => {
     const { data, error: rpcError } = await supabase.rpc('trade_page', {
       p_limit: PAGE_SIZE,
       p_offset: targetPage * PAGE_SIZE,
       p_search: term || null,
       p_filter: activeFilter,
+      // The database does the filtering, so the counts and P&L below describe
+      // every matching trade rather than the page on screen.
+      p_session: activeSession === 'all' ? null : activeSession,
     })
-    if (rpcError) return { result: null, message: rpcError.message }
+    if (rpcError) {
+      // A database that predates the session argument rejects the call outright.
+      // Say so, instead of an unfiltered list that looks filtered.
+      const missing = /pgrst202|could not find the function|p_session/i.test(
+        `${rpcError.code ?? ''} ${rpcError.message}`
+      )
+      return {
+        result: null,
+        message:
+          missing && activeSession !== 'all'
+            ? 'The session filter needs a database update. Apply supabase/migrations/20261104_trade_page_session_filter.sql, then reload.'
+            : rpcError.message,
+      }
+    }
     return { result: data as unknown as TradePageResult, message: null }
   }, [])
 
-  const loadPage = useCallback(async (targetPage: number, term: string, activeFilter: string) => {
-    const { result, message } = await fetchPage(targetPage, term, activeFilter)
+  const loadPage = useCallback(async (targetPage: number, term: string, activeFilter: string, activeSession: string) => {
+    const { result, message } = await fetchPage(targetPage, term, activeFilter, activeSession)
     applyResult(result, message)
   }, [fetchPage, applyResult])
 
@@ -80,12 +98,12 @@ export default function TradesPage() {
 
   useEffect(() => {
     let active = true
-    fetchPage(page, debouncedSearch, filter).then(({ result, message }) => {
+    fetchPage(page, debouncedSearch, filter, session).then(({ result, message }) => {
       if (!active) return
       applyResult(result, message)
     })
     return () => { active = false }
-  }, [page, debouncedSearch, filter, fetchPage, applyResult])
+  }, [page, debouncedSearch, filter, session, fetchPage, applyResult])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this trade?')) return
@@ -103,7 +121,7 @@ export default function TradesPage() {
     const nextPage = trades.length === 1 && page > 0 ? page - 1 : page
     setLoading(true)
     if (nextPage !== page) setPage(nextPage)
-    else await loadPage(page, debouncedSearch, filter)
+    else await loadPage(page, debouncedSearch, filter, session)
   }
 
   const handleClearJournal = async () => {
@@ -125,7 +143,7 @@ export default function TradesPage() {
     } else {
       await removeStoredMedia(mediaPaths).catch(() => {})
       setPage(0)
-      await loadPage(0, debouncedSearch, filter)
+      await loadPage(0, debouncedSearch, filter, session)
     }
     setClearLoading(false)
   }
@@ -142,6 +160,8 @@ export default function TradesPage() {
           p_offset: index * EXPORT_PAGE_SIZE,
           p_search: debouncedSearch || null,
           p_filter: filter,
+          // Export exactly what the screen is showing, session included.
+          p_session: session === 'all' ? null : session,
         })
         if (rpcError) throw new Error(rpcError.message)
         const result = data as unknown as TradePageResult
@@ -253,6 +273,29 @@ export default function TradesPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          ['all', 'All sessions'],
+          ['asian', 'Asian'],
+          ['london', 'London'],
+          ['newyork', 'New York'],
+          ['sydney', 'Sydney'],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => { setSession(value); setPage(0); setLoading(true) }}
+            aria-pressed={session === value}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              session === value
+                ? 'bg-primary/15 text-primary-light border border-primary/50'
+                : 'bg-surface border border-border text-gray-400 hover:text-white'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Phone: one card per trade. The table is a desktop-only layout. */}

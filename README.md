@@ -72,6 +72,8 @@ Run every migration in `supabase/migrations/` in filename order (they are idempo
 
 `20261028_journal_media_and_time_stats.sql` adds the `trade_attachments` table, the private `journal-media` storage bucket and its policies, the `time_stats()` and `journal_feed()` RPCs, and attachment counts on `trade_page`. Apply it after `20261027`. The dashboard and analytics read `time_stats` and `journal_feed`; without them those panels log an error and render empty states, and photo/voice-note uploads fail.
 
+`20261104_trade_page_session_filter.sql` adds the optional `p_session` argument to `trade_page` so the trade history can be narrowed to one UTC trading session (Asian, London, New York, Sydney). It drops the old four-argument signature first, because two overloads whose arguments all have defaults make PostgREST answer `PGRST203` instead of choosing one. Callers that pass no session keep working. Without it, the session chips render and then report that the database needs the update rather than showing an unfiltered list.
+
 After deploying it, existing signed-in browsers must sign in once more. Sessions moved from localStorage to cookies so that server components and the proxy can authenticate them; that is a one-time cost and the old localStorage session is simply ignored.
 
 ### 4. Run Development Server
