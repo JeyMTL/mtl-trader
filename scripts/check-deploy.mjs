@@ -68,6 +68,24 @@ async function main() {
           : 'could not be determined'
     )
   }
+  if (body.migrations) {
+    const { status, checked, missing = [], unknown = [] } = body.migrations
+    line(
+      'database functions',
+      status === 'ok',
+      `${checked} probed${status === 'pending' ? ` — ${missing.length} missing` : ''}`
+    )
+    // Printed rather than folded into the exit code: a pending migration is
+    // fixable in a minute, and failing the gate would leave the deploy-gate job
+    // red for something the app tolerates.
+    for (const entry of missing) {
+      console.log(`    ✖ ${entry.rpc} is missing — apply supabase/migrations/${entry.migration}`)
+      console.log(`      without it: ${entry.usedBy}`)
+    }
+    if (unknown.length > 0) {
+      console.log(`    ? could not probe: ${unknown.join(', ')}`)
+    }
+  }
   if (body.commit) console.log(`  commit ${body.commit}`)
 
   return response.ok && body.status === 'ok' ? 0 : 1

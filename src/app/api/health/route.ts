@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { checkRpcs } from '@/lib/health-rpcs'
 
 /**
  * Liveness and configuration probe.
@@ -48,6 +49,9 @@ export async function GET() {
   }
 
   const avatars = await checkAvatarsBucket(supabaseUrl)
+  // Per-function schema check: a database that has not had the latest migration
+  // applied otherwise looks healthy while one panel renders empty.
+  const migrations = await checkRpcs(supabaseUrl, anonKey)
 
   const healthy =
     config.supabaseUrl && config.supabaseAnonKey && database === 'ok'
@@ -69,6 +73,10 @@ export async function GET() {
       // reached this deployment. Without it a missing key surfaces only as a
       // 503 when a customer tries to connect, which is too late to be useful.
       features: { avatars, hostedSync: Boolean(process.env.SYNC_CREDENTIAL_KEY) },
+      // Like `features`, reported but not part of `status`: a pending migration
+      // is a known, fixable state, and paging every fifteen minutes until
+      // someone pastes SQL would train the alert away. `missing` names the file.
+      migrations,
       checkedAt: new Date().toISOString(),
     },
     {

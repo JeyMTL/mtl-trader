@@ -15,6 +15,37 @@ node scripts/check-deploy.mjs https://your-domain
 
 That script is the same probe used by the deploy gate and the uptime monitor.
 
+### Database functions
+
+The endpoint also reports `migrations`: every RPC the app calls, probed once, with
+`missing` naming both the function and the migration file that creates it.
+
+```json
+"migrations": {
+  "status": "pending",
+  "checked": 22,
+  "missing": [{ "rpc": "session_stats", "migration": "20261105_session_stats.sql",
+                "usedBy": "session strip, dashboard and analytics sessions" }]
+}
+```
+
+A half-migrated database is the failure that looks like a code bug — the pages
+render and one panel is silently empty — so this is what turns it into a
+sentence. The probe sends the argument names the app actually uses, so a dropped
+or renamed parameter reads as missing too, which is correct: the caller breaks
+either way.
+
+Every probe is sent as the anonymous role, which holds no `EXECUTE` on these
+functions; "permission denied" is the *healthy* answer. The arguments are
+harmless by design (a nil uuid, an unknown plan, a one-second window) so that if
+a future migration grants one of them to `anon`, the probe still cannot change
+anything.
+
+`migrations.status` is reported but is **not** part of `status`, and it does not
+fail the deploy gate. A pending migration is a known state with a named fix, and
+an alert that fires every fifteen minutes until someone pastes SQL is an alert
+people learn to ignore.
+
 ## Uptime monitoring
 
 `.github/workflows/uptime.yml` runs every 15 minutes:
