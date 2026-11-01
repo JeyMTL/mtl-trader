@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { isTrialActive, maxTradesForPlan } from '@/lib/subscription'
+import { rateLimit } from '@/lib/rate-limit'
 import { apiError } from '@/lib/log'
 
 /**
@@ -10,6 +11,19 @@ import { apiError } from '@/lib/log'
 export async function POST(req: Request) {
   const user = await getAuthUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Idempotent, but it writes: the import screen calls it on every run, so a
+  // retry loop should hit a wall rather than a database write.
+  const limit = await rateLimit(`trial:${user.id}`, 30, 60 * 60 * 1000)
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Try again shortly.' },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) },
+      }
+    )
+  }
 
   const supabase = getAdminClient()
   const { data: account, error: readError } = await supabase

@@ -3026,17 +3026,27 @@ class _TradingChartPainter extends CustomPainter {
       }
     }
 
+    // Everything below is bounded to the candles that can be seen. A pan
+    // repaints at pointer rate, and walking the whole 5,000-candle series once
+    // per session per frame is what turns a drag into a slideshow. One candle
+    // of padding keeps a band that started just off-screen from being redrawn
+    // from the window edge (the canvas clips that sliver anyway).
+    final from = (start.floor() - 1).clamp(0, candles.length - 1);
+    final to = (start + span).ceil().clamp(from, candles.length - 1);
+    final visibleTimes = <DateTime>[
+      for (var i = from; i <= to; i++) candles[i].time,
+    ];
+
     // Session shading sits behind the candles: a translucent band per enabled
     // session, so price action is never hidden by the context it traded in.
     // Band edges come from UTC hours, which is why London starts at 07:00 no
     // matter what the phone's clock says.
     if (style.showSessions) {
-      final times = candles.map((candle) => candle.time);
       for (final session in TradingSession.values) {
         if (!style.sessions.contains(session)) continue;
-        for (final band in sessionBands(times, session)) {
-          final left = ((band.firstIndex - start) / span) * plotW;
-          final right = ((band.lastIndex + 1 - start) / span) * plotW;
+        for (final band in sessionBands(visibleTimes, session)) {
+          final left = ((band.firstIndex + from - start) / span) * plotW;
+          final right = ((band.lastIndex + 1 + from - start) / span) * plotW;
           if (right < 0 || left > plotW) continue;
           final rect = Rect.fromLTRB(
             math.max(0.0, left),
@@ -3063,8 +3073,8 @@ class _TradingChartPainter extends CustomPainter {
           // The break line is drawn after the band so the tint cannot swallow
           // it: the line is the precise moment the session opened, the band is
           // only the stretch of time around it.
-          if (style.showSessionBreaks && band.firstIndex > 0) {
-            final bx = ((band.firstIndex - start) / span) * plotW;
+          if (style.showSessionBreaks && band.firstIndex + from > 0) {
+            final bx = ((band.firstIndex + from - start) / span) * plotW;
             if (bx > 0 && bx < plotW) {
               _dashed(
                 canvas,
@@ -3081,10 +3091,10 @@ class _TradingChartPainter extends CustomPainter {
     // Period separators: one dashed line where a new day, week or month opens.
     if (style.showSeparators) {
       for (final index in periodSeparatorIndices(
-        candles.map((candle) => candle.time),
+        visibleTimes,
         style.separatorGrain,
       )) {
-        final gx = ((index - start) / span) * plotW;
+        final gx = ((index + from - start) / span) * plotW;
         if (gx < 0 || gx > plotW) continue;
         _dashed(
           canvas,
@@ -3098,7 +3108,7 @@ class _TradingChartPainter extends CustomPainter {
     final slot = plotW / span;
     final bodyWidth = math.max(1.2, slot * 0.66);
     if (chartType == ChartType.candles) {
-      for (var i = 0; i < candles.length; i++) {
+      for (var i = from; i <= to; i++) {
         final candle = candles[i];
         final cx = x(i.toDouble());
         if (cx < -slot || cx > plotW + slot) continue;
@@ -3123,7 +3133,7 @@ class _TradingChartPainter extends CustomPainter {
     } else {
       final line = Path();
       var started = false;
-      for (var i = 0; i < candles.length; i++) {
+      for (var i = from; i <= to; i++) {
         final cx = x(i.toDouble());
         if (cx < -slot || cx > plotW + slot) continue;
         final cy = y(candles[i].close);
@@ -3169,7 +3179,7 @@ class _TradingChartPainter extends CustomPainter {
         ..strokeWidth = 1.3;
       final series = entry.value;
       Path? run;
-      for (var i = 0; i < series.length && i < candles.length; i++) {
+      for (var i = from; i <= to && i < series.length; i++) {
         final value = series[i];
         final px = x(i.toDouble());
         if (value == null || px < -slot || px > plotW + slot) {
@@ -3214,7 +3224,7 @@ class _TradingChartPainter extends CustomPainter {
         size: 8,
       );
       if (maxVolume > 0) {
-        for (var i = 0; i < candles.length; i++) {
+        for (var i = from; i <= to; i++) {
           final cx = x(i.toDouble());
           if (cx < -slot || cx > plotW + slot) continue;
           final height = candles[i].volume / maxVolume * (panes.volumeH - 12);

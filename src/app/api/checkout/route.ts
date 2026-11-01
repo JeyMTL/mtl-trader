@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
 import { PLANS } from '@/lib/plans'
 import { getPayPalAccessToken, PAYPAL_BASE } from '@/lib/payments'
+import { rateLimit } from '@/lib/rate-limit'
 import { apiError, logEvent } from '@/lib/log'
 
 // Derived from PLANS so checkout can never drift from the displayed prices.
@@ -27,6 +28,20 @@ export async function POST(req: Request) {
     }
     if (authUser.id !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Creating an order is free but not free for PayPal or for us: an abandoned
+    // checkout loop leaves a trail of live orders. Ten an hour is far more than
+    // a person needs and far less than a script wants.
+    const limit = await rateLimit(`checkout:${authUser.id}`, 10, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many checkout attempts. Try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) },
+        }
+      )
     }
 
     const accessToken = await getPayPalAccessToken()

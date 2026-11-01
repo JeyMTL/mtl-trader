@@ -22,6 +22,8 @@ const CONTENT_SECURITY_POLICY = [
 
 const nextConfig: NextConfig = {
   transpilePackages: ['xlsx'],
+  // No reason to tell the internet which framework and version is behind this.
+  poweredByHeader: false,
   async headers() {
     return [
       {
@@ -30,6 +32,10 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-Frame-Options', value: 'DENY' },
+          // Vercel terminates TLS but does not add HSTS itself. Two years, with
+          // subdomains, so a first visit over http can never be the one that
+          // leaks a session cookie.
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
           { key: 'Content-Security-Policy', value: CONTENT_SECURITY_POLICY },
           // Journal capture needs the camera and microphone on this origin only.
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },

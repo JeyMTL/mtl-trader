@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
 import { applyPaidOrder, getPayPalAccessToken, parseCustomId, PAYPAL_BASE } from '@/lib/payments'
+import { rateLimit } from '@/lib/rate-limit'
 import { apiError, logEvent } from '@/lib/log'
 
 export async function POST(req: Request) {
@@ -8,6 +9,19 @@ export async function POST(req: Request) {
     const authUser = await getAuthUser(req)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Capturing is a paid provider call and the success page retries on a
+    // flaky connection, so allow a handful and stop the loop.
+    const limit = await rateLimit(`capture:${authUser.id}`, 20, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many confirmation attempts. Try again shortly.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) },
+        }
+      )
     }
 
     const { orderId } = await req.json()
