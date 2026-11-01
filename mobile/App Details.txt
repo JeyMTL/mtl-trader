@@ -1,0 +1,4 @@
+keystore:     mobile_flutter/android/upload-keystore.jks
+alias:        upload
+cert SHA-256: 395115FB64473543C022A125880B546482FD1536DA5F89A270B191DB29F44CF4
+password:     NOT RECORDED HERE — kept in mobile_flutter/android/key.properties (git-ignored) and in the password manager. Never commit it.
