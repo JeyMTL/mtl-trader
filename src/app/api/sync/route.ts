@@ -131,6 +131,19 @@ export async function POST(req: Request) {
       return apiError('sync.insert', insertError, 500, 'Could not save the synced trades.')
     }
 
+    // Marks a hosted connection as live, so the app can show "last trade 12s
+    // ago". Best-effort: desktop-agent users have no row here, and a failed
+    // stamp must never fail a sync whose trades are already saved.
+    const now = new Date().toISOString()
+    try {
+      await supabase
+        .from('broker_connections')
+        .update({ status: 'connected', last_sync_at: now, last_error: null, updated_at: now })
+        .eq('user_id', userId)
+    } catch {
+      // The migration may not be applied yet; the sync itself succeeded.
+    }
+
     // `trades_remaining` is not authoritative: the enforce_trade_quota trigger
     // enforces the monthly limit from `max_trades`, so we no longer mutate it here.
     return NextResponse.json({ message: 'Sync complete', imported: inserted!.length })

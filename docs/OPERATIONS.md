@@ -126,6 +126,34 @@ The picker lives under Account → Language, and
 `mobile_flutter/test/language_picker_test.dart` covers listing the languages,
 switching to French, and switching back to the device language.
 
+## Hosted broker sync
+
+Most customers only have a phone, and MT5 mobile cannot run an Expert Advisor,
+so they connect with the account's **investor** (read-only) password instead. A
+supervisor on our own Windows hosts logs in and streams closed trades to
+`/api/sync`, exactly as a desktop agent would.
+
+* **Table:** `broker_connections`
+  (`supabase/migrations/20261102_broker_connections.sql`). The credential is
+  sealed with AES-256-GCM in the application, and column grants keep
+  `credential_cipher` out of every signed-in read, so the browser can see the
+  connection but never the password.
+* **`SYNC_CREDENTIAL_KEY`** (32 bytes, base64) seals credentials. Without it
+  `POST /api/broker/connection` answers 503 rather than storing a password in
+  the clear. Rotating the key makes existing connections undecryptable, so
+  customers must reconnect — rotate deliberately.
+* **Lifecycle:** `pending` → `connecting` → `connected`, or `failed` with
+  `last_error`. `DELETE /api/broker/connection` wipes the credential and sets
+  `disconnected`; the supervisor must tear that session down.
+* **The supervisor is infrastructure, not part of the Next.js deploy.** It claims
+  rows where `status = 'pending'` ordered by `created_at`, holds one MT5 terminal
+  per connection, and posts to `/api/sync` with the customer's `agent_token`. A
+  crashed session must be retried, and a session whose credential stops working
+  must be marked `failed` with a message the customer can act on.
+* **Never accept the master password.** The investor password cannot trade, which
+  is what makes holding a credential defensible. The customer's revoke buttons
+  are "Disconnect" in the app and changing the investor password in MT5.
+
 ## Vercel projects
 
 Two projects were building this repo on every push, which doubled build minutes

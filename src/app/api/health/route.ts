@@ -64,7 +64,11 @@ export async function GET() {
       // Reported, but deliberately not part of `status`: a missing bucket breaks
       // avatar uploads while the journal itself keeps working, so it must not
       // page anyone. The deploy gate surfaces it instead.
-      features: { avatars },
+      // Presence only, never a value or a prefix: `hostedSync` tells the deploy
+      // gate — and anyone debugging — whether SYNC_CREDENTIAL_KEY actually
+      // reached this deployment. Without it a missing key surfaces only as a
+      // 503 when a customer tries to connect, which is too late to be useful.
+      features: { avatars, hostedSync: Boolean(process.env.SYNC_CREDENTIAL_KEY) },
       checkedAt: new Date().toISOString(),
     },
     {

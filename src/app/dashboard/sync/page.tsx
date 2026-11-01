@@ -6,6 +6,7 @@ import { Download, Key, Server, XCircle, Loader2, Copy, Check, RefreshCw } from 
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
 import { useToast } from '@/components/toast'
+import BrokerConnect from '@/components/broker-connect'
 
 export default function SyncPage() {
   const router = useRouter()
@@ -93,8 +94,12 @@ export default function SyncPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">MT5 Auto Sync</h1>
-        <p className="text-gray-400 mt-1">Connect your MT5 account to automatically sync trades</p>
+        <p className="text-gray-400 mt-1">
+          Connect your MT5 account once and every closed trade lands here — from a phone, no PC needed
+        </p>
       </div>
+
+      <BrokerConnect />
 
       <div className="bg-surface rounded-xl border border-border p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -102,8 +107,11 @@ export default function SyncPage() {
             <Key className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Your Sync Token</h2>
-            <p className="text-sm text-gray-400">This token authenticates your MT5 agent</p>
+            <h2 className="text-lg font-semibold text-white">Desktop agent token</h2>
+            <p className="text-sm text-gray-400">
+              Only needed if you run the agent on a Windows PC — the automatic connection above
+              uses no token
+            </p>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch gap-2">
@@ -187,8 +195,8 @@ export default function SyncPage() {
             <Download className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Setup Instructions</h2>
-            <p className="text-sm text-gray-400">Follow these steps to sync your trades</p>
+            <h2 className="text-lg font-semibold text-white">Running the agent yourself</h2>
+            <p className="text-sm text-gray-400">For Windows users who prefer the local agent</p>
           </div>
         </div>
         
