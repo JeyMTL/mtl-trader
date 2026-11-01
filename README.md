@@ -47,7 +47,9 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - [docs/REPO_MAP.md](docs/REPO_MAP.md) — quick guide to the codebase and how the app fits together
 - [docs/SELLER_BRIEF.md](docs/SELLER_BRIEF.md) — concise overview for a buyer or investor
 - [docs/SELLER_PAGE.md](docs/SELLER_PAGE.md) — product brief for listings and outreach
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — health endpoint, crons, monitoring and hosted sync
 - [mobile_flutter/README.md](mobile_flutter/README.md) — Flutter app bootstrap, permissions and build commands
+- [docs/ANDROID_RELEASE.md](docs/ANDROID_RELEASE.md) — app id, keystore, signing and backups for the Android build
 
 ## Setup Instructions
 
