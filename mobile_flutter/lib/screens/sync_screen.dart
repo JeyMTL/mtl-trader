@@ -33,6 +33,8 @@ class _SyncScreenState extends State<SyncScreen> {
   bool _saving = false;
   String? _error;
   Timer? _poll;
+  DateTime? _pendingSince;
+  bool _stalled = false;
 
   @override
   void initState() {
@@ -73,10 +75,22 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   /// While a session is being established, refresh so the customer sees it go
-  /// live without pulling to refresh. Stops once it settles.
+  /// live without pulling to refresh. Stops once it settles — and after two
+  /// minutes, because a row that never leaves `pending` is a stuck session, not
+  /// a slow one, and polling forever hides the problem instead of naming it.
+  /// This mirrors the two-minute cutoff on the web connect card.
   void _schedulePoll() {
     _poll?.cancel();
-    if (_status != 'pending' && _status != 'connecting') return;
+    if (_status != 'pending' && _status != 'connecting') {
+      _pendingSince = null;
+      if (_stalled) setState(() => _stalled = false);
+      return;
+    }
+    _pendingSince ??= DateTime.now();
+    if (DateTime.now().difference(_pendingSince!) > const Duration(minutes: 2)) {
+      if (!_stalled) setState(() => _stalled = true);
+      return;
+    }
     _poll = Timer(const Duration(seconds: 6), _load);
   }
 
@@ -262,7 +276,9 @@ class _SyncScreenState extends State<SyncScreen> {
         Text(
           _status == 'connected'
               ? 'Closed trades arrive automatically, even with the app shut.'
-              : 'A session usually connects in under a minute. If it does not, disconnect and check the account number, server and investor password.',
+              : _stalled
+                  ? 'Still not connected after two minutes. That normally means the account number, server or investor password was rejected. Disconnect below and enter the details again.'
+                  : 'A session usually connects in under a minute. If it does not, disconnect and check the account number, server and investor password.',
           style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
         ),
         const SizedBox(height: 14),

@@ -10,6 +10,15 @@ import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 import { useToast } from '@/components/toast'
 
+/**
+ * Card subscriptions are wired to Flutterwave, whose keys are deliberately not
+ * configured while the gateway decision is open. A button that answers 503 is
+ * worse than no button — it invites a customer to commit and then fails — so the
+ * option is hidden rather than disabled with a promise. Flip this to true once a
+ * provider is live; the whole flow comes back unchanged.
+ */
+const CARD_CHECKOUT_ENABLED = false
+
 export default function PricingPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -148,6 +157,7 @@ export default function PricingPage() {
                   </Link>
                 ) : (
                   <div className="space-y-2">
+                    {CARD_CHECKOUT_ENABLED && (
                     <button
                       onClick={() => handleCardSubscription(plan.id)}
                       disabled={flwLoading === plan.id}
@@ -163,9 +173,12 @@ export default function PricingPage() {
                         <><RefreshCw className="w-4 h-4" /> Subscribe with card</>
                       )}
                     </button>
+                    )}
+                    {CARD_CHECKOUT_ENABLED && (
                     <p className="text-xs text-gray-500 text-center">
                       Auto-renews monthly · cancel any time
                     </p>
+                    )}
                     <button
                       onClick={() => handleCheckout(plan.id)}
                       disabled={loading === plan.id}
@@ -190,9 +203,10 @@ export default function PricingPage() {
           </div>
 
           <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-gray-500">
-            Card subscriptions renew monthly through Flutterwave and can be stopped from
-            Settings at any time; access continues until the paid period ends. PayPal is a
-            one-time 30-day payment, and bank transfers are approved manually.
+            PayPal is a one-time 30-day payment, and bank transfers are approved manually.
+            {CARD_CHECKOUT_ENABLED
+              ? ' Card subscriptions renew monthly and can be stopped from Settings at any time; access continues until the paid period ends.'
+              : ''}
           </p>
         </div>
       </div>
