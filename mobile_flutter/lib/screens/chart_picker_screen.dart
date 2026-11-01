@@ -10,6 +10,7 @@ import '../core/chart_replay.dart';
 import 'time_frame_sheet.dart';
 import '../core/chart_drawings.dart';
 import '../core/chart_scale.dart';
+import '../core/chart_sessions.dart';
 import '../core/chart_theme.dart';
 import '../core/chart_view.dart';
 import '../core/indicators.dart';
@@ -184,7 +185,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     if (cached != null && cached.isNotEmpty) {
       _candles = cached;
       _loading = false;
-    }    _load(silent: _candles.isNotEmpty, force: true);
+    }
+    _load(silent: _candles.isNotEmpty, force: true);
     _startRefreshTimer();
     _restoreDrawings();
     _restoreLayout();
@@ -670,8 +672,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       draftStart: _draftStart,
       onDraw: _onDraw,
       selectedDrawing: _selectedDrawing,
-      onDrawingSelected: (index) =>
-          setState(() => _selectedDrawing = index),
+      onDrawingSelected: (index) => setState(() => _selectedDrawing = index),
       onDrawingMoved: _moveDrawing,
       onDrawingMoveEnd: _finishDrawingMove,
     );
@@ -1065,8 +1066,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     if (!mounted || action == null) return;
     if (action == 'trend' || action == 'ray') {
       setState(() {
-        _drawingTool =
-            action == 'trend' ? DrawingTool.trend : DrawingTool.ray;
+        _drawingTool = action == 'trend' ? DrawingTool.trend : DrawingTool.ray;
         _draftStart = null;
       });
       return;
@@ -1363,6 +1363,52 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               'Log scale',
               style.logScale,
               (value) => onChanged(style.copyWith(logScale: value)),
+            ),
+            const SizedBox(height: 16),
+            Text('SESSIONS', style: label),
+            _switchRow(
+              'Session shading',
+              style.showSessions,
+              (value) => onChanged(style.copyWith(showSessions: value)),
+            ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final session in TradingSession.values)
+                  _ChartTypeChip(
+                    label: session.label,
+                    selected: style.sessions.contains(session),
+                    onTap: () {
+                      final next = <TradingSession>{...style.sessions};
+                      if (next.contains(session)) {
+                        next.remove(session);
+                      } else {
+                        next.add(session);
+                      }
+                      onChanged(style.copyWith(sessions: next));
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _switchRow(
+              'Period separators',
+              style.showSeparators,
+              (value) => onChanged(style.copyWith(showSeparators: value)),
+            ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final grain in SeparatorGrain.values)
+                  _ChartTypeChip(
+                    label: grain.label,
+                    selected: style.separatorGrain == grain,
+                    onTap: () =>
+                        onChanged(style.copyWith(separatorGrain: grain)),
+                  ),
+              ],
             ),
           ],
         ),
@@ -2043,7 +2089,8 @@ class _ChartCanvas extends StatefulWidget {
   final DateTime? exitTime;
   final ValueChanged<_Marker> onSelect;
   final void Function(_Marker marker, double price, DateTime time) onPin;
-  final void Function(_Marker marker, double price, DateTime? time) onLevelMoved;
+  final void Function(_Marker marker, double price, DateTime? time)
+      onLevelMoved;
   final DrawingTool drawTool;
   final List<ChartDrawing> drawings;
   final DrawingDraft? draftStart;
@@ -2171,12 +2218,10 @@ class _ChartCanvasState extends State<_ChartCanvas> {
 
   double _priceFor(Offset local) {
     final bounds = _bounds();
-    final panes =
-        _TradingChartPainter.paneLayout(_size.height, widget.style);
+    final panes = _TradingChartPainter.paneLayout(_size.height, widget.style);
     if (panes.priceH <= 0) return bounds.max;
-    final ratio = ((local.dy - panes.priceTop) / panes.priceH)
-        .clamp(0.0, 1.0)
-        .toDouble();
+    final ratio =
+        ((local.dy - panes.priceTop) / panes.priceH).clamp(0.0, 1.0).toDouble();
     return priceForRatio(
       ratio: ratio,
       min: bounds.min,
@@ -2197,15 +2242,14 @@ class _ChartCanvasState extends State<_ChartCanvas> {
 
   double _yFor(double price) {
     final bounds = _bounds();
-    final panes =
-        _TradingChartPainter.paneLayout(_size.height, widget.style);
+    final panes = _TradingChartPainter.paneLayout(_size.height, widget.style);
     return panes.priceTop +
         ratioForPrice(
-          price: price,
-          min: bounds.min,
-          max: bounds.max,
-          logScale: widget.style.logScale,
-        ) *
+              price: price,
+              min: bounds.min,
+              max: bounds.max,
+              logScale: widget.style.logScale,
+            ) *
             panes.priceH;
   }
 
@@ -2230,13 +2274,11 @@ class _ChartCanvasState extends State<_ChartCanvas> {
     if (widget.candles.isEmpty) return;
     final plotW = _size.width - _TradingChartPainter.axisWidth;
     if (plotW <= 0 || local.dx > plotW) return;
-    if (widget.drawTool == DrawingTool.none &&
-        widget.selectedDrawing != null) {
+    if (widget.drawTool == DrawingTool.none && widget.selectedDrawing != null) {
       widget.onDrawingSelected(null);
     }
     if (widget.drawTool != DrawingTool.none) {
-      final panes =
-          _TradingChartPainter.paneLayout(_size.height, widget.style);
+      final panes = _TradingChartPainter.paneLayout(_size.height, widget.style);
       if (local.dy < panes.priceTop ||
           local.dy > panes.priceTop + panes.priceH) {
         return;
@@ -2349,9 +2391,9 @@ class _ChartCanvasState extends State<_ChartCanvas> {
     final dy = b.dy - a.dy;
     final lengthSquared = dx * dx + dy * dy;
     if (lengthSquared <= 1e-9) return (point - a).distance;
-    final t = (((point.dx - a.dx) * dx + (point.dy - a.dy) * dy) /
-            lengthSquared)
-        .clamp(0.0, 1.0);
+    final t =
+        (((point.dx - a.dx) * dx + (point.dy - a.dy) * dy) / lengthSquared)
+            .clamp(0.0, 1.0);
     return (point - Offset(a.dx + t * dx, a.dy + t * dy)).distance;
   }
 
@@ -2378,9 +2420,8 @@ class _ChartCanvasState extends State<_ChartCanvas> {
       return ChartDrawing.ray(price: (original.price ?? 0) + priceDelta);
     }
     final plotW = _size.width - _TradingChartPainter.axisWidth;
-    final shift = plotW <= 0
-        ? 0.0
-        : (local.dx - _dragOrigin.dx) / plotW * _view.span;
+    final shift =
+        plotW <= 0 ? 0.0 : (local.dx - _dragOrigin.dx) / plotW * _view.span;
     final candles = widget.candles;
     int shiftTime(int ms) {
       final index = _indexForTime(ms);
@@ -2634,7 +2675,8 @@ class _ChartTypeChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 9),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
+          color:
+              selected ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
           borderRadius: BorderRadius.circular(AppRadius.field),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -2909,11 +2951,11 @@ class _TradingChartPainter extends CustomPainter {
     double y(double price) =>
         panes.priceTop +
         ratioForPrice(
-          price: price,
-          min: minPrice,
-          max: maxPrice,
-          logScale: style.logScale,
-        ) *
+              price: price,
+              min: minPrice,
+              max: maxPrice,
+              logScale: style.logScale,
+            ) *
             plotH;
     double x(double index) => ((index + 0.5 - start) / span) * plotW;
 
@@ -2947,6 +2989,61 @@ class _TradingChartPainter extends CustomPainter {
       if (gx < 0 || gx > plotW) continue;
       if (style.showGrid) {
         canvas.drawLine(Offset(gx, topPad), Offset(gx, topPad + plotH), grid);
+      }
+    }
+
+    // Session shading sits behind the candles: a translucent band per enabled
+    // session, so price action is never hidden by the context it traded in.
+    // Band edges come from UTC hours, which is why London starts at 07:00 no
+    // matter what the phone's clock says.
+    if (style.showSessions) {
+      final times = candles.map((candle) => candle.time);
+      for (final session in TradingSession.values) {
+        if (!style.sessions.contains(session)) continue;
+        for (final band in sessionBands(times, session)) {
+          final left = ((band.firstIndex - start) / span) * plotW;
+          final right = ((band.lastIndex + 1 - start) / span) * plotW;
+          if (right < 0 || left > plotW) continue;
+          final rect = Rect.fromLTRB(
+            math.max(0.0, left),
+            topPad,
+            math.min(plotW, right),
+            topPad + plotH,
+          );
+          if (rect.width < 0.5) continue;
+          canvas.drawRect(
+            rect,
+            Paint()..color = session.tint.withAlpha(style.isLight ? 18 : 26),
+          );
+          // Only label a band wide enough to hold the word, or a zoomed-out
+          // chart turns into a wall of overlapping text.
+          if (rect.width >= 42) {
+            _label(
+              canvas,
+              session.label,
+              Offset(rect.left + 3, topPad + 2),
+              color: session.tint.withAlpha(style.isLight ? 200 : 165),
+              size: 8,
+            );
+          }
+        }
+      }
+    }
+
+    // Period separators: one dashed line where a new day, week or month opens.
+    if (style.showSeparators) {
+      for (final index in periodSeparatorIndices(
+        candles.map((candle) => candle.time),
+        style.separatorGrain,
+      )) {
+        final gx = ((index - start) / span) * plotW;
+        if (gx < 0 || gx > plotW) continue;
+        _dashed(
+          canvas,
+          Offset(gx, topPad),
+          Offset(gx, topPad + plotH),
+          style.muted.withAlpha(95),
+        );
       }
     }
 
@@ -3160,7 +3257,9 @@ class _TradingChartPainter extends CustomPainter {
           maxAbs = math.max(maxAbs, point.histogram.abs());
         }
         double oy(double value) =>
-            paneBottom - (value + maxAbs) / (2 * maxAbs) * (panes.oscH - 10) - 4;
+            paneBottom -
+            (value + maxAbs) / (2 * maxAbs) * (panes.oscH - 10) -
+            4;
         _dashed(canvas, Offset(0, oy(0)), Offset(plotW, oy(0)), style.grid);
         _label(
           canvas,
@@ -3261,8 +3360,7 @@ class _TradingChartPainter extends CustomPainter {
       }
     }
     final draft = draftStart;
-    final draftX =
-        draft == null ? null : _xForTime(draft.timeMs, plotW);
+    final draftX = draft == null ? null : _xForTime(draft.timeMs, plotW);
     if (draft != null && draftX != null && crosshair != null) {
       _dashed(
         canvas,

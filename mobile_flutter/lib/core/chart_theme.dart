@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'chart_sessions.dart';
 import 'indicators.dart';
 
 /// How the price series is drawn.
@@ -63,6 +64,14 @@ class ChartStyle {
     this.showGrid = true,
     this.showCrosshair = true,
     this.showWatermark = true,
+    this.showSessions = true,
+    this.sessions = const <TradingSession>{
+      TradingSession.asian,
+      TradingSession.london,
+      TradingSession.newYork,
+    },
+    this.showSeparators = true,
+    this.separatorGrain = SeparatorGrain.day,
     this.chartType = ChartType.candles,
     this.studies = const <OverlayStudy>{},
     this.studyPeriods = const <String, int>{},
@@ -93,6 +102,20 @@ class ChartStyle {
   final bool showGrid;
   final bool showCrosshair;
   final bool showWatermark;
+
+  /// Shade the UTC trading sessions behind the candles.
+  final bool showSessions;
+
+  /// Which sessions to shade. Overlapping sessions stack: London and New York
+  /// trade together from 12:00 to 16:00 UTC, and that overlap is the busiest
+  /// part of the day, so it is shown rather than merged away.
+  final Set<TradingSession> sessions;
+
+  /// A vertical line where a new day, week or month begins.
+  final bool showSeparators;
+
+  /// The period [showSeparators] marks.
+  final SeparatorGrain separatorGrain;
 
   /// Candles, a close line, or a filled area.
   final ChartType chartType;
@@ -133,6 +156,10 @@ class ChartStyle {
     bool? showGrid,
     bool? showCrosshair,
     bool? showWatermark,
+    bool? showSessions,
+    Set<TradingSession>? sessions,
+    bool? showSeparators,
+    SeparatorGrain? separatorGrain,
     ChartType? chartType,
     Set<OverlayStudy>? studies,
     Map<String, int>? studyPeriods,
@@ -158,6 +185,10 @@ class ChartStyle {
       showGrid: showGrid ?? this.showGrid,
       showCrosshair: showCrosshair ?? this.showCrosshair,
       showWatermark: showWatermark ?? this.showWatermark,
+      showSessions: showSessions ?? this.showSessions,
+      sessions: sessions ?? this.sessions,
+      showSeparators: showSeparators ?? this.showSeparators,
+      separatorGrain: separatorGrain ?? this.separatorGrain,
       chartType: chartType ?? this.chartType,
       studies: studies ?? this.studies,
       studyPeriods: studyPeriods ?? this.studyPeriods,
@@ -263,6 +294,10 @@ class ChartStyle {
         'grid': showGrid,
         'crosshair': showCrosshair,
         'watermark': showWatermark,
+        'sessions': showSessions,
+        'sessionIds': sessions.map((session) => session.name).toList(),
+        'separators': showSeparators,
+        'separatorGrain': separatorGrain.name,
         'chartType': chartType.name,
         'studies': studies.map((study) => study.name).toList(),
         'studyPeriods': studyPeriods,
@@ -304,6 +339,10 @@ class ChartStyle {
       showGrid: _readFlag(decoded['grid']),
       showCrosshair: _readFlag(decoded['crosshair']),
       showWatermark: _readFlag(decoded['watermark']),
+      showSessions: _readFlag(decoded['sessions']),
+      sessions: _readSessions(decoded['sessionIds']),
+      showSeparators: _readFlag(decoded['separators']),
+      separatorGrain: _readGrain(decoded['separatorGrain']),
       chartType: _readChartType(decoded['chartType']),
       studies: _readStudies(decoded['studies']),
       studyPeriods: _readPeriods(decoded['studyPeriods']),
@@ -381,6 +420,25 @@ class ChartStyle {
     if (value is! String) return null;
     for (final oscillator in Oscillator.values) {
       if (oscillator.name == value) return oscillator;
+    }
+    return null;
+  }
+
+  /// An empty list is a real answer (every session switched off), so it must
+  /// not be treated as "missing" and replaced by the defaults.
+  static Set<TradingSession>? _readSessions(Object? value) {
+    if (value is! List) return null;
+    final names = value.whereType<String>().toSet();
+    return <TradingSession>{
+      for (final session in TradingSession.values)
+        if (names.contains(session.name)) session,
+    };
+  }
+
+  static SeparatorGrain? _readGrain(Object? value) {
+    if (value is! String) return null;
+    for (final grain in SeparatorGrain.values) {
+      if (grain.name == value) return grain;
     }
     return null;
   }
