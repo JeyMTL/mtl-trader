@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BarChart3, TrendingUp, Shield, Zap, ArrowRight, Check } from 'lucide-react'
 import { PLANS } from '@/lib/plans'
 import { formatCurrency } from '@/lib/utils'
@@ -38,6 +38,24 @@ const features = [
 export default function HomePage() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [authError, setAuthError] = useState('')
+
+  // Supabase substitutes the project's Site URL whenever the requested redirect
+  // is not allow-listed, which delivers the PKCE `code` to `/` instead of
+  // `/auth/callback`. Without this the sign-in appears to do nothing: the code
+  // is never exchanged and the user bounces back to the marketing page. Forward
+  // it, carrying any error Supabase appended so the callback can explain itself.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const forward = new URLSearchParams()
+    if (code) forward.set('code', code)
+    for (const key of ['error', 'error_code', 'error_description']) {
+      const value = params.get(key)
+      if (value) forward.set(key, value)
+    }
+    if (!forward.toString()) return
+    window.location.replace(`/auth/callback?${forward.toString()}`)
+  }, [])
 
   const signInWithGoogle = async () => {
     setGoogleLoading(true)
