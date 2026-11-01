@@ -3740,6 +3740,50 @@ class _TradingChartPainter extends CustomPainter {
   }
 }
 
+/// Test-only handle on the canvas painter.
+///
+/// The painter is private because nothing outside this file should build one,
+/// but a benchmark that copies its loops measures the copy. This lets
+/// `test/perf/chart_paint_benchmark.dart` time the real paint path — candles,
+/// studies, bands, axes and labels — through a `PictureRecorder`.
+@visibleForTesting
+CustomPainter debugChartPainter({
+  required List<Candle> candles,
+  required double start,
+  required double span,
+  required double minPrice,
+  required double maxPrice,
+  required int decimals,
+  required ChartInterval interval,
+  required ChartStyle style,
+  String symbol = 'EURUSD',
+}) {
+  return _TradingChartPainter(
+    candles: candles,
+    start: start,
+    span: span,
+    minPrice: minPrice,
+    maxPrice: maxPrice,
+    entry: null,
+    exit: null,
+    stop: null,
+    take: null,
+    entryTime: null,
+    exitTime: null,
+    crosshair: null,
+    dragging: null,
+    decimals: decimals,
+    interval: interval,
+    chartType: style.chartType,
+    studies: const {},
+    drawings: const [],
+    draftStart: null,
+    style: style,
+    symbol: symbol,
+    selectedDrawing: null,
+  );
+}
+
 /// Preset preview: three mini candles on the preset's own background.
 class _ThemeSwatch extends StatelessWidget {
   const _ThemeSwatch({
