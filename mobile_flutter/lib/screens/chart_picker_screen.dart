@@ -3247,7 +3247,7 @@ class _TradingChartPainter extends CustomPainter {
     if (panes.oscH > 6) {
       final paneTop = panes.oscTop;
       final paneBottom = paneTop + panes.oscH;
-      final closes = [for (final candle in candles) candle.close];
+      final closes = _oscillatorCloses();
       canvas.drawLine(
         Offset(0, paneTop),
         Offset(plotW, paneTop),
@@ -3256,7 +3256,7 @@ class _TradingChartPainter extends CustomPainter {
           ..strokeWidth = 0.6,
       );
       if (style.oscillator == Oscillator.rsi) {
-        final series = rsi(closes, period: style.rsiPeriod.clamp(2, 100));
+        final series = _rsiSeries(closes, style.rsiPeriod.clamp(2, 100));
         double oy(double value) =>
             paneBottom - (value.clamp(0, 100) / 100) * (panes.oscH - 10) - 4;
         for (final level in const [30.0, 70.0]) {
@@ -3282,9 +3282,9 @@ class _TradingChartPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.2;
         Path? run;
-        for (var i = 0; i < series.length; i++) {
+        for (var i = from; i <= to && i < series.length; i++) {
           final value = series[i];
-          final px = i < candles.length ? x(i.toDouble()) : 0.0;
+          final px = x(i.toDouble());
           if (value == null || px < -slot || px > plotW + slot) {
             if (run != null) {
               canvas.drawPath(run, paint);
@@ -3301,19 +3301,14 @@ class _TradingChartPainter extends CustomPainter {
         }
         if (run != null) canvas.drawPath(run, paint);
       } else if (style.oscillator == Oscillator.macd) {
-        final points = macd(
+        final macdResult = _macdSeries(
           closes,
-          fast: style.macdFast.clamp(2, 100),
-          slow: style.macdSlow.clamp(3, 200),
-          signal: style.macdSignal.clamp(2, 100),
+          style.macdFast.clamp(2, 100),
+          style.macdSlow.clamp(3, 200),
+          style.macdSignal.clamp(2, 100),
         );
-        var maxAbs = 1e-9;
-        for (final point in points) {
-          if (point == null) continue;
-          maxAbs = math.max(maxAbs, point.macd.abs());
-          maxAbs = math.max(maxAbs, point.signal.abs());
-          maxAbs = math.max(maxAbs, point.histogram.abs());
-        }
+        final points = macdResult.points;
+        final maxAbs = macdResult.maxAbs;
         double oy(double value) =>
             paneBottom -
             (value + maxAbs) / (2 * maxAbs) * (panes.oscH - 10) -
@@ -3326,7 +3321,7 @@ class _TradingChartPainter extends CustomPainter {
           color: style.muted,
           size: 8,
         );
-        for (var i = 0; i < points.length; i++) {
+        for (var i = from; i <= to && i < points.length; i++) {
           final point = points[i];
           if (point == null) continue;
           final cx = x(i.toDouble());
@@ -3347,7 +3342,7 @@ class _TradingChartPainter extends CustomPainter {
         }
         void line(Paint paint, double Function(MacdPoint) pick) {
           Path? run;
-          for (var i = 0; i < points.length; i++) {
+          for (var i = from; i <= to && i < points.length; i++) {
             final point = points[i];
             final px = x(i.toDouble());
             if (point == null || px < -slot || px > plotW + slot) {
@@ -3718,6 +3713,80 @@ class _TradingChartPainter extends CustomPainter {
   /// Clearing is cheaper than evicting one at a time and the next frame repays
   /// it immediately, since labels repeat within a frame.
   static const int _labelCacheLimit = 128;
+
+  /// Last closes array and indicator results, reused while the candle list is
+  /// still the same object. Panning changes the window, not the data, so
+  /// rebuilding a 5,000-point RSI — and MACD's three passes plus a max-abs scan —
+  /// on every frame was the most expensive thing on the canvas: measured at
+  /// ~170 us of a ~250 us frame with test/perf/chart_paint_benchmark.dart.
+  ///
+  /// One entry each, because a chart draws one oscillator at a time.
+  /// `identical` is the right test: a refreshed series arrives as a new list and
+  /// invalidates the cache without any explicit invalidation call.
+  static List<Candle>? _closesSource;
+  static List<double>? _closesCache;
+  static List<double>? _rsiSource;
+  static int _rsiPeriodCache = 0;
+  static List<double?>? _rsiCache;
+  static List<double>? _macdSource;
+  static int _macdFastCache = 0;
+  static int _macdSlowCache = 0;
+  static int _macdSignalCache = 0;
+  static List<MacdPoint?>? _macdCache;
+  static double _macdMaxAbsCache = 1e-9;
+
+  List<double> _oscillatorCloses() {
+    if (identical(_closesSource, candles) && _closesCache != null) {
+      return _closesCache!;
+    }
+    final list = <double>[for (final candle in candles) candle.close];
+    _closesSource = candles;
+    _closesCache = list;
+    return list;
+  }
+
+  List<double?> _rsiSeries(List<double> closes, int period) {
+    if (identical(_rsiSource, closes) &&
+        _rsiPeriodCache == period &&
+        _rsiCache != null) {
+      return _rsiCache!;
+    }
+    final series = rsi(closes, period: period);
+    _rsiSource = closes;
+    _rsiPeriodCache = period;
+    _rsiCache = series;
+    return series;
+  }
+
+  ({List<MacdPoint?> points, double maxAbs}) _macdSeries(
+    List<double> closes,
+    int fast,
+    int slow,
+    int signal,
+  ) {
+    if (identical(_macdSource, closes) &&
+        _macdFastCache == fast &&
+        _macdSlowCache == slow &&
+        _macdSignalCache == signal &&
+        _macdCache != null) {
+      return (points: _macdCache!, maxAbs: _macdMaxAbsCache);
+    }
+    final points = macd(closes, fast: fast, slow: slow, signal: signal);
+    var maxAbs = 1e-9;
+    for (final point in points) {
+      if (point == null) continue;
+      maxAbs = math.max(maxAbs, point.macd.abs());
+      maxAbs = math.max(maxAbs, point.signal.abs());
+      maxAbs = math.max(maxAbs, point.histogram.abs());
+    }
+    _macdSource = closes;
+    _macdFastCache = fast;
+    _macdSlowCache = slow;
+    _macdSignalCache = signal;
+    _macdCache = points;
+    _macdMaxAbsCache = maxAbs;
+    return (points: points, maxAbs: maxAbs);
+  }
 
   TextPainter _painter(
     String text, {
