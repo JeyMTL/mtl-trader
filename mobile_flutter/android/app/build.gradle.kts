@@ -1,11 +1,39 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Release signing is read from `android/key.properties`, which is git-ignored
+// along with the keystore itself. Keeping it out of the build file means the
+// passwords are never in the repository, and a contributor without the file can
+// still build: the release build falls back to the debug key and says so.
+//
+// Create the file with:
+//   storePassword=…
+//   keyPassword=…
+//   keyAlias=upload
+//   storeFile=../upload-keystore.jks
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+if (!hasReleaseKeystore) {
+    logger.lifecycle(
+        "Release will be signed with the debug key: android/key.properties is missing. " +
+            "A Play upload needs a real keystore (see mobile_flutter/README.md)."
+    )
+}
+
 android {
-    namespace = "com.mtltrader.mtl_trader_mobile"
+    // The application id is permanent after the first Play upload, so it is the
+    // product's own name rather than the Flutter template's folder-derived one.
+    // It also matches the OAuth redirect scheme in AndroidManifest.xml.
+    namespace = "com.mtltrader.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,8 +43,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.mtltrader.mtl_trader_mobile"
+        applicationId = "com.mtltrader.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,11 +56,27 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // A debug-signed bundle is rejected by Play and can never be updated
+            // under the same key, so this prefers the real keystore when it is
+            // present and only falls back for local `flutter run --release`.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

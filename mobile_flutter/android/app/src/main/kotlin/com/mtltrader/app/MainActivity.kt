@@ -1,4 +1,4 @@
-package com.mtltrader.mtl_trader_mobile
+package com.mtltrader.app
 
 import io.flutter.embedding.android.FlutterActivity
 

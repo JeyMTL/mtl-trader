@@ -51,6 +51,47 @@ flutter build apk --release \
   --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY
 ```
 
+## Signing and release builds
+
+The application id is **`com.mtltrader.app`**. It is permanent once the app is on Play, and the signing key is permanent too: an updated APK signed with a different key is rejected, so back the keystore up somewhere you will still have it in five years.
+
+Create the upload key once (JDK `keytool` is the one bundled with Android Studio):
+
+```bash
+cd android
+"/c/Program Files/Android/Android Studio/jbr/bin/keytool" -genkeypair -v \
+  -keystore upload-keystore.jks -alias upload \
+  -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Record the passwords it asks for in `android/key.properties` (git-ignored, along with `*.jks` and `*.keystore`):
+
+```properties
+storePassword=…
+keyPassword=…
+keyAlias=upload
+storeFile=../upload-keystore.jks
+```
+
+Then build the artifact Play accepts:
+
+```bash
+flutter build appbundle --release \
+  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY
+# android/app/build/outputs/bundle/release/app-release.aab
+```
+
+`android/app/build.gradle.kts` reads that file when it exists and signs with the debug key when it does not, printing a notice — so `flutter run --release` still works on a fresh clone, but a bundle built without `key.properties` must never be uploaded.
+
+Verify what a build was signed with before uploading:
+
+```bash
+"/c/Program Files/Android/Android Studio/jbr/bin/keytool" -print-cert \
+  -keystore android/app/build/outputs/apk/release/app-release.apk \
+  | head -5
+```
+
 The URL and anon key are the same values as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the web app's `.env.local`. No service-role key is used on the device.
 
 Card checkout starts on the web API, so pass `--dart-define=API_BASE_URL=https://your-domain` when the deployment is not the production URL. The Flutterwave secret key and webhook hash live only in that server's environment; nothing secret ships in the app.

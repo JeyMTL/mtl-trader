@@ -76,3 +76,10 @@ mobile/android/local.properties
 mobile/android/app/build/
 mobile/android/build/
 mobile/android/capacitor-cordova-android-plugins/build/
+
+# Signing material. A keystore plus its password is total control of the app's
+# updates, so it must never enter git from any folder — mobile_flutter/ has its
+# own copy of these rules; this covers the legacy mobile/ shell and anything new.
+*.jks
+*.keystore
+key.properties

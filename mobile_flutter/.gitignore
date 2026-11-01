@@ -10,6 +10,12 @@ build/
 # Holds the Supabase anon key passed with --dart-define-from-file
 .vscode/launch.json
 dart_defines.json
+# The upload keystore and its passwords: committing either publishes the app's
+# signing identity, and losing the keystore means never updating it again.
+key.properties
+android/key.properties
+*.jks
+*.keystore
 android/.gradle/
 android/local.properties
 android/.kotlin/
