@@ -7,6 +7,7 @@ import 'core/config.dart';
 import 'core/locale.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'screens/auth_gate.dart';
+import 'ui/perf_overlay.dart';
 import 'ui/theme.dart';
 
 Future<void> main() async {
@@ -32,6 +33,9 @@ Future<void> main() async {
   await ChartStyle.restore();
   await ThemeController.restore();
   await LocaleController.restore();
+  // Off unless someone turned it on; a diagnostic must never be the reason a
+  // launch is slow.
+  await FrameOverlaySettings.restore();
 
   runApp(const MtlTraderApp());
 }
@@ -62,9 +66,11 @@ class MtlTraderApp extends StatelessWidget {
           // InheritedWidget, so a switch has to rebuild the tree. The key makes
           // Flutter discard the subtree instead of keeping const widgets that
           // still hold the old colours or the old strings.
-          home: KeyedSubtree(
-            key: ValueKey<String>('theme-${mode.name}-$language'),
-            child: const AuthGate(),
+          home: PerfOverlay(
+            child: KeyedSubtree(
+              key: ValueKey<String>('theme-${mode.name}-$language'),
+              child: const AuthGate(),
+            ),
           ),
         );
       },

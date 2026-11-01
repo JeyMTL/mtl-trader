@@ -6,6 +6,7 @@ import '../core/config.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/language_picker.dart';
+import '../ui/perf_overlay.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'subscription_screen.dart';
@@ -538,6 +539,36 @@ class _AccountScreenState extends State<AccountScreen> {
                               const SizedBox(width: 8),
                           ],
                         ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FlatCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'Diagnostics',
+                        subtitle:
+                            'Frame times, measured on this phone. Turn it on, pan the chart, read the worst frame.',
+                      ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: FrameOverlaySettings.visible,
+                        builder: (context, visible, _) => SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          value: visible,
+                          onChanged: FrameOverlaySettings.set,
+                          title: Text(
+                            'Frame time overlay',
+                            style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),

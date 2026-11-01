@@ -3704,19 +3704,41 @@ class _TradingChartPainter extends CustomPainter {
     _painter(text, color: color, size: size).paint(canvas, offset);
   }
 
+  /// Laid-out label painters, kept across frames.
+  ///
+  /// Shaping text costs more than painting ninety candles: every axis tick was
+  /// built and laid out again on every frame of a pan, sixty times a second.
+  /// The same handful of strings repeats ("1.08452", "VOL", "RSI 14"), so one
+  /// painter per text/colour/size/weight is reused instead. The cache is static
+  /// because this painter is rebuilt for each frame — an instance field would be
+  /// thrown away with it.
+  static final Map<String, TextPainter> _labelCache = <String, TextPainter>{};
+
+  /// Axis labels drift as the viewport moves, so the key space is unbounded.
+  /// Clearing is cheaper than evicting one at a time and the next frame repays
+  /// it immediately, since labels repeat within a frame.
+  static const int _labelCacheLimit = 128;
+
   TextPainter _painter(
     String text, {
     required Color color,
     required double size,
     FontWeight weight = FontWeight.w500,
   }) {
-    return TextPainter(
+    final key = '$text|${color.toARGB32()}|$size|${weight.value}';
+    final cached = _labelCache[key];
+    if (cached != null) return cached;
+
+    if (_labelCache.length >= _labelCacheLimit) _labelCache.clear();
+    final painter = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(color: color, fontSize: size, fontWeight: weight),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    _labelCache[key] = painter;
+    return painter;
   }
 
   @override
