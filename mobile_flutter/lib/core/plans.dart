@@ -1,5 +1,9 @@
 /// Paid plans offered in the app. Prices and limits mirror `src/lib/plans.ts`
 /// on the web so checkout, the database trigger and the app agree.
+///
+/// The enforced difference is the monthly trade allowance (`enforce_trade_quota`
+/// in Postgres); the feature lines describe what a plan covers, not a lock, and
+/// should be kept in step by hand with the web lists in `src/lib/plans.ts`.
 class MobilePlan {
   const MobilePlan({
     required this.id,
@@ -32,9 +36,10 @@ const List<MobilePlan> mobilePlans = [
     popular: true,
     features: [
       '50 trades per month',
-      'Advanced analytics',
-      'Equity curve charts',
-      'Strategy tagging',
+      'Equity curve, daily and monthly P&L',
+      'Time edge: best hours and sessions',
+      'OANDA chart with studies',
+      'Journal photos and voice notes',
     ],
   ),
   MobilePlan(
@@ -45,8 +50,9 @@ const List<MobilePlan> mobilePlans = [
     features: [
       'Unlimited trades',
       'Everything in Basic',
-      'Advanced risk management',
-      'Priority support',
+      'AI journal review',
+      'Market replay with saved drawings',
+      'MT5 sync and API access',
     ],
   ),
 ];
