@@ -25,9 +25,19 @@ export default function AuthCallbackPage() {
       const code = new URLSearchParams(window.location.search).get('code')
       if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        // A failed exchange is not always a failed sign-in. The code is
+        // single-use and the PKCE verifier is deleted once it succeeds, so a
+        // reload — or the "Try again" button — re-runs the exchange against a
+        // code that already worked and reports "PKCE code verifier not found in
+        // storage" while a perfectly good session sits in storage. Trust the
+        // session over the error, and only surface the failure when there is
+        // genuinely nothing to sign in with.
         if (exchangeError) {
-          if (!cancelled) setError(exchangeError.message)
-          return
+          const { data: existing } = await supabase.auth.getSession()
+          if (!existing.session) {
+            if (!cancelled) setError(exchangeError.message)
+            return
+          }
         }
       }
 
@@ -96,22 +106,26 @@ export default function AuthCallbackPage() {
             <h1 className="text-xl font-bold text-white">Sign-in did not finish</h1>
             <p className="text-gray-400 mt-2 text-sm">{error}</p>
             <p className="text-gray-500 mt-2 text-xs">
-              Your Google account is linked. Fixing the server and retrying is
-              safe — the profile write is idempotent.
+              This is almost always a link that expired or was already used once.
+              Your Google account stays linked, so starting again is safe — the
+              profile write is idempotent.
             </p>
             <div className="mt-6 flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="btn-gradient text-white px-6 py-3 rounded-xl font-semibold"
-              >
-                Try again
-              </button>
+              {/* Reloading this page re-runs the exchange against the same spent
+                  code, which is what produced this error and would keep
+                  producing it. Sending the user back to the sign-in page starts
+                  a fresh code and verifier instead. */}
               <Link
                 href="/auth/login"
+                className="btn-gradient text-white px-6 py-3 rounded-xl font-semibold"
+              >
+                Sign in again
+              </Link>
+              <Link
+                href="/"
                 className="text-sm text-gray-400 transition-colors hover:text-white"
               >
-                Back to login
+                Back to home
               </Link>
             </div>
           </>
