@@ -50,6 +50,10 @@ class _JournalScreenState extends State<JournalScreen> {
   /// uses, so the numbers are what tapping the chip would show.
   Map<String, ({int trades, int wins, double pnl})> _sessionSummary = const {};
 
+  /// Set when the database has no `session_stats()`, so the strip can say what is
+  /// missing instead of quietly disappearing.
+  bool _sessionSummaryMissing = false;
+
   static const List<String> _sessionKeys = [
     'asian',
     'london',
@@ -133,10 +137,17 @@ class _JournalScreenState extends State<JournalScreen> {
       final stats = await widget.api.sessionStats();
       if (!mounted) return;
       setState(() => _sessionSummary = stats);
-    } catch (_) {
-      // A database without the session migration cannot answer these. The strip
-      // stays hidden rather than showing four zeroes as if nothing was traded.
-      if (mounted) setState(() => _sessionSummary = const {});
+    } catch (error) {
+      // A database without the session migration cannot answer this. Say so
+      // rather than showing four zeroes as if nothing was traded.
+      final message = error.toString().toLowerCase();
+      final missing = message.contains('pgrst202') ||
+          message.contains('could not find the function');
+      if (!mounted) return;
+      setState(() {
+        _sessionSummary = const {};
+        _sessionSummaryMissing = missing;
+      });
     }
   }
 
@@ -381,6 +392,18 @@ class _JournalScreenState extends State<JournalScreen> {
                       ),
                   ],
                 ),
+                if (_sessionSummaryMissing)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Session totals need a database update '
+                      '(20261105_session_stats.sql).',
+                      style: TextStyle(
+                        color: AppColors.faint,
+                        fontSize: kMinLabelSize,
+                      ),
+                    ),
+                  ),
                 if (_sessionSummary.isNotEmpty)
                   _SessionSummaryRow(
                     entries: [

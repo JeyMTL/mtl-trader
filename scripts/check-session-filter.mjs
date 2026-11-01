@@ -8,15 +8,23 @@
  * as Asian, say — is invisible until a customer notices their numbers moving.
  *
  * This reads the trader's own rows, buckets them here with the same windows, and
- * compares that against what both RPCs answer. It needs a real session, because
+ * compares that against what both RPCs answer. It needs a real user, because
  * both functions key on `auth.uid()`; the service-role key carries no user and
- * would answer zero.
+ * would answer zero, which would "pass" against nothing.
  *
- *   node --env-file=.env.local scripts/check-session-filter.mjs --token=<access token>
- *   # or export SUPABASE_ACCESS_TOKEN
+ * Three ways in, in order of preference:
  *
- * Get a token from a signed-in browser console:
- *   JSON.parse(localStorage.getItem('sb-<project-ref>-auth-token')).access_token
+ *   # 1. email + password of a test account (the script signs in for you)
+ *   SUPABASE_TEST_EMAIL=you@example.com SUPABASE_TEST_PASSWORD=… \
+ *     node --env-file=.env.local scripts/check-session-filter.mjs
+ *
+ *   # 2. a pasted access token
+ *   node --env-file=.env.local scripts/check-session-filter.mjs --token=<jwt>
+ *
+ *   # 3. SUPABASE_ACCESS_TOKEN in the environment
+ *
+ * A token from a signed-in browser: JSON.parse(localStorage
+ *   .getItem('sb-<project-ref>-auth-token')).access_token
  *
  * Exits 0 when every session matches, 1 when one does not, 2 when it cannot run.
  */
@@ -32,11 +40,6 @@ const key = (
   ''
 ).trim()
 
-const tokenArg = process.argv.find((arg) => arg.startsWith('--token='))
-const token = (
-  tokenArg ? tokenArg.slice('--token='.length) : process.env.SUPABASE_ACCESS_TOKEN || ''
-).trim()
-
 /** The windows shared with the SQL and the Flutter client. Half-open, UTC. */
 const WINDOWS = {
   asian: { firstHour: 0, lastHour: 9 },
@@ -46,6 +49,8 @@ const WINDOWS = {
 }
 
 const SESSIONS = ['asian', 'london', 'newyork', 'sydney']
+
+let token = ''
 
 function inSession(hour, window) {
   if (window.firstHour < window.lastHour) {
@@ -58,19 +63,19 @@ function round2(value) {
   return Math.round(value * 100) / 100
 }
 
-async function request(path, { method = 'GET', body } = {}) {
+async function http(path, { method = 'GET', body, authorization } = {}) {
   const response = await fetch(`${url}${path}`, {
     method,
     headers: {
       apikey: key,
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${authorization ?? token}`,
       'Content-Type': 'application/json',
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const payload = await response.json().catch(() => null)
   if (!response.ok) {
-    const detail = payload?.message || payload?.error || `HTTP ${response.status}`
+    const detail = payload?.msg || payload?.message || payload?.error_description || payload?.error || `HTTP ${response.status}`
     if (payload?.code === 'PGRST202' || /could not find the function/i.test(detail)) {
       throw new Error(
         `${detail} — apply supabase/migrations/20261104_trade_page_session_filter.sql ` +
@@ -82,6 +87,19 @@ async function request(path, { method = 'GET', body } = {}) {
   return payload
 }
 
+/** Signs in with the anon key, which is what a client does. */
+async function signIn(email, password) {
+  const session = await http('/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    body: { email, password },
+    authorization: key,
+  })
+  if (!session?.access_token) {
+    throw new Error('Sign-in returned no access token. Check the email and password.')
+  }
+  return session.access_token
+}
+
 async function main() {
   if (!url) {
     console.error('✖ Set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL)')
@@ -91,9 +109,24 @@ async function main() {
     console.error('✖ Set NEXT_PUBLIC_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY)')
     return 2
   }
+
+  const tokenArg = process.argv.find((arg) => arg.startsWith('--token='))
+  token = (tokenArg ? tokenArg.slice('--token='.length) : process.env.SUPABASE_ACCESS_TOKEN || '').trim()
+
+  const email = (process.env.SUPABASE_TEST_EMAIL || '').trim()
+  const password = process.env.SUPABASE_TEST_PASSWORD || ''
+
+  if (!token && email && password) {
+    process.stdout.write(`signing in as ${email} … `)
+    token = await signIn(email, password)
+    console.log('ok')
+  }
+
   if (!token) {
     console.error(
-      '✖ Give a user access token with --token=<jwt> (or SUPABASE_ACCESS_TOKEN).\n' +
+      '✖ No user session. Either:\n' +
+        '    SUPABASE_TEST_EMAIL=… SUPABASE_TEST_PASSWORD=… node --env-file=.env.local scripts/check-session-filter.mjs\n' +
+        '    node --env-file=.env.local scripts/check-session-filter.mjs --token=<jwt>\n' +
         '  auth.uid() is what these functions filter by, so an anonymous or service key cannot test them.'
     )
     return 2
@@ -102,7 +135,7 @@ async function main() {
   // Every open time this trader owns, paged because PostgREST caps one response.
   const rows = []
   for (let page = 0; page < 200; page++) {
-    const batch = await request(
+    const batch = await http(
       `/rest/v1/trades?select=open_time,pnl&order=created_at.desc&limit=1000&offset=${page * 1000}`
     )
     if (!Array.isArray(batch) || batch.length === 0) break
@@ -110,9 +143,7 @@ async function main() {
     if (batch.length < 1000) break
   }
 
-  const expected = Object.fromEntries(
-    SESSIONS.map((session) => [session, { trades: 0, pnl: 0 }])
-  )
+  const expected = Object.fromEntries(SESSIONS.map((session) => [session, { trades: 0, pnl: 0 }]))
   for (const row of rows) {
     if (!row.open_time) continue
     const hour = new Date(row.open_time).getUTCHours()
@@ -124,7 +155,7 @@ async function main() {
     }
   }
 
-  const aggregate = await request('/rest/v1/rpc/session_stats')
+  const aggregate = await http('/rest/v1/rpc/session_stats', { method: 'POST', body: {} })
   const statsBySession = Object.fromEntries(
     (Array.isArray(aggregate) ? aggregate : []).map((row) => [row.session, row])
   )
@@ -134,7 +165,7 @@ async function main() {
 
   let mismatches = 0
   for (const session of SESSIONS) {
-    const filtered = await request('/rest/v1/rpc/trade_page', {
+    const filtered = await http('/rest/v1/rpc/trade_page', {
       method: 'POST',
       body: { p_limit: 1, p_offset: 0, p_filter: 'all', p_session: session },
     })

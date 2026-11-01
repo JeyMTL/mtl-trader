@@ -8,6 +8,7 @@ import {
   type EquityPoint,
   type JournalFeedEntry,
   type NotificationPreferences,
+  type SessionWindowStat,
   type TimeStats,
   type TradeSummary,
 } from '@/types/journal'
@@ -49,7 +50,7 @@ export default async function DashboardPage() {
   const monthStart = isoDay(new Date(now.getFullYear(), now.getMonth(), 1))
   const monthEnd = isoDay(new Date(now.getFullYear(), now.getMonth() + 1, 0))
 
-  const [summaryResult, equityResult, depositsResult, prefsResult, recentResult, dailyResult, timeResult, feedResult] = await Promise.all([
+  const [summaryResult, equityResult, depositsResult, prefsResult, recentResult, dailyResult, timeResult, feedResult, sessionResult] = await Promise.all([
     supabase.rpc('trade_summary'),
     supabase.rpc('equity_curve'),
     supabase.rpc('deposits_total'),
@@ -67,6 +68,8 @@ export default async function DashboardPage() {
     supabase.rpc('daily_pnl', { p_from: monthStart, p_to: monthEnd }),
     supabase.rpc('time_stats'),
     supabase.rpc('journal_feed', { p_limit: 4 }),
+    // The four UTC windows the chart shades and the journal filters by.
+    supabase.rpc('session_stats'),
   ])
 
   if (summaryResult.error) {
@@ -87,6 +90,9 @@ export default async function DashboardPage() {
   if (feedResult.error) {
     logEvent('error', 'dashboard.journal_feed', { error: feedResult.error, userId: user.id })
   }
+  if (sessionResult.error) {
+    logEvent('error', 'dashboard.session_stats', { error: sessionResult.error, userId: user.id })
+  }
 
   const summary = (summaryResult.data as unknown as TradeSummary) ?? EMPTY_SUMMARY
   const equity = (equityResult.data as unknown as EquityPoint[]) ?? []
@@ -95,6 +101,10 @@ export default async function DashboardPage() {
   const dailyPnl = (dailyResult.data as unknown as DailyPnlRow[]) ?? []
   const timeStats = (timeResult.data as unknown as TimeStats) ?? EMPTY_TIME_STATS
   const journalFeed = (feedResult.data as unknown as JournalFeedEntry[]) ?? []
+  const sessionStats = (sessionResult.data as unknown as SessionWindowStat[]) ?? []
+  // "This database predates the migration" and "you have no timed trades" are
+  // the same empty array and very different advice.
+  const sessionStatsMissing = Boolean(sessionResult.error)
   const preferences: NotificationPreferences = prefsResult.data
     ? {
         notifications_journal_reminders: prefsResult.data.notifications_journal_reminders !== false,
@@ -112,6 +122,8 @@ export default async function DashboardPage() {
       dailyPnl={dailyPnl}
       timeStats={timeStats}
       journalFeed={journalFeed}
+      sessionStats={Array.isArray(sessionStats) ? sessionStats : []}
+      sessionStatsMissing={sessionStatsMissing}
     />
   )
 }

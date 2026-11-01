@@ -69,6 +69,8 @@ export interface AnalyticsViewProps {
   depositsTotal: number
   timeStats: TimeStats
   sessionStats: SessionWindowStat[]
+  /** True when `session_stats` is missing from the database. */
+  sessionStatsMissing: boolean
 }
 
 /** Display names for the four UTC windows the filter and the RPC share. */
@@ -129,7 +131,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats, sessionStats }: AnalyticsViewProps) {
+export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats, sessionStats, sessionStatsMissing }: AnalyticsViewProps) {
   const palette = useChartPalette()
   // Unique per instance, and identical across the server render and the
   // hydrating client. A fixed id collides whenever two of these charts are
@@ -544,7 +546,9 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           </div>
         ) : (
           <p className="mt-4 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-gray-500">
-            No timed trades yet — sessions are built from the entry time on each trade.
+            {sessionStatsMissing
+              ? 'Session totals are unavailable: this database is missing session_stats(). Apply supabase/migrations/20261105_session_stats.sql.'
+              : 'No timed trades yet — sessions are built from the entry time on each trade.'}
           </p>
         )}
       </div>

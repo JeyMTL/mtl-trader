@@ -71,6 +71,9 @@ export default async function AnalyticsPage() {
   const depositsTotal = Number(depositsResult.data ?? 0)
   const timeStats = (timeResult.data as unknown as TimeStats) ?? EMPTY_TIME_STATS
   const sessionStats = (sessionResult.data as unknown as SessionWindowStat[]) ?? []
+  // Distinguishes "this database predates the migration" from "you have no timed
+  // trades", which are the same empty array and very different advice.
+  const sessionStatsMissing = Boolean(sessionResult.error)
 
   return (
     <AnalyticsView
@@ -82,6 +85,7 @@ export default async function AnalyticsPage() {
       depositsTotal={Number.isFinite(depositsTotal) ? depositsTotal : 0}
       timeStats={timeStats}
       sessionStats={Array.isArray(sessionStats) ? sessionStats : []}
+      sessionStatsMissing={sessionStatsMissing}
     />
   )
 }

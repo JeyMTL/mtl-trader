@@ -40,6 +40,7 @@ import type {
   EquityPoint,
   JournalFeedEntry,
   NotificationPreferences,
+  SessionWindowStat,
   TimeStats,
   TradeSummary,
 } from '@/types/journal'
@@ -61,9 +62,20 @@ interface DashboardViewProps {
   dailyPnl: DailyPnlRow[]
   timeStats: TimeStats
   journalFeed: JournalFeedEntry[]
+  sessionStats: SessionWindowStat[]
+  /** True when `session_stats` is missing from the database. */
+  sessionStatsMissing: boolean
 }
 
 type ChartMode = 'equity' | 'daily'
+
+/** Display names for the four UTC windows the filter and the RPC share. */
+const SESSION_LABELS: Record<string, string> = {
+  asian: 'Asian',
+  london: 'London',
+  newyork: 'New York',
+  sydney: 'Sydney',
+}
 
 function Kpi({
   icon: Icon,
@@ -220,6 +232,8 @@ export function DashboardView({
   dailyPnl,
   timeStats,
   journalFeed,
+  sessionStats,
+  sessionStatsMissing,
 }: DashboardViewProps) {
   const palette = useChartPalette()
   // Per-instance gradient id: a fixed one collides as soon as two equity charts
@@ -524,6 +538,33 @@ export function DashboardView({
             <EdgeRow label="Most losses" period={edge.worstHour} tone="neg" />
             <EdgeRow label="Best session" period={edge.bestSession} tone="pos" />
             <EdgeRow label="Weakest session" period={edge.worstSession} tone="neg" />
+          </div>
+
+          {/* The same four UTC buckets everywhere: chart shading, journal
+              filter, analytics table and here. */}
+          <div className="border-t border-border px-4 py-3">
+            <p className="eyebrow">Sessions</p>
+            {sessionStats.length > 0 ? (
+              <div className="mt-2 space-y-1.5">
+                {sessionStats.map((row) => (
+                  <div key={row.session} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-gray-400">{SESSION_LABELS[row.session] ?? row.session}</span>
+                    <span className="flex items-center gap-3 tabular-nums">
+                      <span className="text-gray-500">{row.trades}</span>
+                      <span className={row.pnl >= 0 ? 'text-success' : 'text-danger'}>
+                        {row.pnl >= 0 ? '+' : ''}{formatCurrency(row.pnl)}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-[10px] leading-relaxed text-gray-500">
+                {sessionStatsMissing
+                  ? 'Session totals need the 20261105_session_stats.sql migration.'
+                  : 'No timed trades yet.'}
+              </p>
+            )}
           </div>
 
           <div className="mt-auto border-t border-border p-4">
