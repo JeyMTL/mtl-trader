@@ -102,6 +102,11 @@
 
   "journalTitle": "Journal",
   "journalSearchHint": "Rechercher un symbole, une stratégie ou un tag",
+  "journalSessionAll": "Toutes les sessions",
+  "journalSessionAsian": "Asie",
+  "journalSessionLondon": "Londres",
+  "journalSessionNewYork": "New York",
+  "journalSessionSydney": "Sydney",
   "journalFilterAll": "Toutes",
   "journalFilterWins": "Gains",
   "journalFilterLosses": "Pertes",

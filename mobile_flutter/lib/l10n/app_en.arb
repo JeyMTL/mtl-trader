@@ -208,6 +208,11 @@
 
   "journalTitle": "Journal",
   "journalSearchHint": "Search symbol, strategy or tag",
+  "journalSessionAll": "All sessions",
+  "journalSessionAsian": "Asian",
+  "journalSessionLondon": "London",
+  "journalSessionNewYork": "New York",
+  "journalSessionSydney": "Sydney",
   "journalFilterAll": "All",
   "journalFilterWins": "Wins",
   "journalFilterLosses": "Losses",

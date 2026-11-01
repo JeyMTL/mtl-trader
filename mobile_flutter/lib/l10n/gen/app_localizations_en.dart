@@ -308,6 +308,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get journalSearchHint => 'Search symbol, strategy or tag';
 
   @override
+  String get journalSessionAll => 'All sessions';
+
+  @override
+  String get journalSessionAsian => 'Asian';
+
+  @override
+  String get journalSessionLondon => 'London';
+
+  @override
+  String get journalSessionNewYork => 'New York';
+
+  @override
+  String get journalSessionSydney => 'Sydney';
+
+  @override
   String get journalFilterAll => 'All';
 
   @override

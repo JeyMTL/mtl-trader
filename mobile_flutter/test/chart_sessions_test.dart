@@ -77,6 +77,50 @@ void main() {
     });
   });
 
+  group('session ownership', () {
+    test('the most recently opened session wins an overlap', () {
+      // 13:00 UTC is inside both London and New York; New York opened later, so
+      // it is the answer a trader reading the label wants.
+      final hit = sessionHitOf(
+        index: 0,
+        length: 1,
+        timeAt: (_) => utc(2, 13),
+      );
+      expect(hit?.session, TradingSession.newYork);
+    });
+
+    test('a session wrapped over midnight does not steal the Asian morning',
+        () {
+      // Sydney also covers 02:00 UTC, but it opened five hours ago.
+      final hit = sessionHitOf(
+        index: 0,
+        length: 1,
+        timeAt: (_) => utc(2, 2),
+      );
+      expect(hit?.session, TradingSession.asian);
+      expect(TradingSession.sydney.hoursInto(utc(2, 2)), 5);
+    });
+
+    test('a hit reports the run around the index, not the whole series', () {
+      final times = [utc(2, 1), utc(2, 2), utc(2, 12)];
+      final hit = sessionHitOf(index: 1, length: 3, timeAt: (i) => times[i]);
+      expect(hit?.firstIndex, 0);
+      expect(hit?.lastIndex, 1);
+      expect(hit?.length, 2);
+    });
+
+    test('an index outside the series has no session', () {
+      expect(
+        sessionHitOf(index: 5, length: 3, timeAt: (i) => utc(2, i + 1)),
+        isNull,
+      );
+      expect(
+        sessionHitOf(index: -1, length: 3, timeAt: (i) => utc(2, i + 1)),
+        isNull,
+      );
+    });
+  });
+
   group('period boundaries', () {
     test('a new UTC day is a boundary, the same day is not', () {
       expect(

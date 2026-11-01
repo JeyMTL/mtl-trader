@@ -65,6 +65,7 @@ class ChartStyle {
     this.showCrosshair = true,
     this.showWatermark = true,
     this.showSessions = true,
+    this.showSessionBreaks = true,
     this.sessions = const <TradingSession>{
       TradingSession.asian,
       TradingSession.london,
@@ -117,6 +118,11 @@ class ChartStyle {
   /// The period [showSeparators] marks.
   final SeparatorGrain separatorGrain;
 
+  /// A vertical line where each session opens, distinct from [showSeparators]:
+  /// a trader reading a 15-minute chart wants the London open marked even when
+  /// day separators are switched off.
+  final bool showSessionBreaks;
+
   /// Candles, a close line, or a filled area.
   final ChartType chartType;
 
@@ -157,6 +163,7 @@ class ChartStyle {
     bool? showCrosshair,
     bool? showWatermark,
     bool? showSessions,
+    bool? showSessionBreaks,
     Set<TradingSession>? sessions,
     bool? showSeparators,
     SeparatorGrain? separatorGrain,
@@ -186,6 +193,7 @@ class ChartStyle {
       showCrosshair: showCrosshair ?? this.showCrosshair,
       showWatermark: showWatermark ?? this.showWatermark,
       showSessions: showSessions ?? this.showSessions,
+      showSessionBreaks: showSessionBreaks ?? this.showSessionBreaks,
       sessions: sessions ?? this.sessions,
       showSeparators: showSeparators ?? this.showSeparators,
       separatorGrain: separatorGrain ?? this.separatorGrain,
@@ -295,6 +303,7 @@ class ChartStyle {
         'crosshair': showCrosshair,
         'watermark': showWatermark,
         'sessions': showSessions,
+        'sessionBreaks': showSessionBreaks,
         'sessionIds': sessions.map((session) => session.name).toList(),
         'separators': showSeparators,
         'separatorGrain': separatorGrain.name,
@@ -340,6 +349,7 @@ class ChartStyle {
       showCrosshair: _readFlag(decoded['crosshair']),
       showWatermark: _readFlag(decoded['watermark']),
       showSessions: _readFlag(decoded['sessions']),
+      showSessionBreaks: _readFlag(decoded['sessionBreaks']),
       sessions: _readSessions(decoded['sessionIds']),
       showSeparators: _readFlag(decoded['separators']),
       separatorGrain: _readGrain(decoded['separatorGrain']),

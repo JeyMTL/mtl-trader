@@ -132,18 +132,44 @@ class JournalApi {
     int offset = 0,
     String? search,
     String filter = 'all',
+    String? session,
   }) async {
     final term = (search ?? '').trim();
-    final data = await _db.rpc(
-      'trade_page',
-      params: {
-        'p_limit': limit,
-        'p_offset': offset,
-        'p_search': term.isEmpty ? null : term,
-        'p_filter': filter,
-      },
-    );
+    dynamic data;
+    try {
+      data = await _db.rpc(
+        'trade_page',
+        params: {
+          'p_limit': limit,
+          'p_offset': offset,
+          'p_search': term.isEmpty ? null : term,
+          'p_filter': filter,
+          'p_session': session,
+        },
+      );
+    } catch (error) {
+      // A database that has not had the session migration applied rejects the
+      // extra argument outright. Say so, rather than showing an unfiltered list
+      // as if the session chip had worked.
+      if (session != null && _rejectedSessionArgument(error)) {
+        throw Exception(
+          'The session filter needs a database update. Apply '
+          'supabase/migrations/20261104_trade_page_session_filter.sql, then '
+          'try again.',
+        );
+      }
+      rethrow;
+    }
     return TradePageResult.fromMap(asMap(data));
+  }
+
+  /// True when PostgREST could not find this function signature at all, which
+  /// is what a missing migration looks like from the client.
+  static bool _rejectedSessionArgument(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('pgrst202') ||
+        message.contains('could not find the function') ||
+        message.contains('schema cache');
   }
 
   Future<Map<String, dynamic>> loadTrade(String id) async {
@@ -379,9 +405,8 @@ class JournalApi {
       } catch (_) {
         decoded = <String, dynamic>{};
       }
-      final map = decoded is Map<String, dynamic>
-          ? decoded
-          : <String, dynamic>{};
+      final map =
+          decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
 
       if (response.statusCode >= 400) {
         final message = map['error'];

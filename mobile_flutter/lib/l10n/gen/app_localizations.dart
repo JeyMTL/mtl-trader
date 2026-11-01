@@ -620,6 +620,36 @@ abstract class AppLocalizations {
   /// **'Search symbol, strategy or tag'**
   String get journalSearchHint;
 
+  /// No description provided for @journalSessionAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All sessions'**
+  String get journalSessionAll;
+
+  /// No description provided for @journalSessionAsian.
+  ///
+  /// In en, this message translates to:
+  /// **'Asian'**
+  String get journalSessionAsian;
+
+  /// No description provided for @journalSessionLondon.
+  ///
+  /// In en, this message translates to:
+  /// **'London'**
+  String get journalSessionLondon;
+
+  /// No description provided for @journalSessionNewYork.
+  ///
+  /// In en, this message translates to:
+  /// **'New York'**
+  String get journalSessionNewYork;
+
+  /// No description provided for @journalSessionSydney.
+  ///
+  /// In en, this message translates to:
+  /// **'Sydney'**
+  String get journalSessionSydney;
+
   /// No description provided for @journalFilterAll.
   ///
   /// In en, this message translates to:

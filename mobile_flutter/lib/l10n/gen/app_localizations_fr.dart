@@ -313,6 +313,21 @@ class AppLocalizationsFr extends AppLocalizations {
       'Rechercher un symbole, une stratégie ou un tag';
 
   @override
+  String get journalSessionAll => 'Toutes les sessions';
+
+  @override
+  String get journalSessionAsian => 'Asie';
+
+  @override
+  String get journalSessionLondon => 'Londres';
+
+  @override
+  String get journalSessionNewYork => 'New York';
+
+  @override
+  String get journalSessionSydney => 'Sydney';
+
+  @override
   String get journalFilterAll => 'Toutes';
 
   @override

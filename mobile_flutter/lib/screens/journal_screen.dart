@@ -43,6 +43,7 @@ class _JournalScreenState extends State<JournalScreen> {
   bool _loading = true;
   bool _deleting = false;
   String _filter = 'all';
+  String _session = 'all';
   String? _error;
   int _requestId = 0;
 
@@ -88,6 +89,7 @@ class _JournalScreenState extends State<JournalScreen> {
         offset: _offset,
         search: _search.text,
         filter: _filter,
+        session: _session == 'all' ? null : _session,
       );
       // A newer search/filter request has taken over; drop this response.
       if (!mounted || requestId != _requestId) return;
@@ -324,6 +326,31 @@ class _JournalScreenState extends State<JournalScreen> {
                             _load(reset: true);
                           },
                         ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Sessions sit on their own wrapped row: six chips do not fit
+                // across a phone, and a horizontally scrolling filter row hides
+                // the option a trader is looking for.
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final option in [
+                      ('all', l10n.journalSessionAll),
+                      ('asian', l10n.journalSessionAsian),
+                      ('london', l10n.journalSessionLondon),
+                      ('newyork', l10n.journalSessionNewYork),
+                      ('sydney', l10n.journalSessionSydney),
+                    ])
+                      _FilterTab(
+                        label: option.$2,
+                        active: _session == option.$1,
+                        onTap: () {
+                          setState(() => _session = option.$1);
+                          _load(reset: true);
+                        },
                       ),
                   ],
                 ),

@@ -1391,6 +1391,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   ),
               ],
             ),
+            _switchRow(
+              'Session break lines',
+              style.showSessionBreaks,
+              (value) => onChanged(style.copyWith(showSessionBreaks: value)),
+            ),
             const SizedBox(height: 8),
             _switchRow(
               'Period separators',
@@ -2607,6 +2612,26 @@ class _ChartCanvasState extends State<_ChartCanvas> {
     final candle = widget.candles[index];
     final color = candle.isUp ? widget.style.bull : widget.style.bear;
 
+    // Session the crosshair is sitting in, and how far the session has moved
+    // since its first candle. The journal owns trade P&L; the chart's job is to
+    // say which market this bar belongs to and what that market has done.
+    String? sessionLabel;
+    Color? sessionColor;
+    if (widget.style.showSessions) {
+      final hit = sessionHitOf(
+        index: index,
+        length: widget.candles.length,
+        timeAt: (i) => widget.candles[i].time,
+      );
+      if (hit != null) {
+        final open = widget.candles[hit.firstIndex].open;
+        final move = open == 0 ? 0.0 : (candle.close - open) / open * 100;
+        sessionLabel =
+            '${hit.session.label} ${move >= 0 ? '+' : ''}${move.toStringAsFixed(2)}%';
+        sessionColor = hit.session.tint;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
@@ -2646,6 +2671,15 @@ class _ChartCanvasState extends State<_ChartCanvas> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+            if (sessionLabel != null && sessionColor != null)
+              TextSpan(
+                text: '   · $sessionLabel',
+                style: TextStyle(
+                  color: sessionColor,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
           ],
         ),
         maxLines: 1,
@@ -3025,6 +3059,20 @@ class _TradingChartPainter extends CustomPainter {
               color: session.tint.withAlpha(style.isLight ? 200 : 165),
               size: 8,
             );
+          }
+          // The break line is drawn after the band so the tint cannot swallow
+          // it: the line is the precise moment the session opened, the band is
+          // only the stretch of time around it.
+          if (style.showSessionBreaks && band.firstIndex > 0) {
+            final bx = ((band.firstIndex - start) / span) * plotW;
+            if (bx > 0 && bx < plotW) {
+              _dashed(
+                canvas,
+                Offset(bx, topPad),
+                Offset(bx, topPad + plotH),
+                session.tint.withAlpha(style.isLight ? 130 : 160),
+              );
+            }
           }
         }
       }

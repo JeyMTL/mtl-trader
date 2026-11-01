@@ -33,6 +33,10 @@ enum TradingSession {
 
   bool get wrapsMidnight => startHour >= endHour;
 
+  /// Hours elapsed since this session opened, for a [time] inside it. Used to
+  /// pick an owner when windows overlap: the one that opened most recently wins.
+  int hoursInto(DateTime time) => (time.toUtc().hour - startHour) % 24;
+
   /// Whether [time] falls inside this session. [time] is converted to UTC first,
   /// so a caller holding local dates cannot shift the windows by accident.
   bool contains(DateTime time) {
@@ -103,6 +107,61 @@ Iterable<SessionBand> sessionBands(
   if (first >= 0) {
     yield SessionBand(session: session, firstIndex: first, lastIndex: last);
   }
+}
+
+/// The session that owns a candle, and the run of candles it spans.
+class SessionHit {
+  const SessionHit({
+    required this.session,
+    required this.firstIndex,
+    required this.lastIndex,
+  });
+
+  final TradingSession session;
+  final int firstIndex;
+  final int lastIndex;
+
+  int get length => lastIndex - firstIndex + 1;
+
+  @override
+  String toString() => '${session.label}[$firstIndex..$lastIndex]';
+}
+
+/// Which session a candle belongs to, and where that session started.
+///
+/// Overlaps resolve to the window that opened most recently, measured in hours
+/// since its own open rather than by comparing start hours — a session that
+/// wraps midnight starts "late" on the clock but is the older one at 02:00.
+/// That is why 13:00 UTC reads as New York rather than London.
+SessionHit? sessionHitOf({
+  required int index,
+  required int length,
+  required DateTime Function(int index) timeAt,
+}) {
+  if (index < 0 || index >= length) return null;
+  final time = timeAt(index);
+
+  TradingSession? owner;
+  var ownerAge = 24;
+  for (final session in TradingSession.values) {
+    if (!session.contains(time)) continue;
+    final age = session.hoursInto(time);
+    if (owner == null || age < ownerAge) {
+      owner = session;
+      ownerAge = age;
+    }
+  }
+  if (owner == null) return null;
+
+  var first = index;
+  while (first > 0 && owner.contains(timeAt(first - 1))) {
+    first--;
+  }
+  var last = index;
+  while (last < length - 1 && owner.contains(timeAt(last + 1))) {
+    last++;
+  }
+  return SessionHit(session: owner, firstIndex: first, lastIndex: last);
 }
 
 /// What the vertical separators mark.
