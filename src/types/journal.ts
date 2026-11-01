@@ -73,6 +73,15 @@ export interface TradeRow {
   audio_count?: number
 }
 
+/** One UTC trading window from `session_stats` (migration 20261105). */
+export interface SessionWindowStat {
+  session: string
+  trades: number
+  wins: number
+  losses: number
+  pnl: number
+}
+
 export interface TradePageResult {
   total: number
   total_pnl: number

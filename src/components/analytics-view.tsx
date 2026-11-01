@@ -20,6 +20,7 @@ import {
 } from 'recharts'
 import type {
   EquityPoint,
+  SessionWindowStat,
   SymbolStat,
   TagStat,
   TimeStats,
@@ -67,6 +68,15 @@ export interface AnalyticsViewProps {
   breakdowns: TradeBreakdowns
   depositsTotal: number
   timeStats: TimeStats
+  sessionStats: SessionWindowStat[]
+}
+
+/** Display names for the four UTC windows the filter and the RPC share. */
+const SESSION_LABELS: Record<string, string> = {
+  asian: 'Asian',
+  london: 'London',
+  newyork: 'New York',
+  sydney: 'Sydney',
 }
 
 function EdgeCard({
@@ -119,7 +129,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats }: AnalyticsViewProps) {
+export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats, sessionStats }: AnalyticsViewProps) {
   const palette = useChartPalette()
   // Unique per instance, and identical across the server render and the
   // hydrating client. A fixed id collides whenever two of these charts are
@@ -487,6 +497,54 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           <p className="mt-4 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-gray-500">
             Add the entry and exit time when you journal a trade. The hour-by-hour report builds itself from
             those fields.
+          </p>
+        )}
+      </div>
+
+      <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold text-white">Sessions</h2>
+          <p className="text-xs text-gray-500">UTC windows — the same buckets the journal filters by</p>
+        </div>
+        {sessionStats.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-400">Session</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-400">Trades</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-400">Win rate</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-400">Net P&amp;L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessionStats.map((row) => (
+                  <tr key={row.session} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-2.5 text-sm text-white">
+                      <span className="inline-flex items-center gap-2">
+                        {SESSION_LABELS[row.session] ?? row.session}
+                        {row.pnl > 0 && <span className="badge badge-buy">best</span>}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-sm text-gray-300">{row.trades}</td>
+                    <td className="px-3 py-2.5 text-sm text-gray-300">
+                      {formatPercent(row.trades > 0 ? (row.wins / row.trades) * 100 : 0)}
+                    </td>
+                    <td className={`px-3 py-2.5 text-right text-sm font-medium tabular-nums ${row.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
+                      {row.pnl >= 0 ? '+' : ''}{formatCurrency(row.pnl)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
+              A trade opened in the London/New York overlap is counted in both rows, exactly as it is when
+              you filter by either session. Trades with no entry time cannot be placed and are left out.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-gray-500">
+            No timed trades yet — sessions are built from the entry time on each trade.
           </p>
         )}
       </div>

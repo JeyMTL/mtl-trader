@@ -45,10 +45,10 @@ class _JournalScreenState extends State<JournalScreen> {
   String _filter = 'all';
   String _session = 'all';
 
-  /// Trades and P&L per session, so the header answers "which session pays"
-  /// without four filter taps. Filled from the same RPC the list uses, so the
-  /// numbers are exactly what tapping the chip would show.
-  Map<String, ({int trades, double pnl})> _sessionSummary = const {};
+  /// Trades, wins and P&L per session, so the header answers "which session
+  /// pays" without four filter taps. Comes from the same UTC windows the filter
+  /// uses, so the numbers are what tapping the chip would show.
+  Map<String, ({int trades, int wins, double pnl})> _sessionSummary = const {};
 
   static const List<String> _sessionKeys = [
     'asian',
@@ -126,24 +126,13 @@ class _JournalScreenState extends State<JournalScreen> {
 
   Future<void> _refresh() => _load(reset: true);
 
-  /// Four counts, one request each. The list itself is untouched, so a slow or
-  /// failing summary never delays the trades the trader came for.
+  /// The strip is independent of the list: a failing summary leaves the trades
+  /// the trader came for untouched.
   Future<void> _loadSessionSummary() async {
     try {
-      final results = await Future.wait([
-        for (final key in _sessionKeys)
-          widget.api.tradePage(limit: 1, session: key, filter: _filter),
-      ]);
+      final stats = await widget.api.sessionStats();
       if (!mounted) return;
-      setState(() {
-        _sessionSummary = {
-          for (var i = 0; i < _sessionKeys.length; i++)
-            _sessionKeys[i]: (
-              trades: results[i].total,
-              pnl: results[i].totalPnl,
-            ),
-        };
-      });
+      setState(() => _sessionSummary = stats);
     } catch (_) {
       // A database without the session migration cannot answer these. The strip
       // stays hidden rather than showing four zeroes as if nothing was traded.
@@ -401,6 +390,7 @@ class _JournalScreenState extends State<JournalScreen> {
                             key: key,
                             label: _sessionLabel(l10n, key),
                             trades: _sessionSummary[key]!.trades,
+                            wins: _sessionSummary[key]!.wins,
                             pnl: _sessionSummary[key]!.pnl,
                           ),
                     ],
@@ -779,7 +769,8 @@ class _SessionSummaryRow extends StatelessWidget {
     required this.onTap,
   });
 
-  final List<({String key, String label, int trades, double pnl})> entries;
+  final List<({String key, String label, int trades, int wins, double pnl})>
+      entries;
   final String active;
   final ValueChanged<String> onTap;
 
@@ -838,6 +829,14 @@ class _SessionSummaryRow extends StatelessWidget {
                       fontSize: kMinLabelSize,
                       fontWeight: FontWeight.w700,
                       fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${entry.trades > 0 ? (entry.wins / entry.trades * 100).round() : 0}%',
+                    style: TextStyle(
+                      color: AppColors.faint,
+                      fontSize: kMinLabelSize,
                     ),
                   ),
                 ],

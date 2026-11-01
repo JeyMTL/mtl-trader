@@ -5,6 +5,7 @@ import {
   EMPTY_SUMMARY,
   EMPTY_TIME_STATS,
   type EquityPoint,
+  type SessionWindowStat,
   type SymbolStat,
   type TagStat,
   type TimeStats,
@@ -36,7 +37,7 @@ export default async function AnalyticsPage() {
     )
   }
 
-  const [summaryResult, equityResult, symbolsResult, tagsResult, breakdownsResult, depositsResult, timeResult] = await Promise.all([
+  const [summaryResult, equityResult, symbolsResult, tagsResult, breakdownsResult, depositsResult, timeResult, sessionResult] = await Promise.all([
     supabase.rpc('trade_summary'),
     supabase.rpc('equity_curve'),
     supabase.rpc('symbol_stats', { p_limit: 20 }),
@@ -44,6 +45,9 @@ export default async function AnalyticsPage() {
     supabase.rpc('trade_breakdowns'),
     supabase.rpc('deposits_total'),
     supabase.rpc('time_stats'),
+    // The four UTC windows, the same buckets the journal filters by. A missing
+    // migration logs here and leaves the card showing its empty state.
+    supabase.rpc('session_stats'),
   ])
 
   for (const [event, result] of [
@@ -54,6 +58,7 @@ export default async function AnalyticsPage() {
     ['analytics.breakdowns', breakdownsResult],
     ['analytics.deposits', depositsResult],
     ['analytics.time_stats', timeResult],
+    ['analytics.session_stats', sessionResult],
   ] as const) {
     if (result.error) logEvent('error', event, { error: result.error, userId: user.id })
   }
@@ -65,6 +70,7 @@ export default async function AnalyticsPage() {
   const breakdowns = (breakdownsResult.data as unknown as TradeBreakdowns) ?? EMPTY_BREAKDOWNS
   const depositsTotal = Number(depositsResult.data ?? 0)
   const timeStats = (timeResult.data as unknown as TimeStats) ?? EMPTY_TIME_STATS
+  const sessionStats = (sessionResult.data as unknown as SessionWindowStat[]) ?? []
 
   return (
     <AnalyticsView
@@ -75,6 +81,7 @@ export default async function AnalyticsPage() {
       breakdowns={breakdowns}
       depositsTotal={Number.isFinite(depositsTotal) ? depositsTotal : 0}
       timeStats={timeStats}
+      sessionStats={Array.isArray(sessionStats) ? sessionStats : []}
     />
   )
 }

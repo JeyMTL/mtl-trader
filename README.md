@@ -74,6 +74,8 @@ Run every migration in `supabase/migrations/` in filename order (they are idempo
 
 `20261104_trade_page_session_filter.sql` adds the optional `p_session` argument to `trade_page` so the trade history can be narrowed to one UTC trading session (Asian, London, New York, Sydney). It drops the old four-argument signature first, because two overloads whose arguments all have defaults make PostgREST answer `PGRST203` instead of choosing one. Callers that pass no session keep working. Without it, the session chips render and then report that the database needs the update rather than showing an unfiltered list.
 
+`20261105_session_stats.sql` adds `session_stats()`, the per-window aggregate behind the journal's session strip and the analytics Sessions table. It uses the same four windows as the filter, so a trade in the London/New York overlap is counted in both — filtering by either session does the same. `node --env-file=.env.local scripts/check-session-filter.mjs --token=<user jwt>` proves the buckets against your own rows, which a schema check cannot.
+
 After deploying it, existing signed-in browsers must sign in once more. Sessions moved from localStorage to cookies so that server components and the proxy can authenticate them; that is a one-time cost and the old localStorage session is simply ignored.
 
 ### 4. Run Development Server

@@ -63,6 +63,26 @@ class JournalApi {
     return asDouble(data);
   }
 
+  /// Trades, wins and P&L for each UTC window, from `session_stats`
+  /// (migration 20261105) — one request instead of one per session, and the
+  /// same buckets the journal filter uses.
+  Future<Map<String, ({int trades, int wins, double pnl})>>
+      sessionStats() async {
+    final data = await _db.rpc('session_stats');
+    final result = <String, ({int trades, int wins, double pnl})>{};
+    for (final row in asList(data)) {
+      final map = asMap(row);
+      final key = asString(map['session']);
+      if (key == null || key.isEmpty) continue;
+      result[key] = (
+        trades: asInt(map['trades']),
+        wins: asInt(map['wins']),
+        pnl: asDouble(map['pnl']),
+      );
+    }
+    return result;
+  }
+
   Future<TimeStats> timeStats() async {
     final data = await _db.rpc('time_stats');
     final map = asMap(data);
