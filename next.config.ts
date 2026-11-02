@@ -8,12 +8,18 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+  // /pay loads Paddle.js from their CDN and the checkout itself runs in a
+  // Paddle iframe that talks back to Paddle, so the script, frame and connect
+  // directives all have to reach *.paddle.com. The header is global, so these
+  // origins are allowed site-wide even though only that page uses them.
+  `script-src 'self' 'unsafe-inline' https://cdn.paddle.com${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.supabase.co",
   "media-src 'self' blob: https://*.supabase.co",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",    "form-action 'self' https://www.paypal.com https://*.paddle.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com",
+  "frame-src https://*.paddle.com",
+  "form-action 'self' https://www.paypal.com https://*.paddle.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "object-src 'none'",
