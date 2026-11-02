@@ -6,7 +6,15 @@
 
 import { tradePnl, tradeTime } from './edge-stats'
 import { MAX_FINDINGS } from './schema'
-import type { EdgeStats, GroupStat, PromptMessage, ReviewRequest, SimilarSetup, TradeRecord } from './types'
+import type {
+  CoachInsight,
+  EdgeStats,
+  GroupStat,
+  PromptMessage,
+  ReviewRequest,
+  SimilarSetup,
+  TradeRecord,
+} from './types'
 
 export interface Example {
   note: string
@@ -87,10 +95,22 @@ export function buildUserPrompt(
   input: ReviewRequest,
   stats: EdgeStats,
   similar: SimilarSetup[],
-  examples: Example[]
+  examples: Example[],
+  insights: CoachInsight[] = []
 ): string {
   const sections: string[] = []
   sections.push(`Journal statistics (computed, trust these):\n${JSON.stringify(compactStats(stats))}`)
+
+  if (insights.length) {
+    // These are the same statements the UI shows. Handing them to the model
+    // means the narrative cites the measured number instead of inventing a
+    // softer version of it.
+    sections.push(
+      `Measured execution patterns (compare these; quote the number when you mention one):\n${insights
+        .map((insight) => `- ${insight.summary}`)
+        .join('\n')}`
+    )
+  }
 
   if (examples.length) {
     sections.push(
@@ -120,9 +140,10 @@ export function buildMessages(
   input: ReviewRequest,
   stats: EdgeStats,
   similar: SimilarSetup[],
-  examples: Example[]
+  examples: Example[],
+  insights: CoachInsight[] = []
 ): PromptMessage[] {
-  const text = buildUserPrompt(input, stats, similar, examples)
+  const text = buildUserPrompt(input, stats, similar, examples, insights)
   const system: PromptMessage = { role: 'system', content: buildSystemPrompt(Boolean(input.chartImage)) }
   if (input.chartImage) {
     return [

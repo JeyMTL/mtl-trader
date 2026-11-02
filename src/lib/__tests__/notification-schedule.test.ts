@@ -8,6 +8,7 @@ import {
   normalizeTimeZone,
   zonedDayKey,
   dayKey,
+  trialReminder,
 } from '@/lib/notification-schedule'
 
 const MONDAY = new Date('2026-06-01T07:00:00.000Z') // a Monday, and the 1st
@@ -107,6 +108,44 @@ describe('shouldSendJournalReminder', () => {
 describe('dayKey', () => {
   it('formats the UTC date', () => {
     expect(dayKey(TUESDAY)).toBe('2026-06-02')
+  })
+})
+
+describe('trialReminder', () => {
+  const trial = (overrides: Record<string, unknown> = {}) => ({
+    subscription_status: 'trial',
+    subscription_tier: 'free',
+    trial_ends_at: '2026-06-05T00:00:00.000Z',
+    ...overrides,
+  })
+
+  it('stays quiet while the trial has more than three days left', () => {
+    // 3 days 17 hours out rounds up to 4, so this is still an ordinary day.
+    expect(trialReminder(trial({ trial_ends_at: '2026-06-06T00:00:00.000Z' }), TUESDAY)).toBeNull()
+  })
+
+  it('warns once the trial is within three days', () => {
+    // 3 days to the hour before the end.
+    const reminder = trialReminder(trial(), new Date('2026-06-02T00:00:00.000Z'))
+    expect(reminder).toEqual({ kind: 'trial_ending', daysLeft: 3, windowKey: '2026-06-05' })
+  })
+
+  it('reports a passed trial as ended, not ending', () => {
+    const reminder = trialReminder(trial(), new Date('2026-06-06T07:00:00.000Z'))
+    expect(reminder?.kind).toBe('trial_ended')
+    expect(reminder?.daysLeft).toBe(0)
+  })
+
+  it('keys the send to the trial end date so daily runs cannot repeat it', () => {
+    const first = trialReminder(trial(), new Date('2026-06-03T07:00:00.000Z'))
+    const next = trialReminder(trial(), new Date('2026-06-04T07:00:00.000Z'))
+    expect(first?.windowKey).toBe(next?.windowKey)
+  })
+
+  it('never nags an account that has paid or has no trial date', () => {
+    expect(trialReminder(trial({ subscription_status: 'active' }), TUESDAY)).toBeNull()
+    expect(trialReminder(trial({ trial_ends_at: null }), TUESDAY)).toBeNull()
+    expect(trialReminder(trial({ trial_ends_at: 'not a date' }), TUESDAY)).toBeNull()
   })
 })
 

@@ -1,11 +1,16 @@
 'use client'
 
-import { useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Target, DollarSign, AlertTriangle, Clock, Sparkles, Loader2, TrendingDown, TrendingUp } from 'lucide-react'
 import { formatCurrency, formatDuration, formatPercent } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api'
+import { SetupMatrix } from '@/components/setup-matrix'
+import type { CoachInsight } from '@/lib/ai/types'
 import { axisProps, gridProps, useChartPalette } from '@/lib/chart-theme'
 import { hourlySeries, sessionPeriod, timeEdgeReport, type EdgePeriod } from '@/lib/edge-window'
+import { matchStrategyByLabel } from '@/lib/backtest/strategies'
 import {
   AreaChart,
   Area,
@@ -21,6 +26,7 @@ import {
 import type {
   EquityPoint,
   SessionWindowStat,
+  StrategyStat,
   SymbolStat,
   TagStat,
   TimeStats,
@@ -60,6 +66,14 @@ interface AiReviewMeta {
   generatedAt: string
 }
 
+interface AiQuota {
+  allowed: boolean
+  quota: number
+  used: number
+  remaining: number
+  resetsAt: string
+}
+
 export interface AnalyticsViewProps {
   summary: TradeSummary
   equity: EquityPoint[]
@@ -71,6 +85,9 @@ export interface AnalyticsViewProps {
   sessionStats: SessionWindowStat[]
   /** True when `session_stats` is missing from the database. */
   sessionStatsMissing: boolean
+  strategyStats: StrategyStat[]
+  /** True when `strategy_stats` is missing from the database. */
+  strategyStatsMissing: boolean
 }
 
 /** Display names for the four UTC windows the filter and the RPC share. */
@@ -131,7 +148,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats, sessionStats, sessionStatsMissing }: AnalyticsViewProps) {
+export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats, sessionStats, sessionStatsMissing, strategyStats, strategyStatsMissing }: AnalyticsViewProps) {
   const palette = useChartPalette()
   // Unique per instance, and identical across the server render and the
   // hydrating client. A fixed id collides whenever two of these charts are
@@ -144,6 +161,35 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
   const [aiMeta, setAiMeta] = useState<AiReviewMeta | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [aiQuota, setAiQuota] = useState<AiQuota | null>(null)
+  const [aiInsights, setAiInsights] = useState<CoachInsight[]>([])
+
+  // The allowance is shown before it runs out, not discovered at the wall.
+  // A failed fetch leaves the badge hidden; the review route still enforces.
+  const loadAiQuota = useCallback(async () => {
+    try {
+      const response = await authedFetch('/api/ai/review/quota')
+      if (!response.ok) return
+      setAiQuota((await response.json()) as AiQuota)
+    } catch {
+      // Optional badge; nothing to show if it cannot be read.
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    authedFetch('/api/ai/review/quota')
+      .then(async (response) => (response.ok ? ((await response.json()) as AiQuota) : null))
+      .then((quota) => {
+        if (active && quota) setAiQuota(quota)
+      })
+      .catch(() => {
+        // Optional badge; the review route still enforces the limit.
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const totalTrades = Number(summary.total_trades) || 0
   const wins = Number(summary.wins) || 0
@@ -205,6 +251,29 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
     [tagStats]
   )
 
+  const strategyData = useMemo(
+    () =>
+      strategyStats.map((item) => {
+        const strategy = item.strategy?.trim() || 'Untagged'
+        // Only link a label the backtester can actually recognise; an unmatched
+        // one stays plain text rather than opening a form with the wrong rules.
+        const matched = matchStrategyByLabel(strategy)
+        return {
+          strategy,
+          backtestHref: matched
+            ? `/dashboard/backtest?strategy=${encodeURIComponent(strategy)}`
+            : null,
+          trades: Number(item.trades) || 0,
+          pnl: Number(item.pnl) || 0,
+          winRate:
+            Number(item.trades) > 0
+              ? (Number(item.wins) / Number(item.trades)) * 100
+              : Number(item.win_rate) || 0,
+        }
+      }),
+    [strategyStats]
+  )
+
   const dayData = useMemo(() => {
     const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     const byName = new Map(breakdowns.weekdays.map((row) => [names[row.dow], row]))
@@ -262,12 +331,19 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           // journal from the browser was the largest request in the app.
         }),
       })
-      const data = await response.json() as { review?: AiReview; meta?: AiReviewMeta; error?: string }
+      const data = await response.json() as {
+        review?: AiReview
+        meta?: AiReviewMeta
+        insights?: CoachInsight[]
+        error?: string
+      }
       if (!response.ok) {
         setAiError(data.error || 'Could not generate an AI review.')
       } else {
         setAiReview(data.review || null)
         setAiMeta(data.meta || null)
+        setAiInsights(Array.isArray(data.insights) ? data.insights : [])
+        void loadAiQuota()
       }
     } catch {
       setAiError('Could not generate an AI review.')
@@ -306,6 +382,8 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
         <p className="text-gray-400 text-sm mt-1">Your real trading performance</p>
       </div>
 
+      <SetupMatrix tagStats={tagStats} strategyStats={strategyStats} />
+
       <div className="bg-surface border border-primary/40 rounded-xl p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -314,10 +392,29 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
               <h2 className="text-lg font-semibold text-white">AI Trading Review</h2>
             </div>
             <p className="text-sm text-gray-400 mt-1">Get educational feedback based on your journal statistics.</p>
+            {aiQuota && (
+              <p
+                className={`mt-2 inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${
+                  aiQuota.allowed && aiQuota.remaining > 0
+                    ? 'border-border bg-surface-light text-gray-300'
+                    : 'border-warning/30 bg-warning/10 text-warning'
+                }`}
+              >
+                {aiQuota.allowed
+                  ? aiQuota.remaining > 0
+                    ? `${aiQuota.remaining} of ${aiQuota.quota} AI reviews left this month`
+                    : `No AI reviews left — resets ${new Date(aiQuota.resetsAt).toLocaleDateString()}`
+                  : 'AI reviews are not included in your plan'}
+              </p>
+            )}
           </div>
           <button
             onClick={handleAiReview}
-            disabled={aiLoading || totalTrades === 0}
+            disabled={
+              aiLoading ||
+              totalTrades === 0 ||
+              (aiQuota ? !aiQuota.allowed || aiQuota.remaining <= 0 : false)
+            }
             className="flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
           >
             {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -337,6 +434,31 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
               )}
             </div>
             <p className="text-sm text-white font-medium">{aiReview.headline}</p>
+            {aiInsights.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                  Execution patterns
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {aiInsights.map((insight) => (
+                    <li
+                      key={`${insight.dimension}:${insight.label}`}
+                      className="flex items-start gap-2 text-sm"
+                    >
+                      <span
+                        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                          insight.tone === 'risk' ? 'bg-danger' : 'bg-success'
+                        }`}
+                      />
+                      <span className="text-gray-300">{insight.summary}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-gray-500">
+                  Measured from your own trades; each pattern needs at least six trades in the group.
+                </p>
+              </div>
+            )}
             {renderFindings('Strengths', aiReview.strengths, 'text-success')}
             {renderFindings('Risks', aiReview.risks, 'text-warning')}
             {renderFindings('Actions', aiReview.actions, 'text-primary')}
@@ -745,6 +867,87 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           <p className="text-gray-500 text-sm">
             No tagged trades yet. Add tags when logging a trade — the review reads them, and this table shows
             which setups actually pay.
+          </p>
+        )}
+      </div>
+
+      <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold text-white">Performance by Strategy</h2>
+          <p className="text-xs text-gray-500">The label you typed on each trade</p>
+        </div>
+        {strategyData.length > 0 ? (
+          <>
+          <div className="space-y-2 lg:hidden">
+            {strategyData.map((item) => (
+              <div key={item.strategy} className="flex items-center justify-between rounded-xl border border-border bg-surface-light/60 px-4 py-3">
+                <div className="min-w-0">
+                  {item.backtestHref ? (
+                    <Link
+                      href={item.backtestHref}
+                      className="block truncate text-sm font-semibold text-white hover:text-primary hover:underline"
+                    >
+                      {item.strategy}
+                    </Link>
+                  ) : (
+                    <p className="truncate text-sm font-semibold text-white">{item.strategy}</p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    {item.trades} trades · {formatPercent(item.winRate)} win rate
+                  </p>
+                </div>
+                <span className={`shrink-0 pl-3 text-sm font-semibold tabular-nums ${item.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
+                  {formatCurrency(item.pnl)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Strategy</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Trades</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Win Rate</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">P&amp;L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {strategyData.map((item) => (
+                  <tr key={item.strategy} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-white">
+                      {item.backtestHref ? (
+                        <Link
+                          href={item.backtestHref}
+                          className="hover:text-primary hover:underline"
+                        >
+                          {item.strategy}
+                        </Link>
+                      ) : (
+                        item.strategy
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-300">{item.trades}</td>
+                    <td className="px-4 py-3 text-sm text-gray-300">{formatPercent(item.winRate)}</td>
+                    <td className={`px-4 py-3 text-sm font-medium ${item.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
+                      {formatCurrency(item.pnl)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
+            Rows match the label exactly (trimmed of spaces), so “SMA cross” and “sma cross” count as two
+            strategies. Blank labels are grouped as Untagged. A name the backtester recognises opens it
+            with its rules pre-selected; the rest stay plain text.
+          </p>
+          </>
+        ) : (
+          <p className="text-gray-500 text-sm">
+            {strategyStatsMissing
+              ? 'Strategy totals are unavailable: this database is missing strategy_stats(). Apply supabase/migrations/20261107_strategy_stats.sql.'
+              : 'No trades yet — the strategy field on the journal form is what fills this table.'}
           </p>
         )}
       </div>

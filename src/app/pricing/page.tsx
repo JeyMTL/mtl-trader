@@ -9,26 +9,62 @@ import { formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 import { useToast } from '@/components/toast'
+import type { BillingInterval } from '@/types'
 
 /**
- * Card subscriptions are wired to Flutterwave, whose keys are deliberately not
- * configured while the gateway decision is open. A button that answers 503 is
- * worse than no button — it invites a customer to commit and then fails — so the
- * option is hidden rather than disabled with a promise. Flip this to true once a
- * provider is live; the whole flow comes back unchanged.
+ * Card subscriptions run through Paddle, the merchant of record. Whether the
+ * option appears is decided by the server: `GET /api/paddle/checkout` reports
+ * which plans actually have a configured Paddle price id. A misconfigured
+ * deployment therefore shows no button, instead of a button that invites the
+ * customer to commit and then fails.
  */
-const CARD_CHECKOUT_ENABLED = false
+interface CardStatus {
+  enabled: boolean
+  plans: string[]
+  annual: string[]
+}
 
 export default function PricingPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState<string | null>(null)
-  const [flwLoading, setFlwLoading] = useState<string | null>(null)
+  const [cardLoading, setCardLoading] = useState<string | null>(null)
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+  const [cardStatus, setCardStatus] = useState<CardStatus>({ enabled: false, plans: [], annual: [] })
+  const [billing, setBilling] = useState<BillingInterval>('month')
 
   useEffect(() => {
     if (redirectUrl) window.location.href = redirectUrl
   }, [redirectUrl])
+
+  // Ask the server which paid plans are actually purchasable. A missing key or
+  // price id hides the card option rather than promising a checkout that fails.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch('/api/paddle/checkout')
+        const data = (await res.json()) as { enabled?: boolean; plans?: string[]; annual?: string[] }
+        if (cancelled) return
+        setCardStatus({
+          enabled: Boolean(data.enabled),
+          plans: Array.isArray(data.plans) ? data.plans : [],
+          annual: Array.isArray(data.annual) ? data.annual : [],
+        })
+      } catch {
+        // Leave the card option hidden; PayPal and bank transfer still work.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // A yearly price is a separate Paddle catalogue entry, so each cadence is
+  // offered only when this deployment actually configured it.
+  const cardAvailable = (planId: string, interval: BillingInterval) =>
+    cardStatus.enabled &&
+    (interval === 'year' ? cardStatus.annual : cardStatus.plans).includes(planId)
 
   const handleCheckout = async (planId: string) => {
     setLoading(planId)
@@ -57,12 +93,12 @@ export default function PricingPage() {
   }
 
   /**
-   * Card subscription: the first payment subscribes the card to a monthly
-   * Flutterwave payment plan, so renewals are automatic. The webhook is what
-   * applies each renewal to the account.
+   * Card subscription: Paddle creates the transaction and hosts the checkout, so
+   * the card details never touch this app. `custom_data` carries the user id and
+   * plan, and the webhook is what grants access — never the redirect back.
    */
-  const handleCardSubscription = async (planId: string) => {
-    setFlwLoading(planId)
+  const handleCardSubscription = async (planId: string, interval: BillingInterval) => {
+    setCardLoading(planId)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       router.push('/auth/signup')
@@ -70,10 +106,10 @@ export default function PricingPage() {
     }
 
     try {
-      const res = await fetch('/api/flutterwave/checkout', {
+      const res = await fetch('/api/paddle/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, userId: user.id }),
+        body: JSON.stringify({ planId, userId: user.id, interval }),
       })
       const data = await res.json()
       if (data.url) {
@@ -86,7 +122,7 @@ export default function PricingPage() {
     } catch {
       toast('Could not start the card checkout. Check your connection and try again.', { tone: 'error' })
     }
-    setFlwLoading(null)
+    setCardLoading(null)
   }
 
   const handleBankTransfer = (planId: string) => {
@@ -120,6 +156,20 @@ export default function PricingPage() {
               Simple, <span className="text-gradient">Transparent</span> Pricing
             </h1>
             <p className="text-gray-400 text-lg">Start free, upgrade when you need more</p>
+            <div className="mt-8 inline-flex rounded-full border border-border bg-surface p-1">
+              {(['month', 'year'] as const).map((option) => (
+                <button
+                  key={option}
+                  onClick={() => setBilling(option)}
+                  aria-pressed={billing === option}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    billing === option ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {option === 'month' ? 'Monthly' : 'Annual · 2 months free'}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -135,10 +185,24 @@ export default function PricingPage() {
                 )}
                 <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-white">
-                    {plan.price === 0 ? 'Free' : formatCurrency(plan.price)}
-                  </span>
-                  {plan.price > 0 && <span className="text-gray-400">/month</span>}
+                  {plan.price === 0 ? (
+                    <span className="text-4xl font-bold text-white">Free</span>
+                  ) : billing === 'year' && plan.annual_price ? (
+                    <>
+                      <span className="text-4xl font-bold text-white">
+                        {formatCurrency(plan.annual_price)}
+                      </span>
+                      <span className="text-gray-400">/year</span>
+                      <p className="mt-1 text-xs text-success">
+                        {formatCurrency(plan.annual_price / 12)}/month · two months free
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-4xl font-bold text-white">{formatCurrency(plan.price)}</span>
+                      <span className="text-gray-400">/month</span>
+                    </>
+                  )}
                 </div>
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature) => (
@@ -157,45 +221,55 @@ export default function PricingPage() {
                   </Link>
                 ) : (
                   <div className="space-y-2">
-                    {CARD_CHECKOUT_ENABLED && (
+                    {cardAvailable(plan.id, billing) && (
                     <button
-                      onClick={() => handleCardSubscription(plan.id)}
-                      disabled={flwLoading === plan.id}
+                      onClick={() => handleCardSubscription(plan.id, billing)}
+                      disabled={cardLoading === plan.id}
                       className={`w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 ${
                         plan.popular
                           ? 'btn-gradient text-white'
                           : 'border border-border hover:border-primary text-gray-300 hover:text-white'
                       } disabled:opacity-50`}
                     >
-                      {flwLoading === plan.id ? (
+                      {cardLoading === plan.id ? (
                         <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
                       ) : (
                         <><RefreshCw className="w-4 h-4" /> Subscribe with card</>
                       )}
                     </button>
                     )}
-                    {CARD_CHECKOUT_ENABLED && (
+                    {cardAvailable(plan.id, billing) && (
                     <p className="text-xs text-gray-500 text-center">
-                      Auto-renews monthly · cancel any time
+                      {billing === 'year'
+                        ? 'Auto-renews yearly · cancel any time'
+                        : 'Auto-renews monthly · cancel any time'}
                     </p>
                     )}
-                    <button
-                      onClick={() => handleCheckout(plan.id)}
-                      disabled={loading === plan.id}
-                      className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white disabled:opacity-50"
-                    >
-                      {loading === plan.id ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
-                      ) : (
-                        <><CreditCard className="w-4 h-4" /> Pay with PayPal</>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleBankTransfer(plan.id)}
-                      className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white"
-                    >
-                      Bank Transfer
-                    </button>
+                    {billing === 'month' ? (
+                      <>
+                        <button
+                          onClick={() => handleCheckout(plan.id)}
+                          disabled={loading === plan.id}
+                          className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white disabled:opacity-50"
+                        >
+                          {loading === plan.id ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
+                          ) : (
+                            <><CreditCard className="w-4 h-4" /> Pay with PayPal</>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleBankTransfer(plan.id)}
+                          className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white"
+                        >
+                          Bank Transfer
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-500 text-center">
+                        Annual plans are card only. PayPal and bank transfer buy one 30-day period.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -203,9 +277,10 @@ export default function PricingPage() {
           </div>
 
           <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-gray-500">
-            PayPal is a one-time 30-day payment, and bank transfers are approved manually.
-            {CARD_CHECKOUT_ENABLED
-              ? ' Card subscriptions renew monthly and can be stopped from Settings at any time; access continues until the paid period ends.'
+            A yearly payment buys 365 days; PayPal is a one-time 30-day payment, and bank
+            transfers are approved manually.
+            {cardStatus.enabled
+              ? ' Card payments are processed by Paddle, renew automatically, and can be stopped from Settings at any time; access continues until the paid period ends.'
               : ''}
           </p>
         </div>

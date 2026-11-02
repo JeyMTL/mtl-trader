@@ -1,10 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { parseCustomId, PAID_PLAN_PRICES } from '@/lib/payments'
+import { parseCustomId, PAID_PLAN_PRICES, ANNUAL_PLAN_PRICES, priceForPlan } from '@/lib/payments'
 import { planRank, shouldApplyPlan } from '@/lib/subscription'
 
 describe('PAID_PLAN_PRICES', () => {
   it('excludes the free plan and matches displayed prices', () => {
-    expect(PAID_PLAN_PRICES).toEqual({ basic: '2.50', pro: '5.00' })
+    expect(PAID_PLAN_PRICES).toEqual({ basic: '12.00', pro: '29.00' })
+  })
+})
+
+describe('ANNUAL_PLAN_PRICES', () => {
+  it('prices a year at ten months, and is chosen by interval', () => {
+    expect(ANNUAL_PLAN_PRICES).toEqual({ basic: '120.00', pro: '290.00' })
+    expect(priceForPlan('basic', 'year')).toBe('120.00')
+    expect(priceForPlan('pro', 'year')).toBe('290.00')
+    expect(priceForPlan('pro')).toBe('29.00')
+    // A free plan has no yearly price, so an annual payment cannot apply one.
+    expect(priceForPlan('free', 'year')).toBeUndefined()
   })
 })
 

@@ -165,6 +165,16 @@ export interface TagStat {
   win_rate: number
 }
 
+/** One label from `strategy_stats` (migration 20261107); blanks arrive as "Untagged". */
+export interface StrategyStat {
+  strategy: string
+  trades: number
+  wins: number
+  losses: number
+  pnl: number
+  win_rate: number
+}
+
 export interface DailyPnlRow {
   /** `YYYY-MM-DD` */
   day: string

@@ -4,6 +4,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { rateLimit } from '@/lib/rate-limit'
 import { hasValidBearer } from '@/lib/auth-guards'
 import { apiError, logEvent } from '@/lib/log'
+import { checkFeature } from '@/lib/plan-guard'
 
 /**
  * Trade ingest for the desktop agent and the hosted sync supervisor.
@@ -201,6 +202,17 @@ export async function POST(req: Request) {
       )
     }
 
+    // Autosync is included from Basic, but a lapsed period or ended trial is
+    // still refused. Checked after the token, so an unauthorised caller learns
+    // nothing about the account's plan.
+    const gate = await checkFeature(userId, 'sync')
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.message, code: 'upgrade_required' },
+        { status: gate.status }
+      )
+    }
+
     if (body.trades.length === 0) {
       return NextResponse.json({ imported: 0, skipped: 0, invalid: 0, suppressed: 0 })
     }
@@ -356,6 +368,16 @@ export async function GET(req: Request) {
       .maybeSingle()
 
     if (error || !user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    // Same gate as ingest: a lapsed account must not be able to set up an agent
+    // that then 402s on every trade it sends.
+    const gate = await checkFeature(userId, 'sync')
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.message, code: 'upgrade_required' },
+        { status: gate.status }
+      )
+    }
 
     if (!user.agent_token) {
       const token = randomBytes(32).toString('hex')

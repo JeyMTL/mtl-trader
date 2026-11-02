@@ -69,17 +69,33 @@ describe('credential encryption', () => {
 
 describe('connection input validation', () => {
   it('accepts real MT5 server names', () => {
-    expect(normalizeServerName('MetaQuotes-Demo')).toBe('MetaQuotes-Demo')
     expect(normalizeServerName('  ICMarketsSC-Live12  ')).toBe('ICMarketsSC-Live12')
     expect(normalizeServerName('Deriv-Server 02')).toBe('Deriv-Server 02')
+    expect(normalizeServerName('Exness-MT5Trial15')).toBe('Exness-MT5Trial15')
   })
 
-  it('rejects server names that are empty, too long or unsafe', () => {
+  it('accepts every server spelling a broker may use', () => {
+    // Brokers are free to punctuate server names however they like; an
+    // allowlist here rejected real accounts, so only control characters fail.
+    for (const server of [
+      'MetaQuotes-Demo',
+      'XMGlobal-Real 5',
+      'Forex.com-Live 1',
+      'Trade#1-Demo',
+      'R&D-Live',
+      "O'Hara-Live",
+      'server/../../etc',
+    ]) {
+      expect(normalizeServerName(server)).toBe(server)
+    }
+  })
+
+  it('rejects server names that are empty, too long or carry control characters', () => {
     expect(normalizeServerName('')).toBeNull()
     expect(normalizeServerName('   ')).toBeNull()
     expect(normalizeServerName('a'.repeat(101))).toBeNull()
     expect(normalizeServerName('evil\r\nX-Injected: 1')).toBeNull()
-    expect(normalizeServerName('server/../../etc')).toBeNull()
+    expect(normalizeServerName('tab\tseparated')).toBeNull()
     expect(normalizeServerName(42)).toBeNull()
   })
 

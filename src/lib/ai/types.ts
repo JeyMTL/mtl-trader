@@ -80,6 +80,25 @@ export interface EdgeStats {
   minSample: number
 }
 
+/**
+ * A measured comparison the trader can act on, computed from their own trades.
+ * Rendered as-is and handed to the model as evidence, so the same statement is
+ * never invented by one and contradicted by the other.
+ */
+export interface CoachInsight {
+  label: string
+  dimension: 'symbol' | 'session' | 'symbol-session' | 'hour'
+  trades: number
+  metric: 'expectancy' | 'winRate'
+  value: number
+  baseline: number
+  /** Relative departure for expectancy, percentage points for win rate. */
+  deltaPct: number
+  tone: 'strength' | 'risk'
+  /** Ready-to-show sentence with the number already in it. */
+  summary: string
+}
+
 export interface ReviewFinding {
   title: string
   detail: string

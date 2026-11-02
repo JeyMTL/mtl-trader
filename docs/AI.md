@@ -97,16 +97,90 @@ Returns the caller's 20 most recent saved reviews.
 
 Body `{ "note": "…" }` → `{ "tags": ["breakout", "patient"] }`. No model call.
 
+### `POST /api/backtest/suggest`
+
+Not a review: it converts one journal entry into runnable backtest parameters.
+Body `{ "tradeId": "uuid" }` → the closest strategy id, clamped parameters, a
+short reasoning and a confidence. `GET` on the same path lists the recent trades
+it can read, with their note and screenshot counts.
+
+- Notes are trimmed to 1,500 characters; at most two screenshots are attached.
+- Images over 4 MB, or in a format the vision provider rejects (HEIC), are
+  skipped and counted in `meta.skippedImages` — never sent as an unreadable part.
+- The reply is normalized by `src/lib/backtest/suggest.ts`, which rejects an
+  unknown strategy and clamps every parameter with the engine's own
+  `normalizeParams`, so a hallucinated value cannot reach a run.
+- Rate limit: 5 requests / 10 minutes per user. Provider unconfigured → 503.
+- The note and the image are never logged; only the symbol, the chosen strategy
+  and how many screenshots were sent.
+
 ## Configuration
 
 See `.env.example`. Any one of these enables the review:
 
 - `OPENAI_API_KEY` (+ optional `OPENAI_MODEL`)
 - `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`)
+- `GEMINI_API_KEY` (+ optional `GEMINI_MODEL`) — the free tier
 - `AI_PROVIDER=openai-compatible` with `AI_BASE_URL` and `AI_API_KEY`
 
 Shared overrides: `AI_MODEL`, `AI_VISION_MODEL`. With none set, the review
 returns 503 and the rest of the app is unaffected.
+
+### Running it for free
+
+The review is the only feature that costs money per use, and it does not have to
+cost anything to start. Google's Gemini free tier needs no card, and its
+OpenAI-compatible endpoint is already supported:
+
+```
+GEMINI_API_KEY=your-ai-studio-key
+# AI_PROVIDER is inferred; set it explicitly to force the free path
+AI_PROVIDER=gemini
+# Optional: pin a model, otherwise gemini-3.6-flash is used
+# GEMINI_MODEL=gemini-3.6-flash
+```
+
+That is the whole setup — one key from Google AI Studio. Vision works too, so an
+attached chart screenshot is read on the free tier as well. Structured output is
+supported on the compatibility layer, so the JSON contract in `schema.ts` holds.
+
+One adapter detail exists because of that model family: Gemini 3.x spend tokens
+thinking before they answer, out of the same budget as the reply. A 900-token
+ceiling could therefore be eaten by reasoning and return an empty message, so the
+adapter sends `reasoning_effort: "low"` and raises the ceiling to 2,000 tokens
+for Gemini only. Other providers keep their exact request shape.
+
+Two more behaviours come from the same incident (2026-11-02): the default model
+is pinned to `gemini-3.6-flash` rather than a `latest` alias, because 3.8 Flash
+returned 503 "experiencing high demand" while 3.6 answered in ~2s and 2.5 was
+closed to new keys; and every request now has a 45s ceiling (`AI_TIMEOUT_MS`),
+because a saturated model on the compatibility layer does not fail — it holds
+the socket, which the customer experiences as a review that never finishes. The
+ceiling sits just inside the routes' 60s `maxDuration`, so the failure is our
+own error message rather than a killed function.
+
+Check a key before deploying it:
+
+```
+node --env-file=.env.local scripts/check-ai.mjs           # what resolved, and why
+node --env-file=.env.local scripts/check-ai.mjs --verify  # one real call
+```
+
+Precedence is deliberate: an explicit `AI_PROVIDER` wins, then a paid OpenAI or
+Anthropic key, and Gemini is only chosen when no paid key is present. Adding an
+`OPENAI_API_KEY` later therefore upgrades the path without touching any code.
+
+Two limits to know before you point real customers at it:
+
+- Free-tier quotas are enforced by Google (requests per minute and per day, per
+  key). Exceeding one returns 429 from the provider, which surfaces as a failed
+  review. The per-user rate limit here (5 per 10 minutes) keeps this small for a
+  handful of users, not for hundreds.
+- A single shared key means one customer's burst can exhaust everyone's budget
+  for that minute.
+
+Move to a paid key when the review starts being used daily — at these token
+counts that is cents per customer per month, see the cost note below.
 
 ## Privacy & cost
 
@@ -115,6 +189,11 @@ returns 503 and the rest of the app is unaffected.
 - Results are cached, so an unchanged journal does not re-bill the model.
 - Rate limiting caps cost, but it is per-instance in memory — back it with a
   shared store (e.g. Redis) before scaling.
+- A review is roughly 2,000 input and 600 output tokens. At `gpt-4o-mini` rates
+  that is well under a cent; at Claude Sonnet it is about 1.5 cents. The monthly
+  allowance (30 on Basic, 200 on Pro, `AI_REVIEW_QUOTA`) is what bounds the
+  worst case per customer — check `provider` in the response `meta` to see which
+  path actually served it.
 
 ## Extending
 

@@ -5,12 +5,14 @@ import { isEmailConfigured, sendEmail } from '@/lib/email'
 import {
   renderJournalReminderEmail,
   renderSummaryEmail,
+  renderTrialReminderEmail,
   summarizeTrades,
   type TradeLike,
 } from '@/lib/summaries'
 import {
   dueSummaryWindows,
   shouldSendJournalReminder,
+  trialReminder,
   zonedDayKey,
 } from '@/lib/notification-schedule'
 import { apiError, logEvent } from '@/lib/log'
@@ -24,6 +26,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *   - weekly report    → on Mondays, for the previous 7 days
  *   - monthly overview → on the 1st, for the previous calendar month
  *   - journal reminder → weekdays, when nothing has been journaled yet today
+ *   - trial ending     → within 3 days of the end, then once when it passes
+ *
+ * The trial notice is an account email, not a digest: it goes to every trial
+ * account with an address, whatever the digest toggles say, because it is the
+ * one message that tells a customer what paying would actually get them.
  *
  * Design notes that matter at scale:
  *   - Users are read in pages, and each user's email work is isolated, so one
@@ -53,6 +60,10 @@ interface UserPrefs {
   notifications_weekly: boolean | null
   notifications_monthly_email: boolean | null
   notifications_journal_reminders: boolean | null
+  notifications_email: boolean | null
+  subscription_status: string | null
+  subscription_tier: string | null
+  trial_ends_at: string | null
 }
 
 interface SummaryRun {
@@ -124,26 +135,34 @@ async function processUser(
     return
   }
 
-  const due = dueSummaryWindows(user, now, user.timezone)
-  const journalDue = Boolean(user.notifications_journal_reminders)
-  if (due.length === 0 && !journalDue) {
+  const trial = trialReminder(user, now)
+  // The digests are opt-in, the trial notice is not: an account email should not
+  // depend on a marketing toggle, and it is sent even with digests switched off.
+  const digestsOn = Boolean(user.notifications_email)
+  const due = digestsOn ? dueSummaryWindows(user, now, user.timezone) : []
+  const journalDue = digestsOn && Boolean(user.notifications_journal_reminders)
+  const needsTrades = due.length > 0 || journalDue
+
+  if (!needsTrades && !trial) {
     result.skipped++
     return
   }
 
-  const since = Math.min(
-    ...due.map((window) => window.since.getTime()),
-    journalDue ? now.getTime() - 24 * 60 * 60 * 1000 : Number.POSITIVE_INFINITY
-  )
+  let tradeList: TradeLike[] = []
+  if (needsTrades) {
+    const since = Math.min(
+      ...due.map((window) => window.since.getTime()),
+      journalDue ? now.getTime() - 24 * 60 * 60 * 1000 : Number.POSITIVE_INFINITY
+    )
 
-  const { data: tradeData, error: tradesError } = await supabase.rpc('notification_trades', {
-    p_user_id: user.id,
-    p_since: new Date(Number.isFinite(since) ? since : now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
-  })
+    const { data: tradeData, error: tradesError } = await supabase.rpc('notification_trades', {
+      p_user_id: user.id,
+      p_since: new Date(Number.isFinite(since) ? since : now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+    })
 
-  if (tradesError) throw new Error(`Could not load trades for ${user.id}: ${tradesError.message}`)
-
-  const tradeList = (tradeData || []) as TradeLike[]
+    if (tradesError) throw new Error(`Could not load trades for ${user.id}: ${tradesError.message}`)
+    tradeList = (tradeData || []) as TradeLike[]
+  }
 
   if (journalDue) {
     if (shouldSendJournalReminder(user, tradeList, now, user.timezone)) {
@@ -190,6 +209,24 @@ async function processUser(
     if (sent) result.emailsSent++
     else result.skipped++
   }
+
+  if (trial) {
+    const { subject, html } = renderTrialReminderEmail({
+      name: user.full_name,
+      kind: trial.kind,
+      daysLeft: trial.daysLeft,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    })
+    // The claim is keyed by the trial's end date, so the daily runs between here
+    // and the end cannot send this twice.
+    const sent = await sendClaimed(supabase, user.id, trial.kind, trial.windowKey, {
+      to: user.email,
+      subject,
+      html,
+    })
+    if (sent) result.emailsSent++
+    else result.skipped++
+  }
 }
 
 export async function GET(req: Request) {
@@ -223,9 +260,8 @@ export async function GET(req: Request) {
       const { data: users, error } = await supabase
         .from('users')
         .select(
-          'id, email, full_name, currency, timezone, notifications_daily, notifications_weekly, notifications_monthly_email, notifications_journal_reminders'
+          'id, email, full_name, currency, timezone, notifications_daily, notifications_weekly, notifications_monthly_email, notifications_journal_reminders, notifications_email, subscription_status, subscription_tier, trial_ends_at'
         )
-        .eq('notifications_email', true)
         .order('id', { ascending: true })
         .range(from, from + PAGE_SIZE - 1)
 

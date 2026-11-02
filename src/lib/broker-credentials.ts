@@ -89,14 +89,22 @@ export function decryptCredential(payload: string): string {
 
 /**
  * An MT5 server name as shown in the terminal's login dialog, e.g.
- * `MetaQuotes-Demo` or `ICMarketsSC-Live12`. Brokers use dots, hyphens and
- * spaces; nothing else is legitimate, and a newline would be header injection.
+ * `MetaQuotes-Demo`, `ICMarketsSC-Live12` or `Exness-MT5Trial15`.
+ *
+ * Server names are free-form on the broker side: dots, hyphens, underscores,
+ * digits, spaces, and the occasional `+`, `#`, `&`, `'` or `/`. An allowlist of
+ * "reasonable" characters rejected real accounts (`Server/../../etc` was the
+ * test case that motivated it), so anything printable is accepted now.
+ *
+ * The value is only ever a login parameter and a stored column — never a path,
+ * a URL or a header — so the one thing that must not survive is a control
+ * character, which is what would break a header or split a log line.
  */
 export function normalizeServerName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return null
   const value = raw.trim().replace(/\s+/g, ' ')
   if (value.length < 1 || value.length > 100) return null
-  if (!/^[A-Za-z0-9 ._-]+$/.test(value)) return null
   return value
 }
 

@@ -11,7 +11,7 @@ import '../ui/widgets.dart';
 
 /// Plan cards and a hand-off to the hosted card checkout.
 ///
-/// The checkout runs in the device browser: Flutterwave collects the card, the
+/// The checkout runs in the device browser: the processor collects the card, the
 /// webhook applies the payment, and the account refreshes when the trader comes
 /// back. Nothing card-related ever touches the app process.
 class SubscriptionScreen extends StatefulWidget {
@@ -193,9 +193,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Checkout opens in your browser through Flutterwave. '
-                          'Your card is stored by them, never by this app. '
-                          'PayPal and bank transfer remain one-time 30-day options on the web.',
+                          'Checkout opens in your browser through our payment '
+                          'provider. Your card is stored by them, never by this '
+                          'app. PayPal and bank transfer remain one-time 30-day '
+                          'options on the web.',
                           style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 10.5,

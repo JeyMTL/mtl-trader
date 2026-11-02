@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { hashPayload, stableStringify } from '@/lib/ai/cache'
 import { compareOutcome } from '@/lib/ai/outcomes'
 import { mergeTags, suggestTags } from '@/lib/ai/autotag'
@@ -87,6 +87,31 @@ describe('resolveProviderConfig', () => {
     expect(config?.baseUrl).toBe('https://llm.example.com/v1')
     expect(config?.model).toBe('custom-model')
   })
+
+  it('falls back to the Gemini free tier when only that key exists', () => {
+    const config = resolveProviderConfig({ GEMINI_API_KEY: 'free-key' })
+    expect(config?.provider).toBe('gemini')
+    // No trailing slash: the adapters append `/chat/completions`.
+    expect(config?.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta/openai')
+    expect(config?.model).toBe('gemini-3.6-flash')
+    // Vision is on the same model on the free tier.
+    expect(config?.visionModel).toBe('gemini-3.6-flash')
+  })
+
+  it('prefers a paid key over the free tier, with no code change', () => {
+    const config = resolveProviderConfig({ GEMINI_API_KEY: 'free-key', OPENAI_API_KEY: 'paid-key' })
+    expect(config?.provider).toBe('openai')
+  })
+
+  it('honors an explicit AI_PROVIDER=gemini and a pinned model', () => {
+    const config = resolveProviderConfig({
+      AI_PROVIDER: 'gemini',
+      GEMINI_API_KEY: 'free-key',
+      GEMINI_MODEL: 'gemini-pinned',
+    })
+    expect(config?.provider).toBe('gemini')
+    expect(config?.model).toBe('gemini-pinned')
+  })
 })
 
 describe('createProvider (openai)', () => {
@@ -127,6 +152,86 @@ describe('createProvider (openai)', () => {
     const init = fakeFetch.mock.calls[0][1] as RequestInit
     const body = JSON.parse(init.body as string)
     expect(body.model).toBe('vision-model')
+  })
+})
+
+describe('createProvider (gemini)', () => {
+  const config = resolveProviderConfig({ GEMINI_API_KEY: 'free-key' })
+  if (!config) throw new Error('expected a gemini config')
+
+  it('posts to the OpenAI-compatible chat endpoint with a bearer key', async () => {
+    const fakeFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 })
+    )
+    const provider = createProvider(config, fakeFetch)
+    await provider.complete([{ role: 'user', content: 'hi' }], { json: true })
+
+    const [url, init] = fakeFetch.mock.calls[0]
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions')
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer free-key')
+  })
+
+  it('asks for low reasoning and a ceiling the thinking cannot eat', async () => {
+    const fakeFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] }), { status: 200 })
+    )
+    await createProvider(config, fakeFetch).complete([{ role: 'user', content: 'hi' }], {
+      json: true,
+      maxTokens: 700,
+    })
+
+    const body = JSON.parse((fakeFetch.mock.calls[0][1] as RequestInit).body as string)
+    expect(body.reasoning_effort).toBe('low')
+    expect(body.response_format).toEqual({ type: 'json_object' })
+    // A caller's smaller budget must not clip the reply behind the thinking.
+    expect(body.max_tokens).toBeGreaterThanOrEqual(2000)
+  })
+
+  it('leaves the OpenAI request shape untouched', async () => {
+    const fakeFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 })
+    )
+    const openai = resolveProviderConfig({ OPENAI_API_KEY: 'k' })
+    if (!openai) throw new Error('expected an openai config')
+    await createProvider(openai, fakeFetch).complete([{ role: 'user', content: 'hi' }])
+
+    const body = JSON.parse((fakeFetch.mock.calls[0][1] as RequestInit).body as string)
+    expect(body.reasoning_effort).toBeUndefined()
+    expect(body.max_tokens).toBe(900)
+  })
+})
+
+describe('provider timeouts', () => {
+  const config = {
+    provider: 'openai' as const,
+    apiKey: 'key',
+    baseUrl: 'https://api.example.com/v1',
+    model: 'm',
+    visionModel: 'm',
+  }
+
+  afterEach(() => {
+    delete process.env.AI_TIMEOUT_MS
+  })
+
+  it('fails a hung request with a readable error instead of holding the socket', async () => {
+    // A saturated model on an OpenAI-compatible gateway never answers. The
+    // adapter must give up rather than leave the review spinning.
+    process.env.AI_TIMEOUT_MS = '30'
+    const fakeFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            const error = new Error('This operation was aborted')
+            error.name = 'AbortError'
+            reject(error)
+          })
+        })
+    )
+
+    await expect(
+      createProvider(config, fakeFetch).complete([{ role: 'user', content: 'hi' }])
+    ).rejects.toThrow(/did not answer within/)
   })
 })
 

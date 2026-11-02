@@ -12,6 +12,16 @@ const state = vi.hoisted(() => ({
   updates: [] as Row[],
   connection: null as Row | null,
   upsertError: null as { message: string } | null,
+  // The sync route now checks entitlement, so the mocked account has to be a
+  // live Pro one; otherwise every ingest test would be refused with 402.
+  account: {
+    subscription_tier: 'pro',
+    subscription_status: 'active',
+    trial_ends_at: null,
+    max_trades: -1,
+    current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    cancel_at_period_end: false,
+  } as Row,
 }))
 
 /** A tiny stand-in for the Supabase query builder, recording thenable calls. */
@@ -34,7 +44,7 @@ function chain(table: string) {
 function single(table: string, calls: { method: string; args: unknown[] }[]) {
   if (table === 'users') {
     return state.authUser
-      ? { data: { id: 'u1', agent_token: state.agentToken }, error: null }
+      ? { data: { id: 'u1', agent_token: state.agentToken, ...state.account }, error: null }
       : { data: null, error: null }
   }
   if (table === 'broker_connections') return { data: state.connection, error: null }
@@ -149,6 +159,16 @@ async function postSync(body: Row, token = 'token-abc'): Promise<Response> {
 beforeEach(() => {
   state.authUser = { id: 'u1', email: 'trader@example.com', email_confirmed_at: '2026-01-01T00:00:00Z' }
   state.agentToken = 'token-abc'
+  // Individual tests replace the account; reset so ordering cannot decide
+  // whether an ingest test is entitled.
+  state.account = {
+    subscription_tier: 'pro',
+    subscription_status: 'active',
+    trial_ends_at: null,
+    max_trades: -1,
+    current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    cancel_at_period_end: false,
+  }
   state.emailConfirmed = true
   state.trades = []
   state.suppressions = []
@@ -156,6 +176,14 @@ beforeEach(() => {
   state.updates = []
   state.connection = null
   state.upsertError = null
+  state.account = {
+    ...state.account,
+    subscription_tier: 'pro',
+    subscription_status: 'active',
+    trial_ends_at: null,
+    max_trades: -1,
+    current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+  }
   process.env.SYNC_CREDENTIAL_KEY = KEY
   delete process.env.SYNC_SUPERVISOR_TOKEN
 })
@@ -224,6 +252,52 @@ describe('sync ingest', () => {
     const res = await postSync({ trades: [closedTrade({ close_time: '2030-01-01T00:00:00Z' })] })
     expect(res.status).toBe(400)
     expect(state.upserted).toHaveLength(0)
+  })
+
+  it('lets a Basic account sync, because autosync is part of the entry tier', async () => {
+    state.account = {
+      subscription_tier: 'basic',
+      subscription_status: 'active',
+      trial_ends_at: null,
+      max_trades: 50,
+      current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      cancel_at_period_end: false,
+    }
+
+    const res = await postSync({ trades: [closedTrade()] })
+    expect(res.status).toBe(200)
+    expect(state.upserted).toHaveLength(1)
+  })
+
+  it('refuses a lapsed account with a payment-required response', async () => {
+    state.account = {
+      subscription_tier: 'basic',
+      subscription_status: 'active',
+      trial_ends_at: null,
+      max_trades: 50,
+      current_period_end: new Date(Date.now() - 60_000).toISOString(),
+      cancel_at_period_end: false,
+    }
+
+    const res = await postSync({ trades: [closedTrade()] })
+    expect(res.status).toBe(402)
+    expect((await res.json()).code).toBe('upgrade_required')
+    expect(state.upserted).toHaveLength(0)
+  })
+
+  it('lets a live trial sync, because the trial is the Pro pitch', async () => {
+    state.account = {
+      subscription_tier: 'free',
+      subscription_status: 'trial',
+      trial_ends_at: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+      max_trades: -1,
+      current_period_end: null,
+      cancel_at_period_end: false,
+    }
+
+    const res = await postSync({ trades: [closedTrade()] })
+    expect(res.status).toBe(200)
+    expect(state.upserted).toHaveLength(1)
   })
 
   it('rejects a wrong token', async () => {

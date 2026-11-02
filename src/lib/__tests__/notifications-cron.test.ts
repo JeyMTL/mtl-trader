@@ -217,6 +217,45 @@ describe('notifications cron', () => {
     expect(body.emailsSent).toBe(1)
   })
 
+  it('emails a trial that is within three days of ending, even with digests off', async () => {
+    state.users = [
+      user({
+        notifications_email: false,
+        subscription_status: 'trial',
+        subscription_tier: 'free',
+        trial_ends_at: '2026-06-04T07:00:00.000Z',
+      }),
+    ]
+
+    const { body } = await runCron(AUTH_HEADERS)
+    expect(body.emailsSent).toBe(1)
+    expect(state.sent[0].subject).toContain('trial ends in 2 days')
+  })
+
+  it('keeps the trial notice out of accounts that have already paid', async () => {
+    state.users = [
+      user({
+        subscription_status: 'active',
+        subscription_tier: 'pro',
+        trial_ends_at: '2026-06-04T07:00:00.000Z',
+      }),
+    ]
+
+    const { body } = await runCron(AUTH_HEADERS)
+    expect(body.emailsSent).toBe(0)
+  })
+
+  it('still requires the digest opt-in for summaries', async () => {
+    state.users = [
+      user({ notifications_email: false, notifications_daily: true, subscription_status: 'active' }),
+    ]
+    state.trades = [{ pnl: 100, close_time: '2026-06-01T10:00:00.000Z' }]
+
+    const { body } = await runCron(AUTH_HEADERS)
+    expect(body.emailsSent).toBe(0)
+    expect(state.sent).toHaveLength(0)
+  })
+
   it('isolates a failing user from the rest of the run', async () => {
     state.users = [
       user({ id: 'bad-user', email: 'bad@example.com', notifications_journal_reminders: true }),

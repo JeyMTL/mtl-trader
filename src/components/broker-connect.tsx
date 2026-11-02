@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { authedFetch } from '@/lib/api'
 import { useToast } from '@/components/toast'
+import BrokerPicker, { ServerSuggestions } from '@/components/broker-picker'
 
 /**
  * Automatic MT5 connection, the phone-first path.
@@ -69,14 +70,24 @@ export default function BrokerConnect() {
   const [password, setPassword] = useState('')
   const [problem, setProblem] = useState('')
   const [stalled, setStalled] = useState(false)
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSince = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     try {
       const res = await authedFetch('/api/broker/connection')
       const data = await res.json()
-      if (res.ok) setConnection(data as Connection)
+      if (res.ok) {
+        const next = data as Connection
+        setConnection(next)
+        if (next.status !== 'pending' && next.status !== 'connecting') {
+          setStalled(false)
+        }
+        // A rejected attempt keeps its broker and server, so a retry corrects one
+        // field instead of retyping four. The account number comes back masked,
+        // so it is deliberately not prefilled.
+        if (next.broker) setBroker((current) => current || next.broker!)
+        if (next.server) setServer((current) => current || next.server!)
+      }
     } catch {
       // Falls through to the form: a status read failure must not block setup.
     } finally {
@@ -84,30 +95,39 @@ export default function BrokerConnect() {
     }
   }, [])
 
+  // The first read is deferred by a tick: there is no external store to
+  // subscribe to here, and calling the loader directly in the effect body counts
+  // as a synchronous state update (react-hooks/set-state-in-effect).
   useEffect(() => {
-    load()
+    const timer = setTimeout(() => {
+      void load()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [load])
 
   // While a supervisor is picking the connection up, refresh so the customer
   // sees it go live without reloading the page. After two minutes, stop: a row
   // that never leaves `pending` is a stuck session, not a slow one, and an
   // endlessly spinning card tells the customer nothing.
+  // Both the next poll and the stall flag land in timer callbacks, never in the
+  // effect body, so this effect cannot cascade a render of its own. The flag is
+  // cleared from `load` (after its await) once the status settles.
   useEffect(() => {
     const status = connection?.status
     if (status !== 'pending' && status !== 'connecting') {
       pendingSince.current = null
-      setStalled(false)
       return
     }
     pendingSince.current ??= Date.now()
-    if (Date.now() - pendingSince.current > 120000) {
-      setStalled(true)
-      return
-    }
-    pollTimer.current = setTimeout(load, 6000)
-    return () => {
-      if (pollTimer.current) clearTimeout(pollTimer.current)
-    }
+    const timer = setTimeout(() => {
+      const since = pendingSince.current
+      if (since !== null && Date.now() - since > 120000) {
+        setStalled(true)
+        return
+      }
+      void load()
+    }, 6000)
+    return () => clearTimeout(timer)
   }, [connection, load])
 
   const submit = async (event: React.FormEvent) => {
@@ -125,6 +145,8 @@ export default function BrokerConnect() {
       if (res.ok) {
         setConnection(data as Connection)
         setPassword('')
+        setStalled(false)
+        pendingSince.current = null
         toast('Connection saved. We are connecting to your account now.', { tone: 'success' })
       } else {
         setProblem(data.error || 'Could not save the connection.')
@@ -249,18 +271,24 @@ export default function BrokerConnect() {
             </div>
           )}
 
+          {/* The saved attempt stays on screen after a failure, so the exact
+              server string can be compared against MT5 without a round trip to
+              the database. */}
+          {status === 'failed' && connection?.server && (
+            <p className="text-xs text-gray-500">
+              Last attempt: {connection.broker || 'unknown broker'} ·{' '}
+              <span className="font-mono text-gray-300">{connection.server}</span>
+              {connection.account ? ` · ${connection.account}` : ''} — the server must
+              match MT5 exactly, including any trailing number.
+            </p>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Broker</label>
-              <input
-                type="text"
-                value={broker}
-                onChange={(event) => setBroker(event.target.value)}
-                placeholder="e.g., IC Markets"
-                autoComplete="organization"
-                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primary"
-              />
-            </div>
+            <BrokerPicker
+              value={broker}
+              onChange={setBroker}
+              placeholder="Search e.g. IC Markets, Exness, XM"
+            />
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">Server</label>
               <input
@@ -269,6 +297,11 @@ export default function BrokerConnect() {
                 onChange={(event) => setServer(event.target.value)}
                 placeholder="e.g., ICMarketsSC-Live12"
                 className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primary"
+              />
+              <ServerSuggestions
+                broker={broker}
+                query={server}
+                onPick={setServer}
               />
             </div>
             <div>

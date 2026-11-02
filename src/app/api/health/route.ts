@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { checkRpcs } from '@/lib/health-rpcs'
+import {
+  emptyBrokerSyncReport,
+  summarizeBrokerSync,
+  type BrokerConnectionRow,
+  type BrokerSyncReport,
+} from '@/lib/broker-sync-status'
+import { getAdminClient } from '@/lib/server-auth'
+import { resolveProviderConfig } from '@/lib/ai/providers'
 
 /**
  * Liveness and configuration probe.
@@ -52,6 +60,9 @@ export async function GET() {
   // Per-function schema check: a database that has not had the latest migration
   // applied otherwise looks healthy while one panel renders empty.
   const migrations = await checkRpcs(supabaseUrl, anonKey)
+  // The hosted-sync supervisor is infrastructure outside this deploy, so its
+  // absence is invisible here unless the connection set is read.
+  const sync = await checkBrokerSync()
 
   const healthy =
     config.supabaseUrl && config.supabaseAnonKey && database === 'ok'
@@ -73,10 +84,20 @@ export async function GET() {
       // reached this deployment. Without it a missing key surfaces only as a
       // 503 when a customer tries to connect, which is too late to be useful.
       features: { avatars, hostedSync: Boolean(process.env.SYNC_CREDENTIAL_KEY) },
+      // Which provider this deployment resolved, never a key or a prefix of one.
+      // `configured: false` is a valid deployment (the review answers 503), but
+      // the name matters: "configured and Gemini" and "configured and Sonnet"
+      // cost very different money, and this is where a misconfigured one shows
+      // up instead of when a customer taps Review.
+      ai: aiProvider(),
       // Like `features`, reported but not part of `status`: a pending migration
       // is a known, fixable state, and paging every fifteen minutes until
       // someone pastes SQL would train the alert away. `missing` names the file.
       migrations,
+      // Same rule as `migrations`: reported, not part of `status`. A supervisor
+      // that is not running breaks automatic sync and nothing else, and paging
+      // the uptime monitor for infrastructure would train the alert away.
+      sync,
       checkedAt: new Date().toISOString(),
     },
     {
@@ -84,6 +105,16 @@ export async function GET() {
       headers: { 'Cache-Control': 'no-store' },
     }
   )
+}
+
+/**
+ * The AI provider resolved from this deployment's environment.
+ *
+ * Reported separately from `features` because it carries a name, not a boolean.
+ */
+function aiProvider(): { configured: boolean; provider: string | null } {
+  const config = resolveProviderConfig()
+  return { configured: Boolean(config), provider: config?.provider ?? null }
 }
 
 /**
@@ -107,6 +138,28 @@ async function checkAvatarsBucket(
     return 'unknown'
   } catch {
     return 'unknown'
+  }
+}
+
+/**
+ * Aggregates over `broker_connections`, read with the service role because RLS
+ * keeps the rows private.
+ *
+ * Only counts, a verdict and timestamps are returned: this endpoint is public,
+ * and a broker name, server or account number is the customer's business. A
+ * failed read reports `unknown` rather than pretending everything is idle.
+ */
+async function checkBrokerSync(): Promise<BrokerSyncReport> {
+  try {
+    const { data, error } = await getAdminClient()
+      .from('broker_connections')
+      .select('status, updated_at, last_sync_at')
+      .limit(1000)
+
+    if (error) return emptyBrokerSyncReport('unknown')
+    return summarizeBrokerSync((data ?? []) as BrokerConnectionRow[])
+  } catch {
+    return emptyBrokerSyncReport('unknown')
   }
 }
 

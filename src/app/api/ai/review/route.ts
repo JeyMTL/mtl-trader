@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
+import { aiReviewsThisMonth, checkFeature } from '@/lib/plan-guard'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hashPayload } from '@/lib/ai/cache'
 import { createProvider, resolveProviderConfig } from '@/lib/ai/providers'
@@ -20,6 +21,11 @@ import { apiError, logEvent } from '@/lib/log'
  */
 
 export const dynamic = 'force-dynamic'
+// A review is one model round trip on a thinking model: seconds, not
+// milliseconds, and longer than the platform default. The provider gives up at
+// 45s (AI_TIMEOUT_MS), so this budget is what turns a hung model into our error
+// message instead of a killed function.
+export const maxDuration = 60
 
 const RATE_LIMIT = 5
 const RATE_WINDOW_MS = 10 * 60 * 1000
@@ -103,10 +109,21 @@ export async function POST(req: Request) {
       )
     }
 
+    // Entitlement: every paid plan includes the review (Basic has a monthly
+    // taste, Pro the full allowance) and the trial gets the Pro allowance. This
+    // runs before any provider work, so a refused caller costs nothing.
+    const gate = await checkFeature(user.id, 'ai_review')
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.message, code: 'upgrade_required' },
+        { status: gate.status }
+      )
+    }
+
     const config = resolveProviderConfig()
     if (!config) {
       return NextResponse.json(
-        { error: 'AI reviews are not configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY.' },
+        { error: 'AI reviews are not configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY or GEMINI_API_KEY.' },
         { status: 503 }
       )
     }
@@ -154,8 +171,14 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (cached) {
+      // The saved review does not store the pattern list, and the insights are
+      // pure arithmetic over the trades already loaded — so recompute them here
+      // rather than letting a cached response show fewer sections than a fresh
+      // one for the same journal.
+      const cachedInsights = prepareReview(input).insights
       return NextResponse.json({
         review: cached.review,
+        insights: cachedInsights,
         id: cached.id,
         meta: {
           provider: cached.provider,
@@ -167,24 +190,32 @@ export async function POST(req: Request) {
       })
     }
 
+    // A cached review returned above without inserting a row, so this counts
+    // real generations only: one insert per model call, no separate meter.
+    const used = await aiReviewsThisMonth(user.id)
+    if (gate.quota <= 0 || used >= gate.quota) {
+      return NextResponse.json(
+        {
+          error: `You have used this month's ${gate.quota} AI review${gate.quota === 1 ? '' : 's'}. The allowance resets on the 1st.`,
+          code: 'quota_exceeded',
+        },
+        { status: 402 }
+      )
+    }
+
     const provider = createProvider(config)
     const streamRequested = new URL(req.url).searchParams.get('stream') === '1'
     const prepared = prepareReview(input)
 
     // Too little data: never call the model, just return the deterministic note.
     if (prepared.skipped) {
-      const id = await persistReview(supabase, {
-        userId: user.id,
-        summaryHash,
-        provider: provider.name,
-        model: provider.model,
-        review: prepared.earlyReview!,
-        stats: prepared.stats,
-        similar: [],
-      })
+      // Deliberately not persisted: this answer costs no model call, and the
+      // monthly allowance is counted from `ai_reviews`. Writing it would spend a
+      // customer's quota on a deterministic "not enough data yet" note.
       return NextResponse.json({
         review: prepared.earlyReview,
-        id,
+        insights: prepared.insights,
+        id: null,
         meta: { provider: provider.name, model: provider.model, cached: false, skipped: true, generatedAt: new Date().toISOString() },
       })
     }
@@ -214,6 +245,7 @@ export async function POST(req: Request) {
             send({
               type: 'final',
               review,
+              insights: prepared.insights,
               id,
               meta: { provider: provider.name, model: provider.model, cached: false, skipped: false, generatedAt: new Date().toISOString() },
             })
@@ -251,6 +283,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       review: generated.review,
+      insights: generated.insights,
       id,
       meta: {
         provider: provider.name,

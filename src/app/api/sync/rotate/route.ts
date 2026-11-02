@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, logEvent } from '@/lib/log'
+import { checkFeature } from '@/lib/plan-guard'
 
 /**
  * Rotates the MT5 agent token.
@@ -21,6 +22,14 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Too many token rotations. Please try again later.' },
         { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
+      )
+    }
+
+    const gate = await checkFeature(user.id, 'sync')
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.message, code: 'upgrade_required' },
+        { status: gate.status }
       )
     }
 

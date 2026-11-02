@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
 import { useToast } from '@/components/toast'
 import BrokerConnect from '@/components/broker-connect'
+import BrokerPicker, { ServerSuggestions } from '@/components/broker-picker'
 
 export default function SyncPage() {
   const router = useRouter()
@@ -147,16 +148,12 @@ export default function SyncPage() {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Broker Name</label>
-            <input
-              type="text"
-              value={brokerName}
-              onChange={(e) => setBrokerName(e.target.value)}
-              placeholder="e.g., MetaQuotes"
-              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primary"
-            />
-          </div>
+          <BrokerPicker
+            value={brokerName}
+            onChange={setBrokerName}
+            label="Broker Name"
+            placeholder="Search e.g. IC Markets, Exness, XM"
+          />
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Server</label>
             <input
@@ -166,6 +163,7 @@ export default function SyncPage() {
               placeholder="e.g., MetaQuotes-Demo"
               className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-primary"
             />
+            <ServerSuggestions broker={brokerName} query={server} onPick={setServer} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Login (Account Number)</label>

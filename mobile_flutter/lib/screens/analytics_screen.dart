@@ -7,6 +7,8 @@ import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/a11y.dart';
+import '../ui/ai_coach.dart';
+import '../ui/setup_matrix.dart';
 import '../ui/shimmer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -36,12 +38,14 @@ class _AnalyticsData {
     required this.daily,
     required this.symbols,
     required this.tags,
+    required this.strategies,
   });
 
   final TradeSummary summary;
   final List<DailyPnlPoint> daily;
   final List<SymbolStat> symbols;
   final List<TagStat> tags;
+  final List<StrategyStat> strategies;
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
@@ -61,12 +65,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       widget.api.dailyPnl(from, today),
       widget.api.symbolStats(limit: 10),
       widget.api.tagStats(limit: 12),
+      // The free-text strategy label, for the setup matrix. Older databases
+      // without the migration leave this list empty and the section hidden.
+      widget.api.strategyStats(limit: 20),
     ]);
     return _AnalyticsData(
       summary: results[0] as TradeSummary,
       daily: results[1] as List<DailyPnlPoint>,
       symbols: results[2] as List<SymbolStat>,
       tags: results[3] as List<TagStat>,
+      strategies: results[4] as List<StrategyStat>,
     );
   }
 
@@ -130,6 +138,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   icon: Icons.insights_outlined,
                 )
               else ...[
+                AiCoachCard(api: widget.api, summary: data.summary),
+                const SizedBox(height: 14),
                 _SummaryGrid(summary: data.summary),
                 const SizedBox(height: 14),
                 _MonthlySection(daily: data.daily),
@@ -139,6 +149,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 _SymbolSection(symbols: data.symbols),
                 const SizedBox(height: 14),
                 _TagSection(tags: data.tags),
+                const SizedBox(height: 14),
+                SetupMatrix(tags: data.tags, strategies: data.strategies),
                 const SizedBox(height: 14),
                 FlatCard(
                   onTap: widget.onOpenEdge,

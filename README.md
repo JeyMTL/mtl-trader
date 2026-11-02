@@ -138,13 +138,15 @@ node --env-file=.env.local scripts/check-payments.mjs --reconcile
 
 ## Pricing Tiers
 
-| Plan | Price | Trades/Month |
-|------|-------|--------------|
-| Free Trial | $0 | Unlimited for 30 days |
-| Basic | $2.50 | 50 |
-| Pro | $5.00 | Unlimited |
+| Plan | Monthly | Yearly | Trades/Month |
+|------|---------|--------|--------------|
+| Free | $0 | — | Unlimited for 30 days, read-only afterwards |
+| Basic | $12.00 | $120.00 | 50 |
+| Pro | $29.00 | $290.00 | Unlimited |
 
 Trades are counted per calendar month and enforcement lives in the database trigger, not just the UI. Historical imports (older months) do not count against the limit.
+
+MT5 autosync is included from Basic, because it is the one thing a trader cannot do by hand; the backtester and market replay stay Pro, along with unlimited volume and 200 AI reviews a month (Basic gets 30). Yearly plans are card-only through Paddle and buy 365 days per payment (`apply_annual_order`); PayPal and bank transfer buy one 30-day period.
 
 ## Environment Variables
 
@@ -167,6 +169,7 @@ Trades are counted per calendar month and enforcement lives in the database trig
 | `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, `BANK_BRANCH` | Bank transfer details shown on the payment page. When unset, the page shows a "contact support" message instead |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | Optional; enables the AI journal review on OpenAI |
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Optional alternative AI provider |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Optional AI provider with a card-free free tier; used only when no paid key is set |
 | `AI_PROVIDER`, `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `AI_VISION_MODEL` | Optional AI overrides / OpenAI-compatible gateway |
 
 The app uses the production PayPal endpoint (`api-m.paypal.com`); set `PAYPAL_API_BASE` to `https://api-m.sandbox.paypal.com` for testing.

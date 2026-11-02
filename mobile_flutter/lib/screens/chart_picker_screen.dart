@@ -15,6 +15,7 @@ import '../core/chart_theme.dart';
 import '../core/chart_view.dart';
 import '../core/indicators.dart';
 import '../core/instruments.dart';
+import '../services/journal_api.dart';
 import '../services/market_data.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -805,10 +806,54 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   void _toggleReplayMode() {
     if (_replay == null) {
-      _enterReplay();
+      _enterReplayWhenAllowed();
     } else {
       _exitReplay();
     }
+  }
+
+  Future<void> _enterReplayWhenAllowed() async {
+    if (!await _replayAllowed()) return;
+    _enterReplay();
+  }
+
+  /// Replay is sold with Pro.
+  ///
+  /// This check is the upgrade prompt, not the enforcement: candles are served
+  /// to every plan, and replay is a way of drawing on them. It lives here
+  /// because entering replay is the only moment a trader discovers the feature.
+  /// A trial counts as Pro, and a stale `pro` label cannot outlive its period.
+  Future<bool> _replayAllowed() async {
+    try {
+      final profile = await JournalApi().profile();
+      final status =
+          (profile['subscription_status'] as String? ?? '').toLowerCase();
+      final tier = (profile['subscription_tier'] as String? ?? '').toLowerCase();
+      final now = DateTime.now();
+      final trialEnd =
+          DateTime.tryParse(profile['trial_ends_at'] as String? ?? '');
+      final periodEnd =
+          DateTime.tryParse(profile['current_period_end'] as String? ?? '');
+
+      final trialing =
+          status == 'trial' && trialEnd != null && trialEnd.isAfter(now);
+      final subscribed = status == 'active' &&
+          periodEnd != null &&
+          periodEnd.isAfter(now) &&
+          tier == 'pro';
+      if (trialing || subscribed) return true;
+    } catch (_) {
+      // Offline, or a schema still missing the billing columns: fall through to
+      // the prompt rather than pretending the feature is paid for.
+    }
+
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Market replay is a Pro feature. Upgrade to Pro to use it.'),
+      ),
+    );
+    return false;
   }
 
   void _enterReplay() {

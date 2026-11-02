@@ -17,6 +17,8 @@ import {
   ChevronRight,
   ChevronLeft,
   X,
+  FlaskConical,
+  Lock,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -33,15 +35,20 @@ const navigation = [
   { name: 'Import', href: '/dashboard/import', icon: Upload },
   { name: 'MT5 Sync', href: '/dashboard/sync', icon: RefreshCw },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
+
+/** Destinations the server withholds from Basic accounts (see `plan-guard`). */
+const PRO_ONLY_HREFS = ['/dashboard/backtest']
 
 /** Everything that does not fit in five bottom tabs lives in the sheet. */
 const moreNavigation = [
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Import trades', href: '/dashboard/import', icon: Upload },
   { name: 'MT5 auto sync', href: '/dashboard/sync', icon: RefreshCw },
+  { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
@@ -171,6 +178,22 @@ export default function DashboardLayout({
   const isPro = user?.tier === 'pro'
   const isBasic = user?.tier === 'basic'
 
+  // The backtester is Pro, and a live trial counts. Hiding the entry beats a
+  // nav item that answers 402: the server still refuses a direct URL, so this is
+  // presentation, not enforcement. Autosync is available from Basic.
+  const proTools = isPro || user?.status === 'trial'
+  const visibleNavigation = navigation.filter(
+    (item) => proTools || !PRO_ONLY_HREFS.includes(item.href)
+  )
+  const visibleMoreNavigation = moreNavigation.filter(
+    (item) => proTools || !PRO_ONLY_HREFS.includes(item.href)
+  )
+
+  // `maxTrades` is already the effective allowance, so zero means the period or
+  // trial has ended. That covers a lapsed trial and a lapsed paid period without
+  // guessing from the stored status label, which may still say `pro`.
+  const readOnly = user ? user.maxTrades === 0 : false
+
   const planLabel = !user
     ? ''
     : user.status === 'active'
@@ -219,7 +242,7 @@ export default function DashboardLayout({
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const active = pathname === item.href
             return (
               <Link
@@ -257,13 +280,24 @@ export default function DashboardLayout({
           {user && (
             <div className="bg-surface-light rounded-lg p-3 mb-3">
               <div className="text-xs text-gray-400">
-                {isPro ? 'Pro Plan' : isBasic ? 'Basic Plan' : '30-Day Free Trial'}
+                {isPro
+                  ? 'Pro Plan'
+                  : isBasic
+                    ? 'Basic Plan'
+                    : user.status === 'trial'
+                      ? '30-Day Free Trial'
+                      : 'Free plan'}
               </div>
               <div className="text-sm text-white font-medium">
                 {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
                  user.status === 'trial' ? `${trialDaysLeft} days remaining, unlimited trades` :
-                 'Expired'}
+                 'Read-only — journal safe'}
               </div>
+              {!proTools && (
+                <Link href="/pricing" className="mt-2 block text-xs font-semibold text-primary hover:underline">
+                  Unlock the backtester →
+                </Link>
+              )}
               {!isPro && user.status !== 'trial' && (
                 <div className="w-full bg-background rounded-full h-2 mt-2">
                   <div className="bg-primary h-2 rounded-full" style={{ width: `${trialProgress}%` }} />
@@ -288,7 +322,9 @@ export default function DashboardLayout({
           <div className="flex items-center gap-4 min-w-0">
             {user && (
               <div className="text-sm text-gray-400 truncate">
-                {isPro ? 'Unlimited trades' : (
+                {isPro ? 'Unlimited trades' : user.maxTrades === 0 ? (
+                  'Read-only — journal safe'
+                ) : (
                   <><span className="text-white font-medium">{tradesRemaining}</span> / {user.maxTrades} trades remaining this month</>
                 )}
               </div>
@@ -300,6 +336,26 @@ export default function DashboardLayout({
         </header>
 
         <main className="flex-1 px-4 lg:p-6 mobile-main">
+          {/* The end of a period must read as a pause, not a loss: the trigger
+              refuses new trades, it never deletes anything. */}
+          {readOnly && (
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2.5">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary-light" />
+                <p className="text-sm leading-relaxed text-primary-light">
+                  <span className="font-semibold text-white">Your trial has ended.</span>{' '}
+                  Nothing was deleted — your journal, photos and analytics are still here and
+                  readable. Choose a plan to log new trades.
+                </p>
+              </div>
+              <Link
+                href="/pricing"
+                className="btn btn-primary shrink-0 self-start px-3 py-1.5 text-xs sm:self-auto"
+              >
+                Choose a plan
+              </Link>
+            </div>
+          )}
           {children}
         </main>
       </div>
@@ -427,6 +483,11 @@ export default function DashboardLayout({
                     {isPro ? 'Manage' : 'Upgrade'}
                   </Link>
                 </div>
+                {!proTools && (
+                  <p className="mt-2 text-[11px] text-gray-500">
+                    The backtester and replay are Pro features.
+                  </p>
+                )}
                 {!isPro && user.status !== 'trial' && (
                   <div className="mt-2 h-1.5 w-full rounded-full bg-background">
                     <div className="h-1.5 rounded-full bg-primary" style={{ width: `${trialProgress}%` }} />
@@ -436,7 +497,7 @@ export default function DashboardLayout({
             )}
 
             <div className="overflow-hidden rounded-2xl border border-border bg-surface-light">
-              {moreNavigation.map((item, index) => (
+              {visibleMoreNavigation.map((item, index) => (
                 <Link
                   key={item.name}
                   href={item.href}

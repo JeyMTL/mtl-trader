@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import '../core/format.dart';
 import '../core/instruments.dart';
 import '../core/pnl.dart';
+import '../core/strategy_colors.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../services/media_service.dart';
@@ -58,6 +59,8 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
   String? _createdTradeId;
   Timer? _recordTimer;
   bool _saved = false;
+  List<String> _strategyLabels = const [];
+  bool _strategyOpen = false;
 
   bool get _isEdit => widget.tradeId != null;
   String? get _userId => _api.userId;
@@ -69,6 +72,43 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       _loading = true;
       _loadTrade();
     }
+    unawaited(_loadStrategyLabels());
+  }
+
+  /// Labels this trader has already used, offered as chips. Free text is where
+  /// one model turns into three rows in the analytics matrix.
+  Future<void> _loadStrategyLabels() async {
+    try {
+      final labels = await _api.strategyLabels();
+      if (!mounted) return;
+      setState(() => _strategyLabels = labels);
+    } catch (_) {
+      // Suggestions are optional; a database without the migration has none.
+    }
+  }
+
+  /// One strategy name, one row in analytics: collapse whitespace, trim, and
+  /// cap the length so a pasted paragraph cannot become a filter key.
+  static String _normalizeStrategy(String value) =>
+      value.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  List<String> get _strategyOptions {
+    final typed = _normalizeStrategy(_strategy.text).toLowerCase();
+    final matches = typed.isEmpty
+        ? _strategyLabels
+        : _strategyLabels
+            .where((label) => label.toLowerCase().contains(typed))
+            .toList();
+    return matches.take(8).toList();
+  }
+
+  String? get _similarStrategy {
+    final typed = _normalizeStrategy(_strategy.text);
+    if (typed.isEmpty || _strategyLabels.contains(typed)) return null;
+    for (final label in _strategyLabels) {
+      if (label.toLowerCase() == typed.toLowerCase()) return label;
+    }
+    return null;
   }
 
   @override
@@ -604,7 +644,9 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       'pnl': _pnl ?? 0,
       'commission': _valueOf(_commission) ?? 0,
       'swap': _valueOf(_swap) ?? 0,
-      'strategy': _strategy.text.trim().isEmpty ? null : _strategy.text.trim(),
+      'strategy': _normalizeStrategy(_strategy.text).isEmpty
+          ? null
+          : _normalizeStrategy(_strategy.text),
       'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
       'tags': _tags.isEmpty ? null : _tags,
       'open_time': _openTime?.toUtc().toIso8601String(),
@@ -770,11 +812,109 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _strategy,
-                    decoration: const InputDecoration(
+                    textCapitalization: TextCapitalization.words,
+                    onChanged: (_) => setState(() => _strategyOpen = true),
+                    onTap: () => setState(() => _strategyOpen = true),
+                    decoration: InputDecoration(
                       labelText: 'Strategy',
                       hintText: 'London breakout',
+                      suffixIcon: _strategyLabels.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Saved strategies',
+                              icon: Icon(
+                                _strategyOpen
+                                    ? Icons.arrow_drop_up
+                                    : Icons.arrow_drop_down,
+                                color: AppColors.muted,
+                              ),
+                              onPressed: () => setState(
+                                () => _strategyOpen = !_strategyOpen,
+                              ),
+                            ),
                     ),
                   ),
+                  if (_strategyOpen && _strategyOptions.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceAlt,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        children: [
+                          for (var index = 0;
+                              index < _strategyOptions.length;
+                              index++) ...[
+                            if (index > 0)
+                              Divider(
+                                height: 1,
+                                color: AppColors.border.withAlpha(120),
+                              ),
+                            InkWell(
+                              onTap: () => setState(() {
+                                _strategy.text = _strategyOptions[index];
+                                _strategy.selection = TextSelection.collapsed(
+                                  offset: _strategyOptions[index].length,
+                                );
+                                _strategyOpen = false;
+                              }),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: strategyColor(
+                                          'strategy:${_strategyOptions[index]}',
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _strategyOptions[index],
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: AppColors.text,
+                                          fontSize: 12.5,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_normalizeStrategy(_strategy.text) ==
+                                        _strategyOptions[index])
+                                      Icon(
+                                        Icons.check,
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  if (_similarStrategy != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'You already use “$_similarStrategy”. Pick the existing '
+                      'spelling so its statistics stay together.',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: kMinLabelSize,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1249,6 +1389,9 @@ class _NumberField extends StatelessWidget {
         signed: signed,
       ),
       decoration: InputDecoration(labelText: label),
+      // Validate as the trader types: a zero is caught next to the field instead
+      // of only when Save is pressed.
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       onChanged: (_) => onChanged(),
       validator: (value) {
         final text = (value ?? '').trim();

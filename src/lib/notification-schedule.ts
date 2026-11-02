@@ -93,6 +93,52 @@ function zonedStartOfDay(year: number, month: number, day: number, timeZone: str
   return refined === offset ? candidate : new Date(naiveUtc - refined)
 }
 
+/** Days before the trial ends that the first reminder goes out. */
+export const TRIAL_WARNING_DAYS = 3
+
+export interface TrialAccountState {
+  subscription_status?: string | null
+  subscription_tier?: string | null
+  trial_ends_at?: string | null
+}
+
+export type TrialReminderKind = 'trial_ending' | 'trial_ended'
+
+export interface TrialReminder {
+  kind: TrialReminderKind
+  /** Whole days left, 0 once the trial has passed. */
+  daysLeft: number
+  /** Stable key for the send claim: one reminder per trial, however often the cron runs. */
+  windowKey: string
+}
+
+/**
+ * The trial reminder this account is due on `now`, if any.
+ *
+ * Only an account still marked `trial` is nagged: once the payment lands the
+ * status is `active` and the reminder stops, so nobody is asked to buy something
+ * they just bought. The window key is the trial's end date, not the day the
+ * email goes out, which is what makes the claim idempotent across daily runs.
+ */
+export function trialReminder(
+  account: TrialAccountState,
+  now: Date = new Date()
+): TrialReminder | null {
+  if (account.subscription_status !== 'trial' || !account.trial_ends_at) return null
+  const endsAt = new Date(account.trial_ends_at)
+  const ms = endsAt.getTime()
+  if (!Number.isFinite(ms)) return null
+
+  const daysLeft = Math.ceil((ms - now.getTime()) / DAY_MS)
+  if (daysLeft > TRIAL_WARNING_DAYS) return null
+
+  return {
+    kind: daysLeft > 0 ? 'trial_ending' : 'trial_ended',
+    daysLeft: Math.max(0, daysLeft),
+    windowKey: dayKey(endsAt),
+  }
+}
+
 export type SummaryWindowKind = 'daily' | 'weekly' | 'monthly'
 
 export interface Window {

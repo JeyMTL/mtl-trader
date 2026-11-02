@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Loader2,
   Save,
@@ -21,6 +22,7 @@ import { supabase } from '@/lib/supabase'
 import { calculatePnL, cn, formatCurrency, formatDuration, getPointValue } from '@/lib/utils'
 import { effectiveMaxTrades, UNLIMITED } from '@/lib/subscription'
 import { mergeTags, suggestTags } from '@/lib/ai/autotag'
+import { strategyColor } from '@/lib/strategy-colors'
 import { JournalMedia } from '@/components/journal-media'
 import {
   deleteJournalMedia,
@@ -78,6 +80,17 @@ function pipSize(symbol: string): number {
   return 0.0001
 }
 
+/**
+ * One strategy name, one row in analytics.
+ *
+ * The field is a free-text filter key, so leading, trailing and doubled spaces
+ * are collapsed before the value is compared, suggested or saved — otherwise
+ * "London  breakout" and "London breakout" split one model's statistics.
+ */
+function normalizeStrategy(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().slice(0, 60)
+}
+
 function labelForDateInput(value: string | null | undefined): string {
   if (!value) return ''
   const date = new Date(value)
@@ -95,6 +108,8 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
   const [notFound, setNotFound] = useState(false)
   const [quotaHit, setQuotaHit] = useState<number | null>(null)
   const [tagDraft, setTagDraft] = useState('')
+  const [strategyLabels, setStrategyLabels] = useState<string[]>([])
+  const [strategyOpen, setStrategyOpen] = useState(false)
   const [userId, setUserId] = useState('')
   const [attachments, setAttachments] = useState<JournalAttachment[]>([])
   const [pendingMedia, setPendingMedia] = useState<PendingJournalAttachment[]>([])
@@ -109,6 +124,35 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
   useEffect(() => {
     pendingMediaRef.current = pendingMedia
   }, [pendingMedia])
+
+  // Strategy labels this trader has already used. Tapping one keeps the
+  // analytics matrix from splitting a single model across spelling variants.
+  // The RPC is optional: a database without the migration simply shows none.
+  useEffect(() => {
+    let active = true
+    try {
+      // `rpc` is typed as PromiseLike by the generated client, so it is wrapped
+      // to get a `catch`: no suggestions is a valid state, not an error.
+      Promise.resolve(
+        supabase.rpc('strategy_labels', { p_limit: 20 }) as unknown as Promise<{ data: unknown }>
+      )
+        .then((result) => {
+          if (!active || !Array.isArray(result?.data)) return
+          const labels = result.data
+            .map((row) => (row as { label?: unknown })?.label)
+            .filter((label): label is string => typeof label === 'string' && label.trim().length > 0)
+          setStrategyLabels(labels)
+        })
+        .catch(() => {
+          // No suggestions is a valid state, not an error worth showing.
+        })
+    } catch {
+      // A test double without `rpc` lands here.
+    }
+    return () => {
+      active = false
+    }
+  }, [])
 
   const update = useCallback((field: keyof FormState, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -238,6 +282,18 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
   const rMultiple = risk && risk > 0 && pnl !== null ? pnl / risk : null
 
   const suggestedTags = mergeTags(form.tags, suggestTags(form.notes)).filter(tag => !form.tags.includes(tag))
+  const typedStrategy = normalizeStrategy(form.strategy)
+  // Case-only drift is the most common split, and it is the one that is safe to
+  // spot: a genuinely different model is a different label.
+  const similarStrategy = typedStrategy && !strategyLabels.includes(typedStrategy)
+    ? strategyLabels.find(label => label.toLowerCase() === typedStrategy.toLowerCase())
+    : undefined
+  // Typing filters the saved labels; focusing the empty field shows them all.
+  const showStrategyMenu = strategyOpen && strategyLabels.length > 0
+  const filteredStrategies = (typedStrategy
+    ? strategyLabels.filter(label => label.toLowerCase().includes(typedStrategy.toLowerCase()))
+    : strategyLabels
+  ).slice(0, 8)
 
   const missing = {
     symbol: form.symbol.trim().length === 0,
@@ -272,7 +328,7 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
       pnl: pnl ?? 0,
       commission: Number.isNaN(numbers.commission) ? 0 : numbers.commission,
       swap: Number.isNaN(numbers.swap) ? 0 : numbers.swap,
-      strategy: form.strategy.trim() || null,
+      strategy: typedStrategy || null,
       notes: form.notes.trim() || null,
       tags: form.tags.length ? form.tags : null,
       open_time: form.open_time ? new Date(form.open_time).toISOString() : null,
@@ -338,7 +394,20 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
         .select('id')
         .single()
       if (insertError) {
-        setError(insertError.message)
+        // The trigger speaks in SQL. A refused save must say what happened to the
+        // journal, not just what the constraint was called.
+        const message = insertError.message
+        if (/Free trial ended/i.test(message)) {
+          setError(
+            'Your 30-day trial has ended. Nothing was deleted — your journal is still here and readable. Choose a plan to add new trades.'
+          )
+        } else if (/Monthly trade limit/i.test(message)) {
+          setError(
+            'You have reached this month’s trade limit. Your journal is untouched — upgrade for a higher limit, or log this trade next month.'
+          )
+        } else {
+          setError(message)
+        }
         setSaving(false)
         return
       }
@@ -433,7 +502,9 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
       {quotaHit !== null && (
         <div className="mt-5 flex flex-col gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <p className="text-primary-light">
-            Monthly limit reached — this plan logs {quotaHit} trades per month.
+            {quotaHit === 0
+              ? 'Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.'
+              : `Monthly limit reached — this plan logs ${quotaHit} trades per month.`}
           </p>
           <Link href="/pricing" className="btn btn-primary self-start px-3 py-1.5 text-xs">
             Compare plans
@@ -604,14 +675,90 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
               </div>
               <div>
                 <label htmlFor="strategy" className="field-label">Strategy</label>
-                <input
-                  id="strategy"
-                  type="text"
-                  value={form.strategy}
-                  onChange={(event) => update('strategy', event.target.value)}
-                  placeholder="e.g. London breakout"
-                  className="input"
-                />
+                <div className="relative">
+                  <input
+                    id="strategy"
+                    type="text"
+                    value={form.strategy}
+                    onChange={(event) => {
+                      update('strategy', event.target.value)
+                      setStrategyOpen(true)
+                    }}
+                    onFocus={() => setStrategyOpen(true)}
+                    onBlur={() => {
+                      update('strategy', normalizeStrategy(form.strategy))
+                      // Delayed so a click on an option lands before the list closes.
+                      window.setTimeout(() => setStrategyOpen(false), 120)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') setStrategyOpen(false)
+                    }}
+                    maxLength={60}
+                    autoCapitalize="words"
+                    autoComplete="off"
+                    spellCheck
+                    placeholder="e.g. London breakout"
+                    role="combobox"
+                    aria-expanded={showStrategyMenu}
+                    aria-controls="strategy-options"
+                    className="input pr-9"
+                  />
+                  {strategyLabels.length > 0 && (
+                    <button
+                      type="button"
+                      aria-label="Show saved strategies"
+                      onClick={() => setStrategyOpen(open => !open)}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 transition-colors hover:text-white"
+                    >
+                      <ChevronDown
+                        className={cn('h-4 w-4 transition-transform', showStrategyMenu && 'rotate-180')}
+                      />
+                    </button>
+                  )}
+                  {showStrategyMenu && (
+                    <ul
+                      id="strategy-options"
+                      role="listbox"
+                      className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-surface p-1 shadow-xl"
+                    >
+                      {filteredStrategies.length === 0 ? (
+                        <li className="px-3 py-2 text-xs text-gray-500">
+                          No saved strategy matches. Saving this one adds it to the list.
+                        </li>
+                      ) : (
+                        filteredStrategies.map((label) => (
+                          <li key={label} role="option" aria-selected={typedStrategy === label}>
+                            <button
+                              type="button"
+                              // mousedown rather than click: the input must not blur first.
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => {
+                                update('strategy', label)
+                                setStrategyOpen(false)
+                              }}
+                              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-surface-light hover:text-white"
+                            >
+                              <span
+                                aria-hidden
+                                className="h-2 w-2 shrink-0 rounded-full"
+                                style={{ backgroundColor: strategyColor(label) }}
+                              />
+                              <span className="flex-1 truncate">{label}</span>
+                              {typedStrategy === label && (
+                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                              )}
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
+                </div>
+                {similarStrategy && (
+                  <p className="mt-1.5 text-xs text-warning">
+                    You already use “{similarStrategy}”. Pick the existing spelling so its statistics stay together.
+                  </p>
+                )}
               </div>
             </div>
           </section>

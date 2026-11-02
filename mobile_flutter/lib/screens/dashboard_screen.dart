@@ -11,6 +11,7 @@ import '../services/journal_api.dart';
 import '../ui/a11y.dart';
 import '../ui/brand.dart';
 import '../ui/motion.dart';
+import '../ui/prop_compliance.dart';
 import '../ui/shimmer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -92,6 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: AppColors.primary,
             backgroundColor: AppColors.surface,
             child: _DashboardBody(
+              api: widget.api,
               data: data,
               onOpenEdge: widget.onOpenEdge,
               onEdit: widget.onEdit,
@@ -105,11 +107,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _DashboardBody extends StatelessWidget {
   const _DashboardBody({
+    required this.api,
     required this.data,
     required this.onOpenEdge,
     required this.onEdit,
   });
 
+  final JournalApi api;
   final DashboardData data;
   final VoidCallback onOpenEdge;
   final ValueChanged<String> onEdit;
@@ -134,6 +138,8 @@ class _DashboardBody extends StatelessWidget {
           index: 0,
           child: _BalanceHero(data: data, summary: summary),
         ),
+        const SizedBox(height: 10),
+        PropComplianceCard(api: api),
         const SizedBox(height: 10),
         Reveal(
           index: 1,

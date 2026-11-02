@@ -3,6 +3,8 @@
  * unit tested without a database or an email provider.
  */
 
+import { PLANS } from './plans'
+
 export interface TradeLike {
   pnl: number | string
   close_time?: string | null
@@ -124,6 +126,73 @@ export function renderSummaryEmail({
       </p>
       <p style="color:#6e7681;font-size:12px;margin-top:24px">
         You are receiving this because email notifications are on in your MTL Trader settings.
+      </p>
+    </div>
+  </body>
+</html>`
+
+  return { subject, html }
+}
+
+export interface TrialReminderEmailOptions {
+  name?: string | null
+  kind: 'trial_ending' | 'trial_ended'
+  daysLeft?: number
+  appUrl?: string
+}
+
+/**
+ * The trial ending / ended notice.
+ *
+ * Prices come from PLANS rather than being typed here, so a price change cannot
+ * leave a stale number in an old customer's inbox. The copy says plainly what
+ * keeps working (the journal and its analytics, read-only) and what pauses, so
+ * the upgrade does not feel like a threat invented by marketing.
+ */
+export function renderTrialReminderEmail({
+  name,
+  kind,
+  daysLeft = 0,
+  appUrl = 'https://mtl-trader.vercel.app',
+}: TrialReminderEmailOptions): { subject: string; html: string } {
+  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
+  const basic = PLANS.find((plan) => plan.id === 'basic')
+  const pro = PLANS.find((plan) => plan.id === 'pro')
+  const prices =
+    basic && pro ? `Basic is ${formatMoney(basic.price)} a month, Pro ${formatMoney(pro.price)}.` : ''
+
+  const ending = kind === 'trial_ending'
+  const subject = ending
+    ? `Your trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
+    : 'Your trial has ended'
+  const lede = ending
+    ? `Everything is still open for ${daysLeft} more day${daysLeft === 1 ? '' : 's'}. After that your journal stays readable, but the parts you would miss stop.`
+    : 'Your trial has ended. Your journal, trades and analytics are still there and still yours — the tools that do the work for you are paused.'
+
+  const row = (label: string, detail: string) =>
+    `<tr><td style="padding:6px 12px 6px 0;color:#8b949e;vertical-align:top;white-space:nowrap">${label}</td><td style="padding:6px 0">${detail}</td>`
+
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c9d1d9">
+    <div style="max-width:520px;margin:0 auto;padding:24px">
+      <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Trader</h1>
+      <p style="color:#8b949e;margin:0 0 20px">${escapeHtml(subject)}</p>
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px">
+        <p style="margin:0 0 12px">${greeting}</p>
+        <p style="margin:0 0 16px;color:#c9d1d9">${escapeHtml(lede)}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 18px">
+          ${row('Keeps working', 'Journal, calendar, photos, voice notes, analytics')}
+          ${row('Pauses', 'MT5 autosync, AI reviews, backtester, replay')}
+        </table>
+        <p style="margin:0 0 14px;color:#8b949e;font-size:13px">${escapeHtml(prices)}</p>
+        <a href="${escapeHtml(appUrl)}/pricing" style="display:inline-block;padding:10px 16px;background:#238636;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600">See the plans</a>
+      </div>
+      <p style="margin:20px 0 0">
+        <a href="${escapeHtml(appUrl)}/dashboard" style="color:#58a6ff">Open your journal</a>
+      </p>
+      <p style="color:#6e7681;font-size:12px;margin-top:24px">
+        You are receiving this because you started a trial on MTL Trader. It is a one-off account notice, not a digest.
       </p>
     </div>
   </body>

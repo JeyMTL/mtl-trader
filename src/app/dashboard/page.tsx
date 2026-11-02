@@ -1,6 +1,7 @@
 import { createServerSupabase, requireServerUser } from '@/lib/supabase-server'
 import { logEvent } from '@/lib/log'
 import { DashboardView, type DashboardRecentTrade } from '@/components/dashboard-view'
+import { PropCompliance } from '@/components/prop-compliance'
 import {
   EMPTY_SUMMARY,
   EMPTY_TIME_STATS,
@@ -113,8 +114,10 @@ export default async function DashboardPage() {
     : DEFAULT_PREFERENCES
 
   return (
-    <DashboardView
-      summary={summary}
+    <div className="space-y-4 lg:space-y-5">
+      <PropCompliance />
+      <DashboardView
+        summary={summary}
       equity={equity}
       depositsTotal={Number.isFinite(depositsTotal) ? depositsTotal : 0}
       recentTrades={recentTrades}
@@ -122,8 +125,9 @@ export default async function DashboardPage() {
       dailyPnl={dailyPnl}
       timeStats={timeStats}
       journalFeed={journalFeed}
-      sessionStats={Array.isArray(sessionStats) ? sessionStats : []}
-      sessionStatsMissing={sessionStatsMissing}
-    />
+        sessionStats={Array.isArray(sessionStats) ? sessionStats : []}
+        sessionStatsMissing={sessionStatsMissing}
+      />
+    </div>
   )
 }

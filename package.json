@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:deploy": "node scripts/check-deploy.mjs",
+    "check:ai": "node scripts/check-ai.mjs",
     "check:audit": "node scripts/audit-gate.mjs"
   },
   "dependencies": {

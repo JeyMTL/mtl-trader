@@ -86,6 +86,30 @@ async function main() {
       console.log(`    ? could not probe: ${unknown.join(', ')}`)
     }
   }
+  if (body.sync) {
+    const { verdict, connected = 0, pending = 0, stalled = 0, lastSyncAt } =
+      body.sync
+    // Printed, not part of the exit code: the sync supervisor runs on our own
+    // Windows host, outside this deploy, and the app is healthy without it.
+    line(
+      'sync supervisor',
+      verdict !== 'stalled' && verdict !== 'unknown',
+      verdict === 'stalled'
+        ? `${stalled} connection(s) unclaimed for over 10 minutes — is supervisor/mt5_supervisor.py running?`
+        : verdict === 'unknown'
+          ? 'could not be read'
+          : `${connected} connected · ${pending} queued${lastSyncAt ? ` · last sync ${lastSyncAt}` : ''}`
+    )
+  }
+  if (body.ai) {
+    // Printed, not part of the exit code: no AI key is a valid deployment, and
+    // the review explains itself with a 503. The provider name is the useful bit.
+    line(
+      'ai provider',
+      body.ai.configured,
+      body.ai.provider ?? 'not configured — the review answers 503'
+    )
+  }
   if (body.commit) console.log(`  commit ${body.commit}`)
 
   return response.ok && body.status === 'ok' ? 0 : 1

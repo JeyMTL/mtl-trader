@@ -6,7 +6,9 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config.dart';
+import '../models/ai_review.dart';
 import '../models/models.dart';
+import '../models/prop_rules.dart';
 
 /// A decoded, already error-checked response from the web API.
 class _ApiResult {
@@ -122,6 +124,55 @@ class JournalApi {
   Future<List<TagStat>> tagStats({int limit = 12}) async {
     final data = await _db.rpc('tag_stats', params: {'p_limit': limit});
     return asList(data).map((row) => TagStat.fromMap(asMap(row))).toList();
+  }
+
+  Future<List<StrategyStat>> strategyStats({int limit = 20}) async {
+    final data = await _db.rpc('strategy_stats', params: {'p_limit': limit});
+    return asList(data).map((row) => StrategyStat.fromMap(asMap(row))).toList();
+  }
+
+  /// Distinct strategy labels already used, for the form's suggestion chips.
+  /// Missing migration or an empty journal both yield an empty list.
+  Future<List<String>> strategyLabels({int limit = 20}) async {
+    final data = await _db.rpc('strategy_labels', params: {'p_limit': limit});
+    return asList(data)
+        .map((row) => asMap(row)['label']?.toString() ?? '')
+        .where((label) => label.trim().isNotEmpty)
+        .toList();
+  }
+
+  /// Prop-firm rules plus the standing computed from the trades. The server
+  /// decides whether a rule is breached; this only transports it.
+  Future<Map<String, dynamic>> propRules() async {
+    final result = await _api('GET', '/api/prop-rules');
+    return result.body;
+  }
+
+  Future<Map<String, dynamic>> savePropRules(PropRules rules) async {
+    final result = await _api('PUT', '/api/prop-rules', rules.toBody());
+    return result.body;
+  }
+
+  /// Remaining AI reviews this month. A 402 is not thrown: the card renders the
+  /// allowance as "not included" rather than an error.
+  Future<Map<String, dynamic>> aiReviewQuota() async {
+    final result = await _api('GET', '/api/ai/review/quota');
+    return result.body;
+  }
+
+  /// Generates the journal review. The route loads the note-bearing trades
+  /// itself, so only the summary has to be sent from the device.
+  Future<AiReviewResult> aiReview({
+    required int totalTrades,
+    required double totalPnl,
+    required double winRate,
+  }) async {
+    final result = await _api('POST', '/api/ai/review', <String, dynamic>{
+      'totalTrades': totalTrades,
+      'totalPnl': totalPnl,
+      'winRate': winRate,
+    });
+    return AiReviewResult.fromBody(result.body);
   }
 
   Future<List<JournalEntry>> journalFeed({int limit = 6}) async {
@@ -386,6 +437,17 @@ class JournalApi {
     return result.body;
   }
 
+  /// The MT5 broker directory behind the connect form's searchable picker. The
+  /// whole list comes back in one call and is filtered on the device, so typing
+  /// in the picker never waits on a request.
+  Future<List<Mt5Broker>> brokers() async {
+    final result = await _api('GET', '/api/brokers');
+    return asList(result.body['brokers'])
+        .map((row) => Mt5Broker.fromMap(asMap(row)))
+        .where((broker) => broker.name.isNotEmpty)
+        .toList();
+  }
+
   /// Authenticated JSON call to the web API. Throws the server's message so the
   /// UI can show something actionable instead of a status code.
   Future<_ApiResult> _api(
@@ -442,9 +504,14 @@ class JournalApi {
     }
   }
 
-  /// Starts a Flutterwave card subscription and returns the hosted checkout
-  /// URL. The app opens it in the browser; the webhook applies the payment, so
-  /// closing the app mid-flow loses nothing.
+  /// Starts a card subscription and returns the hosted checkout URL. The app
+  /// opens it in the browser; the webhook applies the payment, so closing the
+  /// app mid-flow loses nothing.
+  ///
+  /// The endpoint is processor-agnostic on purpose: the server picks Paddle or
+  /// Flutterwave from its own configuration. Calling one processor's route
+  /// directly made every mobile payment fail with "not configured" whenever the
+  /// deployment used the other one.
   Future<String> startCardSubscription(String planId) async {
     final session = _db.auth.currentSession;
     final id = userId;
@@ -456,7 +523,7 @@ class JournalApi {
       ..connectionTimeout = const Duration(seconds: 10);
     try {
       final request = await client.postUrl(
-        Uri.parse('${AppConfig.apiBaseUrl}/api/flutterwave/checkout'),
+        Uri.parse('${AppConfig.apiBaseUrl}/api/checkout/card'),
       );
       request.headers.contentType = ContentType.json;
       request.headers.set(

@@ -46,6 +46,24 @@ fail the deploy gate. A pending migration is a known state with a named fix, and
 an alert that fires every fifteen minutes until someone pastes SQL is an alert
 people learn to ignore.
 
+### Sync supervisor
+
+`sync` reports the hosted MT5 connection set as aggregates, because the
+supervisor runs on our own Windows host rather than in this deploy:
+
+```json
+"sync": { "verdict": "stalled", "connections": 12, "pending": 1,
+          "connecting": 0, "connected": 11, "stalled": 1,
+          "lastSyncAt": "2026-11-02T09:14:03.000Z", "oldestPendingMinutes": 47 }
+```
+
+`verdict: "stalled"` means a queued connection has gone unclaimed for more than
+ten minutes — several missed cycles — which is what a supervisor that is not
+running looks like from outside. Like `migrations`, it is reported but does not
+change `status`: the app is fine and the missing piece is infrastructure.
+Aggregates only, never a broker, server or account number, because the endpoint
+is public.
+
 ## Uptime monitoring
 
 `.github/workflows/uptime.yml` runs every 15 minutes:

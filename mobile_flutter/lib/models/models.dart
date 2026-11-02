@@ -516,6 +516,36 @@ class SymbolStat {
       );
 }
 
+/// One label from the `strategy_stats` RPC. Blank labels arrive as "Untagged".
+class StrategyStat {
+  const StrategyStat({
+    required this.strategy,
+    required this.trades,
+    required this.wins,
+    required this.losses,
+    required this.pnl,
+    required this.winRate,
+  });
+
+  final String strategy;
+  final int trades;
+  final int wins;
+  final int losses;
+  final double pnl;
+  final double winRate;
+
+  double get expectancy => trades > 0 ? pnl / trades : 0;
+
+  factory StrategyStat.fromMap(Map<String, dynamic> map) => StrategyStat(
+        strategy: map['strategy']?.toString() ?? 'Untagged',
+        trades: asInt(map['trades']),
+        wins: asInt(map['wins']),
+        losses: asInt(map['losses']),
+        pnl: asDouble(map['pnl']),
+        winRate: asDouble(map['win_rate']),
+      );
+}
+
 class TagStat {
   const TagStat({
     required this.tag,
@@ -540,5 +570,25 @@ class TagStat {
         losses: asInt(map['losses']),
         pnl: asDouble(map['pnl']),
         winRate: asDouble(map['win_rate']),
+      );
+}
+
+/// One broker from the MT5 directory behind `/api/brokers`.
+///
+/// `servers` holds the server names worth suggesting for it. It is deliberately
+/// partial — brokers add and retire servers constantly — so the server field
+/// stays free text and this list is only a shortcut.
+class Mt5Broker {
+  const Mt5Broker({required this.name, this.servers = const []});
+
+  final String name;
+  final List<String> servers;
+
+  factory Mt5Broker.fromMap(Map<String, dynamic> map) => Mt5Broker(
+        name: asString(map['name']) ?? '',
+        servers: asList(map['servers'])
+            .map((server) => server.toString())
+            .where((server) => server.isNotEmpty)
+            .toList(),
       );
 }

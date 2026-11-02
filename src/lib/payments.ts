@@ -1,5 +1,6 @@
 import { PLANS } from '@/lib/plans'
 import { getAdminClient } from '@/lib/server-auth'
+import type { BillingInterval } from '@/types'
 
 /**
  * Server-only payment application.
@@ -24,6 +25,26 @@ export const PAID_PLAN_PRICES: Record<string, string> = Object.fromEntries(
   PLANS.filter((p) => p.price > 0).map((p) => [p.id, p.price.toFixed(2)])
 )
 
+/** Yearly prices, for the plans that have one. Same currency as the monthly ones. */
+export const ANNUAL_PLAN_PRICES: Record<string, string> = Object.fromEntries(
+  PLANS.filter((p) => typeof p.annual_price === 'number' && p.annual_price > 0).map((p) => [
+    p.id,
+    (p.annual_price as number).toFixed(2),
+  ])
+)
+
+/**
+ * The price a payment for this plan and cadence must match exactly.
+ *
+ * Annual is a separate amount, not `monthly × 12`: at $120 and $290 the customer
+ * gets two months free, which is the whole point of paying up front. The amount a
+ * webhook applies is read from here, never from the provider's total (which
+ * includes tax).
+ */
+export function priceForPlan(planId: string, interval: BillingInterval = 'month'): string | undefined {
+  return interval === 'year' ? ANNUAL_PLAN_PRICES[planId] : PAID_PLAN_PRICES[planId]
+}
+
 export type ApplyReason =
   | 'applied'
   | 'duplicate'
@@ -41,8 +62,10 @@ export interface PaidOrder {
   userId: string
   planId: string
   amount: number | string
-  provider: 'paypal' | 'bank' | 'flutterwave'
+  provider: 'paypal' | 'bank' | 'flutterwave' | 'paddle'
   providerEventId: string
+  /** `year` buys 365 days through `apply_annual_order`; default is 30 days. */
+  interval?: BillingInterval
 }
 
 /** PayPal order metadata is a JSON string in `custom_id`. */
@@ -58,17 +81,24 @@ export function parseCustomId(customId: unknown): { userId: string; planId: stri
 }
 
 export async function applyPaidOrder(order: PaidOrder): Promise<ApplyResult> {
-  const expected = PAID_PLAN_PRICES[order.planId]
+  const interval = order.interval ?? 'month'
+  const expected = priceForPlan(order.planId, interval)
   if (!expected) return { applied: false, reason: 'invalid_plan' }
   if (Number(order.amount) !== Number(expected)) return { applied: false, reason: 'amount_mismatch' }
 
-  const { data, error } = await getAdminClient().rpc('apply_paid_order', {
-    p_user_id: order.userId,
-    p_provider: order.provider,
-    p_provider_event_id: order.providerEventId,
-    p_plan_id: order.planId,
-    p_amount: Number(order.amount),
-  })
+  // Annual periods are a separate function rather than a day count argument: the
+  // existing five-argument `apply_paid_order` is called by every provider, and
+  // changing its signature would break whichever caller is not refreshed with it.
+  const { data, error } = await getAdminClient().rpc(
+    interval === 'year' ? 'apply_annual_order' : 'apply_paid_order',
+    {
+      p_user_id: order.userId,
+      p_provider: order.provider,
+      p_provider_event_id: order.providerEventId,
+      p_plan_id: order.planId,
+      p_amount: Number(order.amount),
+    }
+  )
 
   if (error) throw new Error(`Could not apply paid order: ${error.message}`)
   if (

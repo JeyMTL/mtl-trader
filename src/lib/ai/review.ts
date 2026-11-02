@@ -5,11 +5,13 @@
  * The model call is injected so the whole pipeline is testable without network.
  */
 
+import { buildCoachInsights } from './coach'
 import { computeEdgeStats } from './edge-stats'
 import { buildMessages, selectExamples } from './prompt'
 import { buildQueryFromTrades, findSimilarNotes } from './retrieval'
 import { insufficientDataReview, normalizeReview } from './schema'
 import type {
+  CoachInsight,
   EdgeStats,
   GenerateReviewDeps,
   GroupStat,
@@ -66,6 +68,8 @@ export function statsFromSummary(input: ReviewRequest): EdgeStats {
 export interface PreparedReview {
   stats: EdgeStats
   similar: SimilarSetup[]
+  /** Deterministic comparisons, shown even when the model is unavailable. */
+  insights: CoachInsight[]
   messages: PromptMessage[]
   /** True when the sample guard short-circuited before building a model call. */
   skipped: boolean
@@ -80,22 +84,37 @@ export interface PreparedReview {
 export function prepareReview(input: ReviewRequest): PreparedReview {
   const trades = input.trades || []
   const stats = trades.length > 0 ? computeEdgeStats(trades) : statsFromSummary(input)
+  const insights = trades.length > 0 ? buildCoachInsights(trades, stats) : []
 
   if (stats.insufficient) {
-    return { stats, similar: [], messages: [], skipped: true, earlyReview: insufficientDataReview(stats) }
+    return {
+      stats,
+      similar: [],
+      insights,
+      messages: [],
+      skipped: true,
+      earlyReview: insufficientDataReview(stats),
+    }
   }
 
   const query = (input.question && input.question.trim()) || buildQueryFromTrades(trades)
   const similar = trades.length > 0 ? findSimilarNotes(trades, query) : []
   const examples = trades.length > 0 ? selectExamples(trades) : []
 
-  return { stats, similar, messages: buildMessages(input, stats, similar, examples), skipped: false }
+  return {
+    stats,
+    similar,
+    insights,
+    messages: buildMessages(input, stats, similar, examples, insights),
+    skipped: false,
+  }
 }
 
 export interface GeneratedReview {
   review: ReviewResult
   stats: EdgeStats
   similar: SimilarSetup[]
+  insights: CoachInsight[]
   /** True when the sample guard short-circuited before calling the model. */
   skipped: boolean
 }
@@ -106,11 +125,23 @@ export async function generateReview(
 ): Promise<GeneratedReview> {
   const prepared = prepareReview(input)
   if (prepared.skipped) {
-    return { review: prepared.earlyReview!, stats: prepared.stats, similar: [], skipped: true }
+    return {
+      review: prepared.earlyReview!,
+      stats: prepared.stats,
+      similar: [],
+      insights: prepared.insights,
+      skipped: true,
+    }
   }
 
   const raw = await deps.complete(prepared.messages, { json: true })
   const review = normalizeReview(raw, prepared.stats, prepared.similar)
 
-  return { review, stats: prepared.stats, similar: prepared.similar, skipped: false }
+  return {
+    review,
+    stats: prepared.stats,
+    similar: prepared.similar,
+    insights: prepared.insights,
+    skipped: false,
+  }
 }

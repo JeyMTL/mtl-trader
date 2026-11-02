@@ -26,6 +26,11 @@ const webhookId = process.env.PAYPAL_WEBHOOK_ID
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
 const cronSecret = process.env.CRON_SECRET
 
+const paddleKey = process.env.PADDLE_API_KEY
+const paddleSecret = process.env.PADDLE_WEBHOOK_SECRET
+const paddlePriceBasic = process.env.PADDLE_PRICE_BASIC
+const paddlePricePro = process.env.PADDLE_PRICE_PRO
+
 const bank = {
   name: process.env.BANK_NAME,
   accountName: process.env.BANK_ACCOUNT_NAME,
@@ -79,6 +84,38 @@ if (cronSecret) {
 } else {
   problems++
   line('CRON_SECRET', false, 'MISSING — the reconcile cron fails closed with 401')
+}
+
+// Paddle is optional: without a key the card button is hidden, which is a valid
+// deployment. With a key, the rest has to be there or customers pay nothing.
+if (paddleKey) {
+  const environment = paddleKey.startsWith('pdl_sdbx')
+    ? 'SANDBOX'
+    : paddleKey.startsWith('pdl_live')
+      ? 'LIVE'
+      : 'unknown environment'
+  line('PADDLE_API_KEY', true, `set (${mask(paddleKey)}) — ${environment}`)
+  line(
+    'PADDLE_WEBHOOK_SECRET',
+    Boolean(paddleSecret),
+    paddleSecret
+      ? `set (${mask(paddleSecret)})`
+      : 'MISSING — payments would be taken but never applied'
+  )
+  const missingPrices = [
+    !paddlePriceBasic ? 'PADDLE_PRICE_BASIC' : null,
+    !paddlePricePro ? 'PADDLE_PRICE_PRO' : null,
+  ].filter(Boolean)
+  line(
+    'PADDLE_PRICE_*',
+    missingPrices.length === 0,
+    missingPrices.length === 0
+      ? 'basic and pro price ids set'
+      : `MISSING ${missingPrices.join(', ')} — that plan's card button is hidden`
+  )
+  if (!paddleSecret || missingPrices.length > 0) problems++
+} else {
+  line('PADDLE_API_KEY', false, 'not set — card checkout is hidden, PayPal and bank still work')
 }
 
 const bankConfigured = Boolean(bank.name && bank.accountName && bank.accountNumber)

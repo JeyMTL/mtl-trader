@@ -1,9 +1,10 @@
 /// Paid plans offered in the app. Prices and limits mirror `src/lib/plans.ts`
 /// on the web so checkout, the database trigger and the app agree.
 ///
-/// The enforced difference is the monthly trade allowance (`enforce_trade_quota`
-/// in Postgres); the feature lines describe what a plan covers, not a lock, and
-/// should be kept in step by hand with the web lists in `src/lib/plans.ts`.
+/// Enforced differences: the monthly trade allowance (`enforce_trade_quota` in
+/// Postgres), the AI review allowance, and the backtester/replay gate. Autosync
+/// is included from Basic. Keep these lines in step by hand with the web lists in
+/// `src/lib/plans.ts`.
 class MobilePlan {
   const MobilePlan({
     required this.id,
@@ -31,7 +32,7 @@ const List<MobilePlan> mobilePlans = [
   MobilePlan(
     id: 'basic',
     name: 'Basic',
-    price: 2.50,
+    price: 12.00,
     maxTrades: 50,
     popular: true,
     features: [
@@ -40,19 +41,22 @@ const List<MobilePlan> mobilePlans = [
       'Time edge: best hours and sessions',
       'OANDA chart with studies',
       'Journal photos and voice notes',
+      'MT5 broker sync',
+      '30 AI reviews a month',
     ],
   ),
   MobilePlan(
     id: 'pro',
     name: 'Pro',
-    price: 5.00,
+    price: 29.00,
     maxTrades: -1,
     features: [
       'Unlimited trades',
       'Everything in Basic',
-      'AI journal review',
+      'AI journal review (200 a month)',
+      'Backtester with saved runs',
       'Market replay with saved drawings',
-      'MT5 sync and API access',
+      'API access and sync token',
     ],
   ),
 ];

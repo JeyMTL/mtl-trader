@@ -56,6 +56,7 @@ export const RPC_PROBES: readonly RpcProbe[] = [
     args: { p_limit: 1, p_offset: 0, p_search: null, p_filter: 'all', p_session: null },
   },
   { rpc: 'session_stats', migration: '20261105_session_stats.sql', usedBy: 'session strip, dashboard and analytics sessions', args: {} },
+  { rpc: 'strategy_stats', migration: '20261107_strategy_stats.sql', usedBy: 'performance by strategy on analytics', args: { p_limit: 1 } },
 
   // ---------------------------------------------------- server-only, mutating
   // Probed for existence with arguments that make each one return early.

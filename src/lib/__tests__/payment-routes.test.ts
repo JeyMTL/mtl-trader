@@ -122,7 +122,7 @@ describe('paypal webhook', () => {
       resource: {
         id: 'CAP-1',
         custom_id: JSON.stringify({ userId: 'u1', planId: 'pro' }),
-        amount: { value: '5.00' },
+        amount: { value: '29.00' },
       },
     }, async (res) => {
       expect(res.status).toBe(200)
@@ -142,7 +142,7 @@ describe('paypal webhook', () => {
       resource: {
         id: 'REF-1',
         custom_id: JSON.stringify({ userId: 'u1', planId: 'pro' }),
-        amount: { value: '5.00' },
+        amount: { value: '29.00' },
       },
     }, async (res) => {
       expect(res.status).toBe(200)
@@ -150,20 +150,20 @@ describe('paypal webhook', () => {
       expect(state.revokeCalls[0]).toMatchObject({
         p_user_id: 'u1',
         p_provider_event_id: 'paypal:refund:REF-1',
-        p_amount: 5,
+        p_amount: 29,
       })
     })
   })
 
   it('finds the order through the capture link when the refund has no metadata', async () => {
-    state.eventLookup = { user_id: 'u9', plan_id: 'basic', amount: 2.5 }
+    state.eventLookup = { user_id: 'u9', plan_id: 'basic', amount: 12 }
 
     await withWebhook({
       id: 'evt-3',
       event_type: 'PAYMENT.CAPTURE.REVERSED',
       resource: {
         id: 'REF-2',
-        amount: { value: '2.50' },
+        amount: { value: '12.00' },
         links: [
           { rel: 'up', href: 'https://api-m.paypal.com/v2/payments/captures/CAP-9' },
         ],

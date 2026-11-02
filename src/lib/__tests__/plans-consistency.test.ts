@@ -29,6 +29,14 @@ describe('plan catalogue', () => {
     }
   })
 
+  it('sells a year for ten months and never for more than twelve', () => {
+    for (const plan of PLANS.filter((p) => typeof p.annual_price === 'number')) {
+      expect(plan.annual_price).toBe(plan.price * 10)
+      expect(plan.annual_price!).toBeLessThan(plan.price * 12)
+    }
+    expect(PLANS.filter((p) => p.annual_price).map((p) => p.id).sort()).toEqual(['basic', 'pro'])
+  })
+
   it('uses -1 only for the unlimited plans', () => {
     expect(PLANS.filter((plan) => plan.max_trades === -1).map((plan) => plan.id).sort()).toEqual([
       'free',

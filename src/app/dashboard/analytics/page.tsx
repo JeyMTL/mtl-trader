@@ -6,6 +6,7 @@ import {
   EMPTY_TIME_STATS,
   type EquityPoint,
   type SessionWindowStat,
+  type StrategyStat,
   type SymbolStat,
   type TagStat,
   type TimeStats,
@@ -37,7 +38,7 @@ export default async function AnalyticsPage() {
     )
   }
 
-  const [summaryResult, equityResult, symbolsResult, tagsResult, breakdownsResult, depositsResult, timeResult, sessionResult] = await Promise.all([
+  const [summaryResult, equityResult, symbolsResult, tagsResult, breakdownsResult, depositsResult, timeResult, sessionResult, strategyResult] = await Promise.all([
     supabase.rpc('trade_summary'),
     supabase.rpc('equity_curve'),
     supabase.rpc('symbol_stats', { p_limit: 20 }),
@@ -48,6 +49,9 @@ export default async function AnalyticsPage() {
     // The four UTC windows, the same buckets the journal filters by. A missing
     // migration logs here and leaves the card showing its empty state.
     supabase.rpc('session_stats'),
+    // The free-text label typed on each journal trade, grouped in SQL so the
+    // browser receives one row per strategy instead of every trade.
+    supabase.rpc('strategy_stats', { p_limit: 20 }),
   ])
 
   for (const [event, result] of [
@@ -59,6 +63,7 @@ export default async function AnalyticsPage() {
     ['analytics.deposits', depositsResult],
     ['analytics.time_stats', timeResult],
     ['analytics.session_stats', sessionResult],
+    ['analytics.strategy_stats', strategyResult],
   ] as const) {
     if (result.error) logEvent('error', event, { error: result.error, userId: user.id })
   }
@@ -71,9 +76,11 @@ export default async function AnalyticsPage() {
   const depositsTotal = Number(depositsResult.data ?? 0)
   const timeStats = (timeResult.data as unknown as TimeStats) ?? EMPTY_TIME_STATS
   const sessionStats = (sessionResult.data as unknown as SessionWindowStat[]) ?? []
+  const strategyStats = (strategyResult.data as unknown as StrategyStat[]) ?? []
   // Distinguishes "this database predates the migration" from "you have no timed
   // trades", which are the same empty array and very different advice.
   const sessionStatsMissing = Boolean(sessionResult.error)
+  const strategyStatsMissing = Boolean(strategyResult.error)
 
   return (
     <AnalyticsView
@@ -86,6 +93,8 @@ export default async function AnalyticsPage() {
       timeStats={timeStats}
       sessionStats={Array.isArray(sessionStats) ? sessionStats : []}
       sessionStatsMissing={sessionStatsMissing}
+      strategyStats={Array.isArray(strategyStats) ? strategyStats : []}
+      strategyStatsMissing={strategyStatsMissing}
     />
   )
 }

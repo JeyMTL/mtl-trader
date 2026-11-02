@@ -202,6 +202,67 @@ export function shouldApplyPlan(account: AccountState, planId: string, now: Date
 
 export type SubscriptionState = 'trial' | 'active' | 'cancelled' | 'expired'
 
+/** Features that can be withheld by plan. */
+export type PlanFeature = 'ai_review' | 'replay' | 'backtest' | 'sync'
+
+/**
+ * The features only Pro may use.
+ *
+ * Everything needed to record and review your own trading stays available on
+ * every plan: journalling, charts, analytics, import and export. Autosync is
+ * deliberately *not* here any more: it is the one thing a trader cannot do by
+ * hand, so it belongs at the entry price — gating it at Pro left Basic paying
+ * for a nicer view of data they still had to type in. What remains is the
+ * advanced analysis workflow, which is genuinely a step beyond journalling.
+ */
+const PRO_ONLY: readonly PlanFeature[] = ['replay', 'backtest']
+
+export type FeatureRefusal = 'ok' | 'trial' | 'subscription_required' | 'pro_required'
+
+export interface FeatureAccess {
+  allowed: boolean
+  reason: FeatureRefusal
+}
+
+/**
+ * Whether an account may use a feature.
+ *
+ * A trial is allowed everything on purpose: a trial that cannot try the paid
+ * features converts nobody. A lapsed account is refused even though its stored
+ * tier may still say `pro`, because the period — not the label — is what ends
+ * access.
+ */
+export function canUseFeature(
+  account: AccountState,
+  feature: PlanFeature,
+  now: Date = new Date()
+): FeatureAccess {
+  if (isTrialActive(account, now)) return { allowed: true, reason: 'trial' }
+  if (!isSubscriptionActive(account, now)) {
+    return { allowed: false, reason: 'subscription_required' }
+  }
+  if (PRO_ONLY.includes(feature) && planRank(account.subscription_tier) < planRank('pro')) {
+    return { allowed: false, reason: 'pro_required' }
+  }
+  return { allowed: true, reason: 'ok' }
+}
+
+/**
+ * Monthly AI review allowance. The trial is treated as Pro.
+ *
+ * Basic gets a review a day rather than a token few: a review costs well under a
+ * cent on the default model and cached journals do not bill at all, so a tight
+ * cap saved no real money and cost the paid tier its best demonstration.
+ */
+export const AI_REVIEW_QUOTA: Record<string, number> = { free: 0, basic: 30, pro: 200 }
+
+/** How many AI reviews the account may generate this month. */
+export function aiReviewQuota(account: AccountState, now: Date = new Date()): number {
+  if (isTrialActive(account, now)) return AI_REVIEW_QUOTA.pro
+  if (!isSubscriptionActive(account, now)) return 0
+  return AI_REVIEW_QUOTA[account.subscription_tier ?? 'free'] ?? 0
+}
+
 /**
  * The state to show in the UI and to reason about in routes. It resolves the
  * stored status against the clock so a lapsed period reads as expired even
