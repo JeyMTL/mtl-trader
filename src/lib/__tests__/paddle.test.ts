@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  annualPriceCollisions,
   cancelPaddleSubscription,
   createCheckoutTransaction,
   isValidPaddleSignature,
@@ -78,6 +79,19 @@ describe('paddle configuration', () => {
     delete process.env.PADDLE_PRICE_PRO_ANNUAL
     expect(sellablePlanIds(['basic', 'pro'], 'year')).toEqual(['basic'])
     expect(sellablePlanIds(['basic', 'pro'])).toEqual(['basic', 'pro'])
+  })
+
+  it('flags a yearly slot that was filled with a monthly price id', () => {
+    expect(annualPriceCollisions(['basic', 'pro'])).toEqual([])
+
+    // The expensive copy-paste: a $12 monthly id in the yearly slot. Paddle
+    // would charge $12 and the webhook would refuse to grant a year.
+    process.env.PADDLE_PRICE_PRO_ANNUAL = 'pri_pro'
+    expect(annualPriceCollisions(['basic', 'pro'])).toEqual(['pro'])
+
+    // A missing yearly id is not a collision — the cadence is simply not sold.
+    delete process.env.PADDLE_PRICE_BASIC_ANNUAL
+    expect(annualPriceCollisions(['basic', 'pro'])).toEqual(['pro'])
   })
 
   it('offers only plans that have a price id, and none without an API key', () => {

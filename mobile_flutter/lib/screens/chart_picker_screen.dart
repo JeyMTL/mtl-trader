@@ -1672,15 +1672,24 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 text: 'LIVE',
                 tone: Tone.positive,
               ),
-              const Spacer(),
-              if (_updated != null)
-                Text(
-                  'Updated ${DateFormat('HH:mm:ss').format(_updated!)}',
-                  style: tabular.copyWith(
-                    color: AppColors.faint,
-                    fontSize: 9.5,
-                  ),
-                ),
+              const SizedBox(width: 8),
+              // Expanded instead of Spacer: the timestamp is the part that has
+              // to give way when the pills and a doubled text size leave no
+              // room, and a Spacer only reports the overflow.
+              Expanded(
+                child: _updated == null
+                    ? const SizedBox.shrink()
+                    : Text(
+                        'Updated ${DateFormat('HH:mm:ss').format(_updated!)}',
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tabular.copyWith(
+                          color: AppColors.faint,
+                          fontSize: 9.5,
+                        ),
+                      ),
+              ),
             ],
           ),
         ],
@@ -1724,16 +1733,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       children: [
         Row(
           children: [
-            Text(
-              'TIME FRAME',
-              style: TextStyle(
-                color: idleInk,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
+            Expanded(
+              child: Text(
+                'TIME FRAME',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: idleInk,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.1,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             if (_customWindow)
               GestureDetector(
                 onTap: _setLive,

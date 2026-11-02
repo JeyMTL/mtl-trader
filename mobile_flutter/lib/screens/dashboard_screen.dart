@@ -143,16 +143,19 @@ class _DashboardBody extends StatelessWidget {
         const SizedBox(height: 10),
         Reveal(
           index: 1,
-          child: GridView.count(
-            crossAxisCount: 2,
+          child: GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            // Taller cards as the system text size grows: two columns of
-            // 11 px labels turn into four wrapped lines at 2x.
-            childAspectRatio: 1.72 /
-                MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
+            // An explicit height that grows with the text, instead of an aspect
+            // ratio that couples it to the width: at 320pt and a 2x text size the
+            // tiles came up 18px short of their own content and striped.
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              mainAxisExtent: 96 *
+                  MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.5),
+            ),
             children: [
               MetricCard(
                 label: l10n.winRate,
@@ -1184,26 +1187,36 @@ class _MonthCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${summary.monthWins} W / $losses L',
-                    style: tabular.copyWith(
-                      color: AppColors.text,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+              // Flexible, not a plain Column: "12 W / 8 L" at a doubled text
+              // size pushed this row 17px past the card edge.
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${summary.monthWins} W / $losses L',
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tabular.copyWith(
+                        color: AppColors.text,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    l10n.greenDays(summary.monthWinningDays),
-                    style: TextStyle(
-                      color: AppColors.faint,
-                      fontSize: kMinLabelSize,
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.greenDays(summary.monthWinningDays),
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.faint,
+                        fontSize: kMinLabelSize,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

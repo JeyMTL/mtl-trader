@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
+import { loadAccount } from '@/lib/plan-guard'
+import { isDuplicatePurchase } from '@/lib/subscription'
 import { PLANS } from '@/lib/plans'
 import { PAID_PLAN_PRICES } from '@/lib/payments'
 import {
@@ -70,6 +72,20 @@ export async function POST(req: Request) {
     // but may never point the payment at someone else's account.
     if (typeof body.userId === 'string' && body.userId && body.userId !== authUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Tapping the plan you already pay for should not charge you a second time
+    // for days you own. Yearly is never blocked: that is how a monthly customer
+    // upgrades, and `apply_annual_order` stacks the year onto what is left.
+    const account = await loadAccount(authUser.id)
+    if (account && isDuplicatePurchase(account, planId, interval)) {
+      const planName = PLANS.find((plan) => plan.id === planId)?.name ?? planId
+      return NextResponse.json(
+        {
+          error: `You are already on ${planName} monthly. Switch to annual to get two months free.`,
+        },
+        { status: 409 }
+      )
     }
 
     const priceId = priceIdFor(planId, interval)

@@ -10,6 +10,7 @@ class MobilePlan {
     required this.id,
     required this.name,
     required this.price,
+    this.annualPrice,
     required this.maxTrades,
     required this.features,
     this.popular = false,
@@ -18,6 +19,10 @@ class MobilePlan {
   final String id;
   final String name;
   final double price;
+
+  /// A year bought up front: ten months' worth, so two months free. Not
+  /// `price * 12` on purpose — the discount is the point of paying a year early.
+  final double? annualPrice;
 
   /// `-1` means unlimited.
   final int maxTrades;
@@ -33,6 +38,7 @@ const List<MobilePlan> mobilePlans = [
     id: 'basic',
     name: 'Basic',
     price: 12.00,
+    annualPrice: 120.00,
     maxTrades: 50,
     popular: true,
     features: [
@@ -49,6 +55,7 @@ const List<MobilePlan> mobilePlans = [
     id: 'pro',
     name: 'Pro',
     price: 29.00,
+    annualPrice: 290.00,
     maxTrades: -1,
     features: [
       'Unlimited trades',

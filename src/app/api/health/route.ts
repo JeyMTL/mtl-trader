@@ -9,7 +9,7 @@ import {
 } from '@/lib/broker-sync-status'
 import { getAdminClient } from '@/lib/server-auth'
 import { resolveProviderConfig } from '@/lib/ai/providers'
-import { paddleEnvironment, priceIdFor } from '@/lib/paddle'
+import { annualPriceCollisions, paddleEnvironment, priceIdFor } from '@/lib/paddle'
 
 /**
  * Liveness and configuration probe.
@@ -156,6 +156,11 @@ function paddleStatus() {
       basicAnnual: Boolean(priceIdFor('basic', 'year')),
       proAnnual: Boolean(priceIdFor('pro', 'year')),
     },
+    // Plan ids whose yearly price id is also a monthly one. Empty is correct:
+    // a yearly price is its own catalogue entry, and reusing a monthly id means
+    // Paddle charges a month's price for a year that the webhook then refuses.
+    // Plan ids only, never a price id, so this stays safe to publish.
+    annualReusesMonthlyPrice: annualPriceCollisions(['basic', 'pro']),
   }
 }
 

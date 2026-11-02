@@ -511,7 +511,10 @@ class JournalApi {
   /// It talks to this app's own checkout endpoint rather than to Paddle
   /// directly, so the price ids, webhook and merchant-of-record setup stay a
   /// server concern and the app never carries payment credentials.
-  Future<String> startCardSubscription(String planId) async {
+  Future<String> startCardSubscription(
+    String planId, {
+    String interval = 'month',
+  }) async {
     final session = _db.auth.currentSession;
     final id = userId;
     if (session == null || id == null) {
@@ -529,7 +532,11 @@ class JournalApi {
         HttpHeaders.authorizationHeader,
         'Bearer ${session.accessToken}',
       );
-      request.write(jsonEncode({'planId': planId, 'userId': id}));
+      // The cadence travels with the payment so the webhook knows whether to
+      // grant 30 days or a full year. Without it every purchase is monthly.
+      request.write(
+        jsonEncode({'planId': planId, 'userId': id, 'interval': interval}),
+      );
 
       final response = await request.close().timeout(
             const Duration(seconds: 25),

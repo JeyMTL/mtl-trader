@@ -18,9 +18,13 @@ import 'media_viewer_screen.dart';
 import 'symbol_picker_screen.dart';
 
 class TradeFormScreen extends StatefulWidget {
-  const TradeFormScreen({super.key, this.tradeId});
+  const TradeFormScreen({super.key, this.tradeId, this.api});
 
   final String? tradeId;
+
+  /// Injectable so the layout can be laid out in a test without a Supabase
+  /// client; the app leaves it null and builds its own.
+  final JournalApi? api;
 
   @override
   State<TradeFormScreen> createState() => _TradeFormScreenState();
@@ -28,7 +32,7 @@ class TradeFormScreen extends StatefulWidget {
 
 class _TradeFormScreenState extends State<TradeFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _api = JournalApi();
+  late final JournalApi _api = widget.api ?? JournalApi();
   late final MediaService _media = MediaService(_api);
 
   final _symbol = TextEditingController();
@@ -999,8 +1003,6 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                           onChanged: () => setState(() {}),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Spacer(),
                     ],
                   ),
                 ],
@@ -1047,22 +1049,34 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                         color: AppColors.faint,
                       ),
                       const SizedBox(width: 5),
-                      Text(
-                        'Time in market',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 10.5,
+                      Expanded(
+                        child: Text(
+                          'Time in market',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 10.5,
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      Text(
-                        _windowDuration,
-                        style: tabular.copyWith(
-                          color: _windowInvalid
-                              ? AppColors.danger
-                              : AppColors.text,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(width: 8),
+                      // 'Exit before entry' and 'Set both times' are the longest
+                      // this ever gets, and at a 2x text size they pushed the row
+                      // past the card edge.
+                      Flexible(
+                        child: Text(
+                          _windowDuration,
+                          textAlign: TextAlign.right,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tabular.copyWith(
+                            color: _windowInvalid
+                                ? AppColors.danger
+                                : AppColors.text,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
@@ -1213,12 +1227,16 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  tag,
-                                  style: TextStyle(
-                                    color: AppColors.primaryLight,
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w600,
+                                Flexible(
+                                  child: Text(
+                                    tag,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: AppColors.primaryLight,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                                 InkWell(
@@ -1313,26 +1331,37 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                           ],
                         ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            pips == null
-                                ? '—'
-                                : '${pips.toStringAsFixed(1)} pips',
-                            style: tabular.copyWith(
-                              color: AppColors.text,
-                              fontSize: 12,
+                      // Flexible: the duration is the widest thing here
+                      // ('Exit before entry'), and unbounded it pushed the ticket
+                      // row 17px past the card at a 2x text size.
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              pips == null
+                                  ? '—'
+                                  : '${pips.toStringAsFixed(1)} pips',
+                              textAlign: TextAlign.right,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tabular.copyWith(
+                                color: AppColors.text,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                          Text(
-                            _windowDuration,
-                            style: tabular.copyWith(
-                              color: AppColors.faint,
-                              fontSize: 10,
+                            Text(
+                              _windowDuration,
+                              textAlign: TextAlign.right,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tabular.copyWith(
+                                color: AppColors.faint,
+                                fontSize: 10,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

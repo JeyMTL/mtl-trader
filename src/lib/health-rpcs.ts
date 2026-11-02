@@ -70,6 +70,12 @@ export const RPC_PROBES: readonly RpcProbe[] = [
     args: { p_user_id: NIL_UUID, p_provider: 'probe', p_provider_event_id: 'probe', p_plan_id: 'probe', p_amount: 0 },
   },
   {
+    rpc: 'apply_annual_order',
+    migration: '20261110_annual_plans.sql',
+    usedBy: 'yearly card purchases',
+    args: { p_user_id: NIL_UUID, p_provider: 'probe', p_provider_event_id: 'probe', p_plan_id: 'probe', p_amount: 0 },
+  },
+  {
     rpc: 'revoke_paid_order',
     migration: CORE,
     usedBy: 'refunds, reversals and disputes',

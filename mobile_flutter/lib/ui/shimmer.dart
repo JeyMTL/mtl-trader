@@ -94,7 +94,10 @@ class SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: height,
+      // A minimum rather than a fixed height: the block list is taller than the
+      // nominal 92 once the system text size grows, and a fixed box turned that
+      // into a striped overflow before a single row of data had loaded.
+      constraints: BoxConstraints(minHeight: height),
       padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
         color: AppColors.surface,

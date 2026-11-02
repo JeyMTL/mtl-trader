@@ -81,6 +81,25 @@ export async function checkFeature(
 }
 
 /**
+ * The caller's billing row, or null when it cannot be read.
+ *
+ * A purchase route only needs to know whether the account already owns the plan
+ * being bought. Returning null rather than throwing keeps a database hiccup from
+ * turning into a failed sale: the payment is idempotent and the webhook is what
+ * grants access, so a missing row here must not block the checkout.
+ */
+export async function loadAccount(userId: string): Promise<AccountState | null> {
+  const { data, error } = await getAdminClient()
+    .from('users')
+    .select(ACCOUNT_COLUMNS)
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return data as AccountState
+}
+
+/**
  * AI reviews generated since the first of the month (UTC).
  *
  * Every generation writes a row to `ai_reviews`, so the existing table is the

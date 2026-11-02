@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
+import { loadAccount } from '@/lib/plan-guard'
+import { isDuplicatePurchase } from '@/lib/subscription'
 import { PLANS } from '@/lib/plans'
-import { createCheckoutTransaction, paddleConfigured, priceIdFor } from '@/lib/paddle'
+import { createCheckoutTransaction, paddleConfigured, priceIdFor, sellablePlanIds } from '@/lib/paddle'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import type { BillingInterval } from '@/types'
 
 /**
  * Card checkout through Paddle.
@@ -21,16 +24,22 @@ export const dynamic = 'force-dynamic'
 
 const PAID_PLANS = PLANS.filter((plan) => plan.price > 0).map((plan) => plan.id)
 
-/** One decision, used by both the GET and the POST, so they cannot disagree. */
-function sellablePlans(): string[] {
-  if (!paddleConfigured()) return []
-  return PAID_PLANS.filter((planId) => Boolean(priceIdFor(planId, 'month')))
-}
-
+/**
+ * The GET is public and reveals only plan ids: a deployment without a yearly
+ * price must hide the yearly switch rather than offer a checkout that fails
+ * after the customer has decided to pay.
+ */
 export async function GET() {
-  const plans = sellablePlans()
+  const plans = sellablePlanIds(PAID_PLANS, 'month')
   return NextResponse.json(
-    { enabled: plans.length > 0, provider: plans.length > 0 ? 'paddle' : null, plans },
+    {
+      enabled: plans.length > 0,
+      provider: plans.length > 0 ? 'paddle' : null,
+      plans,
+      // Selling a year is a separate catalogue entry, so one cadence can exist
+      // without the other.
+      annual: sellablePlanIds(PAID_PLANS, 'year'),
+    },
     { headers: { 'Cache-Control': 'no-store' } }
   )
 }
@@ -43,8 +52,12 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as {
       planId?: unknown
       userId?: unknown
+      interval?: unknown
     }
     const planId = typeof body.planId === 'string' ? body.planId : ''
+    // Anything unrecognised is monthly rather than refused: the price id and the
+    // amount the webhook expects are what actually gate the cadence.
+    const interval: BillingInterval = body.interval === 'year' ? 'year' : 'month'
     if (!PAID_PLANS.includes(planId)) {
       return apiWarn('checkout.card.invalid_plan', 'Invalid plan')
     }
@@ -62,7 +75,21 @@ export async function POST(req: Request) {
       )
     }
 
-    const priceId = priceIdFor(planId, 'month')
+    // Tapping the plan you already pay for should not charge you a second time
+    // for days you own. Yearly is never blocked: that is how a monthly customer
+    // upgrades, and `apply_annual_order` stacks the year onto what is left.
+    const account = await loadAccount(authUser.id)
+    if (account && isDuplicatePurchase(account, planId, interval)) {
+      const planName = PLANS.find((plan) => plan.id === planId)?.name ?? planId
+      return NextResponse.json(
+        {
+          error: `You are already on ${planName} monthly. Switch to annual to get two months free.`,
+        },
+        { status: 409 }
+      )
+    }
+
+    const priceId = priceIdFor(planId, interval)
     if (!priceId) {
       logEvent('error', 'checkout.card.missing_price', { planId })
       return NextResponse.json(
@@ -75,12 +102,13 @@ export async function POST(req: Request) {
       planId,
       priceId,
       userId: authUser.id,
-      interval: 'month',
+      interval,
     })
 
     logEvent('info', 'checkout.card.created', {
       userId: authUser.id,
       planId,
+      interval,
       provider: 'paddle',
       transactionId: checkout.transactionId,
     })

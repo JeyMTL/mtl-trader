@@ -1,4 +1,5 @@
 import { PLANS } from '@/lib/plans'
+import type { BillingInterval } from '@/types'
 
 /**
  * Single source of truth for plan limits, billing periods, trial state, and
@@ -197,6 +198,29 @@ export function planRank(planId: string | null | undefined): number {
 export function shouldApplyPlan(account: AccountState, planId: string, now: Date = new Date()): boolean {
   if (!isPaidPlan(planId)) return false
   if (isSubscriptionActive(account, now) && planRank(account.subscription_tier) > planRank(planId)) return false
+  return true
+}
+
+/**
+ * Whether a purchase would repeat the subscription the account already has.
+ *
+ * The mistake this prevents: a Basic subscriber taps the same plan again and is
+ * charged a second time for a period they already own. A yearly purchase is never
+ * a repeat — buying a year is precisely how a monthly customer upgrades, and
+ * `apply_annual_order` stacks the 365 days onto the days already paid, so nobody
+ * loses the remainder of their month. A cancelled subscription is also let
+ * through, because re-buying is how a customer who stopped the renewal returns.
+ */
+export function isDuplicatePurchase(
+  account: AccountState,
+  planId: string,
+  interval: BillingInterval = 'month',
+  now: Date = new Date()
+): boolean {
+  if (interval === 'year') return false
+  if (!isSubscriptionActive(account, now)) return false
+  if (account.subscription_tier !== planId) return false
+  if (account.cancel_at_period_end) return false
   return true
 }
 

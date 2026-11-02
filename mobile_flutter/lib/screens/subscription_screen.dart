@@ -28,6 +28,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String? _busy;
   String? _error;
 
+  /// Which cadence the buttons buy. A yearly price is its own entry in the
+  /// provider's catalogue, so this only selects what is charged — the plan, its
+  /// limits and its features are identical either way.
+  bool _yearly = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +52,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  Future<void> _subscribe(String planId) async {
+  Future<void> _subscribe(String planId, String interval) async {
     if (_busy != null) return;
     setState(() {
       _busy = planId;
@@ -55,7 +60,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     });
 
     try {
-      final url = await widget.api.startCardSubscription(planId);
+      final url = await widget.api.startCardSubscription(
+        planId,
+        interval: interval,
+      );
       final opened = await launchUrl(
         Uri.parse(url),
         mode: LaunchMode.externalApplication,
@@ -165,12 +173,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                 ],
                 const SizedBox(height: 10),
-                const SectionTitle(
+                SectionTitle(
                   title: 'Plans',
-                  subtitle:
-                      'A card subscription renews monthly. Cancel any time and keep access until the period ends.',
+                  subtitle: _yearly
+                      ? 'A yearly card subscription renews once a year. Cancel any time and keep access until the period ends.'
+                      : 'A card subscription renews monthly. Cancel any time and keep access until the period ends.',
                 ),
                 const SizedBox(height: 8),
+                _cadenceToggle(),
+                const SizedBox(height: 10),
                 for (final plan in mobilePlans) ...[
                   _planCard(
                     plan: plan,
@@ -211,6 +222,49 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Monthly or yearly. The toggle is hidden behind a plain Row rather than a
+  /// segmented control because two options read faster than a dropdown, and the
+  /// yearly label has to fit on one line on a phone.
+  Widget _cadenceToggle() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          for (final yearly in const <bool>[false, true])
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _yearly = yearly),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: _yearly == yearly
+                        ? AppColors.primary
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    yearly ? 'Annual · 2 months free' : 'Monthly',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _yearly == yearly ? AppColors.ink : AppColors.muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -308,6 +362,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     required bool enabled,
     required bool busy,
   }) {
+    // A monthly subscriber still needs the yearly button: switching cadence is
+    // the one purchase the server allows on the plan they already own, and it
+    // stacks onto the days they have left. Re-buying the same month is the
+    // mistake this disables.
+    final canBuy = !current || _yearly;
     return FlatCard(
       borderColor:
           plan.popular ? AppColors.primary.withAlpha(90) : AppColors.border,
@@ -315,33 +374,63 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // The name takes whatever is left and the price never moves: with a
+          // fixed row, a doubled system text size threw a RenderFlex overflow
+          // across the whole card. Now the name truncates instead.
           Row(
             children: [
-              Text(
-                plan.name,
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
+              Expanded(
+                // A Wrap, not a Row: at the largest system text size the badge
+                // is wider than the space left beside the name, and a Row has
+                // nowhere to put it — it overflowed by 55px on a 320pt phone.
+                // Here it drops onto a second line instead.
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      plan.name,
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    if (plan.popular)
+                      const Pill(text: 'POPULAR', tone: Tone.neutral),
+                  ],
                 ),
               ),
-              if (plan.popular) ...[
-                const SizedBox(width: 6),
-                const Pill(text: 'POPULAR', tone: Tone.neutral),
-              ],
-              const Spacer(),
-              Text(
-                money(plan.price),
-                style: tabular.copyWith(
-                  color: AppColors.text,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(width: 8),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        money(
+                          _yearly ? plan.annualPrice ?? plan.price : plan.price,
+                        ),
+                        style: tabular.copyWith(
+                          color: AppColors.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        _yearly ? '/yr' : '/mo',
+                        style: TextStyle(
+                          color: AppColors.faint,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Text(
-                '/mo',
-                style: TextStyle(color: AppColors.faint, fontSize: 10.5),
               ),
             ],
           ),
@@ -350,6 +439,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             plan.allowance,
             style: TextStyle(color: AppColors.muted, fontSize: 11.5),
           ),
+          if (_yearly && plan.annualPrice != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              '${money(plan.annualPrice! / 12)}/mo · two months free',
+              style: TextStyle(color: AppColors.success, fontSize: 10.5),
+            ),
+          ],
           const SizedBox(height: 10),
           for (final feature in plan.features)
             Padding(
@@ -377,7 +473,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
           const SizedBox(height: 8),
           ElevatedButton(
-            onPressed: current || !enabled ? null : () => _subscribe(plan.id),
+            onPressed: !canBuy || !enabled
+                ? null
+                : () => _subscribe(plan.id, _yearly ? 'year' : 'month'),
             child: busy
                 ? SizedBox(
                     width: 18,
@@ -387,7 +485,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       color: AppColors.ink,
                     ),
                   )
-                : Text(current ? 'Current plan' : 'Subscribe with card'),
+                : Text(
+                    current
+                        ? (_yearly ? 'Switch to annual' : 'Current plan')
+                        : 'Subscribe with card',
+                  ),
           ),
         ],
       ),

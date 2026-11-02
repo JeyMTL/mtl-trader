@@ -63,6 +63,29 @@ export function priceIdFor(planId: string, interval: BillingInterval = 'month'):
   return env(key) || null
 }
 
+/**
+ * Plans whose yearly price id is also one of the monthly ones.
+ *
+ * A yearly price is its own catalogue entry, so all four ids must differ.
+ * Filling an `_ANNUAL` variable with a monthly id is silent everywhere else:
+ * the checkout opens, Paddle charges the monthly amount, and `apply_annual_order`
+ * then refuses it as `amount_mismatch` — the customer pays and gets nothing.
+ * Reported by `/api/health` so the mistake shows up before a sale, not after.
+ *
+ * Returns plan ids only, never price ids: that endpoint is public.
+ */
+export function annualPriceCollisions(planIds: string[]): string[] {
+  const monthly = new Set(
+    planIds
+      .map((planId) => priceIdFor(planId, 'month'))
+      .filter((priceId): priceId is string => Boolean(priceId))
+  )
+  return planIds.filter((planId) => {
+    const yearly = priceIdFor(planId, 'year')
+    return Boolean(yearly) && monthly.has(yearly as string)
+  })
+}
+
 /** Plan ids this deployment can actually sell on that cadence through Paddle. */
 export function sellablePlanIds(
   paidPlanIds: string[],

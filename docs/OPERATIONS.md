@@ -240,3 +240,117 @@ If `commit` stops advancing after a push, the Git integration is on a project
 that does not own the domain. Reconnect it (Project → Settings → Git) instead of
 debugging the app — and note that `Redeploy` in the dashboard is *not* a valid
 test of this, because it rebuilds the same SHA without changing `commit`.
+
+## Paddle go-live
+
+Sandbox and live are separate Paddle accounts with separate catalogues, keys and
+webhook destinations, so **nothing carries over**. The switch is six variables
+and one redeploy; the danger is a half-swap, because it looks like success — the
+button renders, the checkout opens, and the payment either 401s or lands with no
+plan attached.
+
+### 1. In Paddle, in **live** mode
+
+1. **Paddle → Switch to Live**, complete the business details, and get the
+   website approved for `mtl-trader.vercel.app`. This is the long pole; start it
+   first.
+2. Create **four** prices in the live catalogue, USD, quantity 1, no trial:
+   `12.00` monthly, `120.00` yearly (Basic), `29.00` monthly, `290.00` yearly
+   (Pro). Note each `pri_…` id.
+3. **Developer tools → Authentication** → create a live **API key** (`pdl_live_…`).
+4. **Notifications** → add a destination pointing at
+   `https://mtl-trader.vercel.app/api/webhooks/paddle`, subscribed to
+   `transaction.completed`, `subscription.canceled` and `adjustment.created`,
+   and copy its **secret key** (`pdl_ntfset_…`). It is unique per destination —
+   the sandbox secret will not verify live events.
+5. **Checkout settings** → set the default payment link to
+   `https://mtl-trader.vercel.app/pay`. Live accounts require the approved domain
+   here; sandbox does not, which is why this only bites on the switch.
+
+### 2. In Vercel (Production and Preview)
+
+| Variable | Value |
+| --- | --- |
+| `PADDLE_API_KEY` | live `pdl_live_…` |
+| `PADDLE_WEBHOOK_SECRET` | live destination secret |
+| `PADDLE_PRICE_BASIC` | live `pri_…` for 12.00/month |
+| `PADDLE_PRICE_PRO` | live `pri_…` for 29.00/month |
+| `PADDLE_PRICE_BASIC_ANNUAL` | live `pri_…` for 120.00/year |
+| `PADDLE_PRICE_PRO_ANNUAL` | live `pri_…` for 290.00/year |
+| `PADDLE_ENVIRONMENT` | `production` |
+
+`PADDLE_ENVIRONMENT` is the one people forget: leave it unset and a live key is
+sent to `sandbox-api.paddle.com`, which 401s every checkout. Delete any leftover
+`NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` once `PADDLE_CLIENT_TOKEN` is in place — it is
+only a fallback now, and a stale test token there is a trap.
+
+### 3. Verify before a real sale
+
+```bash
+node --env-file=.env.live scripts/check-paddle-live.mjs --live
+```
+
+It reads only: key prefix against `PADDLE_ENVIRONMENT`, the API base, the
+webhook secret, and each of the four price ids resolved against the catalogue
+with the right interval, amount, currency and `active` status. A monthly id
+pasted into a yearly slot is the failure it exists for — that charges $12 and
+then the webhook refuses the year as `amount_mismatch`.
+
+Then confirm the deployment itself:
+
+```bash
+curl -s https://mtl-trader.vercel.app/api/health | node -e "
+let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.stringify(JSON.parse(s).paddle,null,1)))"
+```
+
+Expected: `keyEnvironment: "live"`, `api: "production"`, all four `prices` true,
+and `annualReusesMonthlyPrice: []`. Anything else is a half-swap: fix the
+variable, redeploy, re-read.
+
+### 4. One real sale, then one refund
+
+Buy Basic yearly with a real card. Then check:
+
+* `payment_events` shows `120.00 | applied` for provider `paddle`;
+* `users.current_period_end` moved about 365 days;
+* refund it in Paddle → `adjustment.created` arrives, `revoke_paid_order` runs,
+  and the account drops to `free`.
+
+A refund that does not downgrade is the more expensive bug: it means the
+adjustment webhook or its secret is wrong, and every future refund will need a
+manual fix.
+
+### API key permissions and expiry
+
+The app makes exactly three keyed calls, so the key needs three permissions and
+nothing else:
+
+| Permission | Why |
+| --- | --- |
+| Transactions — **write** | `POST /transactions`: the checkout itself |
+| Subscriptions — **write** | `POST /subscriptions/{id}/cancel` when a customer stops renewing |
+| Prices — **read** | `scripts/check-paddle-live.mjs` resolving the four price ids |
+
+Do not grant *All*. A key that can pay out, refund or read customers is a much
+worse leak than one that can only create checkouts, and the app never uses those
+paths.
+
+**Expiry is a launch risk.** The new-key dialog defaults to 90 days, which is a
+hard stop nobody connects to a payment outage: on the day it lapses every
+checkout returns 401, and nothing in the code changed. Either clear the expiry on
+the production key, or record the date here and put a reminder a week before it:
+
+| Key | Expires | Rotate before |
+| --- | --- | --- |
+| Paddle live (production) | _fill in_ | _fill in_ |
+
+After rotating, re-run the pre-flight and take one real sale: a key that cannot
+create transactions still renders a working-looking button.
+
+### Rollback
+
+Flip the six variables back to the sandbox values, set `PADDLE_ENVIRONMENT` back
+to empty, and redeploy. That restores test payments; it does **not** touch money
+already taken. Live subscriptions keep billing in Paddle and must be cancelled
+there, and any customer who paid live needs their plan in this database, not a
+flipped key.

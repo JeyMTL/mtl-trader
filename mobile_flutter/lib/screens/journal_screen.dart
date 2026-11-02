@@ -347,23 +347,24 @@ class _JournalScreenState extends State<JournalScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                // Wrap, like the session chips below: three tabs in a Row
+                // overflowed by 81px on a 320pt phone at a 2x text size.
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     for (final option in [
                       ('all', l10n.journalFilterAll),
                       ('wins', l10n.journalFilterWins),
                       ('losses', l10n.journalFilterLosses),
                     ])
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: _FilterTab(
-                          label: option.$2,
-                          active: _filter == option.$1,
-                          onTap: () {
-                            setState(() => _filter = option.$1);
-                            _load(reset: true);
-                          },
-                        ),
+                      _FilterTab(
+                        label: option.$2,
+                        active: _filter == option.$1,
+                        onTap: () {
+                          setState(() => _filter = option.$1);
+                          _load(reset: true);
+                        },
                       ),
                   ],
                 ),
