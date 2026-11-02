@@ -30,7 +30,7 @@ A working SaaS foundation, not a template:
 - Plan/trial/quota rules enforced in a Postgres trigger, not just in the UI
 - PayPal checkout + signature-verified webhook + idempotent payment reconciliation (a `payment_events` table makes capture, webhook, and the daily cron safe to run in any order — a dropped webhook doesn't lose a payment)
 - Bank-transfer flow with unique per-user references and an admin approval panel
-- AI journal review pipeline (OpenAI / Anthropic / OpenAI-compatible) with grounded edge statistics, caching, and structured-output validation
+- AI journal review pipeline (Gemini / Anthropic / OpenAI-compatible gateways) with grounded edge statistics, caching, and structured-output validation
 - Timezone-aware daily/weekly/monthly P&L email summaries plus weekday journal reminders (Resend + Vercel cron)
 - MT5 auto-sync agent and a CSV / .xlsx / SpreadsheetML import parser
 - 15 test files covering the import parser, P&L math, plan/quota rules, the notifications cron, and the AI pipeline

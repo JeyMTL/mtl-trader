@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { PLANS } from '@/lib/plans'
 import { PAID_PLAN_PRICES } from '@/lib/payments'
-import { isPaidPlanId } from '@/lib/flutterwave'
 
 /**
  * The plan catalogue is read by the pricing page, the settings page, the PayPal
- * checkout, the Flutterwave checkout and `apply_paid_order`. These guards catch
- * the drift that used to let the UI advertise a price the server would reject.
+ * checkout, the Paddle checkout and `apply_paid_order`. These guards catch the
+ * drift that used to let the UI advertise a price the server would reject.
  */
 describe('plan catalogue', () => {
   it('lists every plan once', () => {
@@ -23,9 +22,9 @@ describe('plan catalogue', () => {
     }
   })
 
-  it('agrees with the server about which plans can be bought', () => {
+  it('only treats priced plans as purchasable', () => {
     for (const plan of PLANS) {
-      expect(isPaidPlanId(plan.id)).toBe(plan.price > 0)
+      expect(Boolean(PAID_PLAN_PRICES[plan.id])).toBe(plan.price > 0)
     }
   })
 

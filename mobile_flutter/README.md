@@ -12,7 +12,7 @@ A native, flat-design Flutter client for the same Supabase journal as the web ap
   - a voice note recorded in the app,
   - an existing audio file.
 - **Edge** — best/worst entry hour, best/weakest session, 24-hour P&L chart and the session table.
-- **Subscription** — plan cards, the current plan and paid-through date, and a hosted card checkout (Flutterwave) that opens in the browser and renews monthly. Cancelling keeps the paid period and stops the card.
+- **Subscription** — plan cards, the current plan and paid-through date, and a hosted card checkout (Paddle) that opens in the browser and renews monthly. Cancelling keeps the paid period and stops the card.
 - **Account** — plan, status, trade limit, editable report timezone and sign out.
 
 The design is deliberately quiet: dark surfaces, 14 px cards with hairline borders, a single gold accent, rounded chips and 12 px fields and buttons. Depth comes from surface steps and spacing rather than gradients, shadows or glows.
@@ -94,7 +94,7 @@ Verify what a build was signed with before uploading:
 
 The URL and anon key are the same values as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the web app's `.env.local`. No service-role key is used on the device.
 
-Card checkout starts on the web API, so pass `--dart-define=API_BASE_URL=https://your-domain` when the deployment is not the production URL. The Flutterwave secret key and webhook hash live only in that server's environment; nothing secret ships in the app.
+Card checkout starts on the web API, so pass `--dart-define=API_BASE_URL=https://your-domain` when the deployment is not the production URL. The Paddle key and webhook secret live only in that server's environment; nothing secret ships in the app.
 
 ## Run from Android Studio or VS Code
 

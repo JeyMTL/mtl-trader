@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { cancelAtPeriodEndFields } from '@/lib/subscription'
-import { cancelRemoteSubscription } from '@/lib/flutterwave'
 import { cancelPaddleSubscription } from '@/lib/paddle'
 import { apiError } from '@/lib/log'
 
@@ -49,46 +48,29 @@ export async function POST(req: Request) {
       })
     }
 
-    // A card subscription keeps charging until the gateway is told to stop, so
-    // cancel remotely before recording the local flag. Both providers are
-    // checked: an account can hold a Paddle subscription and an older
-    // Flutterwave one, and leaving either running would bill them again.
+    // A card subscription keeps charging until Paddle is told to stop, so
+    // cancel remotely before recording the local flag. If that call fails the
+    // request fails: recording the cancel while the card keeps being billed is
+    // the one outcome a customer would never forgive.
     const { data: cardSubscriptions } = await supabase
       .from('billing_subscriptions')
       .select('provider, status, remote_plan_id')
       .eq('user_id', authUser.id)
-      .in('provider', ['flutterwave', 'paddle'])
+      .eq('provider', 'paddle')
 
     for (const subscription of cardSubscriptions ?? []) {
       if (subscription.status !== 'active') continue
-
-      if (subscription.provider === 'flutterwave') {
-        if (!authUser.email) continue
-        try {
-          await cancelRemoteSubscription(authUser.email)
-        } catch (error: unknown) {
-          return apiError(
-            'subscription.cancel.flutterwave',
-            error,
-            502,
-            'Could not stop the card subscription. Please try again.'
-          )
-        }
-      }
-
-      if (subscription.provider === 'paddle') {
-        const remoteId = subscription.remote_plan_id
-        if (typeof remoteId !== 'string' || !remoteId) continue
-        try {
-          await cancelPaddleSubscription(remoteId)
-        } catch (error: unknown) {
-          return apiError(
-            'subscription.cancel.paddle',
-            error,
-            502,
-            'Could not stop the card subscription. Please try again.'
-          )
-        }
+      const remoteId = subscription.remote_plan_id
+      if (typeof remoteId !== 'string' || !remoteId) continue
+      try {
+        await cancelPaddleSubscription(remoteId)
+      } catch (error: unknown) {
+        return apiError(
+          'subscription.cancel.paddle',
+          error,
+          502,
+          'Could not stop the card subscription. Please try again.'
+        )
       }
     }
 

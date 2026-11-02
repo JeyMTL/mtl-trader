@@ -9,6 +9,11 @@
 -- downgrade guard, the idempotency key and the 30-day period maths are
 -- the same for every provider by design.
 --
+-- NOTE: the two amount literals below (2.50 / 5.00) are the prices this file
+-- shipped with and are superseded by 20261109_prices.sql (12.00 / 29.00), which
+-- must be applied immediately after this one. Applying this file alone leaves
+-- `apply_paid_order` refusing every real payment with `amount_mismatch`.
+--
 -- Idempotent: CREATE OR REPLACE, so re-running is safe.
 -- ------------------------------------------------------------
 

@@ -102,7 +102,7 @@ What the model cannot do:
 
 The panel refuses an entry with neither notes nor a screenshot, because the model
 would be guessing from the symbol alone. Limits: 5 suggestions per 10 minutes per
-user, and the provider must be configured (`OPENAI_API_KEY` or
+user, and the provider must be configured (`GEMINI_API_KEY` or
 `ANTHROPIC_API_KEY`); without it the panel says so instead of failing silently.
 
 ## Storage

@@ -136,7 +136,7 @@ export async function POST(req: Request) {
     const config = resolveProviderConfig()
     if (!config) {
       return NextResponse.json(
-        { error: 'AI suggestions are not configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY or GEMINI_API_KEY.' },
+        { error: 'AI suggestions are not configured. Set GEMINI_API_KEY (free tier) or ANTHROPIC_API_KEY.' },
         { status: 503 }
       )
     }

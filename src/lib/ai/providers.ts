@@ -1,16 +1,20 @@
 /**
- * Provider adapters for the AI review. Supports OpenAI, Anthropic, and any
- * OpenAI-compatible base URL, with vision image parts and token streaming.
+ * Provider adapters for the AI review: Gemini (the free tier, and the default),
+ * Anthropic, and any gateway that speaks the OpenAI chat-completions protocol.
  *
- * Implemented over `fetch` (injectable) and the OpenAI/Anthropic REST shapes so
- * there is no SDK dependency and the adapters stay unit-testable.
+ * The protocol is OpenAI-shaped because that is what Gemini's compatibility
+ * layer speaks, not because OpenAI is a supported account: there is no OpenAI
+ * key path here and no default vendor URL to fall back to.
+ *
+ * Implemented over `fetch` (injectable) so there is no SDK dependency and the
+ * adapters stay unit-testable.
  */
 
 import type { PromptContent, PromptMessage } from './types'
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
-export type ProviderName = 'openai' | 'anthropic' | 'openai-compatible' | 'gemini'
+export type ProviderName = 'anthropic' | 'openai-compatible' | 'gemini'
 
 /**
  * Gemini's OpenAI-compatible endpoint (no trailing slash: the adapters append
@@ -65,29 +69,19 @@ export function parseDataUrl(dataUrl: string): ParsedImage | null {
 /** Resolve provider config from the environment, or null if unconfigured. */
 export function resolveProviderConfig(env: Record<string, string | undefined> = process.env): ProviderConfig | null {
   const explicit = env.AI_PROVIDER?.toLowerCase()
-  const openAiKey = env.OPENAI_API_KEY
   const anthropicKey = env.ANTHROPIC_API_KEY
   const geminiKey = env.GEMINI_API_KEY
 
   let provider: ProviderName
-  if (
-    explicit === 'anthropic' ||
-    explicit === 'openai' ||
-    explicit === 'openai-compatible' ||
-    explicit === 'gemini'
-  ) {
+  if (explicit === 'anthropic' || explicit === 'gemini' || explicit === 'openai-compatible') {
     provider = explicit
-  } else if (anthropicKey && !openAiKey) {
-    provider = 'anthropic'
-  } else if (openAiKey) {
-    provider = 'openai'
   } else if (anthropicKey) {
+    // Last paid provider standing; the free Gemini tier is the fallback.
     provider = 'anthropic'
   } else if (geminiKey) {
-    // Last in the precedence order on purpose: a paid key, when present, wins.
     provider = 'gemini'
   } else {
-    provider = 'openai'
+    return null
   }
 
   if (provider === 'gemini') {
@@ -113,17 +107,19 @@ export function resolveProviderConfig(env: Record<string, string | undefined> = 
     }
   }
 
-  const apiKey = provider === 'openai-compatible' ? env.AI_API_KEY || openAiKey : openAiKey
-  if (!apiKey) return null
+  // A gateway must be configured in full: with no default vendor there is
+  // nothing sensible to fall back to, and posting a journal to a URL nobody
+  // chose would be worse than refusing.
+  const baseUrl = env.AI_BASE_URL
+  const apiKey = env.AI_API_KEY
+  const model = env.AI_MODEL
+  if (!baseUrl || !apiKey || !model) return null
   return {
-    provider,
+    provider: 'openai-compatible',
     apiKey,
-    baseUrl:
-      provider === 'openai-compatible'
-        ? env.AI_BASE_URL || 'https://api.openai.com/v1'
-        : env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-    model: env.AI_MODEL || env.OPENAI_MODEL || 'gpt-4o-mini',
-    visionModel: env.AI_VISION_MODEL || env.AI_MODEL || env.OPENAI_MODEL || 'gpt-4o-mini',
+    baseUrl,
+    model,
+    visionModel: env.AI_VISION_MODEL || model,
   }
 }
 
@@ -165,7 +161,7 @@ async function* sseData(response: Response): AsyncGenerator<string> {
   if (rest.startsWith('data:')) yield rest.slice(5).trim()
 }
 
-function openAiContent(content: string | PromptContent[]) {
+function compatibleContent(content: string | PromptContent[]) {
   if (typeof content === 'string') return content
   return content.map((part) =>
     part.type === 'text'
@@ -174,8 +170,8 @@ function openAiContent(content: string | PromptContent[]) {
   )
 }
 
-function openAiMessages(messages: PromptMessage[]) {
-  return messages.map((message) => ({ role: message.role, content: openAiContent(message.content) }))
+function compatibleMessages(messages: PromptMessage[]) {
+  return messages.map((message) => ({ role: message.role, content: compatibleContent(message.content) }))
 }
 
 function anthropicMessages(messages: PromptMessage[]) {
@@ -243,7 +239,7 @@ async function runRequest(run: () => Promise<Response>): Promise<Response> {
   }
 }
 
-function createOpenAiProvider(config: ProviderConfig, fetchImpl: FetchLike): AiProvider {
+function createCompatibleProvider(config: ProviderConfig, fetchImpl: FetchLike): AiProvider {
   /**
    * Gemini 3.x are thinking models: the reasoning is spent from the same budget
    * as the visible reply, so the review's 900-token ceiling can be consumed
@@ -260,7 +256,7 @@ function createOpenAiProvider(config: ProviderConfig, fetchImpl: FetchLike): AiP
     max_tokens: gemini ? Math.max(options.maxTokens ?? 900, 2000) : options.maxTokens ?? 900,
     ...(options.json ? { response_format: { type: 'json_object' } } : {}),
     ...(stream ? { stream: true } : {}),
-    messages: openAiMessages(messages),
+    messages: compatibleMessages(messages),
   })
 
   return {
@@ -373,5 +369,5 @@ function createAnthropicProvider(config: ProviderConfig, fetchImpl: FetchLike): 
 
 export function createProvider(config: ProviderConfig, fetchImpl: FetchLike = fetch): AiProvider {
   if (config.provider === 'anthropic') return createAnthropicProvider(config, fetchImpl)
-  return createOpenAiProvider(config, fetchImpl)
+  return createCompatibleProvider(config, fetchImpl)
 }

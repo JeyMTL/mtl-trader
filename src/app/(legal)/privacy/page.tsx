@@ -70,7 +70,7 @@ export default function PrivacyPage() {
         <li><strong>Vercel</strong> — application hosting and scheduled jobs.</li>
         <li><strong>PayPal</strong> — subscription checkout and payment capture.</li>
         <li><strong>Resend</strong> — transactional and summary email delivery.</li>
-        <li><strong>An AI provider</strong> (OpenAI or Anthropic, depending on deployment configuration) — receives the trade summary you submit for a review. Reviews are not used by us to train models.</li>
+        <li><strong>An AI provider</strong> (Google Gemini, or Anthropic where configured) — receives the trade summary you submit for a review. Reviews are not used by us to train models.</li>
       </ul>
       <p>
         These providers process data on our instructions and under their own safeguards. Some are located

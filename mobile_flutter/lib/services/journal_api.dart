@@ -508,10 +508,9 @@ class JournalApi {
   /// opens it in the browser; the webhook applies the payment, so closing the
   /// app mid-flow loses nothing.
   ///
-  /// The endpoint is processor-agnostic on purpose: the server picks Paddle or
-  /// Flutterwave from its own configuration. Calling one processor's route
-  /// directly made every mobile payment fail with "not configured" whenever the
-  /// deployment used the other one.
+  /// It talks to this app's own checkout endpoint rather than to Paddle
+  /// directly, so the price ids, webhook and merchant-of-record setup stay a
+  /// server concern and the app never carries payment credentials.
   Future<String> startCardSubscription(String planId) async {
     final session = _db.auth.currentSession;
     final id = userId;

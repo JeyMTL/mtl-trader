@@ -64,12 +64,6 @@ describe('resolveProviderConfig', () => {
     expect(resolveProviderConfig({})).toBeNull()
   })
 
-  it('selects OpenAI by default when an OpenAI key exists', () => {
-    const config = resolveProviderConfig({ OPENAI_API_KEY: 'k' })
-    expect(config?.provider).toBe('openai')
-    expect(config?.model).toBe('gpt-4o-mini')
-  })
-
   it('selects Anthropic when only that key exists', () => {
     const config = resolveProviderConfig({ ANTHROPIC_API_KEY: 'k' })
     expect(config?.provider).toBe('anthropic')
@@ -98,9 +92,23 @@ describe('resolveProviderConfig', () => {
     expect(config?.visionModel).toBe('gemini-3.6-flash')
   })
 
-  it('prefers a paid key over the free tier, with no code change', () => {
-    const config = resolveProviderConfig({ GEMINI_API_KEY: 'free-key', OPENAI_API_KEY: 'paid-key' })
-    expect(config?.provider).toBe('openai')
+  it('prefers Anthropic over the free tier, with no code change', () => {
+    const config = resolveProviderConfig({
+      GEMINI_API_KEY: 'free-key',
+      ANTHROPIC_API_KEY: 'paid-key',
+    })
+    expect(config?.provider).toBe('anthropic')
+  })
+
+  it('refuses a half-configured gateway instead of guessing a vendor', () => {
+    // No default vendor URL any more, so a base URL with no key (or the reverse)
+    // must fail closed rather than post a journal somewhere unexpected.
+    expect(
+      resolveProviderConfig({ AI_PROVIDER: 'openai-compatible', AI_API_KEY: 'k' })
+    ).toBeNull()
+    expect(
+      resolveProviderConfig({ AI_PROVIDER: 'openai-compatible', AI_BASE_URL: 'https://gw.example.com/v1' })
+    ).toBeNull()
   })
 
   it('honors an explicit AI_PROVIDER=gemini and a pinned model', () => {
@@ -114,9 +122,9 @@ describe('resolveProviderConfig', () => {
   })
 })
 
-describe('createProvider (openai)', () => {
+describe('createProvider (gateway)', () => {
   const config = {
-    provider: 'openai' as const,
+    provider: 'openai-compatible' as const,
     apiKey: 'key',
     baseUrl: 'https://api.example.com/v1',
     model: 'text-model',
@@ -187,13 +195,18 @@ describe('createProvider (gemini)', () => {
     expect(body.max_tokens).toBeGreaterThanOrEqual(2000)
   })
 
-  it('leaves the OpenAI request shape untouched', async () => {
+  it('leaves a gateway request free of the Gemini-only fields', async () => {
     const fakeFetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
       async () => new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 })
     )
-    const openai = resolveProviderConfig({ OPENAI_API_KEY: 'k' })
-    if (!openai) throw new Error('expected an openai config')
-    await createProvider(openai, fakeFetch).complete([{ role: 'user', content: 'hi' }])
+    const gateway = resolveProviderConfig({
+      AI_PROVIDER: 'openai-compatible',
+      AI_API_KEY: 'k',
+      AI_BASE_URL: 'https://gw.example.com/v1',
+      AI_MODEL: 'some-model',
+    })
+    if (!gateway) throw new Error('expected a gateway config')
+    await createProvider(gateway, fakeFetch).complete([{ role: 'user', content: 'hi' }])
 
     const body = JSON.parse((fakeFetch.mock.calls[0][1] as RequestInit).body as string)
     expect(body.reasoning_effort).toBeUndefined()
@@ -203,7 +216,7 @@ describe('createProvider (gemini)', () => {
 
 describe('provider timeouts', () => {
   const config = {
-    provider: 'openai' as const,
+    provider: 'openai-compatible' as const,
     apiKey: 'key',
     baseUrl: 'https://api.example.com/v1',
     model: 'm',

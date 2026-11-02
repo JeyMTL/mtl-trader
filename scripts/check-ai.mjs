@@ -28,7 +28,6 @@ const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai
 const GEMINI_DEFAULT_MODEL = 'gemini-3.6-flash'
 
 const explicit = (process.env.AI_PROVIDER || '').toLowerCase()
-const openAiKey = process.env.OPENAI_API_KEY
 const anthropicKey = process.env.ANTHROPIC_API_KEY
 const geminiKey = process.env.GEMINI_API_KEY
 const aiModel = process.env.AI_MODEL
@@ -46,18 +45,14 @@ function line(label, ok, detail = '') {
 /** Mirrors `resolveProviderConfig`, minus the parts this script does not need. */
 function resolve() {
   let provider
-  if (['anthropic', 'openai', 'openai-compatible', 'gemini'].includes(explicit)) {
+  if (['anthropic', 'openai-compatible', 'gemini'].includes(explicit)) {
     provider = explicit
-  } else if (anthropicKey && !openAiKey) {
-    provider = 'anthropic'
-  } else if (openAiKey) {
-    provider = 'openai'
   } else if (anthropicKey) {
     provider = 'anthropic'
   } else if (geminiKey) {
     provider = 'gemini'
   } else {
-    provider = 'openai'
+    return null
   }
 
   if (provider === 'anthropic') {
@@ -82,18 +77,11 @@ function resolve() {
     }
   }
 
-  const apiKey = provider === 'openai-compatible' ? process.env.AI_API_KEY || openAiKey : openAiKey
-  if (!apiKey) return null
-  return {
-    provider,
-    apiKey,
-    baseUrl:
-      provider === 'openai-compatible'
-        ? process.env.AI_BASE_URL || 'https://api.openai.com/v1'
-        : process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-    model: aiModel || process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    keyVar: provider === 'openai-compatible' ? 'AI_API_KEY' : 'OPENAI_API_KEY',
-  }
+  const baseUrl = process.env.AI_BASE_URL
+  const apiKey = process.env.AI_API_KEY
+  const model = aiModel
+  if (!baseUrl || !apiKey || !model) return null
+  return { provider: 'openai-compatible', apiKey, baseUrl, model, keyVar: 'AI_API_KEY' }
 }
 
 console.log('MTL Trader — AI check\n')
@@ -105,7 +93,6 @@ if (explicit) {
 }
 
 for (const [name, value] of [
-  ['OPENAI_API_KEY', openAiKey],
   ['ANTHROPIC_API_KEY', anthropicKey],
   ['GEMINI_API_KEY', geminiKey],
 ]) {
@@ -125,7 +112,7 @@ if (!config) {
   line('base URL', true, config.baseUrl)
   if (config.provider === 'gemini') {
     console.log('  Free tier: no card needed, quota is per project and visible in AI Studio.')
-    console.log('  This path is chosen only because no paid key is set.')
+    console.log('  This path is chosen because no Anthropic key is set.')
   }
   if (!verify) {
     console.log('\nConfig looks resolvable. Prove the key with:')

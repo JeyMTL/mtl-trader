@@ -26,7 +26,7 @@ financial advice.
 | `retrieval.ts` | TF-IDF retrieval over the user's own notes (RAG, no embeddings) | 2 |
 | `schema.ts` | JSON schema, tolerant extractor, strict normalizer, sample guard | 1 |
 | `prompt.ts` | System/user prompt, compact stats, in-context examples | 1 / 3 |
-| `providers.ts` | OpenAI, Anthropic, OpenAI-compatible; vision; streaming | 2 / 3 |
+| `providers.ts` | Gemini, Anthropic, OpenAI-compatible gateways; vision; streaming | 2 / 3 |
 | `review.ts` | Orchestrator (`prepareReview`, `generateReview`) | — |
 | `cache.ts` | Stable hashing so identical journals reuse a review | 1 |
 | `outcomes.ts` | Before/after comparison to track whether advice helped | 3 |
@@ -46,7 +46,7 @@ financial advice.
 - Deterministic edge statistics that the model narrates
 - Retrieval over the trader's own notes so reviews reference their history
 - Rule-based auto-tagging (`POST /api/ai/autotag`) — free, instant
-- Multi-provider support with an OpenAI-compatible escape hatch
+- Multi-provider support with an OpenAI-compatible gateway escape hatch
 
 **Tier 3 — advanced**
 - Vision: attach a chart screenshot (`chartImage` data URL) for vision models
@@ -82,7 +82,7 @@ Response:
     "disclaimer": "…"
   },
   "id": "uuid-or-null",
-  "meta": { "provider": "openai", "model": "gpt-4o-mini", "cached": false, "skipped": false }
+  "meta": { "provider": "gemini", "model": "gemini-3.6-flash", "cached": false, "skipped": false }
 }
 ```
 
@@ -118,10 +118,13 @@ it can read, with their note and screenshot counts.
 
 See `.env.example`. Any one of these enables the review:
 
-- `OPENAI_API_KEY` (+ optional `OPENAI_MODEL`)
+- `GEMINI_API_KEY` (+ optional `GEMINI_MODEL`) — the free tier, the default
 - `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`)
-- `GEMINI_API_KEY` (+ optional `GEMINI_MODEL`) — the free tier
-- `AI_PROVIDER=openai-compatible` with `AI_BASE_URL` and `AI_API_KEY`
+- `AI_PROVIDER=openai-compatible` with `AI_BASE_URL`, `AI_API_KEY` and `AI_MODEL`
+
+There is no OpenAI account path. The `openai-compatible` provider exists for a
+self-hosted gateway and is refused unless all three variables are set, so a
+half-configured gateway cannot post a journal to a URL nobody chose.
 
 Shared overrides: `AI_MODEL`, `AI_VISION_MODEL`. With none set, the review
 returns 503 and the rest of the app is unaffected.
@@ -166,9 +169,9 @@ node --env-file=.env.local scripts/check-ai.mjs           # what resolved, and w
 node --env-file=.env.local scripts/check-ai.mjs --verify  # one real call
 ```
 
-Precedence is deliberate: an explicit `AI_PROVIDER` wins, then a paid OpenAI or
-Anthropic key, and Gemini is only chosen when no paid key is present. Adding an
-`OPENAI_API_KEY` later therefore upgrades the path without touching any code.
+Precedence is deliberate: an explicit `AI_PROVIDER` wins, then an Anthropic key,
+then Gemini. Adding `ANTHROPIC_API_KEY` later therefore upgrades the path without
+touching any code, and removing it falls back to the free tier.
 
 Two limits to know before you point real customers at it:
 
@@ -189,8 +192,8 @@ counts that is cents per customer per month, see the cost note below.
 - Results are cached, so an unchanged journal does not re-bill the model.
 - Rate limiting caps cost, but it is per-instance in memory — back it with a
   shared store (e.g. Redis) before scaling.
-- A review is roughly 2,000 input and 600 output tokens. At `gpt-4o-mini` rates
-  that is well under a cent; at Claude Sonnet it is about 1.5 cents. The monthly
+- A review is roughly 2,000 input and 600 output tokens: free on the Gemini
+  free tier, about 1.5 cents on Claude Sonnet. The monthly
   allowance (30 on Basic, 200 on Pro, `AI_REVIEW_QUOTA`) is what bounds the
   worst case per customer — check `provider` in the response `meta` to see which
   path actually served it.

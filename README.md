@@ -14,7 +14,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **MT5 Auto Sync** - Python agent that syncs closed trades every 60s with proper entry/exit pairing; its token can be rotated or revoked from Settings
 - **Subscription System** - 30-day unlimited free trial, then paid 30-day periods (PayPal + bank transfer). Each payment buys a period; access lapses unless it is renewed
 - **PayPal Webhook** - Signature-verified webhook applies upgrades server-side, so a closed tab no longer loses a payment; refunds, reversals and disputes revoke access
-- **Flutterwave Card Subscriptions** - Auto-renewing monthly card payments. The first charge subscribes the card to a payment plan, every renewal is applied by the signed webhook, and cancelling stops the card at the gateway while keeping the paid period
+- **Paddle Card Subscriptions** - Auto-renewing monthly card payments through Paddle, the merchant of record. Paddle handles sales tax and receipts; every renewal is applied by the signed webhook, and cancelling stops the card at the gateway while keeping the paid period
 - **Email Verification** - Users must verify a real email address before using the journal
 - **Monthly Trade Quota** - Enforced server-side by a Postgres trigger, which also rejects writes once a paid period has lapsed
 - **Data Export & Deletion** - Self-service JSON export and a single-statement account deletion (cascading deletes, email confirmation required)
@@ -34,7 +34,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Backend:** Next.js API Routes
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase Auth
-- **Payments:** PayPal Checkout (one-time capture), Flutterwave card subscriptions (auto-renewing), and bank transfer with unique references and admin approval
+- **Payments:** PayPal Checkout (one-time capture), Paddle card subscriptions (auto-renewing), and bank transfer with unique references and admin approval
 - **Email:** Resend (transactional summaries; optional in production, no-ops when unconfigured)
 - **Charts:** Recharts
 - **CSV Parsing:** PapaParse + SheetJS (xlsx)
@@ -158,16 +158,15 @@ MT5 autosync is included from Basic, because it is the one thing a trader cannot
 | `NEXT_PUBLIC_APP_URL` | Public base URL (PayPal return/cancel URLs) |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | PayPal REST app credentials |
 | `PAYPAL_WEBHOOK_ID` | Webhook ID for signature verification (required for the webhook and reconciliation) |
-| `FLUTTERWAVE_SECRET_KEY` | Flutterwave secret key; enables the card subscription checkout |
-| `FLUTTERWAVE_SECRET_HASH` | Webhook secret hash from the Flutterwave dashboard (verifies `/api/webhooks/flutterwave`) |
-| `FLUTTERWAVE_CURRENCY` | Currency for payment plans and charges (default `USD`) |
+| `PADDLE_API_KEY` / `PADDLE_WEBHOOK_SECRET` | Paddle credentials; enable the card checkout and verify `/api/webhooks/paddle` |
+| `PADDLE_PRICE_BASIC` / `PADDLE_PRICE_PRO` | Monthly price ids; a plan without one is not sold |
 | `ERROR_REPORT_URL` | Optional JSON webhook that receives unhandled request errors; logs are structured either way |
 | `PAYPAL_API_BASE` | Optional override of the PayPal REST base URL (defaults to production `https://api-m.paypal.com`; set to the sandbox URL for testing) |
 | `CRON_SECRET` | Bearer secret Vercel Cron sends to `/api/admin/reconcile` and `/api/cron/notifications` |
 | `RESEND_API_KEY` | Resend API key. When unset, email sending is a no-op (the app never fails because email is missing) |
 | `EMAIL_FROM` | From address for summary emails, e.g. `MTL Trader <reports@yourdomain.com>` (must be a Resend-verified domain) |
 | `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, `BANK_BRANCH` | Bank transfer details shown on the payment page. When unset, the page shows a "contact support" message instead |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | Optional; enables the AI journal review on OpenAI |
+
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Optional alternative AI provider |
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | Optional AI provider with a card-free free tier; used only when no paid key is set |
 | `AI_PROVIDER`, `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `AI_VISION_MODEL` | Optional AI overrides / OpenAI-compatible gateway |
