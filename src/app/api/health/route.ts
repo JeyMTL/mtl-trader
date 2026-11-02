@@ -9,6 +9,7 @@ import {
 } from '@/lib/broker-sync-status'
 import { getAdminClient } from '@/lib/server-auth'
 import { resolveProviderConfig } from '@/lib/ai/providers'
+import { paddleEnvironment, priceIdFor } from '@/lib/paddle'
 
 /**
  * Liveness and configuration probe.
@@ -90,6 +91,10 @@ export async function GET() {
       // cost very different money, and this is where a misconfigured one shows
       // up instead of when a customer taps Review.
       ai: aiProvider(),
+      // Presence only, never a value. The expensive go-live mistake is a
+      // sandbox key left in production: it takes test cards and grants real
+      // access, and nothing else in the app can tell the two apart.
+      paddle: paddleStatus(),
       // Like `features`, reported but not part of `status`: a pending migration
       // is a known, fixable state, and paging every fifteen minutes until
       // someone pastes SQL would train the alert away. `missing` names the file.
@@ -115,6 +120,43 @@ export async function GET() {
 function aiProvider(): { configured: boolean; provider: string | null } {
   const config = resolveProviderConfig()
   return { configured: Boolean(config), provider: config?.provider ?? null }
+}
+
+/**
+ * Paddle config, read the way the payment routes read it.
+ *
+ * `keyEnvironment` comes from the key's own prefix, `api` from
+ * PADDLE_ENVIRONMENT: a `pdl_sdbx_` key with `api: production` is a live
+ * deployment that cannot take a single payment, and this is where that shows up
+ * instead of in a customer's failed checkout.
+ */
+function paddleStatus() {
+  const key = (process.env.PADDLE_API_KEY || '').trim()
+  const clientToken = (
+    process.env.PADDLE_CLIENT_TOKEN ||
+    process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN ||
+    ''
+  ).trim()
+
+  return {
+    configured: Boolean(key),
+    keyEnvironment: key.startsWith('pdl_live_')
+      ? 'live'
+      : key.startsWith('pdl_sdbx_')
+        ? 'sandbox'
+        : key
+          ? 'unknown'
+          : null,
+    api: paddleEnvironment(),
+    webhookSecret: Boolean((process.env.PADDLE_WEBHOOK_SECRET || '').trim()),
+    clientToken: Boolean(clientToken),
+    prices: {
+      basic: Boolean(priceIdFor('basic', 'month')),
+      pro: Boolean(priceIdFor('pro', 'month')),
+      basicAnnual: Boolean(priceIdFor('basic', 'year')),
+      proAnnual: Boolean(priceIdFor('pro', 'year')),
+    },
+  }
 }
 
 /**
