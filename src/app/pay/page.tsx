@@ -17,8 +17,10 @@ import { Logo } from '@/components/logo'
  * page that quietly shows nothing.
  *
  * The token is the client-side token (sandbox tokens start with `test_`), not
- * the API key — it can only open checkouts, which is what makes it safe in the
- * bundle. The API key stays server-side.
+ * the API key — it can only open checkouts, which is what makes it safe to
+ * publish. It is fetched from `/api/paddle/client-token` at runtime rather than
+ * inlined as `NEXT_PUBLIC_*`, so a token saved with the wrong scope shows up as
+ * a 503 on that route instead of a page that quietly says "not configured".
  */
 
 const PADDLE_SCRIPT = 'https://cdn.paddle.com/paddle/v2/paddle.js'
@@ -72,6 +74,26 @@ function loadPaddle(): Promise<PaddleGlobal> {
 }
 
 /**
+ * The client-side token, read from the server so rotating it needs no rebuild.
+ * A missing token and an unreachable route are the same problem to a customer:
+ * card payments are not wired up yet.
+ */
+async function fetchClientToken(): Promise<string> {
+  try {
+    const response = await fetch('/api/paddle/client-token', { cache: 'no-store' })
+    const body = (await response.json()) as { token?: string | null }
+    const token = (body.token || '').trim()
+    if (token) return token
+  } catch {
+    // Fall through: an unreachable route means the same thing as no token.
+  }
+  throw new CheckoutProblem(
+    'unconfigured',
+    'Card payments are not configured for this deployment yet.'
+  )
+}
+
+/**
  * Opens the transaction Paddle named in the URL.
  *
  * Everything that can fail throws rather than setting state, so the effect only
@@ -84,14 +106,7 @@ async function openCheckout(): Promise<void> {
     throw new CheckoutProblem('missing', 'This page needs a transaction id.')
   }
 
-  const token = (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '').trim()
-  if (!token) {
-    throw new CheckoutProblem(
-      'unconfigured',
-      'Card payments are not configured for this deployment yet.'
-    )
-  }
-
+  const token = await fetchClientToken()
   const paddle = await loadPaddle()
   // A sandbox token against the live checkout (or the reverse) fails with an
   // opaque error, so the environment is chosen from the token itself.
