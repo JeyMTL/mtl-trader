@@ -12,7 +12,7 @@ function paid(tier: 'basic' | 'pro'): AccountState {
     subscription_tier: tier,
     subscription_status: 'active',
     trial_ends_at: null,
-    max_trades: tier === 'pro' ? -1 : 50,
+    max_trades: -1,
     current_period_end: new Date(Date.now() + 20 * 86_400_000).toISOString(),
     cancel_at_period_end: false,
   }

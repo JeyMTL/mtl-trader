@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Download, Key, Server, XCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
+import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { useToast } from '@/components/toast'
 import BrokerConnect from '@/components/broker-connect'
 import BrokerPicker, { ServerSuggestions } from '@/components/broker-picker'
@@ -21,6 +22,13 @@ export default function SyncPage() {
   const [login, setLogin] = useState('')
 
   useEffect(() => {
+    // The nav link is hidden, but a bookmark or an old typed URL still reaches
+    // this route. Bounce it instead of showing a feature that is not sold.
+    if (!MT5_SYNC_ENABLED) {
+      router.replace('/dashboard')
+      return
+    }
+
     async function loadUser() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) {

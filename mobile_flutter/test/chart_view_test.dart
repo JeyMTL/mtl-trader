@@ -26,6 +26,28 @@ void main() {
       expect(view.start, 210);
     });
 
+    test('pinToEdge follows the newest bar without changing the zoom', () {
+      final view = ChartViewport()..fit(300);
+      final span = view.span;
+      view.pinToEdge(305);
+      expect(view.span, span);
+      expect(view.start + view.span, 305);
+      expect(view.isAtEdge(305), isTrue);
+    });
+
+    test('anchorLeftEdge holds the bar the trader was looking at', () {
+      final view = ChartViewport()..fit(300);
+      view.pan(-150);
+      view.clampTo(300);
+      expect(view.start, 60);
+      expect(view.isAtEdge(300), isFalse);
+
+      // The window slid by one bar; the same index is now a bar later in time.
+      view.anchorLeftEdge(61, 301);
+      expect(view.start, 61);
+      expect(view.isAtEdge(301), isFalse);
+    });
+
     test('zoom keeps the anchored candle under the focal point', () {
       final view = ChartViewport()..fit(300);
       final baseStart = view.start;
@@ -55,6 +77,49 @@ void main() {
       expect(view.span, ChartViewport.minSpan);
       expect(view.start, greaterThanOrEqualTo(0));
       expect(view.start + view.span, lessThanOrEqualTo(300));
+    });
+
+    test('snap settles the left edge on a whole candle', () {
+      final view = ChartViewport()..fit(300);
+      view.start = 40.37;
+      view.snap(300);
+      expect(view.start, 40);
+
+      view.start = 40.6;
+      view.snap(300);
+      expect(view.start, 41);
+    });
+
+    test('snap cannot push the window past the newest bars', () {
+      final view = ChartViewport()..fit(300);
+      view.start = 299.7;
+      view.snap(300);
+      // 300 - 90 = 210 is the furthest right the left edge may sit.
+      expect(view.start, 210);
+    });
+
+    test('a fling travels further the faster it was thrown, and always stops', () {
+      final slow = ChartViewport()..fit(300);
+      final fast = ChartViewport()..fit(300);
+      final slowRest = slow.flingRest(-30, 300);
+      final fastRest = fast.flingRest(-120, 300);
+      expect(slowRest, lessThan(slow.start));
+      expect(fastRest, lessThan(slowRest));
+      expect(fastRest, greaterThanOrEqualTo(0));
+    });
+
+    test('a fling never lands outside the loaded history', () {
+      final view = ChartViewport()..fit(300);
+      expect(view.flingRest(-10000, 300), 0);
+      expect(view.flingRest(10000, 300), 210);
+    });
+
+    test('sitting at the oldest bar is reported, so history can be fetched', () {
+      final view = ChartViewport()..fit(300);
+      expect(view.isAtStart, isFalse);
+      view.pan(-1000);
+      view.clampTo(300);
+      expect(view.isAtStart, isTrue);
     });
 
     test('maps ratios to candles and prices', () {

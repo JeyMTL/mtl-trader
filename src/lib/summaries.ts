@@ -183,7 +183,7 @@ export function renderTrialReminderEmail({
         <p style="margin:0 0 16px;color:#c9d1d9">${escapeHtml(lede)}</p>
         <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 18px">
           ${row('Keeps working', 'Journal, calendar, photos, voice notes, analytics')}
-          ${row('Pauses', 'MT5 autosync, AI reviews, backtester, replay')}
+          ${row('Pauses', 'AI reviews, backtester, replay')}
         </table>
         <p style="margin:0 0 14px;color:#8b949e;font-size:13px">${escapeHtml(prices)}</p>
         <a href="${escapeHtml(appUrl)}/pricing" style="display:inline-block;padding:10px 16px;background:#238636;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600">See the plans</a>

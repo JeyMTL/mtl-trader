@@ -720,8 +720,9 @@ export default function SettingsPage() {
                       {userPlan.tier === 'pro' ? 'Pro Plan' : userPlan.tier === 'basic' ? 'Basic Plan' : '30-Day Free Trial'}
                     </h3>
                     <p className="text-sm text-gray-400">
-                      {userPlan.tier === 'free' ? 'Unlimited trades for 30 days, then choose a paid plan' :
-                       userPlan.tier === 'basic' ? '50 trades per month' : 'Unlimited trades'}
+                      {userPlan.tier === 'free'
+                        ? 'Unlimited trades for 30 days, then choose a paid plan'
+                        : 'Unlimited trades'}
                     </p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -763,7 +764,7 @@ export default function SettingsPage() {
                 }`}>
                   <h3 className="font-semibold text-white mb-2">Basic Plan</h3>
                   <p className="text-2xl font-bold text-white mb-2">{formatCurrency(BASIC_PRICE)}<span className="text-sm text-gray-400">/mo</span></p>
-                  <p className="text-sm text-gray-400 mb-4">50 trades per month</p>
+                  <p className="text-sm text-gray-400 mb-4">Unlimited trades</p>
                   <div className="space-y-2">
                     <button
                       onClick={() => handleCheckout('basic')}

@@ -37,7 +37,10 @@ describe('plan catalogue', () => {
   })
 
   it('uses -1 only for the unlimited plans', () => {
+    // Volume is not a differentiator: every plan, paid or not, is unlimited. A
+    // cap on Basic is the one thing that made paying worse than the trial.
     expect(PLANS.filter((plan) => plan.max_trades === -1).map((plan) => plan.id).sort()).toEqual([
+      'basic',
       'free',
       'pro',
     ])

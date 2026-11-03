@@ -17,6 +17,7 @@ import '../core/indicators.dart';
 import '../core/instruments.dart';
 import '../services/journal_api.dart';
 import '../services/market_data.dart';
+import '../ui/color_wheel.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -676,6 +677,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       onDrawingSelected: (index) => setState(() => _selectedDrawing = index),
       onDrawingMoved: _moveDrawing,
       onDrawingMoveEnd: _finishDrawingMove,
+      onReachStart: _loadingOlder ? null : _loadOlder,
     );
   }
 
@@ -1542,12 +1544,34 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                     selected: color == current,
                     onTap: () => onPick(color),
                   ),
+                // Any colour, not just the ten on somebody else's shortlist.
+                // The wheel opens on the current colour, so nudging a shade
+                // stays a nudge instead of starting from scratch.
+                _WheelDot(
+                  current: current,
+                  known: ChartStyle.candlePalette.contains(current),
+                  onTap: () => _pickCustomColor(title, current, onPick),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _pickCustomColor(
+    String title,
+    Color current,
+    ValueChanged<Color> onPick,
+  ) async {
+    final picked = await showColorWheelPicker(
+      context,
+      initial: current,
+      title: '$title colour',
+      quickPicks: ChartStyle.candlePalette,
+    );
+    if (picked != null) onPick(picked);
   }
 
   Widget _switchRow(String title, bool value, ValueChanged<bool> onChanged) {
@@ -2132,6 +2156,7 @@ class _ChartCanvas extends StatefulWidget {
     required this.onDrawingMoveEnd,
     required this.onDraw,
     this.height,
+    this.onReachStart,
   });
 
   final List<Candle> candles;
@@ -2143,6 +2168,10 @@ class _ChartCanvas extends StatefulWidget {
   /// Fixed canvas height, or null to fill the space the parent offers (the
   /// fullscreen layout).
   final double? height;
+
+  /// Fired when a pan reaches the oldest loaded bar, so the screen can fetch an
+  /// earlier window instead of the chart dead-ending at the left edge.
+  final VoidCallback? onReachStart;
   final _Marker active;
   final double? entry;
   final double? stop;
@@ -2167,7 +2196,8 @@ class _ChartCanvas extends StatefulWidget {
   State<_ChartCanvas> createState() => _ChartCanvasState();
 }
 
-class _ChartCanvasState extends State<_ChartCanvas> {
+class _ChartCanvasState extends State<_ChartCanvas>
+    with SingleTickerProviderStateMixin {
   final _view = ChartViewport();
 
   double? _entry;
@@ -2189,6 +2219,23 @@ class _ChartCanvasState extends State<_ChartCanvas> {
   double _baseSpan = 0;
   double _baseStart = 0;
 
+  /// Manual vertical offset of the price window, as a share of the visible
+  /// range. Zero is auto-fit, which is what the chart does by default; dragging
+  /// up or down moves the price axis without touching the time axis, the way a
+  /// desktop terminal does.
+  double _pricePan = 0;
+
+  /// Drives the coast after a fling and the short spring onto a whole bar.
+  late final AnimationController _settle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  )
+    ..addListener(_onSettleTick)
+    ..addStatusListener(_onSettleStatus);
+  double _settleFrom = 0;
+  double _settleTo = 0;
+  bool _thenSnap = false;
+
   @override
   void initState() {
     super.initState();
@@ -2198,14 +2245,38 @@ class _ChartCanvasState extends State<_ChartCanvas> {
   }
 
   @override
+  void dispose() {
+    _settle.dispose();
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant _ChartCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.candles, widget.candles) ||
         oldWidget.interval != widget.interval) {
-      if (oldWidget.candles.isEmpty || oldWidget.interval != widget.interval) {
+      final oldLength = oldWidget.candles.length;
+      if (oldLength == 0 || oldWidget.interval != widget.interval) {
+        // First data, or a different candle size: show the newest bars, and drop
+        // any manual price offset since the range has changed underneath it.
+        _pricePan = 0;
         _view.fit(widget.candles.length);
+      } else if (_view.isAtEdge(oldLength)) {
+        // Watching the live edge, so keep following it as bars arrive.
+        _view.pinToEdge(widget.candles.length);
       } else {
-        _view.clampTo(widget.candles.length);
+        // The trader panned back. Hold the bar that was under the left edge,
+        // because the window slid underneath the viewport and keeping the same
+        // index would creep towards the newest candle on every refresh.
+        final left = _view.start.floor().clamp(0, oldLength - 1);
+        final fraction = _view.start - left;
+        final anchor = oldWidget.candles[left].time;
+        final next =
+            widget.candles.indexWhere((candle) => !candle.time.isBefore(anchor));
+        _view.anchorLeftEdge(
+          next < 0 ? 0 : next + fraction,
+          widget.candles.length,
+        );
       }
     }
     if (!identical(oldWidget.candles, widget.candles) ||
@@ -2276,7 +2347,17 @@ class _ChartCanvasState extends State<_ChartCanvas> {
       max += 1;
     }
     final pad = (max - min) * 0.06;
-    return (min: min - pad, max: max + pad);
+    var low = min - pad;
+    var high = max + pad;
+
+    // A manual vertical drag shifts the window by a share of its own range, so
+    // the zoom is untouched and the axis labels travel with the candles.
+    if (_pricePan != 0) {
+      final shift = (high - low) * _pricePan;
+      low += shift;
+      high += shift;
+    }
+    return (min: low, max: high);
   }
 
   double _priceFor(Offset local) {
@@ -2363,8 +2444,65 @@ class _ChartCanvasState extends State<_ChartCanvas> {
   }
 
   void _onScaleStart(ScaleStartDetails details) {
+    // A new touch owns the chart: stop the coast where it is.
+    _settle.stop();
     _baseSpan = _view.span;
     _baseStart = _view.start;
+  }
+
+  void _onSettleTick() {
+    if (widget.candles.isEmpty) return;
+    if (_dragging != null || _drawingIndex != null) {
+      _settle.stop();
+      return;
+    }
+    final t = Curves.easeOutCubic.transform(_settle.value);
+    setState(() => _view.start = _settleFrom + (_settleTo - _settleFrom) * t);
+    _view.clampTo(widget.candles.length);
+    // Coasting into the oldest bar keeps pulling history in, so a long fling
+    // does not stop at the edge of the loaded window.
+    if (_view.isAtStart) widget.onReachStart?.call();
+  }
+
+  void _onSettleStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    if (_thenSnap) {
+      _thenSnap = false;
+      final target = _view.start.roundToDouble();
+      if ((target - _view.start).abs() > 0.001) {
+        _animateStartTo(target, 130);
+        return;
+      }
+    }
+    setState(() => _view.snap(widget.candles.length));
+  }
+
+  void _animateStartTo(double target, int millis, {bool thenSnap = false}) {
+    _settleFrom = _view.start;
+    _settleTo = target;
+    _thenSnap = thenSnap;
+    _settle
+      ..duration = Duration(milliseconds: millis)
+      ..forward(from: 0);
+  }
+
+  /// Lift-off: the finger's speed becomes candle travel with friction, then the
+  /// window settles onto a whole bar instead of resting between two.
+  void _onScaleEnd(ScaleEndDetails details) {
+    setState(() => _crosshair = null);
+    final count = widget.candles.length;
+    if (count < 2 || _dragging != null || _drawingIndex != null) return;
+    final plotW = _size.width - _TradingChartPainter.axisWidth;
+    if (plotW <= 0) return;
+
+    // Finger moving right moves the chart right, which walks the window back.
+    final perSecond = -details.velocity.pixelsPerSecond.dx / plotW * _view.span;
+    if (perSecond.abs() < 4) {
+      // Too slow to be a throw: just sit on the nearest bar.
+      _animateStartTo(_view.start.roundToDouble(), 120);
+      return;
+    }
+    _animateStartTo(_view.flingRest(perSecond, count), 420, thenSnap: true);
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
@@ -2385,6 +2523,22 @@ class _ChartCanvasState extends State<_ChartCanvas> {
       } else {
         _view.pan(-details.focalPointDelta.dx / plotW * _view.span);
         _view.clampTo(widget.candles.length);
+        // Dragged onto the oldest loaded bar: ask for an earlier window, so the
+        // chart keeps moving instead of stopping at the edge of the fetch.
+        if (_view.isAtStart) widget.onReachStart?.call();
+
+        // The vertical component moves the price axis. Without this the only
+        // way to see a wick off the top of the pane is to pinch and lose the
+        // time span you were reading.
+        final panes = _TradingChartPainter.paneLayout(
+          _size.height,
+          widget.style,
+        );
+        if (panes.priceH > 0) {
+          _pricePan = (_pricePan + details.focalPointDelta.dy / panes.priceH)
+              .clamp(-1.5, 1.5)
+              .toDouble();
+        }
       }
       _crosshair = details.localFocalPoint;
     });
@@ -2612,7 +2766,7 @@ class _ChartCanvasState extends State<_ChartCanvas> {
             onTapUp: (details) => _tap(details.localPosition),
             onScaleStart: _onScaleStart,
             onScaleUpdate: _onScaleUpdate,
-            onScaleEnd: (_) => setState(() => _crosshair = null),
+            onScaleEnd: _onScaleEnd,
             onLongPressStart: (details) => _startDrag(details.localPosition),
             onLongPressMoveUpdate: (details) =>
                 _updateDrag(details.localPosition),
@@ -2653,6 +2807,73 @@ class _ChartCanvasState extends State<_ChartCanvas> {
                   right: _TradingChartPainter.axisWidth + 6,
                   child: IgnorePointer(child: _readout()),
                 ),
+                // A shifted price axis: the same affordance as LIVE, so the
+                // trader is never stuck with a scale they cannot undo.
+                if (_pricePan != 0)
+                  Positioned(
+                    right: _TradingChartPainter.axisWidth + 6,
+                    bottom: 34,
+                    child: Semantics(
+                      button: true,
+                      label: 'Fit the price scale',
+                      child: GestureDetector(
+                        onTap: () => setState(() => _pricePan = 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: widget.style.background.withAlpha(225),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: widget.style.axis),
+                          ),
+                          child: Text(
+                            'AUTO ↺',
+                            style: TextStyle(
+                              color: widget.style.text,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Panned back into history: one tap returns to the newest bars,
+                // which is otherwise a long drag the trader has to guess at.
+                if (!_view.isAtEdge(widget.candles.length))
+                  Positioned(
+                    right: _TradingChartPainter.axisWidth + 6,
+                    bottom: 6,
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        _view.pinToEdge(widget.candles.length);
+                        _crosshair = null;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.style.background.withAlpha(225),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: widget.style.axis),
+                        ),
+                        child: Text(
+                          'LIVE →',
+                          style: TextStyle(
+                            color: widget.style.text,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           );
@@ -4001,6 +4222,48 @@ class _ThemeSwatch extends StatelessWidget {
 }
 
 /// One selectable candle colour.
+/// The way into the colour wheel from a swatch row.
+///
+/// It doubles as the "custom colour" indicator: when the current colour is not
+/// one of the palette dots, this one wears it, so a colour chosen from the wheel
+/// shows up as the selection instead of nothing being selected at all.
+class _WheelDot extends StatelessWidget {
+  const _WheelDot({
+    required this.current,
+    required this.known,
+    required this.onTap,
+  });
+
+  final Color current;
+  final bool known;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = current.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: known ? AppColors.surfaceAlt : current,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: known ? AppColors.border : ink,
+            width: known ? 1 : 2,
+          ),
+        ),
+        child: Icon(
+          Icons.colorize,
+          size: 14,
+          color: known ? AppColors.muted : ink,
+        ),
+      ),
+    );
+  }
+}
+
 class _ColorDot extends StatelessWidget {
   const _ColorDot({
     required this.color,

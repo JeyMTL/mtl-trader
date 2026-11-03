@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/config.dart';
+import '../core/features.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/language_picker.dart';
@@ -97,7 +99,8 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   /// The MT5 connection lives here rather than in the tab bar: it is set up once
-  /// and then forgotten, unlike the desk, journal and analytics.
+  /// and then forgotten, unlike the desk, journal and analytics. Hidden while
+  /// `kMt5SyncEnabled` is off; the screen itself is untouched.
   Future<void> _openSync() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -106,6 +109,44 @@ class _AccountScreenState extends State<AccountScreen> {
     );
     if (!mounted) return;
     await _refresh();
+  }
+
+  /// Opens the mail app with the account address already in the body, so a
+  /// support request arrives with a way to find the account.
+  Future<void> _emailSupport() async {
+    final account = Supabase.instance.client.auth.currentUser?.email ?? '';
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'jfx064@gmail.com',
+      queryParameters: {
+        'subject': 'MTL Trader support',
+        'body': 'Account: $account\n\nWhat happened:\n',
+      },
+    );
+    try {
+      if (await launchUrl(uri)) return;
+    } catch (_) {
+      // Falls through to the address below.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No mail app found. Write to jfx064@gmail.com'),
+      ),
+    );
+  }
+
+  /// The store listing in the browser. Play handles an already-reviewed account
+  /// itself, which is why there is no review plugin to keep up to date.
+  Future<void> _rateApp() async {
+    final uri = Uri.parse(
+      'https://play.google.com/store/apps/details?id=com.mtltrader.app',
+    );
+    if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open the store listing.')),
+    );
   }
 
   Future<void> _signOut() async {
@@ -514,11 +555,60 @@ class _AccountScreenState extends State<AccountScreen> {
                   icon: const Icon(Icons.credit_card, size: 16),
                   label: const Text('View plans & billing'),
                 ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _openSync,
-                  icon: const Icon(Icons.sync, size: 16),
-                  label: const Text('Connect MT5 account'),
+                if (kMt5SyncEnabled) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _openSync,
+                    icon: const Icon(Icons.sync, size: 16),
+                    label: const Text('Connect MT5 account'),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                FlatCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionTitle(
+                        title: 'Help & feedback',
+                        subtitle:
+                            'Questions, bugs, or something the journal should do. Every message is read.',
+                      ),
+                      const SizedBox(height: 10),
+                      LabelValue(
+                        label: 'Email support',
+                        value: 'jfx064@gmail.com',
+                        trailing: TextButton(
+                          onPressed: _emailSupport,
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Write'),
+                        ),
+                      ),
+                      const ListDivider(),
+                      LabelValue(
+                        label: 'Rate MTL Trader',
+                        value: 'One tap in the store',
+                        trailing: TextButton(
+                          onPressed: _rateApp,
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Rate'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 10),
                 FlatCard(

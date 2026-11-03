@@ -22,8 +22,10 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
+import { HelpCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { effectiveMaxTrades } from '@/lib/subscription'
+import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
 import { Avatar } from '@/components/avatar'
 import { useBackButton, useHaptics } from '@/hooks/useCapacitor'
@@ -38,6 +40,7 @@ const navigation = [
   { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Support', href: '/support', icon: HelpCircle },
 ]
 
 /** Destinations the server withholds from Basic accounts (see `plan-guard`). */
@@ -50,6 +53,7 @@ const moreNavigation = [
   { name: 'MT5 auto sync', href: '/dashboard/sync', icon: RefreshCw },
   { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Support', href: '/support', icon: HelpCircle },
 ]
 
 export default function DashboardLayout({
@@ -182,12 +186,15 @@ export default function DashboardLayout({
   // nav item that answers 402: the server still refuses a direct URL, so this is
   // presentation, not enforcement. Autosync is available from Basic.
   const proTools = isPro || user?.status === 'trial'
-  const visibleNavigation = navigation.filter(
-    (item) => proTools || !PRO_ONLY_HREFS.includes(item.href)
-  )
-  const visibleMoreNavigation = moreNavigation.filter(
-    (item) => proTools || !PRO_ONLY_HREFS.includes(item.href)
-  )
+  // MT5 sync is built but not sold while the hosted agent has no funding behind
+  // it, so its entry point is filtered out rather than deleted: the route, the
+  // credentials store and the supervisor stay, and `MT5_SYNC_ENABLED` brings the
+  // link back in one line. See `src/lib/features.ts`.
+  const hiddenHrefs = MT5_SYNC_ENABLED ? [] : ['/dashboard/sync']
+  const isVisible = (href: string) =>
+    (proTools || !PRO_ONLY_HREFS.includes(href)) && !hiddenHrefs.includes(href)
+  const visibleNavigation = navigation.filter((item) => isVisible(item.href))
+  const visibleMoreNavigation = moreNavigation.filter((item) => isVisible(item.href))
 
   // `maxTrades` is already the effective allowance, so zero means the period or
   // trial has ended. That covers a lapsed trial and a lapsed paid period without
@@ -215,7 +222,6 @@ export default function DashboardLayout({
   const subRouteTitles: Record<string, string> = {
     '/dashboard/trades/new': 'Add trade',
     '/dashboard/import': 'Import trades',
-    '/dashboard/sync': 'MT5 sync',
     '/dashboard/calendar': 'Calendar',
     '/dashboard/settings': 'Settings',
     '/dashboard/payment': 'Payment',

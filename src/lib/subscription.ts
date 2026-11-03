@@ -68,8 +68,9 @@ export function daysLeftInPeriod(account: AccountState, now: Date = new Date()):
 
 /**
  * The allowance actually in force for an account: an active trial is unlimited,
- * an active paid period uses the stored `max_trades`, anything else has none.
- * This mirrors the `enforce_trade_quota` trigger.
+ * an active paid period uses the stored `max_trades` (a users trigger pins that
+ * to -1 for every paid tier, so volume is never what a plan withholds), anything
+ * else has none. This mirrors the `enforce_trade_quota` trigger.
  */
 export function effectiveMaxTrades(account: AccountState, now: Date = new Date()): number {
   if (isTrialActive(account, now)) return UNLIMITED

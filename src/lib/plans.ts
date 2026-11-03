@@ -5,11 +5,18 @@ import { SubscriptionPlan } from '@/types'
  * Settings, the PayPal checkout, the Paddle checkout, `apply_paid_order`
  * and the Flutter app (`mobile_flutter/lib/core/plans.dart`).
  *
- * What a plan covers is now genuinely split: Basic adds MT5 autosync (the one
- * thing a trader cannot do by hand) and a review a day, Pro adds the analysis
- * workflow (backtester, replay) and unlimited volume. The remaining gates live
- * in `canUseFeature` (`src/lib/subscription.ts`) and are enforced server-side, so
- * these lines must never promise something a Basic account cannot open.
+ * What a plan covers is now genuinely split: Basic adds the desk (calendar, time
+ * edge, journal media, charts, import/export) and a review a day, Pro adds the
+ * analysis workflow (backtester, replay) and the full review allowance. MT5
+ * autosync is not listed on any plan while the hosted agent is unfunded — see
+ * `MT5_SYNC_ENABLED` in `src/lib/features.ts`. Trade volume is
+ * deliberately *not* a differentiator: capping Basic below the unlimited trial
+ * made paying worse than not paying, and a trader doing two trades a day hit the
+ * old 50 cap three weeks in. Both paid tiers are unlimited, and
+ * `trg_normalize_paid_allowance` in Postgres pins that for the account row. The
+ * remaining gates live in `canUseFeature` (`src/lib/subscription.ts`) and are
+ * enforced server-side, so these lines must never promise something a Basic
+ * account cannot open.
  *
  * Keep prices here and in `PAID_PLAN_PRICES` / `ANNUAL_PLAN_PRICES`
  * (`src/lib/payments.ts`) identical, and the annual ones with the Paddle price
@@ -34,15 +41,14 @@ export const PLANS: SubscriptionPlan[] = [
     name: 'Basic',
     price: 12,
     annual_price: 120,
-    max_trades: 50,
+    max_trades: -1,
     features: [
-      '50 trades per month',
+      'Unlimited trades',
       'Dashboard, journal and calendar',
       'Equity curve, daily and monthly P&L',
       'Time edge: best hours and sessions',
       'OANDA chart with SMA, EMA, RSI and MACD',
       'Journal photos and voice notes',
-      'MT5 broker sync',
       '30 AI reviews a month',
       'Strategy tags and CSV import/export',
       'Email daily and weekly summaries',

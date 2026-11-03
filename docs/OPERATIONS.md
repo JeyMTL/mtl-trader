@@ -258,11 +258,25 @@ plan attached.
    `12.00` monthly, `120.00` yearly (Basic), `29.00` monthly, `290.00` yearly
    (Pro). Note each `pri_…` id.
 3. **Developer tools → Authentication** → create a live **API key** (`pdl_live_…`).
-4. **Notifications** → add a destination pointing at
+4. **Events → Notifications** → **New destination**, pointing at
    `https://mtl-trader.vercel.app/api/webhooks/paddle`, subscribed to
    `transaction.completed`, `subscription.canceled` and `adjustment.created`,
    and copy its **secret key** (`pdl_ntfset_…`). It is unique per destination —
    the sandbox secret will not verify live events.
+
+   The secret key has the shape `pdl_ntfset_<26 chars>_<32 chars>`. The
+   destination's **ID** is `ntfset_<26 chars>` — the same ULID without the
+   `pdl_` prefix and the trailing `_…` half. Copying the ID from the URL or the
+   list row looks plausible (right prefix family, right length) and makes every
+   delivery fail signature verification with a 401, so a customer pays and never
+   gets the plan. If the value has no `pdl_` prefix or no `_` in it, it is the
+   ID, not the secret.
+
+   Set the destination's usage/`traffic_source` to include **simulations**
+   (`all`, not `platform`) if you want to prove the secret without a sale —
+   Developer tools → Simulations delivers a real, signed event to the URL, and
+   because the signature is per destination rather than per event, any harmless
+   event (`product.updated`) proves it. Expect **200**, not 401.
 5. **Checkout settings** → set the default payment link to
    `https://mtl-trader.vercel.app/pay`. Live accounts require the approved domain
    here; sandbox does not, which is why this only bites on the switch.

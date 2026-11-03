@@ -27,7 +27,8 @@ const iso = (d: Date) => d.toISOString()
 describe('maxTradesForPlan', () => {
   it('maps each plan id to its allowance', () => {
     expect(maxTradesForPlan('free')).toBe(UNLIMITED)
-    expect(maxTradesForPlan('basic')).toBe(50)
+    // Unlimited on Basic too: a cap there made paying worse than the trial.
+    expect(maxTradesForPlan('basic')).toBe(UNLIMITED)
     expect(maxTradesForPlan('pro')).toBe(UNLIMITED)
   })
 
@@ -175,7 +176,7 @@ describe('column value builders', () => {
     const basic = planFields('basic', { now: NOW })
     expect(basic.subscription_tier).toBe('basic')
     expect(basic.subscription_status).toBe('active')
-    expect(basic.max_trades).toBe(50)
+    expect(basic.max_trades).toBe(UNLIMITED)
     expect(basic.current_period_end).toBe(iso(day(PERIOD_DAYS)))
     expect(basic.cancel_at_period_end).toBe(false)
     expect(basic.last_payment_at).toBe(iso(NOW))

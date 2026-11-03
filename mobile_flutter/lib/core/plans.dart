@@ -1,9 +1,11 @@
 /// Paid plans offered in the app. Prices and limits mirror `src/lib/plans.ts`
 /// on the web so checkout, the database trigger and the app agree.
 ///
-/// Enforced differences: the monthly trade allowance (`enforce_trade_quota` in
-/// Postgres), the AI review allowance, and the backtester/replay gate. Autosync
-/// is included from Basic. Keep these lines in step by hand with the web lists in
+/// Enforced differences: the AI review allowance and the backtester/replay gate.
+/// Trade volume is unlimited on every plan in force — capping Basic below the
+/// unlimited trial made paying worse than not paying. MT5 autosync is not sold
+/// on any plan while the hosted agent is unfunded (`kMt5SyncEnabled`), so no plan
+/// lists it. Keep these lines in step by hand with the web lists in
 /// `src/lib/plans.ts`.
 class MobilePlan {
   const MobilePlan({
@@ -39,15 +41,14 @@ const List<MobilePlan> mobilePlans = [
     name: 'Basic',
     price: 12.00,
     annualPrice: 120.00,
-    maxTrades: 50,
+    maxTrades: -1,
     popular: true,
     features: [
-      '50 trades per month',
+      'Unlimited trades',
       'Equity curve, daily and monthly P&L',
       'Time edge: best hours and sessions',
       'OANDA chart with studies',
       'Journal photos and voice notes',
-      'MT5 broker sync',
       '30 AI reviews a month',
     ],
   ),

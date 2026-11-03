@@ -116,7 +116,7 @@ export function Onboarding({ hasTrades }: { hasTrades: boolean }) {
   const steps = [
     {
       title: 'Bring in your history',
-      body: 'Import an MT5 or broker export, or let the desktop agent sync every closed trade automatically.',
+      body: 'Import an MT5 or broker export — XML report, CSV or Excel — and every closed trade lands in the journal.',
       icon: Upload,
     },
     {

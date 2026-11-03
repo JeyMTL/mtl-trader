@@ -29,8 +29,8 @@ const features = [
   },
   {
     icon: Zap,
-    title: 'MT5 Integration',
-    description: 'Import trades directly from MetaTrader 5 with CSV upload or real-time sync.',
+    title: 'AI Journal Review',
+    description: 'A read of your own fills: what worked, what repeated, and what to stop doing.',
     tile: 'icon-tile-violet',
   },
 ]

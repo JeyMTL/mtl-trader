@@ -33,6 +33,63 @@ class ChartViewport {
 
   void pan(double candles) => start += candles;
 
+  /// Settles the left edge onto a whole candle.
+  ///
+  /// A gesture leaves `start` fractional, so the chart can come to rest halfway
+  /// between two bars with the crosshair pointing at neither. Desktop platforms
+  /// snap; so does this, as the last step after a drag or a fling.
+  void snap(int count) {
+    start = start.roundToDouble();
+    clampTo(count);
+  }
+
+  /// True while the oldest loaded bar is on screen, so the caller can fetch an
+  /// earlier window instead of letting the chart stop at a wall.
+  bool get isAtStart => start <= 0.5;
+
+  /// Where a fling coasts to, from a speed in candles per second.
+  ///
+  /// Exponential friction: distance = speed / friction. Clamped to the loaded
+  /// bars, so a hard throw lands on the first or last bar rather than past it.
+  double flingRest(double candlesPerSecond, int count, {double friction = 5.5}) {
+    if (count <= 0) return 0;
+    final upper = math.max(0.0, count.toDouble() - span);
+    final travel = candlesPerSecond / friction;
+    return (start + travel).clamp(0.0, upper).toDouble();
+  }
+
+  /// True when the newest candle is visible, i.e. the view is pinned to the live
+  /// edge. Half a bar of slack, because `start` is fractional while a finger is
+  /// panning and the edge would otherwise flicker in and out of "at edge".
+  bool isAtEdge(int count) {
+    if (count <= 0) return true;
+    return start + span >= count - 0.5;
+  }
+
+  /// Pins the newest candle to the right edge without changing the zoom. Used
+  /// when bars arrive while the trader is already watching the live edge, so the
+  /// chart follows the market instead of stalling behind it.
+  void pinToEdge(int count) {
+    if (count <= 0) {
+      start = 0;
+      return;
+    }
+    final upper = count.toDouble();
+    span = span.clamp(math.min(minSpan, upper), upper);
+    start = math.max(0.0, upper - span);
+  }
+
+  /// Puts `index` under the left edge, then clamps.
+  ///
+  /// A live window drops its oldest bar as a new one arrives, so holding the
+  /// same index would drag a panned-back chart a bar forward on every refresh
+  /// until it snapped to the newest candle. Anchoring on the bar the trader was
+  /// looking at keeps the chart where they put it.
+  void anchorLeftEdge(double index, int count) {
+    start = index;
+    clampTo(count);
+  }
+
   /// Zooms by `scale` while keeping the candle under `anchorRatio` fixed.
   /// `baseSpan`/`baseStart` are the viewport values when the gesture began,
   /// because Flutter reports cumulative scale for the whole gesture.
