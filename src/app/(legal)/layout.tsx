@@ -27,6 +27,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
             <Link href="/terms" className="hover:text-white">Terms</Link>
             <Link href="/privacy" className="hover:text-white">Privacy</Link>
             <Link href="/refunds" className="hover:text-white">Refunds</Link>
+            <Link href="/delete-account" className="hover:text-white">Delete account</Link>
             <Link href="/support" className="hover:text-white">Support</Link>
             <Link href="/" className="hover:text-white">Home</Link>
           </div>
