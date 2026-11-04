@@ -13,6 +13,7 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Published | 4 Nov 2026 (Console: "Last published on November 4, 2026") |
 | Testers | Google Group `mtl-trader-testers@googlegroups.com` |
 | Feedback email | `jfx064@gmail.com` |
+| Play Billing products | 4 subscriptions **Active** (4 Nov 2026), each with one activated, priced base plan |
 | Production track | Inactive — awaiting the 14-day rule |
 | Database | Migrated through `20261116` (signup trigger); `/api/health` reports every RPC ready and none missing |
 | Git | `main` pushed to `origin`, tree clean — production verified serving the pushed commit |
@@ -117,10 +118,13 @@ Billing cannot be exercised until the app is installed **from Play** with a
 licence-tester account, and until the Console/API pieces exist:
 
 1. Payments profile active on the developer account.
-2. **Monetise with Play → Products → Subscriptions** — four subscriptions, ids
-   exactly as in `docs/ANDROID_RELEASE.md`: `basic_month`/`basic-month`,
-   `basic_year`/`basic-year`, `pro_month`/`pro-month`, `pro_year`/`pro-year`.
-   Every base plan must be **Active**.
+2. ~~Monetise with Play → Products → Subscriptions~~ — **done 4 Nov 2026.** All
+   four exist with the ids from `docs/ANDROID_RELEASE.md` (`basic_month` /
+   `basic-month`, `basic_year` / `basic-year`, `pro_month` / `pro-month`,
+   `pro_year` / `pro-year`), each base plan **Active** and priced from the USD
+   list price ($12 / $120 / $29 / $290), 7-day grace, automatic account hold,
+   all countries. Activating a base plan is what makes a product visible to
+   Play Billing; a draft one is simply absent from `queryProductDetails`.
 3. **Settings → API access** — service account with *View financial data* and
    *Manage orders and subscriptions*; JSON key.
 4. Vercel env: `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_PLAY_PACKAGE_NAME=com.mtltrader.app`; redeploy.
