@@ -144,6 +144,12 @@ licence-tester account, and until the Console/API pieces exist:
    has mangled is not silently guessed at: `serviceAccount()` returns null and
    the route answers `503 Google Play billing is not configured yet`, so the
    base64 form (`base64 -w0 key.json`) is the fallback if that ever appears.
+
+   **Proven on 4 Nov 2026:** the downloaded key signs a JWT that Google exchanges
+   for an access token (`200`), and `androidpublisher/v3/applications/com.mtltrader.app/subscriptions`
+   lists all four products with their base plans. That covers the three things a
+   purchase would otherwise have to discover: the key is valid, the *Google Play
+   Android Developer API* is enabled, and the Play permission grant is right.
 5. **Setup → License testing** — add the test phone's account.
 6. Buy each plan once from the Play-installed build; confirm the row in
    `google_play_subscriptions` gets `acknowledged = true` and the plan unlocks.
@@ -177,11 +183,17 @@ the old `04e96d8`. The app's Play purchase verification route is therefore live:
 `POST /api/billing/google/verify` answers `401 Unauthorized` (it checks the
 session before the Play credentials), `GET` answers `405`.
 
-The redeploy that carried the Play credentials on 4 Nov keeps the same `commit`
-(`d2553ca`) — an environment-only change does not move the hash, so the health
-field cannot confirm it. The confirmation is the first verified purchase: a
-mangled key shows up as `503 Google Play billing is not configured yet` rather
-than as a failed purchase.
+The 4 Nov redeploy that carried the Play credentials serves `commit: c0eff7b`,
+which is live and answers `200`. `/api/health` still cannot date an
+environment-only change, so the key itself was checked directly instead — see
+the access-token proof in step 4 above. If a paste ever gets mangled the symptom
+is `503 Google Play billing is not configured yet`, not a failed purchase.
+
+Unrelated quirk seen that evening: this machine could not open TCP to the
+project's anycast addresses (`216.198.79.131`, `64.29.17.131`, ports 80 and 443)
+while the sibling `.3` addresses in the same ranges opened instantly, and an
+independent fetch of the same URL returned `200`. The deployment was healthy
+throughout; reaching it from the dev machine is what failed.
 
 `/api/health` on 4 Nov 2026: database ok, 24 of 24 RPCs ready, no missing
 migrations, `config` complete, Paddle live with all four price ids, AI resolved
