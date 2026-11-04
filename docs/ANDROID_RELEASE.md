@@ -188,9 +188,14 @@ flutter build appbundle --release \
    an error message. **Activate** every base plan — an inactive one is invisible
    to the store and never returned to the app. Google sets local prices and taxes
    from the USD amount, so the app shows Play's price, not `plans.dart`'s.
-2. **Settings → API access**: link a Google Cloud project, then create a service
-   account and grant it *View financial data* and *Manage orders and
-   subscriptions* in Play Console. Create a JSON key for it.
+2. **Service account.** There is no *Settings → API access* entry in the current
+   console; the page is `/console/developers/<developer-id>/api-access`. Google
+   no longer requires linking the Cloud project to Play. Instead: create a Cloud
+   project, enable the **Google Play Developer API**, create a service account
+   with a JSON key, then Play Console → **Users and permissions → Invite new
+   users**, enter the account's `...iam.gserviceaccount.com` address and grant
+   *View financial data, orders, and cancellation survey responses* plus *Manage
+   orders and subscriptions*. Only the account owner can do this.
 3. Vercel → Settings → Environment Variables:
    `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` = the JSON key (raw, or base64 of it — the
    private key is a multi-line PEM), and `GOOGLE_PLAY_PACKAGE_NAME` =

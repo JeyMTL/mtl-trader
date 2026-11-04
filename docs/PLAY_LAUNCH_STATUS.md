@@ -125,8 +125,12 @@ licence-tester account, and until the Console/API pieces exist:
    list price ($12 / $120 / $29 / $290), 7-day grace, automatic account hold,
    all countries. Activating a base plan is what makes a product visible to
    Play Billing; a draft one is simply absent from `queryProductDetails`.
-3. **Settings → API access** — service account with *View financial data* and
-   *Manage orders and subscriptions*; JSON key.
+3. Service account — the page is `/console/developers/<developer-id>/api-access`
+   (the new menu has no *Settings* item), and linking the Cloud project to Play is
+   no longer required. Enable the **Google Play Developer API** in a Cloud
+   project, create the service account and its JSON key there, then grant it
+   *View financial data, orders, and cancellation survey responses* + *Manage
+   orders and subscriptions* via **Users and permissions → Invite new users**.
 4. Vercel env: `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_PLAY_PACKAGE_NAME=com.mtltrader.app`; redeploy.
 5. **Setup → License testing** — add the test phone's account.
 6. Buy each plan once from the Play-installed build; confirm the row in
