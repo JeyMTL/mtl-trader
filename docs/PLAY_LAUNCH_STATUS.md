@@ -9,6 +9,7 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | --- | --- |
 | App id | `com.mtltrader.app` |
 | Live version | **1.0.3**, version code **4** |
+| Built, not yet uploaded | **1.0.4**, version code **5** — release-signed `app-release.aab`, 64,216,166 bytes, built 4 Nov 2026 18:48 |
 | Track | Closed testing – Alpha (Active, 178 countries) |
 | Published | 4 Nov 2026 (Console: "Last published on November 4, 2026") |
 | Testers | Google Group `mtl-trader-testers@googlegroups.com` |
@@ -22,7 +23,8 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 ## Version codes already burned
 
 `1` (old internal 1.0.0), `2` (1.0.1, had the photo permission), `3` (1.0.2,
-discarded draft), `4` (1.0.3, live). **Next build must be `1.0.4+5`.**
+discarded draft), `4` (1.0.3, live). `5` (1.0.4, the Play-billing build) is built
+and signed but **not uploaded yet**. The next code after it is `6`.
 
 Play never re-releases a version code, *including* codes from drafts that were
 discarded before rollout. Do not upload the same AAB twice and do not discard a
@@ -62,6 +64,13 @@ unzip -p build/app/outputs/bundle/release/app-release.aab base/manifest/AndroidM
 ```
 
 `grep -c` printing `0` exits 1 — that is a pass, not a failure.
+
+**The 1.0.4+5 bundle passed all three on 4 Nov 2026:** `versionCode="5"`,
+`versionName="1.0.4"`, `READ_MEDIA` count `0`, and `keytool -printcert -jarfile`
+reports `CN=MTL Trader, O=MTL Trader, L=Nairobi, C=KE`, SHA384withRSA — the
+release key, not the debug fallback. `--dart-define=PLAY_BUILD=true` was on the
+build line; whether it actually reached the runtime is what the first purchase
+proves, because a `PLAY_BUILD=false` build shows no subscriptions at all.
 
 ## How a tester installs
 
