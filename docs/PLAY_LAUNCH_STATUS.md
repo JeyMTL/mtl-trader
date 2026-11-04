@@ -15,7 +15,7 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Feedback email | `jfx064@gmail.com` |
 | Production track | Inactive — awaiting the 14-day rule |
 | Database | Migrated through `20261116` (signup trigger); `/api/health` reports every RPC ready and none missing |
-| Git | `bcde2b6` is the tip, tree clean — production was serving `04e96d8` when last checked |
+| Git | `main` pushed to `origin`, tree clean — production verified serving the pushed commit |
 
 ## Version codes already burned
 
@@ -151,10 +151,11 @@ licence-tester account, and until the Console/API pieces exist:
 
 ## Git and deploy state
 
-The launch push is committed on `main`; the tree is clean. Production was serving
-`04e96d8` when this was checked, so **the push and the redeploy are still
-outstanding**. That matters for billing: the app's Play purchase verification
-calls `/api/billing/google/verify`, and that route is not in the deployed build.
+The launch push is committed and pushed to `origin/main`, and the Vercel deploy
+was confirmed by polling `/api/health` until its `commit` field stopped reporting
+the old `04e96d8`. The app's Play purchase verification route is therefore live:
+`POST /api/billing/google/verify` answers `401 Unauthorized` (it checks the
+session before the Play credentials), `GET` answers `405`.
 
 `/api/health` on 4 Nov 2026: database ok, 24 of 24 RPCs ready, no missing
 migrations, `config` complete, Paddle live with all four price ids, AI resolved
@@ -162,11 +163,10 @@ to Gemini, `features.avatars` ready.
 
 ## Open outside the Play Console
 
-- **Hosted sync is stalled, not broken.** `/api/health` reports `verdict:
-  "stalled"`, `connections: 1`, `pending: 1`, `oldestPendingMinutes: 2251` and
-  `lastSyncAt: null`: one `broker_connections` row has been queued for about 37
-  hours and no supervisor ever claimed it. That is the correct state while
-  `MT5_SYNC_ENABLED = false` (see `src/lib/features.ts`) and no Windows
-  supervisor is running. Clear that row — or fund the supervisor — before
-  flipping the flag, otherwise the first customer to connect watches a spinner
-  that is already known to be dead.
+- **Hosted sync has no supervisor behind it.** The one queued
+  `broker_connections` row (created 1 Nov, never claimed, `lastSyncAt: null`) was
+  deleted on 4 Nov, so `/api/health` now reports `verdict: "idle"` with 0
+  connections. Nothing is broken — but while `MT5_SYNC_ENABLED = false` (see
+  `src/lib/features.ts`) and no Windows supervisor runs, any customer who
+  connects queues a row nobody will claim. Fund the supervisor before flipping
+  that flag, or the first one to connect watches a spinner known to be dead.
