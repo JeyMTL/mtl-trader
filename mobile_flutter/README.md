@@ -167,15 +167,16 @@ Two settings in the Android project exist to keep plugin builds working with thi
 
 ## Platform permissions
 
-The checked-in Android manifest and iOS `Info.plist` already include the microphone, camera and photo permissions. If you regenerate the platform folders, add these entries again.
+The checked-in Android manifest and iOS `Info.plist` already include the microphone and camera permissions. If you regenerate the platform folders, add these entries again.
 
 **`android/app/src/main/AndroidManifest.xml`** (inside `<manifest>`):
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 ```
+
+There is deliberately no `READ_MEDIA_IMAGES`: photos are attached through the Android system picker, which needs no permission, and declaring broad photo access makes Play demand a justification for a permission the app never uses.
 
 **`ios/Runner/Info.plist`**:
 
@@ -188,7 +189,7 @@ The checked-in Android manifest and iOS `Info.plist` already include the microph
 <string>Attach a chart screenshot to a journal entry.</string>
 ```
 
-Photo picking uses the system picker; audio recording uses `record` 7; playback uses `just_audio`.
+Photo picking uses the system picker (`image_picker`), which needs no media permission on either platform; audio recording uses `record` 7; playback uses `just_audio`.
 
 ## Chart data
 
