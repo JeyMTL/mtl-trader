@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/server-auth'
 import { hasValidBearer } from '@/lib/auth-guards'
 import { applyPaidOrder, expireLapsedSubscriptions, fetchRecentCompletedCaptures } from '@/lib/payments'
+import { syncStoredGoogleSubscriptions } from '@/lib/google-billing'
+import { googlePlayConfigured } from '@/lib/google-play'
 import { getAdminClient } from '@/lib/server-auth'
 import { apiError, logEvent } from '@/lib/log'
 
@@ -57,6 +59,9 @@ async function runReconciliation() {
       failed: 0,
       expired,
       ratesSwept,
+      google: 'not_configured' as
+        | 'not_configured'
+        | { checked: number; applied: number; failed: number },
     }
 
     for (const order of orders) {
@@ -70,6 +75,21 @@ async function runReconciliation() {
         logEvent('error', 'reconcile.apply', { error, userId: order.userId, planId: order.planId })
       }
     }
+
+    // Play subscriptions are re-checked here because Google cannot push to us
+    // without a Pub/Sub topic: a renewal is only learned about by asking. It runs
+    // before the response so a failed call is visible in the summary.
+    let google: { checked: number; applied: number; failed: number } | 'not_configured' = 'not_configured'
+    if (googlePlayConfigured()) {
+      try {
+        google = await syncStoredGoogleSubscriptions()
+      } catch (error: unknown) {
+        logEvent('error', 'reconcile.google', { error })
+        google = { checked: 0, applied: 0, failed: 1 }
+      }
+    }
+
+    summary.google = google
 
     logEvent('info', 'reconcile.complete', summary)
     return NextResponse.json({ success: true, ...summary })

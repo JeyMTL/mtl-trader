@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type ChangeEvent } from 'react'
 import { User, CreditCard, Bell, Shield, Save, Wallet, Trash2, Palette, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
-import { useTheme } from '@/lib/theme'
+import { useTheme, THEMES } from '@/lib/theme'
 import { useToast } from '@/components/toast'
 import { Avatar } from '@/components/avatar'
 import { deleteAvatarByUrl, uploadAvatar, validateAvatarFile } from '@/lib/avatar-upload'
@@ -37,7 +37,7 @@ interface UserProfile {
 }
 
 export default function SettingsPage() {
-  const { theme, toggle } = useTheme()
+  const { theme, setTheme } = useTheme()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('profile')
   // Which section most recently saved; a single boolean made both sections
@@ -671,26 +671,29 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold text-white">Appearance</h2>
               
               <div className="space-y-4">
-                <div className="flex items-center justify-between py-4 border-b border-border">
-                  <div>
-                    <p className="text-sm font-medium text-white">Theme</p>
-                    <p className="text-xs text-gray-400">Switch between dark and light mode</p>
+                <div className="py-4 border-b border-border">
+                  <p className="text-sm font-medium text-white">Theme</p>
+                  <p className="text-xs text-gray-400">Graphite, paper, or the mark&apos;s own navy and ice.</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {THEMES.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setTheme(option.id)}
+                        aria-pressed={theme === option.id}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                          theme === option.id
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-surface-light text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
-                  <button
-                    onClick={toggle}
-                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                      theme === 'dark' ? 'bg-primary' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                        theme === 'dark' ? 'translate-x-7' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Current: {theme === 'dark' ? 'Dark' : 'Light'} mode
+                  Current: {THEMES.find((option) => option.id === theme)?.label} theme
                 </p>
               </div>
             </div>

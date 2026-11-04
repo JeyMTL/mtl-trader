@@ -62,7 +62,7 @@ export interface PaidOrder {
   userId: string
   planId: string
   amount: number | string
-  provider: 'paypal' | 'bank' | 'paddle'
+  provider: 'paypal' | 'bank' | 'paddle' | 'google'
   providerEventId: string
   /** `year` buys 365 days through `apply_annual_order`; default is 30 days. */
   interval?: BillingInterval
