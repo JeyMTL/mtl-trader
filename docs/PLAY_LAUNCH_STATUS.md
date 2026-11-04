@@ -14,6 +14,7 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Testers | Google Group `mtl-trader-testers@googlegroups.com` |
 | Feedback email | `jfx064@gmail.com` |
 | Play Billing products | 4 subscriptions **Active** (4 Nov 2026), each with one activated, priced base plan |
+| Play API access | Service account `play-billing@mtl-trader.iam.gserviceaccount.com` **Active**; its JSON key is in Vercel (Production) |
 | Production track | Inactive — awaiting the 14-day rule |
 | Database | Migrated through `20261116` (signup trigger); `/api/health` reports every RPC ready and none missing |
 | Git | `main` pushed to `origin`, tree clean — production verified serving the pushed commit |
@@ -125,13 +126,24 @@ licence-tester account, and until the Console/API pieces exist:
    list price ($12 / $120 / $29 / $290), 7-day grace, automatic account hold,
    all countries. Activating a base plan is what makes a product visible to
    Play Billing; a draft one is simply absent from `queryProductDetails`.
-3. Service account — the page is `/console/developers/<developer-id>/api-access`
-   (the new menu has no *Settings* item), and linking the Cloud project to Play is
-   no longer required. Enable the **Google Play Developer API** in a Cloud
-   project, create the service account and its JSON key there, then grant it
-   *View financial data, orders, and cancellation survey responses* + *Manage
-   orders and subscriptions* via **Users and permissions → Invite new users**.
-4. Vercel env: `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_PLAY_PACKAGE_NAME=com.mtltrader.app`; redeploy.
+3. ~~Service account~~ — **done 4 Nov 2026.** Cloud project `mtl-trader` (org
+   `jfx064-org`) with the **Google Play Android Developer API** enabled, service
+   account `play-billing@mtl-trader.iam.gserviceaccount.com`, JSON key created.
+   Granted *View financial data, orders, and cancellation survey responses* +
+   *Manage orders and subscriptions* through **Users and permissions → Invite new
+   users**: the page is `/console/developers/<developer-id>/api-access`, the new
+   menu has no *Settings* item, and linking the Cloud project to Play is not
+   required. The org constraint `iam.disableServiceAccountKeyCreation` blocked
+   key creation and had to be unenforced at project scope first:
+   `gcloud alpha resource-manager org-policies disable-enforce
+   iam.disableServiceAccountKeyCreation --project=mtl-trader`, which needs
+   `roles/orgpolicy.policyAdmin` granted at the **organization**, not the project.
+4. ~~Vercel env~~ — **done 4 Nov 2026.** `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (raw
+   JSON, Production only, marked sensitive) and
+   `GOOGLE_PLAY_PACKAGE_NAME=com.mtltrader.app`, then a redeploy. A paste Vercel
+   has mangled is not silently guessed at: `serviceAccount()` returns null and
+   the route answers `503 Google Play billing is not configured yet`, so the
+   base64 form (`base64 -w0 key.json`) is the fallback if that ever appears.
 5. **Setup → License testing** — add the test phone's account.
 6. Buy each plan once from the Play-installed build; confirm the row in
    `google_play_subscriptions` gets `acknowledged = true` and the plan unlocks.
@@ -164,6 +176,12 @@ was confirmed by polling `/api/health` until its `commit` field stopped reportin
 the old `04e96d8`. The app's Play purchase verification route is therefore live:
 `POST /api/billing/google/verify` answers `401 Unauthorized` (it checks the
 session before the Play credentials), `GET` answers `405`.
+
+The redeploy that carried the Play credentials on 4 Nov keeps the same `commit`
+(`d2553ca`) — an environment-only change does not move the hash, so the health
+field cannot confirm it. The confirmation is the first verified purchase: a
+mangled key shows up as `503 Google Play billing is not configured yet` rather
+than as a failed purchase.
 
 `/api/health` on 4 Nov 2026: database ok, 24 of 24 RPCs ready, no missing
 migrations, `config` complete, Paddle live with all four price ids, AI resolved
