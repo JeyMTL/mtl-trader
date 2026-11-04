@@ -10,6 +10,7 @@ import '../core/pnl.dart';
 import '../core/strategy_colors.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../services/telemetry.dart';
 import '../services/media_service.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -608,6 +609,34 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     });
   }
 
+  /// A quiet label above a group of fields, so one card can hold prices, levels
+  /// and costs without reading as a single undifferentiated grid of numbers.
+  Widget _fieldGroup(String title) {
+    // A full-width rule under the label rather than beside it: at a 2x text size
+    // the label and a trailing line together were wider than the card, and an
+    // underline cannot run out of room.
+    return Container(
+      margin: const EdgeInsets.only(top: 12, bottom: 8),
+      padding: const EdgeInsets.only(bottom: 5),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.border.withAlpha(120)),
+        ),
+      ),
+      child: Text(
+        title.toUpperCase(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: AppColors.faint,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.1,
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -664,6 +693,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
             .timeout(const Duration(seconds: 25));
         if (!mounted) return;
         _saved = true;
+        Telemetry.event('trade_saved', {'mode': 'edit'});
         Navigator.pop(context, true);
         return;
       }
@@ -686,6 +716,10 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       }
       if (!mounted) return;
       _saved = true;
+      // The activation step: a trader who saves one trade has a journal. The
+      // count of accounts that reach this, against paywall_view, is the whole
+      // funnel until payments exist.
+      Telemetry.event('trade_saved', {'mode': 'create'});
       Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
@@ -929,6 +963,10 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                 children: [
                   const SectionTitle(title: 'Execution'),
                   const SizedBox(height: 10),
+                  // Prices, levels, size and costs are three different questions.
+                  // Laid out as one 2x4 grid they read as a single block of
+                  // numbers, and the broker costs were mixed in with the trade.
+                  _fieldGroup('Prices'),
                   Row(
                     children: [
                       Expanded(
@@ -950,18 +988,9 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  _fieldGroup('Stop & target'),
                   Row(
                     children: [
-                      Expanded(
-                        child: _NumberField(
-                          controller: _lots,
-                          label: 'Size (lots)',
-                          positive: true,
-                          onChanged: () => setState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: _NumberField(
                           controller: _stop,
@@ -969,11 +998,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                           onChanged: () => setState(() {}),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _NumberField(
                           controller: _take,
@@ -981,7 +1006,18 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                           onChanged: () => setState(() {}),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                    ],
+                  ),
+                  _fieldGroup('Size & costs'),
+                  _NumberField(
+                    controller: _lots,
+                    label: 'Size (lots)',
+                    positive: true,
+                    onChanged: () => setState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
                       Expanded(
                         child: _NumberField(
                           controller: _commission,
@@ -990,11 +1026,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                           onChanged: () => setState(() {}),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _NumberField(
                           controller: _swap,

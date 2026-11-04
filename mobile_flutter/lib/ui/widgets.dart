@@ -127,6 +127,80 @@ class SectionTitle extends StatelessWidget {
   }
 }
 
+/// A titled block of related settings, drawn as a card.
+///
+/// The chart's bottom sheets group their options into these, so a sheet reads as
+/// a handful of labelled decisions instead of one column of controls. `trailing`
+/// is the current value of the group, shown beside the label so the state is
+/// legible without opening anything.
+class SettingsSection extends StatelessWidget {
+  const SettingsSection({
+    super.key,
+    required this.title,
+    required this.children,
+    this.trailing,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title.toUpperCase(),
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ),
+                if (trailing != null)
+                  Text(
+                    trailing!,
+                    style: TextStyle(
+                      color: AppColors.faint,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class MetricCard extends StatelessWidget {
   const MetricCard({
     super.key,

@@ -83,7 +83,8 @@ class _AiCoachCardState extends State<AiCoachCard> {
   @override
   Widget build(BuildContext context) {
     final exhausted = _allowed && _remaining != null && _remaining! <= 0;
-    final disabled = _loading || widget.summary.totalTrades == 0 || !_allowed || exhausted;
+    final disabled =
+        _loading || widget.summary.totalTrades == 0 || !_allowed || exhausted;
 
     return FlatCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -110,7 +111,8 @@ class _AiCoachCardState extends State<AiCoachCard> {
           const SizedBox(height: 4),
           Text(
             'Educational feedback grounded in your own journal statistics.',
-            style: TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.45),
+            style:
+                TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.45),
           ),
           if (_quota != null) ...[
             const SizedBox(height: 6),
@@ -127,7 +129,8 @@ class _AiCoachCardState extends State<AiCoachCard> {
                     : (exhausted
                         ? 'No reviews left this month'
                         : '${_remaining ?? 0} of $_quota reviews left this month'),
-                style: TextStyle(color: AppColors.muted, fontSize: kMinLabelSize),
+                style:
+                    TextStyle(color: AppColors.muted, fontSize: kMinLabelSize),
               ),
             ),
           ],
@@ -143,7 +146,8 @@ class _AiCoachCardState extends State<AiCoachCard> {
                       height: 14,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.text),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(AppColors.text),
                       ),
                     )
                   : const Icon(Icons.auto_awesome, size: 15),
@@ -152,27 +156,32 @@ class _AiCoachCardState extends State<AiCoachCard> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: AppColors.danger, fontSize: 11.5, height: 1.45)),
+            Text(_error!,
+                style: TextStyle(
+                    color: AppColors.danger, fontSize: 11.5, height: 1.45)),
           ],
           if (_review != null && !_review!.isEmpty) ...[
             const SizedBox(height: 12),
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceAlt,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     '${_review!.confidence} confidence',
-                    style: TextStyle(color: AppColors.muted, fontSize: kMinLabelSize),
+                    style: TextStyle(
+                        color: AppColors.muted, fontSize: kMinLabelSize),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '${_review!.sampleSize} trades analysed',
-                  style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize),
+                  style: TextStyle(
+                      color: AppColors.faint, fontSize: kMinLabelSize),
                 ),
               ],
             ),
@@ -209,7 +218,9 @@ class _AiCoachCardState extends State<AiCoachCard> {
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: insight.isRisk ? AppColors.danger : AppColors.success,
+                          color: insight.isRisk
+                              ? AppColors.danger
+                              : AppColors.success,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -229,7 +240,10 @@ class _AiCoachCardState extends State<AiCoachCard> {
                 ),
               Text(
                 'Measured from your own trades; each pattern needs at least six trades in the group.',
-                style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize, height: 1.4),
+                style: TextStyle(
+                    color: AppColors.faint,
+                    fontSize: kMinLabelSize,
+                    height: 1.4),
               ),
             ],
             _findings('Strengths', _review!.strengths, AppColors.success),
@@ -238,7 +252,8 @@ class _AiCoachCardState extends State<AiCoachCard> {
             const SizedBox(height: 6),
             Text(
               'AI feedback is educational and is not financial advice.',
-              style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize, height: 1.4),
+              style: TextStyle(
+                  color: AppColors.faint, fontSize: kMinLabelSize, height: 1.4),
             ),
           ],
         ],
@@ -285,7 +300,8 @@ class _AiCoachCardState extends State<AiCoachCard> {
                     if (item.evidence != null && item.evidence!.isNotEmpty)
                       TextSpan(
                         text: '\nevidence: ${item.evidence}',
-                        style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize),
+                        style: TextStyle(
+                            color: AppColors.faint, fontSize: kMinLabelSize),
                       ),
                   ],
                 ),

@@ -55,14 +55,18 @@ void main() {
     });
 
     test('suggests a candle size for the window length', () {
-      expect(defaultIntervalFor(const Duration(hours: 2)), ChartInterval.oneMinute);
-      expect(defaultIntervalFor(const Duration(days: 1)), ChartInterval.fiveMinutes);
+      expect(defaultIntervalFor(const Duration(hours: 2)),
+          ChartInterval.oneMinute);
+      expect(defaultIntervalFor(const Duration(days: 1)),
+          ChartInterval.fiveMinutes);
       expect(
         defaultIntervalFor(const Duration(days: 5)),
         ChartInterval.fifteenMinutes,
       );
-      expect(defaultIntervalFor(const Duration(days: 20)), ChartInterval.oneHour);
-      expect(defaultIntervalFor(const Duration(days: 60)), ChartInterval.fourHours);
+      expect(
+          defaultIntervalFor(const Duration(days: 20)), ChartInterval.oneHour);
+      expect(defaultIntervalFor(const Duration(days: 60)),
+          ChartInterval.fourHours);
     });
   });
 
@@ -90,7 +94,14 @@ void main() {
     test('reads the bar volume, defaulting to zero when absent', () {
       final candles = parseCandlePayload({
         'candles': [
-          {'t': 1793369400000, 'o': 1.1, 'h': 1.15, 'l': 1.05, 'c': 1.12, 'v': 420},
+          {
+            't': 1793369400000,
+            'o': 1.1,
+            'h': 1.15,
+            'l': 1.05,
+            'c': 1.12,
+            'v': 420
+          },
           {'t': 1793369700000, 'o': 1.1, 'h': 1.15, 'l': 1.05, 'c': 1.12},
         ],
       });

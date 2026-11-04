@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../services/market_data.dart';
 import '../ui/theme.dart';
+import '../ui/widgets.dart';
 
 /// Longest window `/api/market/candles` accepts.
 const Duration maxChartTimeFrame = Duration(days: 62);
@@ -179,111 +180,150 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
     final problem = _problem;
     final bars = _bars;
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Chart time frame',
-              style: TextStyle(
-                color: AppColors.text,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.borderStrong,
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Pick the period and the candle size. Both are sent to the feed as-is.',
-              style: TextStyle(
-                color: AppColors.faint,
-                fontSize: 11.5,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'QUICK SPANS',
-              style: TextStyle(
-                color: AppColors.muted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final shortcut in _shortcuts.entries)
-                  SizedBox(
-                    width: 108,
-                    child: OutlinedButton(
-                      onPressed: () => _applyShortcut(shortcut.value),
-                      child: Text(shortcut.key),
+                Text(
+                  'Chart time frame',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Pick the period and the candle size, or jump to the newest candles.',
+                  style: TextStyle(
+                    color: AppColors.faint,
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SettingsSection(
+                    title: 'Quick spans',
+                    children: [
+                      // Three equal targets rather than three fixed-width
+                      // buttons that wrapped onto a second line on a narrow
+                      // phone before anything else could be reached.
+                      Row(
+                        children: [
+                          for (var i = 0; i < _shortcuts.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _applyShortcut(
+                                  _shortcuts.values.elementAt(i),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(0, 40),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                ),
+                                child: Text(
+                                  _shortcuts.keys.elementAt(i),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Each one ends at the newest candle and picks a candle size that fits.',
+                        style: TextStyle(
+                          color: AppColors.faint,
+                          fontSize: 10,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SettingsSection(
+                    title: 'Window',
+                    children: [
+                      _row('From', _from, start: true),
+                      const SizedBox(height: 8),
+                      _row('To', _to, start: false),
+                    ],
+                  ),
+                  SettingsSection(
+                    title: 'Candle size',
+                    trailing: _interval.key.toUpperCase(),
+                    children: [
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final interval in ChartInterval.values)
+                            _IntervalChip(
+                              interval: interval,
+                              selected: interval == _interval,
+                              onTap: () => setState(() => _interval = interval),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        bars == null
+                            ? 'Too many candles at this size.'
+                            : '≈ $bars candles in this window',
+                        style: TextStyle(
+                          color:
+                              bars == null ? AppColors.danger : AppColors.faint,
+                          fontSize: 10.5,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (problem != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
+                      child: Text(
+                        problem,
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 11.5,
+                          height: 1.4,
+                        ),
+                      ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'FROM · TO',
-              style: TextStyle(
-                color: AppColors.muted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
+                ],
               ),
             ),
-            const SizedBox(height: 6),
-            _row('From', _from, start: true),
-            const SizedBox(height: 8),
-            _row('To', _to, start: false),
-            const SizedBox(height: 14),
-            Text(
-              'CANDLE SIZE',
-              style: TextStyle(
-                color: AppColors.muted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final interval in ChartInterval.values)
-                  _IntervalChip(
-                    interval: interval,
-                    selected: interval == _interval,
-                    onTap: () => setState(() => _interval = interval),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              bars == null
-                  ? 'Too many candles at this size.'
-                  : '≈ $bars candles',
-              style: TextStyle(
-                color: bars == null ? AppColors.danger : AppColors.faint,
-                fontSize: 10.5,
-                height: 1.4,
-              ),
-            ),
-            if (problem != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                problem,
-                style: TextStyle(color: AppColors.danger, fontSize: 11.5),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            child: Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
@@ -309,8 +349,8 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

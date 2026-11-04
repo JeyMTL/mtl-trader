@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../services/telemetry.dart';
 import 'app_shell.dart';
 import 'login_screen.dart';
 
@@ -23,10 +24,16 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
+    if (_session != null) Telemetry.event('session_resumed');
     _subscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       state,
     ) {
       if (!mounted) return;
+      // Only a fresh sign-in, not a token refresh: a refresh every hour would
+      // swamp the funnel with events that say nothing about activation.
+      if (state.event == AuthChangeEvent.signedIn) {
+        Telemetry.event('sign_in');
+      }
       setState(() => _session = state.session);
     });
   }

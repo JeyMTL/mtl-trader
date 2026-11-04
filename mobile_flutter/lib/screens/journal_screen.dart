@@ -347,83 +347,7 @@ class _JournalScreenState extends State<JournalScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Wrap, like the session chips below: three tabs in a Row
-                // overflowed by 81px on a 320pt phone at a 2x text size.
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final option in [
-                      ('all', l10n.journalFilterAll),
-                      ('wins', l10n.journalFilterWins),
-                      ('losses', l10n.journalFilterLosses),
-                    ])
-                      _FilterTab(
-                        label: option.$2,
-                        active: _filter == option.$1,
-                        onTap: () {
-                          setState(() => _filter = option.$1);
-                          _load(reset: true);
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                // Sessions sit on their own wrapped row: six chips do not fit
-                // across a phone, and a horizontally scrolling filter row hides
-                // the option a trader is looking for.
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final option in [
-                      ('all', l10n.journalSessionAll),
-                      ('asian', l10n.journalSessionAsian),
-                      ('london', l10n.journalSessionLondon),
-                      ('newyork', l10n.journalSessionNewYork),
-                      ('sydney', l10n.journalSessionSydney),
-                    ])
-                      _FilterTab(
-                        label: option.$2,
-                        active: _session == option.$1,
-                        onTap: () {
-                          setState(() => _session = option.$1);
-                          _load(reset: true);
-                        },
-                      ),
-                  ],
-                ),
-                if (_sessionSummaryMissing)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      'Session totals need a database update '
-                      '(20261105_session_stats.sql).',
-                      style: TextStyle(
-                        color: AppColors.faint,
-                        fontSize: kMinLabelSize,
-                      ),
-                    ),
-                  ),
-                if (_sessionSummary.isNotEmpty)
-                  _SessionSummaryRow(
-                    entries: [
-                      for (final key in _sessionKeys)
-                        if (_sessionSummary[key] != null)
-                          (
-                            key: key,
-                            label: _sessionLabel(l10n, key),
-                            trades: _sessionSummary[key]!.trades,
-                            wins: _sessionSummary[key]!.wins,
-                            pnl: _sessionSummary[key]!.pnl,
-                          ),
-                    ],
-                    active: _session,
-                    onTap: (key) {
-                      setState(() => _session = key);
-                      _load(reset: true);
-                    },
-                  ),
+                _filterCard(l10n),
               ],
             ),
           ),
@@ -455,6 +379,119 @@ class _JournalScreenState extends State<JournalScreen> {
         return key;
     }
   }
+
+  /// Both filter axes in one card.
+  ///
+  /// They used to be two identical rows of chips with nothing saying they
+  /// filtered different things, and the sessions then appeared a second time as
+  /// a summary strip. Now each axis is labelled, and the session filter is a
+  /// single control: the summary strip when the database has the session stats,
+  /// plain chips when it does not.
+  Widget _filterCard(AppLocalizations l10n) {
+    final sessionOptions = <(String, String)>[
+      ('all', l10n.journalSessionAll),
+      ('asian', l10n.journalSessionAsian),
+      ('london', l10n.journalSessionLondon),
+      ('newyork', l10n.journalSessionNewYork),
+      ('sydney', l10n.journalSessionSydney),
+    ];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _filterLabel('Result'),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final option in [
+                ('all', l10n.journalFilterAll),
+                ('wins', l10n.journalFilterWins),
+                ('losses', l10n.journalFilterLosses),
+              ])
+                _FilterTab(
+                  label: option.$2,
+                  active: _filter == option.$1,
+                  onTap: () {
+                    setState(() => _filter = option.$1);
+                    _load(reset: true);
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(height: 1, color: AppColors.border.withAlpha(120)),
+          const SizedBox(height: 10),
+          _filterLabel('Session'),
+          const SizedBox(height: 6),
+          if (_sessionSummary.isNotEmpty)
+            _SessionSummaryRow(
+              entries: [
+                for (final key in _sessionKeys)
+                  if (_sessionSummary[key] != null)
+                    (
+                      key: key,
+                      label: _sessionLabel(l10n, key),
+                      trades: _sessionSummary[key]!.trades,
+                      wins: _sessionSummary[key]!.wins,
+                      pnl: _sessionSummary[key]!.pnl,
+                    ),
+              ],
+              active: _session,
+              onTap: (key) {
+                setState(() => _session = key);
+                _load(reset: true);
+              },
+            )
+          else
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final option in sessionOptions)
+                  _FilterTab(
+                    label: option.$2,
+                    active: _session == option.$1,
+                    onTap: () {
+                      setState(() => _session = option.$1);
+                      _load(reset: true);
+                    },
+                  ),
+              ],
+            ),
+          if (_sessionSummaryMissing)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Session totals need a database update '
+                '(20261105_session_stats.sql).',
+                style: TextStyle(
+                  color: AppColors.faint,
+                  fontSize: kMinLabelSize,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterLabel(String text) => Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: AppColors.faint,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.1,
+        ),
+      );
 
   Widget _body() {
     if (_loading && _items.isEmpty) {

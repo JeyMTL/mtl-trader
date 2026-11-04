@@ -89,7 +89,8 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
             child: Text(
               'Prop-rule monitoring needs the database migration '
               '20261111_prop_rules.sql. Apply it and refresh.',
-              style: TextStyle(color: AppColors.danger, fontSize: 11.5, height: 1.45),
+              style: TextStyle(
+                  color: AppColors.danger, fontSize: 11.5, height: 1.45),
             ),
           );
         }
@@ -107,7 +108,8 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
             initial: data.rules ?? PropRules.defaults(),
             saving: _saving,
             error: _error,
-            onCancel: status == null ? null : () => setState(() => _editing = false),
+            onCancel:
+                status == null ? null : () => setState(() => _editing = false),
             onSave: _save,
           );
         }
@@ -119,7 +121,8 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.verified_user_outlined, size: 16, color: AppColors.primary),
+                  Icon(Icons.verified_user_outlined,
+                      size: 16, color: AppColors.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -133,7 +136,8 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                   ),
                   if (status != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: accent.withAlpha(30),
                         borderRadius: BorderRadius.circular(999),
@@ -158,17 +162,20 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                 status == null
                     ? 'Track a prop-firm evaluation: daily loss, trailing drawdown and the profit target.'
                     : 'Headroom against the evaluation rules you set.',
-                style: TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.45),
+                style: TextStyle(
+                    color: AppColors.faint, fontSize: 11.5, height: 1.45),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!, style: TextStyle(color: AppColors.danger, fontSize: 11.5)),
+                Text(_error!,
+                    style: TextStyle(color: AppColors.danger, fontSize: 11.5)),
               ],
               if (status == null) ...[
                 const SizedBox(height: 10),
                 FilledButton(
                   onPressed: () => setState(() => _editing = true),
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary),
                   child: const Text('Set up rules'),
                 ),
               ] else ...[
@@ -180,7 +187,8 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                         : status.status == 'breach_drawdown'
                             ? 'The drawdown limit has been reached. Check the firm’s rules before opening another trade.'
                             : 'You are within 20% of a rule limit. Position size and stop distance matter more than the next setup.',
-                    style: TextStyle(color: accent, fontSize: 11.5, height: 1.45),
+                    style:
+                        TextStyle(color: accent, fontSize: 11.5, height: 1.45),
                   ),
                   const SizedBox(height: 10),
                 ],
@@ -188,7 +196,8 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                   label: 'Daily loss',
                   used: status.dailyPnl < 0 ? -status.dailyPnl : 0,
                   limit: status.dailyLossLimit,
-                  detail: '${money(status.dailyHeadroom)} left today · limit ${percent(status.maxDailyLossPct)}',
+                  detail:
+                      '${money(status.dailyHeadroom)} left today · limit ${percent(status.maxDailyLossPct)}',
                   tone: status.status == 'breach_daily'
                       ? AppColors.danger
                       : status.status == 'warn_daily'
@@ -197,10 +206,13 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                 ),
                 const SizedBox(height: 8),
                 _Meter(
-                  label: status.trailingDrawdown ? 'Trailing drawdown' : 'Drawdown',
+                  label: status.trailingDrawdown
+                      ? 'Trailing drawdown'
+                      : 'Drawdown',
                   used: status.drawdown,
                   limit: status.drawdownLimit,
-                  detail: '${money(status.drawdownHeadroom)} left · peak ${money(status.peakEquity)}',
+                  detail:
+                      '${money(status.drawdownHeadroom)} left · peak ${money(status.peakEquity)}',
                   tone: status.status == 'breach_drawdown'
                       ? AppColors.danger
                       : status.status == 'warn_drawdown'
@@ -212,7 +224,8 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                   label: 'Profit target',
                   used: status.profitProgress < 0 ? 0 : status.profitProgress,
                   limit: status.profitTarget,
-                  detail: '${status.tradingDays}/${status.minTradingDays} qualifying days',
+                  detail:
+                      '${status.tradingDays}/${status.minTradingDays} qualifying days',
                   tone: AppColors.primary,
                 ),
                 const SizedBox(height: 10),
@@ -222,7 +235,10 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                       child: Text(
                         'Evaluated from ${money(status.accountSize)} of starting balance. '
                         'A firm’s own dashboard wins any disagreement.',
-                        style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize, height: 1.4),
+                        style: TextStyle(
+                            color: AppColors.faint,
+                            fontSize: kMinLabelSize,
+                            height: 1.4),
                       ),
                     ),
                     TextButton(
@@ -261,7 +277,9 @@ class _PropData {
     return _PropData(
       configured: configured,
       missing: missing,
-      rules: rules is Map ? PropRules.fromMap(Map<String, dynamic>.from(rules)) : null,
+      rules: rules is Map
+          ? PropRules.fromMap(Map<String, dynamic>.from(rules))
+          : null,
       status: configured && status is Map && status['configured'] != false
           ? PropStatus.fromMap(Map<String, dynamic>.from(status))
           : null,
@@ -323,7 +341,8 @@ class _Meter extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 3),
-        Text(detail, style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize)),
+        Text(detail,
+            style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize)),
       ],
     );
   }
@@ -370,8 +389,9 @@ class _RulesFormState extends State<_RulesForm> {
     _days = TextEditingController(text: '${initial.minTradingDays}');
   }
 
-  static String _trim(double value) =>
-      value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
+  static String _trim(double value) => value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toString();
 
   @override
   void dispose() {
@@ -457,7 +477,8 @@ class _RulesFormState extends State<_RulesForm> {
               style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize),
             ),
             value: _rules.trailingDrawdown,
-            onChanged: (value) => setState(() => _rules = _rules.copyWith(trailingDrawdown: value)),
+            onChanged: (value) => setState(
+                () => _rules = _rules.copyWith(trailingDrawdown: value)),
           ),
           InkWell(
             onTap: _pickDate,
@@ -479,14 +500,16 @@ class _RulesFormState extends State<_RulesForm> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Icon(Icons.edit_calendar_outlined, size: 15, color: AppColors.muted),
+                  Icon(Icons.edit_calendar_outlined,
+                      size: 15, color: AppColors.muted),
                 ],
               ),
             ),
           ),
           if (widget.error != null) ...[
             const SizedBox(height: 4),
-            Text(widget.error!, style: TextStyle(color: AppColors.danger, fontSize: 11.5)),
+            Text(widget.error!,
+                style: TextStyle(color: AppColors.danger, fontSize: 11.5)),
           ],
           const SizedBox(height: 8),
           Row(
@@ -498,12 +521,14 @@ class _RulesFormState extends State<_RulesForm> {
                         _sync();
                         widget.onSave(_rules);
                       },
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                style:
+                    FilledButton.styleFrom(backgroundColor: AppColors.primary),
                 child: Text(widget.saving ? 'Saving…' : 'Save rules'),
               ),
               if (widget.onCancel != null) ...[
                 const SizedBox(width: 8),
-                TextButton(onPressed: widget.onCancel, child: const Text('Cancel')),
+                TextButton(
+                    onPressed: widget.onCancel, child: const Text('Cancel')),
               ],
             ],
           ),
@@ -512,7 +537,8 @@ class _RulesFormState extends State<_RulesForm> {
     );
   }
 
-  Widget _number(String label, TextEditingController controller, String suffix) {
+  Widget _number(
+      String label, TextEditingController controller, String suffix) {
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),

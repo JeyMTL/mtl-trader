@@ -47,7 +47,8 @@ void main() {
 
     test('leaves long periods empty rather than throwing', () {
       final closes = List<double>.filled(10, 2);
-      expect(studySeries(OverlayStudy.sma200, closes).every((v) => v == null), isTrue);
+      expect(studySeries(OverlayStudy.sma200, closes).every((v) => v == null),
+          isTrue);
     });
   });
 

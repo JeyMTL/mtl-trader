@@ -207,8 +207,7 @@ class _InstrumentTile extends StatelessWidget {
                 tone: Tone.positive,
               ),
             ),
-            if (selected)
-              Icon(Icons.check, size: 15, color: AppColors.primary),
+            if (selected) Icon(Icons.check, size: 15, color: AppColors.primary),
           ],
         ),
       ),

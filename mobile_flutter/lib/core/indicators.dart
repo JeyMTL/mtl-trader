@@ -90,8 +90,10 @@ List<double?> rsi(List<double> closes, {int period = 14}) {
   out[period] = _rsiValue(averageGain, averageLoss);
   for (var i = period + 1; i < closes.length; i++) {
     final change = closes[i] - closes[i - 1];
-    averageGain = (averageGain * (period - 1) + (change > 0 ? change : 0)) / period;
-    averageLoss = (averageLoss * (period - 1) + (change < 0 ? -change : 0)) / period;
+    averageGain =
+        (averageGain * (period - 1) + (change > 0 ? change : 0)) / period;
+    averageLoss =
+        (averageLoss * (period - 1) + (change < 0 ? -change : 0)) / period;
     out[i] = _rsiValue(averageGain, averageLoss);
   }
   return out;

@@ -189,9 +189,8 @@ class MarketDataService {
     // A past window never changes, so it is kept far longer than the live tail.
     // Every instrument is real-time OANDA data now, so one short TTL applies to
     // all of them instead of a 10-minute window for the exchange-traded classes.
-    final ttl = hasWindow
-        ? const Duration(minutes: 30)
-        : const Duration(seconds: 45);
+    final ttl =
+        hasWindow ? const Duration(minutes: 30) : const Duration(seconds: 45);
     if (!force && entry != null && DateTime.now().difference(entry.at) < ttl) {
       return entry.candles;
     }

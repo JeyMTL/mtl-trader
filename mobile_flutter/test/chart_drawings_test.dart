@@ -28,7 +28,8 @@ void main() {
     expect(decodeDrawings(''), isEmpty);
     expect(decodeDrawings('not json'), isEmpty);
     expect(decodeDrawings('{"k":"ray","p":1}'), isEmpty);
-    expect(decodeDrawings('[{"k":"trend"},{"k":"ray"},{"k":"other"}]'), isEmpty);
+    expect(
+        decodeDrawings('[{"k":"trend"},{"k":"ray"},{"k":"other"}]'), isEmpty);
     expect(decodeDrawings('[{"k":"ray","p":2}]'), hasLength(1));
   });
 

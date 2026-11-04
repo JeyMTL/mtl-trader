@@ -3,8 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// One concrete set of app colours.
 ///
-/// Two palettes exist — [dark] and [light] — and [AppColors] reads whichever
-/// one [ThemeController] has activated. The chart keeps a separate palette
+/// Three palettes exist — [dark], [light] and [blue] — and [AppColors] reads
+/// whichever one [ThemeController] has activated. The chart keeps a separate palette
 /// (`ChartStyle`) on purpose: a light journal with a dark chart is a valid
 /// preference, and the canvas needs candle colours the UI never uses.
 @immutable
@@ -86,7 +86,27 @@ class AppPalette {
     faint: Color(0xFF8A94A3),
   );
 
-  static const List<AppPalette> all = <AppPalette>[dark, light];
+  /// The mark's own palette: the icon's navy surfaces with its ice accent, so
+  /// the journal can sit beside the logo instead of only in brass. Dark-based,
+  /// so every light-mode assumption in the UI treats it as dark.
+  static const AppPalette blue = AppPalette(
+    id: 'blue',
+    background: Color(0xFF071320),
+    surface: Color(0xFF0C1C2B),
+    surfaceAlt: Color(0xFF12293C),
+    border: Color(0xFF1B3448),
+    borderStrong: Color(0xFF2A4D67),
+    primary: Color(0xFF57CCF7),
+    primaryLight: Color(0xFF9BE4FF),
+    ink: Color(0xFF04141F),
+    success: Color(0xFF45D29A),
+    danger: Color(0xFFF26B78),
+    text: Color(0xFFE6F2FA),
+    muted: Color(0xFF9AB1C4),
+    faint: Color(0xFF6D879C),
+  );
+
+  static const List<AppPalette> all = <AppPalette>[dark, light, blue];
 }
 
 /// The app palette, resolved at runtime.
@@ -114,7 +134,12 @@ class AppColors {
   static Color get faint => palette.faint;
 }
 
-/// Dark / light / follow-the-device, remembered across launches.
+/// The appearance choices offered in Settings: the three palettes, plus
+/// follow-the-device, which resolves to dark or light when it is chosen.
+enum AppTheme { dark, light, blue, system }
+
+/// Dark / light / the mark's blue / follow-the-device, remembered across
+/// launches.
 class ThemeController extends ChangeNotifier {
   ThemeController._();
 
@@ -122,9 +147,9 @@ class ThemeController extends ChangeNotifier {
 
   static const String storageKey = 'app.theme.v1';
 
-  ThemeMode _mode = ThemeMode.dark;
+  AppTheme _theme = AppTheme.dark;
 
-  ThemeMode get mode => _mode;
+  AppTheme get theme => _theme;
 
   bool get isLight => AppColors.palette.isLight;
 
@@ -139,41 +164,51 @@ class ThemeController extends ChangeNotifier {
   }
 
   /// Switches palette, notifies the root and stores the choice.
-  Future<void> setMode(ThemeMode mode) async {
-    if (mode == _mode) return;
-    _apply(mode, notify: true);
+  Future<void> setTheme(AppTheme theme) async {
+    if (theme == _theme) return;
+    _apply(theme, notify: true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(storageKey, mode.name);
+      await prefs.setString(storageKey, theme.name);
     } catch (_) {
       // The switch still applies for this session.
     }
   }
 
-  void _apply(ThemeMode mode, {required bool notify}) {
-    _mode = mode;
-    AppColors.palette = _paletteFor(mode);
+  void _apply(AppTheme theme, {required bool notify}) {
+    _theme = theme;
+    AppColors.palette = _paletteFor(theme);
     if (notify) notifyListeners();
   }
 
-  /// `ThemeMode.system` is resolved once, because the getters have no
+  /// [AppTheme.system] is resolved once, because the getters have no
   /// `BuildContext` to ask.
-  static AppPalette _paletteFor(ThemeMode mode) {
-    if (mode == ThemeMode.light) return AppPalette.light;
-    if (mode == ThemeMode.dark) return AppPalette.dark;
+  static AppPalette _paletteFor(AppTheme theme) {
+    switch (theme) {
+      case AppTheme.dark:
+        return AppPalette.dark;
+      case AppTheme.light:
+        return AppPalette.light;
+      case AppTheme.blue:
+        return AppPalette.blue;
+      case AppTheme.system:
+        break;
+    }
     final brightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
     return brightness == Brightness.light ? AppPalette.light : AppPalette.dark;
   }
 
-  static ThemeMode _parse(String? value) {
+  static AppTheme _parse(String? value) {
     switch (value) {
       case 'light':
-        return ThemeMode.light;
+        return AppTheme.light;
+      case 'blue':
+        return AppTheme.blue;
       case 'system':
-        return ThemeMode.system;
+        return AppTheme.system;
       default:
-        return ThemeMode.dark;
+        return AppTheme.dark;
     }
   }
 }

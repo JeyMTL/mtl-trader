@@ -48,7 +48,8 @@ void main() {
   });
 
   test('per-instrument storage keys are distinct', () {
-    expect(ChartStyle.layoutKey('EURUSD'), isNot(ChartStyle.layoutKey('NAS100')));
+    expect(
+        ChartStyle.layoutKey('EURUSD'), isNot(ChartStyle.layoutKey('NAS100')));
     expect(ChartStyle.layoutKey('EURUSD'), contains('EURUSD'));
   });
 }

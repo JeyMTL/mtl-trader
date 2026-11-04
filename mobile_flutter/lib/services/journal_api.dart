@@ -448,6 +448,25 @@ class JournalApi {
         .toList();
   }
 
+  /// Reports a Google Play subscription and returns its state.
+  ///
+  /// The purchase token is the only proof of payment the device can offer: the
+  /// server asks Google what that token is worth before granting anything, so a
+  /// modified client cannot give itself a plan. Sending no token re-checks the
+  /// purchase already stored for this account, which is how a renewal — or a
+  /// purchase made on another phone — is noticed.
+  Future<Map<String, dynamic>> syncGooglePlaySubscription({
+    String? purchaseToken,
+    String? productId,
+  }) async {
+    final result = await _api('POST', '/api/billing/google/verify', {
+      if (purchaseToken != null && purchaseToken.isNotEmpty)
+        'purchaseToken': purchaseToken,
+      if (productId != null && productId.isNotEmpty) 'productId': productId,
+    });
+    return result.body;
+  }
+
   /// Authenticated JSON call to the web API. Throws the server's message so the
   /// UI can show something actionable instead of a status code.
   Future<_ApiResult> _api(

@@ -18,7 +18,8 @@ void main() {
         now: DateTime(2026, 10, 28),
       );
 
-      expect(totals.map((month) => month.key), ['2026-08', '2026-09', '2026-10']);
+      expect(
+          totals.map((month) => month.key), ['2026-08', '2026-09', '2026-10']);
       expect(totals[0].pnl, 100);
       expect(totals[0].trades, 3);
       expect(totals[1].isEmpty, isTrue);

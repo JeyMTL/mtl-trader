@@ -58,7 +58,8 @@ class _SyncScreenState extends State<SyncScreen> {
     super.dispose();
   }
 
-  String get _status => (asString(_connection['status']) ?? 'none').toLowerCase();
+  String get _status =>
+      (asString(_connection['status']) ?? 'none').toLowerCase();
   bool get _active =>
       _status == 'connected' || _status == 'pending' || _status == 'connecting';
 
@@ -104,7 +105,8 @@ class _SyncScreenState extends State<SyncScreen> {
       return;
     }
     _pendingSince ??= DateTime.now();
-    if (DateTime.now().difference(_pendingSince!) > const Duration(minutes: 2)) {
+    if (DateTime.now().difference(_pendingSince!) >
+        const Duration(minutes: 2)) {
       if (!_stalled) setState(() => _stalled = true);
       return;
     }
@@ -129,7 +131,8 @@ class _SyncScreenState extends State<SyncScreen> {
       setState(() => _connection = data);
       _schedulePoll();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connection saved. We are signing in now.')),
+        const SnackBar(
+            content: Text('Connection saved. We are signing in now.')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -144,7 +147,8 @@ class _SyncScreenState extends State<SyncScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Disconnect account?', style: TextStyle(fontSize: 16)),
+        title:
+            const Text('Disconnect account?', style: TextStyle(fontSize: 16)),
         content: Text(
           'We delete the stored password and stop syncing. Your trades stay in your journal.',
           style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.45),
@@ -627,10 +631,8 @@ class _BrokerSheetState extends State<_BrokerSheet> {
       value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
 
   List<Mt5Broker> get _matches {
-    final terms = _norm(_query)
-        .split(' ')
-        .where((term) => term.isNotEmpty)
-        .toList();
+    final terms =
+        _norm(_query).split(' ').where((term) => term.isNotEmpty).toList();
     if (terms.isEmpty) return widget.brokers;
     return widget.brokers.where((broker) {
       final name = _norm(broker.name);

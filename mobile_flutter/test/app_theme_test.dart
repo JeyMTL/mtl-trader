@@ -10,10 +10,15 @@ void main() {
     AppColors.palette = AppPalette.dark;
   });
 
-  test('the two palettes are distinct and readable', () {
+  test('the three palettes are distinct and readable', () {
+    expect(AppPalette.all, hasLength(3));
     expect(AppPalette.dark.id, isNot(AppPalette.light.id));
+    expect(AppPalette.blue.id, isNot(AppPalette.light.id));
     expect(AppPalette.dark.isLight, isFalse);
     expect(AppPalette.light.isLight, isTrue);
+    // The blue theme is the mark's navy, so it has to stay dark: every
+    // light-mode rule in the UI keys off this.
+    expect(AppPalette.blue.isLight, isFalse);
 
     for (final palette in AppPalette.all) {
       final background = palette.background.computeLuminance();
@@ -28,7 +33,8 @@ void main() {
         reason: '${palette.id} muted text',
       );
       expect(
-        (palette.primary.computeLuminance() - palette.surface.computeLuminance())
+        (palette.primary.computeLuminance() -
+                palette.surface.computeLuminance())
             .abs(),
         greaterThan(0.08),
         reason: '${palette.id} accent',
@@ -49,21 +55,35 @@ void main() {
   test('a chosen mode survives a restart', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
 
-    await ThemeController.instance.setMode(ThemeMode.light);
+    await ThemeController.instance.setTheme(AppTheme.light);
     expect(AppColors.palette.isLight, isTrue);
 
     // Simulate the next cold start: palette back to default, then restore.
     AppColors.palette = AppPalette.dark;
     await ThemeController.restore();
 
-    expect(ThemeController.instance.mode, ThemeMode.light);
+    expect(ThemeController.instance.theme, AppTheme.light);
     expect(AppColors.palette.isLight, isTrue);
     expect(AppColors.background, AppPalette.light.background);
+  });
+
+  test('a blue choice survives a restart', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    await ThemeController.instance.setTheme(AppTheme.blue);
+    expect(AppColors.palette, AppPalette.blue);
+
+    AppColors.palette = AppPalette.dark;
+    await ThemeController.restore();
+
+    expect(ThemeController.instance.theme, AppTheme.blue);
+    expect(AppColors.background, AppPalette.blue.background);
   });
 
   test('the built theme matches the palette brightness', () {
     expect(buildFlatTheme(AppPalette.dark).brightness, Brightness.dark);
     expect(buildFlatTheme(AppPalette.light).brightness, Brightness.light);
+    expect(buildFlatTheme(AppPalette.blue).brightness, Brightness.dark);
     expect(
       buildFlatTheme(AppPalette.light).scaffoldBackgroundColor,
       AppPalette.light.background,

@@ -26,8 +26,7 @@ DateTime addMonths(DateTime date, int delta) =>
     DateTime(date.year, date.month + delta);
 
 /// `2026-10-28`, the shape `daily_pnl` and `day_trades` return.
-String isoDay(DateTime date) =>
-    '${date.year.toString().padLeft(4, '0')}-'
+String isoDay(DateTime date) => '${date.year.toString().padLeft(4, '0')}-'
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
 

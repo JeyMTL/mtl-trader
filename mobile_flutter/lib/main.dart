@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +9,7 @@ import 'core/config.dart';
 import 'core/locale.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'screens/auth_gate.dart';
+import 'services/telemetry.dart';
 import 'ui/perf_overlay.dart';
 import 'ui/theme.dart';
 
@@ -37,6 +40,20 @@ Future<void> main() async {
   // launch is slow.
   await FrameOverlaySettings.restore();
 
+  // Crash reporting, installed before the first frame so a failure while the
+  // widget tree boots is still counted. `presentError` comes second so the red
+  // screen in debug builds is unchanged.
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    Telemetry.crash(details.exception, details.stack, source: 'flutter');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    Telemetry.crash(error, stack, source: 'platform');
+    return true;
+  };
+
+  Telemetry.start();
+
   runApp(const MtlTraderApp());
 }
 
@@ -51,7 +68,7 @@ class MtlTraderApp extends StatelessWidget {
         LocaleController.instance,
       ]),
       builder: (context, _) {
-        final mode = ThemeController.instance.mode;
+        final appearance = ThemeController.instance.theme;
         final language = LocaleController.instance.code ?? 'system';
         return MaterialApp(
           title: 'MTL Trader',
@@ -68,7 +85,7 @@ class MtlTraderApp extends StatelessWidget {
           // still hold the old colours or the old strings.
           home: PerfOverlay(
             child: KeyedSubtree(
-              key: ValueKey<String>('theme-${mode.name}-$language'),
+              key: ValueKey<String>('theme-${appearance.name}-$language'),
               child: const AuthGate(),
             ),
           ),

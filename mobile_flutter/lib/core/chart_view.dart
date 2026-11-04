@@ -12,6 +12,16 @@ class ChartViewport {
   /// Never show fewer than this many candles, so zooming stays readable.
   static const double minSpan = 12;
 
+  /// How much blank space past the newest candle a drag may pull in, as a share
+  /// of the visible span.
+  ///
+  /// Without it the live bar is welded to the right edge: the window cannot
+  /// move at all once it is there, which reads as a dead chart to a trader
+  /// trying to look at the candle they are actually trading. Half a pane is
+  /// enough to park the newest bar mid-chart and still leaves the rest for
+  /// price. `pinToEdge` takes the space back, so it is never stuck that way.
+  static const double maxShift = 0.5;
+
   /// Show the most recent candles, `preferred` of them at most.
   void fit(int count, {double preferred = 90}) {
     if (count <= 0) return;
@@ -21,6 +31,15 @@ class ChartViewport {
     clampTo(count);
   }
 
+  /// The furthest right `start` may sit: the newest candle at the right edge,
+  /// plus the blank shift a drag can pull in.
+  double maxStart(int count) {
+    if (count <= 0) return 0;
+    final upper = count.toDouble();
+    final visibleSpan = span.clamp(math.min(minSpan, upper), upper);
+    return math.max(0.0, upper - visibleSpan + visibleSpan * maxShift);
+  }
+
   void clampTo(int count) {
     if (count <= 0) {
       start = 0;
@@ -28,7 +47,7 @@ class ChartViewport {
     }
     final upper = count.toDouble();
     span = span.clamp(math.min(minSpan, upper), upper);
-    start = start.clamp(0.0, math.max(0.0, upper - span));
+    start = start.clamp(0.0, maxStart(count));
   }
 
   void pan(double candles) => start += candles;
@@ -51,19 +70,26 @@ class ChartViewport {
   ///
   /// Exponential friction: distance = speed / friction. Clamped to the loaded
   /// bars, so a hard throw lands on the first or last bar rather than past it.
-  double flingRest(double candlesPerSecond, int count, {double friction = 5.5}) {
+  double flingRest(double candlesPerSecond, int count,
+      {double friction = 5.5}) {
     if (count <= 0) return 0;
-    final upper = math.max(0.0, count.toDouble() - span);
+    final upper = maxStart(count);
     final travel = candlesPerSecond / friction;
     return (start + travel).clamp(0.0, upper).toDouble();
   }
 
-  /// True when the newest candle is visible, i.e. the view is pinned to the live
-  /// edge. Half a bar of slack, because `start` is fractional while a finger is
-  /// panning and the edge would otherwise flicker in and out of "at edge".
+  /// True when the newest candle sits on the right edge, i.e. the view is pinned
+  /// to the live edge. Half a bar of slack, because `start` is fractional while
+  /// a finger is panning and the edge would otherwise flicker in and out of
+  /// "at edge".
+  ///
+  /// A chart shifted into the blank space is deliberately *not* at the edge:
+  /// the caller then offers the way back instead of silently re-pinning the live
+  /// bar every time a new candle arrives.
   bool isAtEdge(int count) {
     if (count <= 0) return true;
-    return start + span >= count - 0.5;
+    final overshoot = start + span - count;
+    return overshoot >= -0.5 && overshoot <= 0.5;
   }
 
   /// Pins the newest candle to the right edge without changing the zoom. Used

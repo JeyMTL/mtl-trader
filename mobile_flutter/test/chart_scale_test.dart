@@ -13,7 +13,8 @@ void main() {
     });
 
     test('round-trips a price', () {
-      final ratio = ratioForPrice(price: 137, min: 100, max: 200, logScale: false);
+      final ratio =
+          ratioForPrice(price: 137, min: 100, max: 200, logScale: false);
       expect(
         priceForRatio(ratio: ratio, min: 100, max: 200, logScale: false),
         closeTo(137, 1e-9),
@@ -30,7 +31,8 @@ void main() {
     });
 
     test('round-trips a price', () {
-      final ratio = ratioForPrice(price: 1000, min: 100, max: 10000, logScale: true);
+      final ratio =
+          ratioForPrice(price: 1000, min: 100, max: 10000, logScale: true);
       expect(
         priceForRatio(ratio: ratio, min: 100, max: 10000, logScale: true),
         closeTo(1000, 1e-6),

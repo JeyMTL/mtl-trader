@@ -75,7 +75,9 @@ class AiReviewResult {
 
   factory AiReviewResult.fromBody(Map<String, dynamic> body) {
     final review = body['review'];
-    final map = review is Map ? Map<String, dynamic>.from(review) : const <String, dynamic>{};
+    final map = review is Map
+        ? Map<String, dynamic>.from(review)
+        : const <String, dynamic>{};
     final rawInsights = body['insights'];
     return AiReviewResult(
       headline: map['headline']?.toString() ?? '',
@@ -87,7 +89,8 @@ class AiReviewResult {
       insights: rawInsights is List
           ? rawInsights
               .whereType<Map>()
-              .map((row) => CoachInsight.fromMap(Map<String, dynamic>.from(row)))
+              .map(
+                  (row) => CoachInsight.fromMap(Map<String, dynamic>.from(row)))
               .toList()
           : const <CoachInsight>[],
     );

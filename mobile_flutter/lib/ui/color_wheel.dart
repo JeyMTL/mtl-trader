@@ -111,7 +111,8 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
               aspectRatio: 1,
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  _wheelSize = Size(constraints.maxWidth, constraints.maxHeight);
+                  _wheelSize =
+                      Size(constraints.maxWidth, constraints.maxHeight);
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onPanDown: (details) => _pick(details.localPosition),
@@ -172,7 +173,8 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
                 children: [
                   for (final quick in widget.quickPicks)
                     GestureDetector(
-                      onTap: () => setState(() => _hsv = HSVColor.fromColor(quick)),
+                      onTap: () =>
+                          setState(() => _hsv = HSVColor.fromColor(quick)),
                       child: Container(
                         width: 26,
                         height: 26,
@@ -248,7 +250,8 @@ class _WheelPainter extends CustomPainter {
       canvas.drawCircle(
         center,
         radius,
-        Paint()..color = Colors.black.withAlpha(((1 - hsv.value) * 255).round()),
+        Paint()
+          ..color = Colors.black.withAlpha(((1 - hsv.value) * 255).round()),
       );
     }
 

@@ -16,14 +16,32 @@ void main() {
       expect(view.start, 0);
     });
 
-    test('pan clamps to the list edges', () {
+    test(
+        'pan clamps to the list edges, allowing a blank shift past the last bar',
+        () {
       final view = ChartViewport()..fit(300);
       view.pan(-1000);
       view.clampTo(300);
       expect(view.start, 0);
       view.pan(1000);
       view.clampTo(300);
-      expect(view.start, 210);
+      expect(view.start, view.maxStart(300));
+      // Half a pane of blank space past the newest candle, no more.
+      expect(view.start + view.span, closeTo(300 + 45, 0.001));
+    });
+
+    test('the newest candle can be dragged in from the right edge', () {
+      final view = ChartViewport()..fit(300);
+      expect(view.isAtEdge(300), isTrue);
+      view.pan(20);
+      view.clampTo(300);
+      expect(view.start, 230);
+      expect(view.isAtEdge(300), isFalse);
+
+      // Coming back to live takes the blank space away again.
+      view.pinToEdge(300);
+      expect(view.start + view.span, 300);
+      expect(view.isAtEdge(300), isTrue);
     });
 
     test('pinToEdge follows the newest bar without changing the zoom', () {
@@ -94,11 +112,11 @@ void main() {
       final view = ChartViewport()..fit(300);
       view.start = 299.7;
       view.snap(300);
-      // 300 - 90 = 210 is the furthest right the left edge may sit.
-      expect(view.start, 210);
+      expect(view.start, view.maxStart(300));
     });
 
-    test('a fling travels further the faster it was thrown, and always stops', () {
+    test('a fling travels further the faster it was thrown, and always stops',
+        () {
       final slow = ChartViewport()..fit(300);
       final fast = ChartViewport()..fit(300);
       final slowRest = slow.flingRest(-30, 300);
@@ -111,10 +129,11 @@ void main() {
     test('a fling never lands outside the loaded history', () {
       final view = ChartViewport()..fit(300);
       expect(view.flingRest(-10000, 300), 0);
-      expect(view.flingRest(10000, 300), 210);
+      expect(view.flingRest(10000, 300), view.maxStart(300));
     });
 
-    test('sitting at the oldest bar is reported, so history can be fetched', () {
+    test('sitting at the oldest bar is reported, so history can be fetched',
+        () {
       final view = ChartViewport()..fit(300);
       expect(view.isAtStart, isFalse);
       view.pan(-1000);

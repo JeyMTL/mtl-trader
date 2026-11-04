@@ -618,15 +618,15 @@ class _AccountScreenState extends State<AccountScreen> {
                       const SectionTitle(
                         title: 'Appearance',
                         subtitle:
-                            'Dark, light, or follow the device setting. Saved on this phone.',
+                            'Dark, light, the mark\'s blue, or follow the device. Saved on this phone.',
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          for (final mode in ThemeMode.values) ...[
-                            _ThemeChoice(mode: mode),
-                            if (mode != ThemeMode.values.last)
-                              const SizedBox(width: 8),
+                          for (final theme in AppTheme.values) ...[
+                            _ThemeChoice(theme: theme),
+                            if (theme != AppTheme.values.last)
+                              const SizedBox(width: 6),
                           ],
                         ],
                       ),
@@ -634,14 +634,19 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                const LanguagePicker(),
+                const SizedBox(height: 10),
+                // Developer and behind-the-scenes detail, kept together at the
+                // bottom instead of sitting at the same weight as the settings a
+                // trader actually changes.
                 FlatCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SectionTitle(
-                        title: 'Diagnostics',
+                        title: 'About & diagnostics',
                         subtitle:
-                            'Frame times, measured on this phone. Turn it on, pan the chart, read the worst frame.',
+                            'Frame times measured on this phone, and where your journal media lives.',
                       ),
                       ValueListenableBuilder<bool>(
                         valueListenable: FrameOverlaySettings.visible,
@@ -660,26 +665,17 @@ class _AccountScreenState extends State<AccountScreen> {
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const LanguagePicker(),
-                const SizedBox(height: 10),
-                FlatCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                      const ListDivider(),
+                      const SizedBox(height: 10),
                       Text(
-                        'PRIVATE MEDIA',
+                        'Private media',
                         style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: kMinLabelSize,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
+                          color: AppColors.text,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: 5),
+                      const SizedBox(height: 4),
                       Text(
                         'Journal photos and voice notes live in a private bucket. '
                         'Each file is signed for one hour and only your account can request it.',
@@ -693,6 +689,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+
                 OutlinedButton(
                   onPressed: _signOut,
                   style: OutlinedButton.styleFrom(
@@ -786,30 +783,32 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-/// One of the three appearance options. The root rebuilds the tree when the
-/// mode changes, so this needs no local state.
+/// One of the four appearance options. The root rebuilds the tree when the
+/// theme changes, so this needs no local state.
 class _ThemeChoice extends StatelessWidget {
-  const _ThemeChoice({required this.mode});
+  const _ThemeChoice({required this.theme});
 
-  final ThemeMode mode;
+  final AppTheme theme;
 
   @override
   Widget build(BuildContext context) {
-    final active = ThemeController.instance.mode == mode;
-    final label = switch (mode) {
-      ThemeMode.dark => 'Dark',
-      ThemeMode.light => 'Light',
-      ThemeMode.system => 'System',
+    final active = ThemeController.instance.theme == theme;
+    final label = switch (theme) {
+      AppTheme.dark => 'Dark',
+      AppTheme.light => 'Light',
+      AppTheme.blue => 'Blue',
+      AppTheme.system => 'System',
     };
-    final icon = switch (mode) {
-      ThemeMode.dark => Icons.dark_mode_outlined,
-      ThemeMode.light => Icons.light_mode_outlined,
-      ThemeMode.system => Icons.brightness_auto_outlined,
+    final icon = switch (theme) {
+      AppTheme.dark => Icons.dark_mode_outlined,
+      AppTheme.light => Icons.light_mode_outlined,
+      AppTheme.blue => Icons.water_drop_outlined,
+      AppTheme.system => Icons.brightness_auto_outlined,
     };
 
     return Expanded(
       child: InkWell(
-        onTap: () => ThemeController.instance.setMode(mode),
+        onTap: () => ThemeController.instance.setTheme(theme),
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),

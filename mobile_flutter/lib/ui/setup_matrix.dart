@@ -136,7 +136,8 @@ class _SetupMatrixState extends State<SetupMatrix> {
           const SizedBox(height: 4),
           Text(
             'Compare your trading models directly. Tap a setup to include or remove it.',
-            style: TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.45),
+            style:
+                TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.45),
           ),
           if (groups.length > 1) ...[
             const SizedBox(height: 10),
@@ -258,7 +259,8 @@ class _SetupMatrixState extends State<SetupMatrix> {
           Text(
             'Sorted by net P&L. Labels match exactly after trimming, so two spellings of one model '
             'appear as two rows; rename them on the journal form to combine them.',
-            style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize, height: 1.4),
+            style: TextStyle(
+                color: AppColors.faint, fontSize: kMinLabelSize, height: 1.4),
           ),
         ],
       ),
@@ -291,10 +293,12 @@ class _Chip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: active ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
+            color:
+                active ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: active ? AppColors.primary.withAlpha(110) : AppColors.border,
+              color:
+                  active ? AppColors.primary.withAlpha(110) : AppColors.border,
             ),
           ),
           child: Row(
@@ -362,7 +366,8 @@ class _MatrixRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${row.trades}T · ${percent(row.winRate)} win · ${money(row.expectancy)}/trade',
-                  style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize),
+                  style: TextStyle(
+                      color: AppColors.faint, fontSize: kMinLabelSize),
                 ),
               ],
             ),

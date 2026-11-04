@@ -46,7 +46,8 @@ Widget _harness(Widget home, {double scale = 2}) => MaterialApp(
       home: home,
     );
 
-Future<void> _reveal(WidgetTester tester, String text) => tester.scrollUntilVisible(
+Future<void> _reveal(WidgetTester tester, String text) =>
+    tester.scrollUntilVisible(
       find.text(text),
       200,
       scrollable: find.byType(Scrollable).first,

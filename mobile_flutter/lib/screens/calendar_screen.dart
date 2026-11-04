@@ -303,7 +303,8 @@ class _DayCell extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: const BorderRadius.all(Radius.circular(4)),
             border: Border.all(
-              color: hasTrades ? tint.withValues(alpha: 0.35) : AppColors.border,
+              color:
+                  hasTrades ? tint.withValues(alpha: 0.35) : AppColors.border,
             ),
           ),
           child: Column(
@@ -349,7 +350,8 @@ class _Legend extends StatelessWidget {
           height: 10,
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.16),
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+            border:
+                Border.all(color: AppColors.success.withValues(alpha: 0.35)),
             borderRadius: const BorderRadius.all(Radius.circular(2)),
           ),
         ),
@@ -415,7 +417,8 @@ class _DaySheet extends StatelessWidget {
                 Text(
                   signedMoney(point.pnl),
                   style: TextStyle(
-                    color: point.pnl >= 0 ? AppColors.success : AppColors.danger,
+                    color:
+                        point.pnl >= 0 ? AppColors.success : AppColors.danger,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -455,7 +458,8 @@ class _DaySheet extends StatelessWidget {
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         'No trades loaded for this day.',
-                        style: TextStyle(color: AppColors.faint, fontSize: 11.5),
+                        style:
+                            TextStyle(color: AppColors.faint, fontSize: 11.5),
                       ),
                     );
                   }

@@ -4,19 +4,19 @@ import '../core/format.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'theme.dart';
 
-// A fixed, clean gold set for the rim around the mark. The theme's primary is
-// deliberately deeper (it has to work on buttons and text), but at badge size it
-// reads as brown, so the mark carries its own brighter metal.
-const Color _goldLight = Color(0xFFFFF1C9);
-const Color _goldBright = Color(0xFFF3C766);
-const Color _goldDeep = Color(0xFFC68C2B);
+// A fixed, clean cool set for the rim around the mark, matching the ice-blue
+// artwork. The theme's primary stays brass (it has to work on buttons and text);
+// at badge size the mark carries its own brighter metal.
+const Color _rimLight = Color(0xFFE8F9FF);
+const Color _rimBright = Color(0xFF7ED9FA);
+const Color _rimDeep = Color(0xFF1E7FC0);
 
-/// The store icon, generated from `assets/brand/app-icon-master.jpg` by
+/// The store icon, generated from `assets/brand/app-icon.svg` by
 /// `scripts/make-app-icons.mjs`. Declared in pubspec.yaml.
 const String kBrandIconAsset = 'assets/brand/app_icon.png';
 
-/// The MTL monogram — gold M and T on the brand's navy, with the equity arrow —
-/// inside a gold rim with a slow luminous pulse, optionally with today's date
+/// The MTL monogram — the ice-blue M on the brand's navy, with the equity
+/// arrow — inside a cool rim with a slow luminous pulse, optionally with today's date
 /// underneath. Used in the desk header and, larger, on login.
 ///
 /// The artwork is the same file the launcher, the favicon and the store listing
@@ -79,7 +79,7 @@ class _BrandMarkState extends State<BrandMark>
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // A metallic rim: a bright gold outer shell around the artwork.
+                // A metallic rim: a bright cool outer shell around the artwork.
                 Container(
                   padding: EdgeInsets.all(1.25 * scale),
                   decoration: BoxDecoration(
@@ -88,21 +88,21 @@ class _BrandMarkState extends State<BrandMark>
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        _goldLight,
-                        _goldBright,
-                        _goldDeep,
-                        _goldBright,
+                        _rimLight,
+                        _rimBright,
+                        _rimDeep,
+                        _rimBright,
                       ],
                       stops: [0, 0.35, 0.72, 1],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: _goldBright.withAlpha((60 + 55 * t).round()),
+                        color: _rimBright.withAlpha((60 + 55 * t).round()),
                         blurRadius: (9 + 9 * t) * scale,
                         spreadRadius: (0.4 + 1.1 * t) * scale,
                       ),
                       BoxShadow(
-                        color: _goldLight.withAlpha((18 + 22 * t).round()),
+                        color: _rimLight.withAlpha((18 + 22 * t).round()),
                         blurRadius: 3 * scale,
                       ),
                     ],

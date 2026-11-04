@@ -1,19 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/config.dart';
 import '../core/format.dart';
 import '../core/plans.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../services/play_billing.dart';
+import '../services/telemetry.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
-/// Plan cards and a hand-off to the hosted card checkout.
+/// Plan cards and whichever purchase path this build is allowed to use.
 ///
-/// The checkout runs in the device browser: the processor collects the card, the
-/// webhook applies the payment, and the account refreshes when the trader comes
-/// back. Nothing card-related ever touches the app process.
+/// A side-loaded or web-linked build opens the hosted card checkout in the
+/// device browser: the processor collects the card, the webhook applies the
+/// payment, and the account refreshes when the trader comes back.
+///
+/// The Play build sells through Google Play instead, because a Play-distributed
+/// app may not send buyers to an external checkout for the same subscription.
+/// Play's sheet collects the payment, and the purchase token is verified by the
+/// server before any plan changes. Nothing card-related touches either path.
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key, required this.api});
 
@@ -28,6 +39,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String? _busy;
   String? _error;
 
+  /// Play Billing, only alive in the Play build. Null until the catalogue has
+  /// loaded, which is what keeps the buttons disabled until there is a real
+  /// price to show.
+  PlayBilling? _play;
+  Map<String, ProductDetails> _playProducts = const <String, ProductDetails>{};
+  StreamSubscription<List<PurchaseDetails>>? _playPurchases;
+  bool _restoring = false;
+
   /// Which cadence the buttons buy. A yearly price is its own entry in the
   /// provider's catalogue, so this only selects what is charged — the plan, its
   /// limits and its features are identical either way.
@@ -37,6 +56,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   void initState() {
     super.initState();
     _future = widget.api.profile();
+    // The first step of the funnel that matters: someone opening the paywall is
+    // the closest thing to intent we can observe before a payment exists.
+    Telemetry.event('paywall_view', {'cadence': _yearly ? 'year' : 'month'});
+    if (AppConfig.playBuild) unawaited(_initPlay());
+  }
+
+  @override
+  void dispose() {
+    _playPurchases?.cancel();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -54,6 +83,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Future<void> _subscribe(String planId, String interval) async {
     if (_busy != null) return;
+    Telemetry.event('checkout_started', {'plan': planId, 'interval': interval});
     setState(() {
       _busy = planId;
       _error = null;
@@ -90,6 +120,140 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     } finally {
       if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  // --------------------------------------------------------- Google Play
+
+  /// Loads the Play catalogue and starts listening for purchases.
+  ///
+  /// Only the Play build does this: everywhere else the subscription is sold
+  /// through the hosted card checkout and Play has nothing to sell.
+  Future<void> _initPlay() async {
+    final play = PlayBilling();
+    late final Map<String, ProductDetails> products;
+    try {
+      products = await play.load();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Google Play is not available on this device.');
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _play = play;
+      _playProducts = products;
+    });
+    _playPurchases = play.purchases.listen(_onPurchases);
+
+    // A renewal, or a purchase made on another phone, is known only to Google.
+    // Re-checking the stored token here keeps the plan in step without making
+    // the trader hunt for "Restore purchases".
+    try {
+      await widget.api.syncGooglePlaySubscription();
+      await _refresh();
+    } catch (_) {
+      // Offline, or nothing bought yet: the card above still shows what the
+      // server already knows.
+    }
+  }
+
+  Future<void> _onPurchases(List<PurchaseDetails> purchases) async {
+    for (final purchase in purchases) {
+      if (purchase.status == PurchaseStatus.purchased ||
+          purchase.status == PurchaseStatus.restored) {
+        await _verifyPlayPurchase(purchase);
+      } else if (purchase.status == PurchaseStatus.error) {
+        if (mounted) {
+          setState(
+            () => _error = purchase.error?.message ??
+                'Google Play could not complete the purchase. Nothing was charged.',
+          );
+        }
+      }
+      // Play re-delivers an unfinished purchase, so it is cleared even when the
+      // server check failed: the token is stored on the account either way.
+      await _play?.finish(purchase);
+    }
+    if (mounted) setState(() => _busy = null);
+  }
+
+  /// Hands the purchase token to the server, which asks Google what it is worth.
+  /// The app never decides for itself that a payment happened.
+  Future<void> _verifyPlayPurchase(PurchaseDetails purchase) async {
+    final token = purchase.verificationData.serverVerificationData.isNotEmpty
+        ? purchase.verificationData.serverVerificationData
+        : (purchase.purchaseID ?? '');
+    if (token.isEmpty) {
+      if (mounted) {
+        setState(() => _error = 'Google Play did not return a purchase token.');
+      }
+      return;
+    }
+
+    try {
+      final result = await widget.api.syncGooglePlaySubscription(
+        purchaseToken: token,
+        productId: purchase.productID,
+      );
+      final active = asString(result['status']) == 'active';
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            active
+                ? 'Payment confirmed. Your plan is active.'
+                : 'Google Play is still processing the payment. Refresh in a minute.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error = error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> _buyWithPlay(ProductDetails product) async {
+    final entry = playCatalog[product.id];
+    Telemetry.event('checkout_started', {
+      'plan': entry?.planId ?? product.id,
+      'interval': entry?.interval ?? 'month',
+      'provider': 'google_play',
+    });
+    setState(() {
+      _busy = entry?.planId ?? product.id;
+      _error = null;
+    });
+    try {
+      await _play!.buy(product);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+        _busy = null;
+      });
+    }
+    // Otherwise Play reports back on the purchase stream and that clears _busy.
+  }
+
+  Future<void> _restorePurchases() async {
+    setState(() {
+      _restoring = true;
+      _error = null;
+    });
+    try {
+      await _play?.restore();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error = error.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) setState(() => _restoring = false);
     }
   }
 
@@ -175,10 +339,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 const SizedBox(height: 10),
                 SectionTitle(
                   title: 'Plans',
-                  subtitle: _yearly
-                      ? 'A yearly card subscription renews once a year. Cancel any time and keep access until the period ends.'
-                      : 'A card subscription renews monthly. Cancel any time and keep access until the period ends.',
+                  subtitle: AppConfig.playBuild
+                      ? (_yearly
+                          ? 'Billed by Google Play once a year. Cancel any time in Play Store → Payments and subscriptions, and keep access until the period ends.'
+                          : 'Billed by Google Play monthly. Cancel any time in Play Store → Payments and subscriptions, and keep access until the period ends.')
+                      : (_yearly
+                          ? 'A yearly card subscription renews once a year. Cancel any time and keep access until the period ends.'
+                          : 'A card subscription renews monthly. Cancel any time and keep access until the period ends.'),
                 ),
+                // Both builds sell their own cadence: card checkout on the web,
+                // Play Billing in the Play build, which sells annual plans too.
                 const SizedBox(height: 8),
                 _cadenceToggle(),
                 const SizedBox(height: 10),
@@ -191,6 +361,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                   const SizedBox(height: 10),
                 ],
+                if (AppConfig.playBuild)
+                  Center(
+                    child: TextButton(
+                      onPressed: _play == null || _restoring
+                          ? null
+                          : _restorePurchases,
+                      child: Text(
+                        _restoring
+                            ? 'Checking Google Play…'
+                            : 'Restore purchases',
+                      ),
+                    ),
+                  ),
                 FlatCard(
                   padding: EdgeInsets.all(12),
                   child: Row(
@@ -204,10 +387,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Checkout opens in your browser through our payment '
-                          'provider. Your card is stored by them, never by this '
-                          'app. PayPal and bank transfer remain one-time 30-day '
-                          'options on the web.',
+                          AppConfig.playBuild
+                              ? 'Payment is handled by Google Play, which stores '
+                                  'your card and renews the plan. Cancel any time in '
+                                  'Play Store → Payments and subscriptions; access '
+                                  'runs to the end of the period you paid for.'
+                              : 'Checkout opens in your browser through our payment '
+                                  'provider. Your card is stored by them, never by this '
+                                  'app. PayPal and bank transfer remain one-time 30-day '
+                                  'options on the web.',
                           style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 10.5,
@@ -256,7 +444,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     yearly ? 'Annual · 2 months free' : 'Monthly',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _yearly == yearly ? AppColors.ink : AppColors.muted,
+                      color:
+                          _yearly == yearly ? AppColors.ink : AppColors.muted,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -356,6 +545,56 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
+  /// The Google Play buy control.
+  ///
+  /// Play owns the transaction: the sheet, the card, the receipt and the
+  /// renewal. The app passes a product id and, once Play reports back, hands the
+  /// purchase token to the server — which is the only party that decides, after
+  /// asking Google, whether a plan was paid for.
+  Widget _googlePlayButton({
+    required bool current,
+    required bool enabled,
+    required bool busy,
+    required ProductDetails? product,
+  }) {
+    final canBuy = (!current || _yearly) && enabled && product != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ElevatedButton(
+          onPressed: canBuy ? () => _buyWithPlay(product) : null,
+          child: busy
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.ink,
+                  ),
+                )
+              : Text(
+                  current
+                      ? (_yearly ? 'Switch to annual' : 'Current plan')
+                      : 'Subscribe with Google Play',
+                ),
+        ),
+        // Play returns nothing for a product that is not on sale in the buyer's
+        // country or has not been activated in the console. Saying so beats a
+        // button that looks tappable and does nothing.
+        if (product == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              _play == null
+                  ? 'Google Play is not available on this device.'
+                  : 'This plan is not on sale for your account yet.',
+              style: TextStyle(color: AppColors.faint, fontSize: 10.5),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _planCard({
     required MobilePlan plan,
     required bool current,
@@ -367,6 +606,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // stacks onto the days they have left. Re-buying the same month is the
     // mistake this disables.
     final canBuy = !current || _yearly;
+    // Play owns the price display. The store price can differ from our list
+    // price by country, tax and promotions, and showing ours next to the amount
+    // Google actually charges is the kind of mismatch that turns into a support
+    // ticket and a refund request.
+    final playProduct = AppConfig.playBuild
+        ? _playProducts[playProductIdFor(plan.id, _yearly ? 'year' : 'month')]
+        : null;
     return FlatCard(
       borderColor:
           plan.popular ? AppColors.primary.withAlpha(90) : AppColors.border,
@@ -412,9 +658,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        money(
-                          _yearly ? plan.annualPrice ?? plan.price : plan.price,
-                        ),
+                        playProduct?.price ??
+                            money(
+                              _yearly
+                                  ? plan.annualPrice ?? plan.price
+                                  : plan.price,
+                            ),
                         style: tabular.copyWith(
                           color: AppColors.text,
                           fontSize: 18,
@@ -472,25 +721,37 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
             ),
           const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: !canBuy || !enabled
-                ? null
-                : () => _subscribe(plan.id, _yearly ? 'year' : 'month'),
-            child: busy
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.ink,
+          // The purchase path is build-specific. A Play-distributed app may not
+          // send buyers to an external checkout for this subscription, so it
+          // sells through Play instead; everything else keeps the card
+          // checkout, which keeps the revenue share at the processor's rate.
+          if (AppConfig.playBuild)
+            _googlePlayButton(
+              current: current,
+              enabled: enabled,
+              busy: busy,
+              product: playProduct,
+            )
+          else
+            ElevatedButton(
+              onPressed: !canBuy || !enabled
+                  ? null
+                  : () => _subscribe(plan.id, _yearly ? 'year' : 'month'),
+              child: busy
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.ink,
+                      ),
+                    )
+                  : Text(
+                      current
+                          ? (_yearly ? 'Switch to annual' : 'Current plan')
+                          : 'Subscribe with card',
                     ),
-                  )
-                : Text(
-                    current
-                        ? (_yearly ? 'Switch to annual' : 'Current plan')
-                        : 'Subscribe with card',
-                  ),
-          ),
+            ),
         ],
       ),
     );

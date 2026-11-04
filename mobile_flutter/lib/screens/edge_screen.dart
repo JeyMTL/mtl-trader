@@ -161,6 +161,10 @@ class _EdgeScreenState extends State<EdgeScreen> {
                     ),
                   )
                 else ...[
+                  // Two labelled pairs instead of four identical cards in one
+                  // stack, so it is obvious which two compare hours and which
+                  // two compare sessions.
+                  const _GroupLabel('Time of day'),
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -179,6 +183,18 @@ class _EdgeScreenState extends State<EdgeScreen> {
                         period: edge.worstHour,
                         positive: false,
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const _GroupLabel('Sessions'),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1.35,
+                    children: [
                       _EdgeCard(
                         title: 'Best session',
                         period: edge.bestSession,
@@ -250,6 +266,29 @@ class _EdgeScreenState extends State<EdgeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The label above a pair of comparison cards.
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 2, bottom: 6),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: AppColors.faint,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.1,
+        ),
       ),
     );
   }
