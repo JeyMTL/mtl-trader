@@ -8,8 +8,8 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Item | Value |
 | --- | --- |
 | App id | `com.mtltrader.app` |
-| Live version | **1.0.3**, version code **4** |
-| Built, not yet uploaded | **1.0.4**, version code **5** — release-signed `app-release.aab`, 64,216,166 bytes, built 4 Nov 2026 18:48 |
+| Live version | **1.0.4**, version code **5** on Closed testing – Alpha (4 Nov 2026); **1.0.3 / code 4** was the previous Alpha release |
+| Built | **1.0.4**, code **5** — release-signed `app-release.aab`, 64,216,166 bytes, built 4 Nov 2026 18:48 |
 | Track | Closed testing – Alpha (Active, 178 countries) |
 | Published | 4 Nov 2026 (Console: "Last published on November 4, 2026") |
 | Testers | Google Group `mtl-trader-testers@googlegroups.com` |
@@ -23,8 +23,8 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 ## Version codes already burned
 
 `1` (old internal 1.0.0), `2` (1.0.1, had the photo permission), `3` (1.0.2,
-discarded draft), `4` (1.0.3, live). `5` (1.0.4, the Play-billing build) is built
-and signed but **not uploaded yet**. The next code after it is `6`.
+discarded draft), `4` (1.0.3), `5` (1.0.4, the Play-billing build — uploaded and
+rolled out to Alpha 4 Nov 2026). The next code after it is `6`.
 
 Play never re-releases a version code, *including* codes from drafts that were
 discarded before rollout. Do not upload the same AAB twice and do not discard a
