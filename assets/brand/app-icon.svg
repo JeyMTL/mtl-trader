@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="MTL Trader">
+  <title>MTL Trader mark</title>
+  <!--
+    The master artwork for every icon (see scripts/make-app-icons.mjs).
+
+    One "M" whose right arm rises toward the equity arrow, with the account bars
+    climbing behind it. Everything is geometry, so the 1024px store icon and the
+    48px launcher tile come from the same outlines.
+
+    Both mark gradients are userSpaceOnUse: overlapping shapes filled from one
+    gradient map merge without a seam, which is what lets the stem, the chevron
+    and the tail read as one continuous ribbon. The stem and the chevron are
+    clipped at the top so the peak is a single corner, not two mitered cuts.
+  -->
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#0c1a29"/>
+      <stop offset="1" stop-color="#0a1420"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.44" r="0.62">
+      <stop offset="0" stop-color="#173a56" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#0b1a28" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ice" gradientUnits="userSpaceOnUse" x1="200" y1="240" x2="800" y2="830">
+      <stop offset="0" stop-color="#f4fcff"/>
+      <stop offset="0.26" stop-color="#c3ecfd"/>
+      <stop offset="0.58" stop-color="#57ccf7"/>
+      <stop offset="1" stop-color="#1d97e0"/>
+    </linearGradient>
+    <linearGradient id="flow" gradientUnits="userSpaceOnUse" x1="595" y1="585" x2="890" y2="206">
+      <stop offset="0" stop-color="#1c86d8"/>
+      <stop offset="0.55" stop-color="#3fbcf4"/>
+      <stop offset="1" stop-color="#8fe3ff"/>
+    </linearGradient>
+    <clipPath id="peak">
+      <rect x="40" y="252" width="984" height="700"/>
+    </clipPath>
+  </defs>
+
+  <!-- `ground` is the layer the transparent logo render strips. Both background
+       rectangles stay inside it so nothing else can ever be removed. -->
+  <g id="ground">
+    <rect width="1024" height="1024" fill="url(#page)"/>
+    <rect width="1024" height="1024" fill="url(#halo)"/>
+  </g>
+
+  <g transform="translate(-24 -14)">
+    <!-- The four account bars, climbing left to right, behind the letter. -->
+    <g fill="url(#ice)">
+      <path d="M480 640 538 660 538 836 480 812Z"/>
+      <path d="M564 612 622 632 622 812 564 792Z"/>
+      <path d="M648 576 706 596 706 790 648 770Z"/>
+      <path d="M732 536 790 556 790 766 732 746Z"/>
+    </g>
+
+    <!-- The M: a vertical stem tapering to the floor point, then the chevron
+         whose right arm rises toward the arrow. -->
+    <g clip-path="url(#peak)">
+      <path fill="url(#ice)" d="M250 252 378 252 378 690 186 808Z"/>
+      <path fill="none" stroke="url(#ice)" stroke-width="132" stroke-linejoin="miter" d="M300 268 505 520 660 360"/>
+    </g>
+
+    <!-- The equity arrow, the one element that sits above the letter. -->
+    <path fill="none" stroke="url(#flow)" stroke-width="76" d="M600 570 812 318"/>
+    <path fill="url(#flow)" d="M884 212 826 396 698 264Z"/>
+  </g>
+</svg>

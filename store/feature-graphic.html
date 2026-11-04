@@ -1,0 +1,189 @@
+<!doctype html>
+<!--
+  Google Play feature graphic, 1024x500.
+
+  Source of truth for store/feature-graphic.png. Regenerate after editing:
+
+    node scripts/make-store-graphics.mjs
+
+  Everything is inline and drawn with CSS/SVG so the file renders identically
+  when Chrome screenshots it — no webfonts to load, no network, no image assets.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MTL Trader — feature graphic</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        width: 1024px;
+        height: 500px;
+        overflow: hidden;
+        background: #08090c;
+        color: #f5f2ea;
+        font-family: "Segoe UI", Inter, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .stage {
+        position: relative;
+        width: 1024px;
+        height: 500px;
+        display: flex;
+        align-items: center;
+        padding: 0 56px;
+        gap: 40px;
+        background:
+          radial-gradient(760px 420px at 780px 60px, rgba(213, 164, 78, 0.16), transparent 70%),
+          radial-gradient(600px 380px at 60px 460px, rgba(213, 164, 78, 0.07), transparent 70%),
+          #08090c;
+      }
+      .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(circle at 65% 45%, #000 30%, transparent 78%);
+      }
+      .left { position: relative; width: 470px; }
+      .brand { display: flex; align-items: center; gap: 14px; }
+      .mark {
+        width: 54px; height: 54px; border-radius: 15px;
+        display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(145deg, #e7bd72, #c08f3c);
+        color: #17130a; font-weight: 800; font-size: 21px; letter-spacing: -0.5px;
+        box-shadow: 0 10px 30px rgba(213, 164, 78, 0.28);
+      }
+      .wordmark { font-size: 27px; font-weight: 800; letter-spacing: 2.6px; }
+      .wordmark span { color: #d5a44e; }
+      h1 {
+        margin-top: 26px;
+        font-size: 45px;
+        line-height: 1.08;
+        letter-spacing: -1.5px;
+        font-weight: 800;
+      }
+      h1 em { font-style: normal; color: #e7bd72; }
+      p.sub {
+        margin-top: 16px;
+        font-size: 17px;
+        line-height: 1.5;
+        color: #a5a29a;
+        max-width: 430px;
+      }
+      .chips { margin-top: 22px; display: flex; gap: 9px; flex-wrap: wrap; }
+      .chip {
+        font-size: 12.5px; font-weight: 600; letter-spacing: 0.3px;
+        color: #d8cbb2;
+        padding: 7px 13px; border-radius: 999px;
+        border: 1px solid #2f3542; background: rgba(21, 24, 32, 0.85);
+      }
+      .panel {
+        position: relative;
+        width: 400px;
+        height: 348px;
+        border-radius: 24px;
+        background: linear-gradient(180deg, #101319, #0b0d11);
+        border: 1px solid #22262f;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+        padding: 20px 20px 16px;
+        transform: rotate(-1.2deg);
+      }
+      .panel-head { display: flex; justify-content: space-between; align-items: baseline; }
+      .panel-title { font-size: 13px; font-weight: 700; color: #e9e5dc; letter-spacing: 0.2px; }
+      .panel-tag { font-size: 11px; color: #8f8b83; letter-spacing: 0.6px; }
+      .equity { margin-top: 14px; height: 132px; width: 100%; }
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 14px; }
+      .stat {
+        border-radius: 13px; border: 1px solid #22262f; background: #0e1015;
+        padding: 10px 11px;
+      }
+      .stat .k { font-size: 9.5px; letter-spacing: 0.7px; color: #8f8b83; text-transform: uppercase; }
+      .stat .v { margin-top: 5px; font-size: 19px; font-weight: 800; letter-spacing: -0.4px; }
+      .up { color: #4ec98a; }
+      .down { color: #d95757; }
+      .rows { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+      .row { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: #a5a29a; }
+      .dot { width: 7px; height: 7px; border-radius: 99px; }
+      .long { color: #4ec98a; }
+      .short { color: #d95757; }
+      .row .amt { margin-left: auto; font-weight: 700; }
+      .row .sym { color: #e9e5dc; font-weight: 600; width: 62px; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="grid"></div>
+
+      <div class="left">
+        <div class="brand">
+          <div class="mark">MT</div>
+          <div class="wordmark">MTL <span>TRADER</span></div>
+        </div>
+        <h1>Know which trades <em>actually</em> make you money.</h1>
+        <p class="sub">
+          A trading journal that turns your own history into the numbers you need:
+          equity, time edge, strategy performance.
+        </p>
+        <div class="chips">
+          <span class="chip">Journal</span>
+          <span class="chip">Analytics</span>
+          <span class="chip">Time edge</span>
+          <span class="chip">Backtester</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Equity curve</span>
+          <span class="panel-tag">THIS MONTH</span>
+        </div>
+        <svg class="equity" viewBox="0 0 360 132" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#d5a44e" stop-opacity="0.28" />
+              <stop offset="100%" stop-color="#d5a44e" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="33" x2="360" y2="33" stroke="#1b1f29" stroke-width="1" />
+          <line x1="0" y1="66" x2="360" y2="66" stroke="#1b1f29" stroke-width="1" />
+          <line x1="0" y1="99" x2="360" y2="99" stroke="#1b1f29" stroke-width="1" />
+          <path
+            d="M0 104 L28 98 L56 106 L84 88 L112 92 L140 74 L168 80 L196 58 L224 64 L252 46 L280 52 L308 30 L336 36 L360 18 L360 132 L0 132 Z"
+            fill="url(#fill)"
+          />
+          <path
+            d="M0 104 L28 98 L56 106 L84 88 L112 92 L140 74 L168 80 L196 58 L224 64 L252 46 L280 52 L308 30 L336 36 L360 18"
+            fill="none"
+            stroke="#d5a44e"
+            stroke-width="2.6"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+        </svg>
+
+        <div class="stats">
+          <div class="stat"><div class="k">Win rate</div><div class="v up">58%</div></div>
+          <div class="stat"><div class="k">Avg R</div><div class="v">1.7</div></div>
+          <div class="stat"><div class="k">Trades</div><div class="v">42</div></div>
+        </div>
+
+        <div class="rows">
+          <div class="row">
+            <span class="dot long"></span><span class="sym">EURUSD</span>
+            <span class="long">Long</span><span class="amt up">+$320</span>
+          </div>
+          <div class="row">
+            <span class="dot short"></span><span class="sym">GBPJPY</span>
+            <span class="short">Short</span><span class="amt down">-$86</span>
+          </div>
+          <div class="row">
+            <span class="dot long"></span><span class="sym">XAUUSD</span>
+            <span class="long">Long</span><span class="amt up">+$1,140</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

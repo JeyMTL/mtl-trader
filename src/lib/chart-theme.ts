@@ -1,18 +1,20 @@
 'use client'
 
-import { useTheme } from '@/lib/theme'
+import { useTheme, type Theme } from '@/lib/theme'
 
 /**
  * Chart tokens shared by every Recharts view.
  *
  * Keeping these in one place is what makes dashboard and analytics look like one
  * instrument: same hairline grid, muted axes, profit/loss pair, tooltip surface.
- * Two palettes because mint-on-white and mint-on-graphite need different values.
+ * One palette per theme, because mint-on-white, mint-on-graphite and
+ * mint-on-navy need different values.
  */
 
 export interface ChartPalette {
   profit: string
   loss: string
+  /** The accent slot, brass in the graphite and paper themes. */
   brass: string
   axis: string
   grid: string
@@ -34,8 +36,18 @@ export const LIGHT_CHART: ChartPalette = {
   grid: 'rgba(0, 0, 0, 0.08)',
 }
 
-export function chartPalette(theme: 'dark' | 'light'): ChartPalette {
-  return theme === 'light' ? LIGHT_CHART : DARK_CHART
+export const BLUE_CHART: ChartPalette = {
+  profit: '#45d29a',
+  loss: '#f26b78',
+  brass: '#57ccf7',
+  axis: '#7f9bb0',
+  grid: 'rgba(140, 200, 235, 0.09)',
+}
+
+export function chartPalette(theme: Theme): ChartPalette {
+  if (theme === 'light') return LIGHT_CHART
+  if (theme === 'blue') return BLUE_CHART
+  return DARK_CHART
 }
 
 /** Theme-aware palette for chart components. */

@@ -83,3 +83,6 @@ mobile/android/capacitor-cordova-android-plugins/build/
 *.jks
 *.keystore
 key.properties
+
+# Rendered store assets keep a throwaway Chrome profile
+store/.chrome-profile/

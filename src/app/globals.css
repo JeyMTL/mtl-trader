@@ -64,6 +64,33 @@
   --warning: #8a6520;
 }
 
+/* The mark's own palette: the icon's navy surfaces with its ice accent. It is
+   dark-based, so none of the :root.light overrides below apply to it. */
+:root.blue {
+  --background: #071320;
+  --background-raised: #0a1a29;
+  --foreground: #e6f2fa;
+  --foreground-muted: #9ab1c4;
+  --surface: #0c1c2b;
+  --surface-light: #12293c;
+  --surface-strong: #183547;
+
+  --primary: #57ccf7;
+  --primary-dark: #35b2e0;
+  --primary-light: #9be4ff;
+  --ink: #04141f;
+
+  --accent: #9be4ff;
+  --border: #1b3448;
+  --border-strong: #2a4d67;
+
+  --success: #45d29a;
+  --success-soft: rgba(69, 210, 154, 0.12);
+  --danger: #f26b78;
+  --danger-soft: rgba(242, 107, 120, 0.12);
+  --warning: #e0b35b;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -103,6 +130,23 @@ body {
   background:
     radial-gradient(1200px 600px at 50% -10%, rgba(138, 101, 32, 0.06), transparent 70%),
     var(--background);
+}
+
+:root.blue body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(87, 204, 247, 0.07), transparent 70%),
+    var(--background);
+}
+
+:root.blue ::selection {
+  background: rgba(87, 204, 247, 0.3);
+  color: var(--foreground);
+}
+
+:root.blue .hero-grid {
+  background-image:
+    linear-gradient(rgba(87, 204, 247, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(87, 204, 247, 0.06) 1px, transparent 1px);
 }
 
 ::selection {
