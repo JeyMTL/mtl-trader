@@ -14,6 +14,8 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Testers | Google Group `mtl-trader-testers@googlegroups.com` |
 | Feedback email | `jfx064@gmail.com` |
 | Production track | Inactive — awaiting the 14-day rule |
+| Database | Migrated through `20261116` (signup trigger); `/api/health` reports every RPC ready and none missing |
+| Git | `bcde2b6` is the tip, tree clean — production was serving `04e96d8` when last checked |
 
 ## Version codes already burned
 
@@ -93,6 +95,22 @@ Then: **Dashboard → Apply for production access** → answer the questionnaire
 Create production release with the same AAB approach (bump the version code
 first) → roll out in stages.
 
+## Signup: "Database error saving new user" — fixed 4 Nov 2026
+
+One account could not be created. Supabase Auth answers that generic message for
+*any* failure of its own `auth.users` insert, which is why the client error said
+nothing useful. The profile trigger was the fault: an invoker function cannot
+write `public.users` past RLS and the revoked INSERT grant (`20261019`), and a
+leftover row holding the email could abort the same insert on the unique key.
+
+`public.handle_new_user()` now runs `SECURITY DEFINER` with a pinned
+`search_path` and inserts with `ON CONFLICT DO NOTHING`, and any hand-made
+trigger on `auth.users` is dropped first. Applied by hand to the live project as
+`supabase/migrations/20261116_new_user_profile_trigger.sql`; a real sign-in
+immediately afterwards proved it. `20261117_backfill_missing_profiles.sql` is a
+guard for databases built fresh — it inserted nothing here, where the
+missing-profile count was 0.
+
 ## Still to do after production (Play Billing is not testable yet)
 
 Billing cannot be exercised until the app is installed **from Play** with a
@@ -128,10 +146,27 @@ licence-tester account, and until the Console/API pieces exist:
 | `src/app/api/billing/google/verify/route.ts` | server-side verification + ack |
 | `src/lib/google-play.ts`, `src/lib/google-billing.ts` | Google API client |
 | `supabase/migrations/20261115_google_play_billing.sql` | `google_play_subscriptions` |
+| `supabase/migrations/20261116_new_user_profile_trigger.sql` | profile row created on every signup |
 | `store/` | icon, feature graphic, mockups |
 
-## Uncommitted work
+## Git and deploy state
 
-Everything from this launch push — the manifest permission removal, the version
-bump, the docs, `store/`, the billing and telemetry code — is **uncommitted** in
-git on `main`. Nothing has been pushed.
+The launch push is committed on `main`; the tree is clean. Production was serving
+`04e96d8` when this was checked, so **the push and the redeploy are still
+outstanding**. That matters for billing: the app's Play purchase verification
+calls `/api/billing/google/verify`, and that route is not in the deployed build.
+
+`/api/health` on 4 Nov 2026: database ok, 24 of 24 RPCs ready, no missing
+migrations, `config` complete, Paddle live with all four price ids, AI resolved
+to Gemini, `features.avatars` ready.
+
+## Open outside the Play Console
+
+- **Hosted sync is stalled, not broken.** `/api/health` reports `verdict:
+  "stalled"`, `connections: 1`, `pending: 1`, `oldestPendingMinutes: 2251` and
+  `lastSyncAt: null`: one `broker_connections` row has been queued for about 37
+  hours and no supervisor ever claimed it. That is the correct state while
+  `MT5_SYNC_ENABLED = false` (see `src/lib/features.ts`) and no Windows
+  supervisor is running. Clear that row — or fund the supervisor — before
+  flipping the flag, otherwise the first customer to connect watches a spinner
+  that is already known to be dead.
