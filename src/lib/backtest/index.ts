@@ -8,9 +8,11 @@
  * result forward.
  */
 
+import { buyAndHold, type Benchmark } from './benchmark'
 import { parseBarsCsv, type ParseOptions } from './csv'
 import { simulate } from './engine'
 import { barsPerYearFrom, computeMetrics, emptyMetrics, type Metrics } from './metrics'
+import { stressTest, type StressSummary } from './stress'
 import { getStrategy, normalizeParams, type StrategyId } from './strategies'
 import type { Bar, BacktestConfig, EquityPoint, Trade } from './types'
 
@@ -42,6 +44,10 @@ export interface BacktestReport {
   to: number
   metrics: Metrics
   split: { ratio: number; inSample: Metrics; outOfSample: Metrics } | null
+  /** Owning the instrument over the same bars, with the same costs. */
+  benchmark: Benchmark | null
+  /** The same trades reshuffled, to separate an edge from a lucky order. */
+  stress: StressSummary | null
   trades: Trade[]
   equityCurve: EquityPoint[]
   assumptions: string[]
@@ -89,6 +95,7 @@ function assumptionsFor(
     'A position still open on the final bar is closed at that bar’s close, so reported P&L is realised.',
     'Values are in the data’s quote currency; no FX conversion is applied.',
     'Sizing risks a fixed percent of equity to the stop, then caps notional at the leverage limit.',
+    'Buy and hold is one fully invested unit of notional equal to the starting balance, no leverage, entered at the first open and sold at the last close with the same costs.',
   ]
 
   if (offsetMinutes === 0) {
@@ -145,6 +152,12 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
   const full = simulate(bars, definition, params, config)
   const metrics = computeMetrics(full, initialBalance, barsPerYear)
 
+  // Two questions a positive curve cannot answer: would owning the instrument
+  // have paid better, and is the result an artefact of the order the trades
+  // happened to arrive in?
+  const benchmark = buyAndHold(bars, initialBalance, config.costs)
+  const stress = stressTest(full.trades, initialBalance, metrics.maxDrawdownPct)
+
   const ratio = Math.min(0.9, Math.max(0.5, request.splitRatio ?? 0.7))
   const splitIndex = Math.floor(bars.length * ratio)
   let split: BacktestReport['split'] = null
@@ -179,6 +192,16 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
   if (metrics.exposurePct > 90) {
     warnings.push('Positions were open for over 90% of the range — most of this result is one long exposure, not many independent bets.')
   }
+  if (benchmark && metrics.trades > 0 && metrics.returnPct < benchmark.returnPct) {
+    warnings.push(
+      `Buy and hold returned ${benchmark.returnPct.toFixed(2)}% over the same bars; these rules returned ${metrics.returnPct.toFixed(2)}%.`
+    )
+  }
+  if (stress && stress.probabilityOfProfit < 0.5) {
+    warnings.push(
+      `More than half of ${stress.simulations.toLocaleString('en-US')} reshuffles of these trades lost money — the result depends heavily on the order they arrived in.`
+    )
+  }
 
   return {
     symbol: config.symbol,
@@ -190,6 +213,8 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
     to: full.to,
     metrics,
     split,
+    benchmark,
+    stress,
     trades: full.trades,
     equityCurve: downsample(full.equity),
     assumptions: assumptionsFor(config, request.timezoneOffsetMinutes ?? 0, full.leverageCapped),

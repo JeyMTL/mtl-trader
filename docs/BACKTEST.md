@@ -49,6 +49,26 @@ the second window starts flat and knows nothing the first window produced.
 A backtest with fewer than ~30 trades is noise. The report says so rather than
 letting a 100% win rate on four trades look like an edge.
 
+## Is the edge real?
+
+Two checks on every report attack the question a positive curve cannot answer.
+
+**Versus buy and hold.** The same bars, one fully invested unit of notional equal
+to the starting balance, no leverage, entered at the first open and sold at the
+last close — paying the same spread, slippage and commission. If the rules do not
+beat simply owning the instrument, the curve is describing the market rather than
+an edge, and the report says so in its warnings.
+
+**Luck check.** The run's trades are reshuffled 1,000 times with a generator
+seeded from the trades themselves, keeping the same outcomes but destroying their
+order. The report shows the 5th–95th percentile of final return and max drawdown,
+the share of reshuffles that end profitable, and how many drew down deeper than
+the actual run. When fewer than half the reshuffles make money, the result depends
+on the sequence it happened in — luck, not a rule.
+
+Both are derived deterministically: the same file and parameters reproduce the
+same benchmark and the same stress range.
+
 ## Exporting from MT5
 
 1. Open the chart for the instrument and timeframe you want.
@@ -111,7 +131,7 @@ Saved runs live in `public.backtests` (migration `20261106_backtests.sql`) with
 RLS scoped to the owner and **no** insert/update policy: runs are written by
 `POST /api/backtest` only, so a stored result cannot be edited after the fact.
 Each row keeps the strategy parameters, cost model, data window, metrics, split
-metrics, equity curve, trades and assumptions.
+metrics, benchmark, stress range, equity curve, trades and assumptions.
 
 ## Adding a strategy
 

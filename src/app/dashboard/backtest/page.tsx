@@ -16,7 +16,9 @@ import { useToast } from '@/components/toast'
 import BacktestJournal from '@/components/backtest-journal'
 import BacktestSuggest, { type AppliedSuggestion } from '@/components/backtest-suggest'
 import { STRATEGIES, matchStrategyByLabel } from '@/lib/backtest/strategies'
+import type { Benchmark } from '@/lib/backtest/benchmark'
 import type { Metrics } from '@/lib/backtest/metrics'
+import type { StressSummary } from '@/lib/backtest/stress'
 import type { Trade } from '@/lib/backtest/types'
 
 /**
@@ -43,6 +45,8 @@ interface Report {
   to: number
   metrics: Metrics
   split: { ratio: number; inSample: Metrics; outOfSample: Metrics } | null
+  benchmark: Benchmark | null
+  stress: StressSummary | null
   trades: Trade[]
   equityCurve: EquityPoint[]
   assumptions: string[]
@@ -69,6 +73,8 @@ interface SavedRunRow extends RunSummary {
   assumptions?: string[]
   warnings?: string[]
   split_metrics?: Report['split']
+  benchmark?: Report['benchmark']
+  stress?: Report['stress']
 }
 
 const defaultStrategy = STRATEGIES[0]!
@@ -297,6 +303,8 @@ function BacktestWorkbench() {
         to: new Date(row.period_end).getTime(),
         metrics: row.metrics,
         split: row.split_metrics ?? null,
+        benchmark: row.benchmark ?? null,
+        stress: row.stress ?? null,
         trades: row.trades ?? [],
         equityCurve: row.equity_curve ?? [],
         assumptions: row.assumptions ?? [],
@@ -640,6 +648,12 @@ function BacktestWorkbench() {
                 </div>
               )}
 
+              <RobustnessPanel
+                benchmark={report.benchmark}
+                stress={report.stress}
+                metrics={report.metrics}
+              />
+
               <div className="rounded-xl border border-border bg-surface p-5">
                 <h2 className="mb-3 text-sm font-semibold text-white">Assumptions</h2>
                 <ul className="space-y-2">
@@ -751,6 +765,102 @@ function BacktestWorkbench() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Benchmark and reshuffle ranges: the two checks a positive curve cannot pass on its own. */
+function RobustnessPanel({
+  benchmark,
+  stress,
+  metrics,
+}: {
+  benchmark: Benchmark | null
+  stress: StressSummary | null
+  metrics: Metrics
+}) {
+  if (!benchmark && !stress) return null
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-5">
+      <h2 className="text-sm font-semibold text-white">Is the edge real?</h2>
+      <p className="mb-4 mt-1 text-xs text-gray-500">
+        A rising curve is not proof. These checks ask whether the rules beat owning the
+        instrument, and how much of the result depends on the order the trades arrived in.
+      </p>
+
+      {benchmark && (
+        <div className="mb-5">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Versus buy and hold
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-500">
+                  <th className="pb-2 font-medium">Window</th>
+                  <th className="pb-2 font-medium">Return</th>
+                  <th className="pb-2 font-medium">Max drawdown</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-300">
+                <tr className="border-t border-border">
+                  <td className="py-2">These rules</td>
+                  <td className="py-2">{pct(metrics.returnPct, 2)}</td>
+                  <td className="py-2">{pct(metrics.maxDrawdownPct, 2)}</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="py-2">Buy and hold</td>
+                  <td className="py-2">{pct(benchmark.returnPct, 2)}</td>
+                  <td className="py-2">{pct(benchmark.maxDrawdownPct, 2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500">
+            {metrics.returnPct > benchmark.returnPct
+              ? `The rules beat buying and holding by ${pct(metrics.returnPct - benchmark.returnPct, 2)} over ${benchmark.bars.toLocaleString('en-US')} bars.`
+              : `Owning the instrument returned ${pct(benchmark.returnPct, 2)}; these rules did not beat it.`}
+          </p>
+        </div>
+      )}
+
+      {stress && (
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Luck check · {stress.simulations.toLocaleString('en-US')} reshuffles
+          </h3>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {[
+              {
+                label: 'Chance of profit',
+                value: pct(stress.probabilityOfProfit * 100, 0),
+              },
+              { label: 'Median return', value: pct(stress.returnPct.p50, 2) },
+              {
+                label: 'Return 5–95%',
+                value: `${pct(stress.returnPct.p05, 1)} to ${pct(stress.returnPct.p95, 1)}`,
+              },
+              {
+                label: 'Drawdown 5–95%',
+                value: `${pct(stress.maxDrawdownPct.p05, 1)} to ${pct(stress.maxDrawdownPct.p95, 1)}`,
+              },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-border bg-background p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                  {item.label}
+                </p>
+                <p className="mt-1 font-mono text-sm font-semibold text-white">{item.value}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500">
+            The actual run drew down {pct(metrics.maxDrawdownPct, 2)};{' '}
+            {pct(stress.worseDrawdownRate * 100, 0)} of reshuffles were deeper. Same trades,
+            different order.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

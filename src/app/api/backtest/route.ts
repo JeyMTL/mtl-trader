@@ -139,6 +139,8 @@ export async function POST(req: Request) {
         period_end: new Date(report.to).toISOString(),
         metrics: report.metrics,
         split_metrics: report.split,
+        benchmark: report.benchmark,
+        stress: report.stress,
         equity_curve: report.equityCurve,
         trades: report.trades.slice(-MAX_TRADES_STORED),
         assumptions: report.assumptions,
