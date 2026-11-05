@@ -56,7 +56,7 @@ export default function TermsPage() {
 
       <h2>4. Subscriptions, trials and billing</h2>
       <ul>
-        <li>New accounts receive a 30-day free trial. No payment is taken during the trial.</li>
+        <li>New accounts receive a 14-day free trial. No payment is taken during the trial.</li>
         <li>Paid plans are billed monthly in advance through PayPal or bank transfer, at the prices shown on the{' '}
           <Link href="/pricing">pricing page</Link>.</li>
         <li>Subscriptions renew automatically until cancelled. You can cancel from Settings at any time; access

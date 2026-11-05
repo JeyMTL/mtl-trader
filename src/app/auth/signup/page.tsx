@@ -128,7 +128,7 @@ export default function SignupPage() {
             <Logo size="md" />
           </Link>
           <h1 className="text-2xl font-bold text-white">Create your account</h1>
-          <p className="text-gray-400 mt-2">Enjoy unlimited access free for 30 days</p>
+          <p className="text-gray-400 mt-2">Enjoy unlimited access free for 14 days</p>
         </div>
 
         <form onSubmit={handleSignup} className="bg-surface border border-border rounded-2xl p-8 space-y-6 shadow-2xl shadow-primary/5">
@@ -215,7 +215,7 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full btn-gradient text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating account...' : 'Start 30-Day Free Trial'}
+            {loading ? 'Creating account...' : 'Start 14-Day Free Trial'}
           </button>
 
           <p className="text-center text-xs leading-relaxed text-gray-500">

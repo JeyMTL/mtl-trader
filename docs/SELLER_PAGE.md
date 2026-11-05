@@ -13,7 +13,7 @@ MTL Trader is a trading journal and analytics web app for traders who want to br
 - **Review performance:** Track win rate, profit factor, expectancy, equity curve, drawdown, monthly and daily P&L, and results by symbol.
 - **Keep a journal:** Add trade notes and strategies, then review activity in a P&L calendar.
 - **Sync MT5 trades:** An optional Python agent can sync closed trades on a 60-second interval and pair entries and exits. The buyer must configure and run the agent.
-- **Manage paid plans:** Includes a 30-day trial, monthly trade quotas, PayPal checkout, and bank-transfer requests with admin approval. Trade quotas are enforced in Postgres; PayPal payment events are verified and applied idempotently.
+- **Manage paid plans:** Includes a 14-day trial, monthly trade quotas, PayPal checkout, and bank-transfer requests with admin approval. Trade quotas are enforced in Postgres; PayPal payment events are verified and applied idempotently.
 - **Send optional email updates:** Daily, weekly, or monthly performance summaries and weekday journal reminders can be scheduled when the buyer configures Resend and the deployment cron.
 - **Review trades with AI:** An optional AI review endpoint uses the trader's notes and performance statistics. It requires an AI provider key and is unavailable until configured.
 - **Extend to mobile:** A Capacitor wrapper and native project structure are included; this is not represented as a published app-store product.

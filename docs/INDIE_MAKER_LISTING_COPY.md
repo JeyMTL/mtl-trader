@@ -20,7 +20,7 @@ What it does:
 Traders log trades by hand, bulk-import broker exports (CSV, XLSX, and SpreadsheetML XML), or let an automated Python background agent sync closed trades every 60 seconds with correct entry/exit pairing. An AI coaching endpoint reads the trader's own notes alongside deterministic edge statistics to surface recurring mistakes and patterns. The dashboard converts raw trades into win rate, profit factor, expectancy, equity curve, and max drawdown, with a visual P&L calendar heatmap and per-symbol breakdowns.
 
 How it earns:
-Automated subscription billing turns an unlimited 30-day free trial into a low-cost tier or a higher tier that adds the backtester and market replay; trade volume is unlimited on both, so paying never means logging fewer trades than the trial allowed. Trials, entitlements, and plan upgrades are enforced server-side, and payments are applied idempotently so a dropped payment webhook never loses a sale.
+Automated subscription billing turns an unlimited 14-day free trial into a low-cost tier or a higher tier that adds the backtester and market replay; trade volume is unlimited on both, so paying never means logging fewer trades than the trial allowed. Trials, entitlements, and plan upgrades are enforced server-side, and payments are applied idempotently so a dropped payment webhook never loses a sale.
 
 Under the hood:
 A modern TypeScript web app on a hosted Postgres database, a database-level quota trigger, signature-verified payment webhooks, an admin approval flow for bank transfers, and timezone-aware email performance summaries. Includes a mobile wrapper and a test suite covering the import parser, billing rules, and notification scheduling.
@@ -32,7 +32,7 @@ A modern TypeScript web app on a hosted Postgres database, a database-level quot
 1. Automated background sync agent plus multi-format CSV/XLSX/XML trade import
 2. AI-powered trade review that narrates the trader's own notes against edge statistics
 3. Real-time analytics: win rate, profit factor, expectancy, equity curve, and drawdown
-4. Server-enforced subscriptions — 30-day trial and plan quotas applied idempotently
+4. Server-enforced subscriptions — 14-day trial and plan quotas applied idempotently
 5. Companion mobile app and timezone-aware email performance summaries
 
 ---

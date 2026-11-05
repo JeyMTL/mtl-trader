@@ -399,7 +399,7 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
         const message = insertError.message
         if (/Free trial ended/i.test(message)) {
           setError(
-            'Your 30-day trial has ended. Nothing was deleted — your journal is still here and readable. Choose a plan to add new trades.'
+            'Your 14-day trial has ended. Nothing was deleted — your journal is still here and readable. Choose a plan to add new trades.'
           )
         } else if (/Monthly trade limit/i.test(message)) {
           setError(

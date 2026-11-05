@@ -208,7 +208,7 @@ describe('column value builders', () => {
     })
   })
 
-  it('trialFields starts a fresh 30-day unlimited trial', () => {
+  it('trialFields starts a fresh 14-day unlimited trial', () => {
     const fields = trialFields(NOW)
     expect(fields.subscription_status).toBe('trial')
     expect(fields.max_trades).toBe(UNLIMITED)

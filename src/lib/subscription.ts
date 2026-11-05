@@ -16,7 +16,7 @@ import type { BillingInterval } from '@/types'
  */
 
 export const UNLIMITED = -1
-export const TRIAL_DAYS = 30
+export const TRIAL_DAYS = 14
 /** Length of one paid billing period, in days. Renewals stack onto unexpired time. */
 export const PERIOD_DAYS = 30
 const MS_PER_DAY = 24 * 60 * 60 * 1000

@@ -29,7 +29,7 @@ export const PLANS: SubscriptionPlan[] = [
     price: 0,
     max_trades: -1,
     features: [
-      '30-day unlimited trial, no card',
+      '14-day unlimited trial, no card',
       'Everything in Pro during the trial',
       'Journal and analytics stay readable afterwards',
       'Journal photos and voice notes',
