@@ -1,5 +1,7 @@
-# Localisation is generated at build time from the ARB files in lib/l10n.
-# Nothing is downloaded at runtime, so the app works offline in every language.
+# English is generated at build time from the ARB files in lib/l10n and is the
+# only language compiled in. Other languages live in lib/l10n/packs and are
+# published as downloadable packs by scripts/make-locales.mjs; the app stores
+# them on the phone and falls back to English for anything not translated.
 arb-dir: lib/l10n
 template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart

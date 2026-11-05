@@ -1,14 +1,21 @@
 {
   "@@locale": "fr",
-
   "appTitle": "MTL Trader",
-
   "retry": "Réessayer",
   "cancel": "Annuler",
   "refresh": "Actualiser",
   "language": "Langue",
   "languageSystem": "Système",
-
+  "languageSystemSubtitle": "Suivre la langue de l'appareil",
+  "searchLanguages": "Rechercher une langue",
+  "noLanguageMatches": "Aucune langue ne correspond.",
+  "languageBuiltIn": "Intégré",
+  "languageDownload": "Télécharger",
+  "languageDownloading": "Téléchargement…",
+  "languageDownloaded": "Téléchargé",
+  "languageRemove": "Supprimer le téléchargement",
+  "languageEnglishFallback": "Anglais en attendant la traduction",
+  "languagePackFailed": "Impossible de télécharger cette langue. Vérifiez votre connexion et réessayez.",
   "navDesk": "Bureau",
   "navJournal": "Journal",
   "navAnalytics": "Analyses",
@@ -16,10 +23,8 @@
   "navAccount": "Compte",
   "newTrade": "Consigner un trade",
   "timeEdge": "Edge horaire",
-
   "brandName": "MTL Trader",
   "brandOpenPlans": "MTL Trader — ouvrir les offres",
-
   "loginHeadline": "Le journal qui\nvous lit en retour.",
   "loginTagline": "Notez l'exécution, la capture et la note vocale. Trouvez les heures qui paient.",
   "continueWithGoogle": "Continuer avec Google",
@@ -39,7 +44,6 @@
   "signInUnreachable": "Impossible de joindre le journal. Vérifiez votre connexion et réessayez.",
   "googleFinishNotice": "Terminez la connexion avec Google, puis revenez ici — le journal s'ouvre tout seul.",
   "confirmEmailNotice": "Compte créé. Ouvrez le lien de confirmation reçu à {email}, puis connectez-vous ici.",
-
   "accountBalance": "Solde du compte",
   "inProfit": "En profit",
   "inDrawdown": "En drawdown",
@@ -48,7 +52,6 @@
   "worstTrade": "Pire trade",
   "netSummary": "{pnl} net · {closed} clôturés · {wins}G / {losses}P",
   "importHistoryHint": "Importez l'historique pour tracer la courbe",
-
   "winRate": "Taux de réussite",
   "profitFactor": "Facteur de profit",
   "maxDrawdown": "Drawdown max",
@@ -56,12 +59,10 @@
   "winnersCount": "{count} gagnants",
   "peakToTrough": "Du pic au creux",
   "expectancy": "Espérance",
-
   "thisMonth": "Ce mois",
   "monthTrades": "{count} trades",
   "greenDays": "{count} jours verts",
   "monthWinRate": "Réussite du mois",
-
   "timeEdgeSubtitle": "Heures d'entrée en {timezone} ; sessions en UTC. Durée médiane {hold}.",
   "report": "Rapport",
   "noTimedTradesTitle": "Aucun trade horodaté",
@@ -73,23 +74,19 @@
   "needsMoreTrades": "3 trades minimum",
   "periodStats": "{trades} trades · {winRate} de réussite",
   "thinSampleNote": "Les heures avec moins de 3 trades sont exclues du meilleur et du pire.",
-
   "journalSectionTitle": "Journal",
   "journalSectionSubtitle": "Les notes, captures et notes vocales derrière chaque exécution.",
   "nothingJournaledTitle": "Rien de consigné",
   "nothingJournaledBody": "Ouvrez un trade et ajoutez une capture ou une note vocale — c'est la fiche que vous relirez.",
   "recentFills": "Exécutions récentes",
   "noFillsTitle": "Aucune exécution",
-
   "startHere": "Commencez ici",
   "startHeadline": "Trois étapes pour un journal qui vous rapporte.",
   "startStep1": "Importez l'historique MT5 ou saisissez votre première exécution.",
   "startStep2": "Ajoutez l'heure d'entrée et de sortie — c'est ce qui alimente le rapport d'edge.",
   "startStep3": "Joignez la capture du graphique et une note vocale.",
   "seeTimeReport": "Voir le rapport horaire →",
-
   "couldNotLoadDesk": "Impossible de charger le bureau",
-
   "a11yProfit": "Gain de {amount}",
   "a11yLoss": "Perte de {amount}",
   "a11yBreakEven": "Neutre, {amount}",
@@ -97,9 +94,7 @@
   "a11yHourChart": "Profit et perte par heure d'entrée.",
   "a11yScreenshots": "{count} captures jointes",
   "a11yVoiceNotes": "{count} notes vocales jointes",
-
   "languageSubtitle": "Les libellés, les mois et les dates suivent ce choix. Enregistré sur ce téléphone.",
-
   "journalTitle": "Journal",
   "journalSearchHint": "Rechercher un symbole, une stratégie ou un tag",
   "journalSessionAll": "Toutes les sessions",
@@ -126,7 +121,6 @@
   "clearJournalBody": "Tous les trades, photos et notes vocales de ce compte seront supprimés. Action irréversible.",
   "clearAllAction": "Tout effacer",
   "clearFailed": "Impossible de vider le journal : {error}",
-
   "analyticsEmptyTitle": "Aucun trade à analyser",
   "analyticsEmptyBody": "Consignez quelques trades et les analyses se remplissent automatiquement.",
   "analyticsErrorTitle": "Impossible de charger les analyses",

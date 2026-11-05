@@ -1,13 +1,30 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:mtl_trader_mobile/l10n/gen/app_localizations.dart';
+import 'package:mtl_trader_mobile/core/language_packs.dart';
+import 'package:mtl_trader_mobile/core/locale.dart';
 import 'package:mtl_trader_mobile/screens/login_screen.dart';
 import 'package:mtl_trader_mobile/ui/a11y.dart';
 import 'package:mtl_trader_mobile/ui/brand.dart';
 import 'package:mtl_trader_mobile/ui/language_picker.dart';
 import 'package:mtl_trader_mobile/ui/theme.dart';
 import 'package:mtl_trader_mobile/ui/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// The French strings exactly as published, read from the pack's ARB source.
+Map<String, String> _packMessages(String code) {
+  final decoded = jsonDecode(
+    File('lib/l10n/packs/app_$code.arb').readAsStringSync(),
+  ) as Map<String, dynamic>;
+  return <String, String>{
+    for (final entry in decoded.entries)
+      if (!entry.key.startsWith('@') && entry.value is String)
+        entry.key: entry.value as String,
+  };
+}
 
 /// Wraps a screen the way the real root does, with the system text size forced
 /// to [scale].
@@ -15,8 +32,8 @@ Widget appHome(Widget home,
     {double scale = 1, Locale locale = const Locale('fr')}) {
   return MaterialApp(
     locale: locale,
-    supportedLocales: AppLocalizations.supportedLocales,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: LocaleController.supported,
+    localizationsDelegates: LanguagePacks.instance.delegates,
     theme: buildFlatTheme(AppPalette.dark),
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(
@@ -114,7 +131,16 @@ Widget gallery() => Scaffold(
     );
 
 void main() {
-  setUpAll(() => initializeDateFormatting());
+  setUpAll(() async {
+    await initializeDateFormatting();
+    // French is a downloadable pack now, so the harness installs it the way the
+    // app does: the strings the published ARB carries, without a network.
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    LanguagePacks.instance = LanguagePacks(
+      fetch: (uri) => Future<String>.error(StateError('offline')),
+    );
+    await LanguagePacks.instance.seed('fr', _packMessages('fr'));
+  });
 
   testWidgets('shared widgets survive a 2x text scale without overflowing', (
     tester,

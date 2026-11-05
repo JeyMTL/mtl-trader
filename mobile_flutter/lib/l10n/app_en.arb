@@ -1,14 +1,21 @@
 {
   "@@locale": "en",
-
   "appTitle": "MTL Trader",
-
   "retry": "Retry",
   "cancel": "Cancel",
   "refresh": "Refresh",
   "language": "Language",
   "languageSystem": "System",
-
+  "languageSystemSubtitle": "Follow the device language",
+  "searchLanguages": "Search languages",
+  "noLanguageMatches": "No language matches that search.",
+  "languageBuiltIn": "Built in",
+  "languageDownload": "Download",
+  "languageDownloading": "Downloading…",
+  "languageDownloaded": "Downloaded",
+  "languageRemove": "Remove download",
+  "languageEnglishFallback": "English until translated",
+  "languagePackFailed": "Could not download this language. Check your connection and try again.",
   "navDesk": "Desk",
   "navJournal": "Journal",
   "navAnalytics": "Analytics",
@@ -16,10 +23,8 @@
   "navAccount": "Account",
   "newTrade": "Journal a trade",
   "timeEdge": "Time edge",
-
   "brandName": "MTL Trader",
   "brandOpenPlans": "MTL Trader — open payment plans",
-
   "loginHeadline": "The journal that\nreads you back.",
   "loginTagline": "Log the fill, the screenshot and the voice note. Find the hours that pay.",
   "continueWithGoogle": "Continue with Google",
@@ -46,7 +51,6 @@
       }
     }
   },
-
   "accountBalance": "Account balance",
   "inProfit": "In profit",
   "inDrawdown": "In drawdown",
@@ -71,7 +75,6 @@
     }
   },
   "importHistoryHint": "Import history to plot the curve",
-
   "winRate": "Win rate",
   "profitFactor": "Profit factor",
   "maxDrawdown": "Max drawdown",
@@ -86,7 +89,6 @@
   },
   "peakToTrough": "Peak to trough",
   "expectancy": "Expectancy",
-
   "thisMonth": "This month",
   "monthTrades": "{count} trades",
   "@monthTrades": {
@@ -105,7 +107,6 @@
     }
   },
   "monthWinRate": "Month win rate",
-
   "timeEdgeSubtitle": "Entry hours in {timezone}; sessions in UTC. Median hold {hold}.",
   "@timeEdgeSubtitle": {
     "placeholders": {
@@ -137,23 +138,19 @@
     }
   },
   "thinSampleNote": "Hours with fewer than 3 trades are left out of the best/worst call.",
-
   "journalSectionTitle": "Journal",
   "journalSectionSubtitle": "The notes, screenshots and voice notes behind the fills.",
   "nothingJournaledTitle": "Nothing journaled yet",
   "nothingJournaledBody": "Open a trade and add a screenshot or a voice note — it becomes the entry you read later.",
   "recentFills": "Recent fills",
   "noFillsTitle": "No fills recorded",
-
   "startHere": "Start here",
   "startHeadline": "Three steps to a journal that pays you back.",
   "startStep1": "Import MT5 history or log your first fill.",
   "startStep2": "Add the entry and exit time — that powers the edge report.",
   "startStep3": "Attach the chart screenshot and a voice note.",
   "seeTimeReport": "See the time report →",
-
   "couldNotLoadDesk": "Could not load the desk",
-
   "a11yProfit": "Profit of {amount}",
   "@a11yProfit": {
     "placeholders": {
@@ -203,9 +200,7 @@
       }
     }
   },
-
   "languageSubtitle": "App labels, month names and dates follow this choice. Saved on this phone.",
-
   "journalTitle": "Journal",
   "journalSearchHint": "Search symbol, strategy or tag",
   "journalSessionAll": "All sessions",
@@ -263,7 +258,6 @@
       }
     }
   },
-
   "analyticsEmptyTitle": "No trades to analyse yet",
   "analyticsEmptyBody": "Journal a few entries and the breakdowns fill in automatically.",
   "analyticsErrorTitle": "Could not load analytics",

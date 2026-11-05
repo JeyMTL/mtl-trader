@@ -27,6 +27,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageSystem => 'System';
 
   @override
+  String get languageSystemSubtitle => 'Follow the device language';
+
+  @override
+  String get searchLanguages => 'Search languages';
+
+  @override
+  String get noLanguageMatches => 'No language matches that search.';
+
+  @override
+  String get languageBuiltIn => 'Built in';
+
+  @override
+  String get languageDownload => 'Download';
+
+  @override
+  String get languageDownloading => 'Downloading…';
+
+  @override
+  String get languageDownloaded => 'Downloaded';
+
+  @override
+  String get languageRemove => 'Remove download';
+
+  @override
+  String get languageEnglishFallback => 'English until translated';
+
+  @override
+  String get languagePackFailed =>
+      'Could not download this language. Check your connection and try again.';
+
+  @override
   String get navDesk => 'Desk';
 
   @override

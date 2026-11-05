@@ -6,7 +6,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
-import 'app_localizations_fr.dart';
 
 // ignore_for_file: type=lint
 
@@ -93,10 +92,7 @@ abstract class AppLocalizations {
   ];
 
   /// A list of this localizations delegate's supported locales.
-  static const List<Locale> supportedLocales = <Locale>[
-    Locale('en'),
-    Locale('fr')
-  ];
+  static const List<Locale> supportedLocales = <Locale>[Locale('en')];
 
   /// No description provided for @appTitle.
   ///
@@ -133,6 +129,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'System'**
   String get languageSystem;
+
+  /// No description provided for @languageSystemSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the device language'**
+  String get languageSystemSubtitle;
+
+  /// No description provided for @searchLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'Search languages'**
+  String get searchLanguages;
+
+  /// No description provided for @noLanguageMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No language matches that search.'**
+  String get noLanguageMatches;
+
+  /// No description provided for @languageBuiltIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Built in'**
+  String get languageBuiltIn;
+
+  /// No description provided for @languageDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get languageDownload;
+
+  /// No description provided for @languageDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get languageDownloading;
+
+  /// No description provided for @languageDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded'**
+  String get languageDownloaded;
+
+  /// No description provided for @languageRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove download'**
+  String get languageRemove;
+
+  /// No description provided for @languageEnglishFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'English until translated'**
+  String get languageEnglishFallback;
+
+  /// No description provided for @languagePackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not download this language. Check your connection and try again.'**
+  String get languagePackFailed;
 
   /// No description provided for @navDesk.
   ///
@@ -975,7 +1031,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'fr'].contains(locale.languageCode);
+      <String>['en'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -986,8 +1042,6 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   switch (locale.languageCode) {
     case 'en':
       return AppLocalizationsEn();
-    case 'fr':
-      return AppLocalizationsFr();
   }
 
   throw FlutterError(

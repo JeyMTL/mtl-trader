@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,8 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/chart_theme.dart';
 import 'core/config.dart';
+import 'core/language_packs.dart';
 import 'core/locale.dart';
-import 'l10n/gen/app_localizations.dart';
 import 'screens/auth_gate.dart';
 import 'services/telemetry.dart';
 import 'ui/perf_overlay.dart';
@@ -36,6 +37,13 @@ Future<void> main() async {
   await ChartStyle.restore();
   await ThemeController.restore();
   await LocaleController.restore();
+  // Packs already on the phone, read before the first frame so a downloaded
+  // language is not briefly English. A saved language whose pack is missing
+  // fetches itself below, so upgrading does not lose the choice.
+  await LanguagePacks.instance.restore();
+  unawaited(LanguagePacks.instance.ensureActivePack(
+    LocaleController.instance.code,
+  ));
   // Off unless someone turned it on; a diagnostic must never be the reason a
   // launch is slow.
   await FrameOverlaySettings.restore();
@@ -66,6 +74,7 @@ class MtlTraderApp extends StatelessWidget {
       listenable: Listenable.merge(<Listenable>[
         ThemeController.instance,
         LocaleController.instance,
+        LanguagePacks.instance,
       ]),
       builder: (context, _) {
         final appearance = ThemeController.instance.theme;
@@ -77,15 +86,20 @@ class MtlTraderApp extends StatelessWidget {
           // Null locale means "follow the device", resolved against the
           // generated list, which falls back to English for anything else.
           locale: LocaleController.instance.locale,
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          // The catalogue is what the picker offers; the delegate resolves each
+          // entry from the bundled strings, a downloaded pack, or English.
+          supportedLocales: LocaleController.supported,
+          localizationsDelegates: LanguagePacks.instance.delegates,
           // The palette is read through `AppColors` getters rather than an
           // InheritedWidget, so a switch has to rebuild the tree. The key makes
           // Flutter discard the subtree instead of keeping const widgets that
           // still hold the old colours or the old strings.
           home: PerfOverlay(
             child: KeyedSubtree(
-              key: ValueKey<String>('theme-${appearance.name}-$language'),
+              key: ValueKey<String>(
+                'theme-${appearance.name}-$language-'
+                '${LanguagePacks.instance.generation}',
+              ),
               child: const AuthGate(),
             ),
           ),
@@ -102,7 +116,7 @@ class _ConfigMissingApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: buildFlatTheme(AppPalette.dark),
+      theme: buildFlatTheme(AppColors.palette),
       home: Scaffold(
         body: SafeArea(
           child: ListView(

@@ -155,25 +155,45 @@ account row on login.
 
 ## Languages
 
-English and French ship today. Adding a third:
+English is compiled into the binary. Every other language is a pack the user
+downloads on demand from Account → Language, so the install stays small and a
+pack can be fixed without a store release.
 
-1. copy `mobile_flutter/lib/l10n/app_en.arb` to `app_XX.arb` and translate the
-   values (never the keys);
-2. add `Locale('xx')` to `LocaleController.supported` in
-   `mobile_flutter/lib/core/locale.dart`;
-3. add its native name to `LocaleController.nativeNames`;
-4. run `flutter gen-l10n` and `flutter test` — `test/l10n_test.dart` fails if a
-   language resolves no strings.
+- `mobile_flutter/lib/core/locale.dart` lists 77 languages with native name,
+  English name and flag. A language with no pack is still selectable; it renders
+  English and the picker marks it "English until translated".
+- Packs live in `mobile_flutter/lib/l10n/packs/app_XX.arb`, one complete file
+  per language with the same keys and `{placeholders}` as `app_en.arb`.
+- `npm run make:locales` at the repo root validates the packs, regenerates the
+  runtime reader (`mobile_flutter/lib/l10n/app_localizations_pack.dart`) and
+  writes `public/locales/<code>.json` plus `manifest.json`. It rejects unknown
+  keys and placeholder mismatches and prunes packs whose ARB is gone.
+- At startup the app fetches `${apiBaseUrl}/locales/manifest.json`, keeps
+  installed packs in `SharedPreferences`, and resolves a string as installed
+  pack → English. `flutter gen-l10n` is only used for English.
+
+Adding a language:
+
+1. copy `mobile_flutter/lib/l10n/app_en.arb` to
+   `mobile_flutter/lib/l10n/packs/app_XX.arb` and translate the values (never
+   the keys, never the `{placeholders}`);
+2. add its `AppLanguage(...)` entry to `LocaleController` if the catalogue does
+   not have it yet;
+3. run `npm run make:locales` and `flutter test` — `test/l10n_test.dart` fails
+   if any pack misses a key or a placeholder.
 
 Strings live in code as `AppLocalizations.of(context).key`. Translated today:
 login, the five-tab shell, Desk, Journal, Analytics and the language picker
-itself. Still English: Calendar, the Account page body, Plans and billing, the
-trade form and the chart — they keep inline literals until they are migrated the
-same way.
+itself. Still inline English: Calendar, the Account page body, Plans and
+billing, the trade form and the chart — they keep inline literals until they are
+migrated the same way.
 
 The picker lives under Account → Language, and
 `mobile_flutter/test/language_picker_test.dart` covers listing the languages,
-switching to French, and switching back to the device language.
+ordering (translated rows above untranslated), the status badges, the download
+flow, a failed download keeping the previous language, and switching back to the
+device language. `mobile_flutter/test/language_packs_test.dart` covers the pack
+store, and `mobile_flutter/test/l10n_test.dart` checks every pack is complete.
 
 ## Hosted broker sync
 
