@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'The terms that govern your use of MTL Trader, including subscriptions, acceptable use and liability.',
 }
 
-const UPDATED = '25 October 2026'
+const UPDATED = '5 November 2026'
 
 export default function TermsPage() {
   return (
@@ -57,13 +57,19 @@ export default function TermsPage() {
       <h2>4. Subscriptions, trials and billing</h2>
       <ul>
         <li>New accounts receive a 14-day free trial. No payment is taken during the trial.</li>
-        <li>Paid plans are billed monthly in advance through PayPal or bank transfer, at the prices shown on the{' '}
+        <li>Paid plans are billed monthly or annually in advance, at the prices shown in the app or on the{' '}
           <Link href="/pricing">pricing page</Link>.</li>
-        <li>Subscriptions renew automatically until cancelled. You can cancel from Settings at any time; access
+        <li>On the website, payment is taken through PayPal, card or bank transfer. In the Android app,
+          subscriptions are sold and billed by Google Play.</li>
+        <li>Subscriptions renew automatically until cancelled. Website subscriptions can be cancelled from
+          Settings; Google Play subscriptions must be cancelled in Google Play &rarr; Subscriptions. Cancelling
+          in the app or uninstalling it does not cancel a Google Play subscription. After cancellation, access
           continues until the end of the period you have paid for.</li>
         <li>Bank transfers are activated once the transfer has been verified. References must match the amount
           and reference shown at checkout.</li>
-        <li>Refunds are covered by our <Link href="/refunds">Refund Policy</Link>.</li>
+        <li>Refunds for website purchases are covered by our <Link href="/refunds">Refund Policy</Link>.
+          Refunds for Google Play purchases are handled under Google Play&apos;s refund policy and any statutory
+          rights you have.</li>
       </ul>
 
       <h2>5. Acceptable use</h2>

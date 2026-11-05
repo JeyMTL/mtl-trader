@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'How trials, cancellation, billing errors and refunds work for MTL Trader subscriptions.',
 }
 
-const UPDATED = '25 October 2026'
+const UPDATED = '5 November 2026'
 
 export default function RefundPolicyPage() {
   return (
@@ -17,7 +17,7 @@ export default function RefundPolicyPage() {
 
       <p className="mt-6">
         This policy applies to subscriptions sold by <strong>Jeremiah Chipeta</strong>, trading as
-        MTL Trader, through our card subscription, PayPal or bank transfer. It does not limit any
+        MTL Trader, through our card subscription, PayPal, bank transfer or Google Play. It does not limit any
         statutory rights you have as a consumer in your country of residence.
       </p>
 
@@ -27,10 +27,11 @@ export default function RefundPolicyPage() {
         confirm the journal fits how you trade — that is the intended way to evaluate the product.
       </p>
 
-      <h2>2. Monthly subscriptions</h2>
+      <h2>2. Monthly and annual subscriptions</h2>
       <ul>
-        <li>Paid plans are billed monthly in advance and renew automatically.</li>
-        <li>You can cancel at any time from Settings. Cancellation stops the next charge.</li>
+        <li>Paid plans are billed monthly or annually in advance and renew automatically.</li>
+        <li>Website subscriptions can be cancelled at any time from Settings. Google Play subscriptions must
+          be cancelled in Google Play &rarr; Subscriptions. Cancellation stops the next charge.</li>
         <li>You keep access until the end of the period you have already paid for.</li>
         <li>We do not automatically refund a period that has already started and been used, except as set out below.</li>
       </ul>
@@ -57,6 +58,12 @@ export default function RefundPolicyPage() {
         bank reference and the date of payment. We reply within two business days. Approved refunds are returned
         by the original payment method: PayPal payments usually within 5 business days, bank transfers within 10
         business days of receiving the return details.
+      </p>
+      <p>
+        For a subscription bought in the Android app, request the refund through Google Play (Play Store &rarr;
+        Payments &amp; subscriptions &rarr; Budget &amp; order history) or Google Play support. We cannot issue a
+        Google Play refund directly; if Google approves one, we will align your access with the refunded period.
+        This does not limit any statutory rights you have.
       </p>
 
       <h2>6. Chargebacks</h2>
