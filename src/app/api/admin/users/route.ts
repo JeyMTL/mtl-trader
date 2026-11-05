@@ -41,7 +41,7 @@ export async function GET(req: Request) {
       }
     })
 
-    return NextResponse.json({ users })
+    return NextResponse.json({ users }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error: unknown) {
     return apiError('admin.users', error, 500, 'Could not load users.')
   }

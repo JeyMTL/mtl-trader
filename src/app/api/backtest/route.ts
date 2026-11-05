@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 import { runBacktest } from '@/lib/backtest'
 import { checkFeature } from '@/lib/plan-guard'
 
@@ -64,7 +65,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const parsed = await readJsonBody<Record<string, unknown>>(req, {
+      maxBytes: 5 * 1024 * 1024,
+    })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
     const csv = typeof body.csv === 'string' ? body.csv : ''
     if (!csv.trim()) {
       return apiWarn('backtest.invalid', 'Paste or upload the bar data first.', 400)

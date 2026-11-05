@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { suggestTags } from '@/lib/ai/autotag'
 import { apiError } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 /**
  * POST /api/ai/autotag
@@ -25,7 +26,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = (await req.json().catch(() => ({}))) as { note?: unknown }
+    const parsed = await readJsonBody<{ note?: unknown }>(req, { maxBytes: 64 * 1024 })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
     if (typeof body.note !== 'string') {
       return NextResponse.json({ error: 'Expected a note string' }, { status: 400 })
     }

@@ -11,6 +11,7 @@ import {
   webhookSecretConfigured,
 } from '@/lib/paddle'
 import { apiError, logEvent } from '@/lib/log'
+import { readRawBody } from '@/lib/request'
 
 /**
  * Paddle notifications.
@@ -43,7 +44,10 @@ export async function POST(req: Request) {
     )
   }
 
-  const rawBody = await req.text()
+  const parsedBody = await readRawBody(req, 1024 * 1024)
+  if (!parsedBody.ok) return parsedBody.response
+  const rawBody = parsedBody.value
+
   if (!isValidPaddleSignature(req.headers.get('paddle-signature'), rawBody)) {
     logEvent('warn', 'paddle.webhook.invalid_signature')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })

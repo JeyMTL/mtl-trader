@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/server-auth'
 import { applyPaidOrder, getPayPalAccessToken, parseCustomId, PAYPAL_BASE } from '@/lib/payments'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 export async function POST(req: Request) {
   try {
@@ -24,7 +25,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const { orderId } = await req.json()
+    const parsedBody = await readJsonBody<{ orderId?: unknown }>(req, { maxBytes: 8 * 1024 })
+    if (!parsedBody.ok) return parsedBody.response
+    const orderId = typeof parsedBody.value.orderId === 'string' ? parsedBody.value.orderId : ''
 
     if (!orderId) {
       return NextResponse.json({ error: 'Missing orderId' }, { status: 400 })

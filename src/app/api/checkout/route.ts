@@ -4,6 +4,7 @@ import { PLANS } from '@/lib/plans'
 import { getPayPalAccessToken, PAYPAL_BASE } from '@/lib/payments'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 // Derived from PLANS so checkout can never drift from the displayed prices.
 const PLAN_MAP: Record<string, { amount: string; name: string }> = Object.fromEntries(
@@ -12,14 +13,18 @@ const PLAN_MAP: Record<string, { amount: string; name: string }> = Object.fromEn
 
 export async function POST(req: Request) {
   try {
-    const { planId, userId, email } = await req.json()
+    const parsed = await readJsonBody<{ planId?: unknown; userId?: unknown }>(req, {
+      maxBytes: 8 * 1024,
+    })
+    if (!parsed.ok) return parsed.response
 
-    if (!planId || !PLAN_MAP[planId]) {
+    const { planId, userId } = parsed.value
+    if (typeof planId !== 'string' || !PLAN_MAP[planId]) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
-    if (!userId || !email) {
-      return NextResponse.json({ error: 'Missing userId or email' }, { status: 400 })
+    if (typeof userId !== 'string' || !userId) {
+      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
     }
 
     const authUser = await getAuthUser(req)
@@ -29,6 +34,7 @@ export async function POST(req: Request) {
     if (authUser.id !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const buyerId = authUser.id
 
     // Creating an order is free but not free for PayPal or for us: an abandoned
     // checkout loop leaves a trail of live orders. Ten an hour is far more than
@@ -63,7 +69,7 @@ export async function POST(req: Request) {
           // Honest description: one payment buys one 30-day period. Access ends
           // unless it is renewed (see `expire_lapsed_subscriptions`).
           description: `MTL Trader - ${plan.name} Plan (30 days)`,
-          custom_id: JSON.stringify({ userId, planId }),
+          custom_id: JSON.stringify({ userId: buyerId, planId }),
         }],
         application_context: {
           brand_name: 'MTL Trader',

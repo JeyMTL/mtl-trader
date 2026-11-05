@@ -9,6 +9,7 @@ import {
 } from '@/lib/payments'
 import { getAdminClient } from '@/lib/server-auth'
 import { apiError, logEvent } from '@/lib/log'
+import { readRawBody } from '@/lib/request'
 
 /**
  * PayPal webhook — the durable upgrade path.
@@ -81,8 +82,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'PayPal webhook is not configured' }, { status: 503 })
   }
 
-  // The raw body must be verified exactly as received.
-  const rawBody = await req.text()
+  // The raw body must be verified exactly as received, and it should not be
+  // allowed to grow past what a webhook can plausibly be.
+  const parsedBody = await readRawBody(req, 1024 * 1024)
+  if (!parsedBody.ok) return parsedBody.response
+  const rawBody = parsedBody.value
 
   const transmissionId = req.headers.get('paypal-transmission-id')
   const transmissionTime = req.headers.get('paypal-transmission-time')

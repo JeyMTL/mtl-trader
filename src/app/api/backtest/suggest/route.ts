@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 import { createProvider, resolveProviderConfig } from '@/lib/ai/providers'
 import { MAX_SUGGEST_IMAGES, buildSuggestionMessages, normalizeSuggestion } from '@/lib/backtest/suggest'
 import type { SuggestionTrade } from '@/lib/backtest/suggest'
@@ -129,7 +130,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const parsed = await readJsonBody<Record<string, unknown>>(req, { maxBytes: 8 * 1024 })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
     const tradeId = typeof body.tradeId === 'string' ? body.tradeId : ''
     if (!tradeId) return apiWarn('backtest.suggest.invalid', 'Choose a journal trade first.', 400)
 

@@ -3,6 +3,7 @@ import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { cancelAtPeriodEndFields } from '@/lib/subscription'
 import { cancelPaddleSubscription } from '@/lib/paddle'
 import { apiError } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 /**
  * Cancels the renewal of the current paid period.
@@ -19,7 +20,9 @@ export async function POST(req: Request) {
     }
 
     // The body is optional; the authenticated user is the source of truth.
-    const body = await req.json().catch(() => ({})) as { userId?: unknown }
+    const parsed = await readJsonBody<{ userId?: unknown }>(req, { allowEmpty: true, maxBytes: 8 * 1024 })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
     if (typeof body.userId === 'string' && body.userId && body.userId !== authUser.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

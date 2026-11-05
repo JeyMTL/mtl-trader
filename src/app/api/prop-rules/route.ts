@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { parsePropRules } from '@/lib/prop-rules'
 import { apiError } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 /**
  * Prop-firm evaluation rules.
@@ -65,7 +66,12 @@ export async function PUT(req: Request) {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const body = await req.json().catch(() => null)
+    const read = await readJsonBody<Record<string, unknown>>(req, {
+      allowEmpty: true,
+      maxBytes: 16 * 1024,
+    })
+    if (!read.ok) return read.response
+    const body = read.value
     const parsed = parsePropRules(body)
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 400 })

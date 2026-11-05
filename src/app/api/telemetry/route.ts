@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { clientKey, rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 /**
  * First-party sink for crash and funnel events.
@@ -46,7 +47,9 @@ export async function POST(req: Request) {
       return new NextResponse(null, { status: 429 })
     }
 
-    const body = (await req.json().catch(() => null)) as Payload | null
+    const parsed = await readJsonBody<Payload>(req, { maxBytes: 8 * 1024 })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
     if (!body || typeof body !== 'object') {
       return new NextResponse(null, { status: 400 })
     }

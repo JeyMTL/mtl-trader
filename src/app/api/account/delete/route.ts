@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { apiError, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 /**
  * Deletes the caller's account.
@@ -22,7 +23,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Account has no email address to confirm' }, { status: 400 })
     }
 
-    const body = await req.json().catch(() => ({})) as { userId?: unknown; confirmEmail?: unknown }
+    const parsed = await readJsonBody<{ userId?: unknown; confirmEmail?: unknown }>(req, {
+      allowEmpty: true,
+      maxBytes: 8 * 1024,
+    })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
 
     if (typeof body.userId === 'string' && body.userId && body.userId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

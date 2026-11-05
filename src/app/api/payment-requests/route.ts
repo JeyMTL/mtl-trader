@@ -4,6 +4,7 @@ import { PLANS } from '@/lib/plans'
 import { rateLimit } from '@/lib/rate-limit'
 import { randomBytes } from 'node:crypto'
 import { apiError } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 const PLAN_MAP = new Map(
   PLANS.filter((plan) => plan.price > 0).map((plan) => [plan.id, plan])
@@ -23,7 +24,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = await req.json() as { planId?: unknown; reference?: unknown }
+    const parsed = await readJsonBody<{ planId?: unknown; reference?: unknown }>(req, {
+      maxBytes: 8 * 1024,
+    })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
     const planId = typeof body.planId === 'string' ? body.planId : ''
     const requestedReference = typeof body.reference === 'string' ? body.reference.trim() : ''
     const plan = PLAN_MAP.get(planId)

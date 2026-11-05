@@ -11,6 +11,7 @@ import {
   sellablePlanIds,
 } from '@/lib/paddle'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 import type { BillingInterval } from '@/types'
 
 /**
@@ -54,11 +55,13 @@ export async function POST(req: Request) {
     const authUser = await getAuthUser(req)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const body = (await req.json().catch(() => ({}))) as {
+    const parsed = await readJsonBody<{
       planId?: unknown
       userId?: unknown
       interval?: unknown
-    }
+    }>(req, { maxBytes: 8 * 1024 })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
 
     const planId = typeof body.planId === 'string' ? body.planId : ''
     // Anything unrecognised is treated as monthly rather than refused: the

@@ -9,6 +9,7 @@ import { generateReview, prepareReview } from '@/lib/ai/review'
 import { normalizeReview } from '@/lib/ai/schema'
 import type { ReviewRequest, ReviewResult, EdgeStats, SimilarSetup, TradeRecord } from '@/lib/ai/types'
 import { apiError, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 /**
  * POST /api/ai/review
@@ -89,7 +90,10 @@ export async function GET(req: Request) {
       .limit(20)
 
     if (error) return apiError('ai.review.list', error, 500, 'Could not load saved reviews.')
-    return NextResponse.json({ reviews: data || [] })
+    return NextResponse.json(
+      { reviews: data || [] },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error: unknown) {
     return apiError('ai.review.list', error, 500, 'Could not load saved reviews.')
   }
@@ -128,7 +132,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const input = (await req.json()) as ReviewRequest
+    const parsed = await readJsonBody<ReviewRequest>(req, { maxBytes: 2 * 1024 * 1024 })
+    if (!parsed.ok) return parsed.response
+    const input = parsed.value
     const hasShape =
       input &&
       typeof input === 'object' &&

@@ -121,6 +121,15 @@ export function detectDelimiter(text: string): string {
   return best
 }
 
+/**
+ * A broker statement is thousands of rows, not millions. These ceilings bound
+ * the work a crafted workbook can cause after the 4 MB upload cap: `sheetRows`
+ * stops SheetJS before it materialises a decompression bomb, and the row check
+ * turns a truncated sheet into an error instead of a silent partial import.
+ */
+const MAX_PARSE_ROWS = 100_000
+const MAX_PARSE_COLUMNS = 256
+
 /** Read any supported file (xlsx / xls / xml / csv / tsv / txt) into rows of strings. */
 export async function parseFileToRows(file: File): Promise<string[][]> {
   const buffer = await file.arrayBuffer()
@@ -135,11 +144,20 @@ export async function parseFileToRows(file: File): Promise<string[][]> {
   // Read both modern .xlsx and legacy .xls files, even when the extension is wrong.
   if (isZip || isLegacyExcel || lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
     const XLSX = await import('xlsx')
-    const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
+    const wb = XLSX.read(buffer, {
+      type: 'array',
+      cellDates: true,
+      sheetRows: MAX_PARSE_ROWS + 1,
+    })
     const ws = wb.Sheets[wb.SheetNames[0]]
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as unknown[][]
+    if (rows.length > MAX_PARSE_ROWS) {
+      throw new Error(`This workbook has more than ${MAX_PARSE_ROWS.toLocaleString()} rows.`)
+    }
     return rows.map(row =>
-      (row || []).map(v => (v instanceof Date ? v.toISOString() : String(v ?? '').trim()))
+      (row || [])
+        .slice(0, MAX_PARSE_COLUMNS)
+        .map(v => (v instanceof Date ? v.toISOString() : String(v ?? '').trim()))
     )
   }
 

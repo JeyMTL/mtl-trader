@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, requireAdmin } from '@/lib/server-auth'
 import { apiError, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 export async function GET(req: Request) {
   try {
@@ -20,7 +21,10 @@ export async function GET(req: Request) {
       return apiError('admin.payments.list', dbError, 500, 'Could not load payment requests.')
     }
 
-    return NextResponse.json({ requests: requests || [] })
+    return NextResponse.json(
+      { requests: requests || [] },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error: unknown) {
     return apiError('admin.payments', error, 500, 'Could not load payment requests.')
   }
@@ -28,7 +32,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { requestId, action } = await req.json()
+    const parsed = await readJsonBody<{ requestId?: unknown; action?: unknown }>(req, {
+      maxBytes: 8 * 1024,
+    })
+    if (!parsed.ok) return parsed.response
+    const { requestId, action } = parsed.value
 
     if (typeof requestId !== 'string' || !requestId || !action) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })

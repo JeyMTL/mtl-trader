@@ -20,9 +20,15 @@ const CONTENT_SECURITY_POLICY = [
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com",
   "frame-src https://*.paddle.com",
   "form-action 'self' https://www.paypal.com https://*.paddle.com",
+  // Blocks inline onclick=/onerror= attributes even though the bootstrap
+  // scripts still need 'unsafe-inline'. React attaches listeners, so the app
+  // never relies on an inline handler.
+  "script-src-attr 'none'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "object-src 'none'",
+  // Production only: in dev this would rewrite the HMR websocket to https.
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join('; ');
 
 const nextConfig: NextConfig = {
@@ -42,8 +48,20 @@ const nextConfig: NextConfig = {
           // leaks a session cookie.
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
           { key: 'Content-Security-Policy', value: CONTENT_SECURITY_POLICY },
+          // Keep our documents out of other browsing contexts and cross-origin
+          // resource loads; frame-ancestors above covers embedding, these cover
+          // opener access and no-cors reads.
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
+          { key: 'Origin-Agent-Cluster', value: '?1' },
+          { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
           // Journal capture needs the camera and microphone on this origin only.
-          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
+          // Everything a journal has no use for is denied outright.
+          {
+            key: 'Permissions-Policy',
+            value:
+              'camera=(self), microphone=(self), geolocation=(), usb=(), serial=(), hid=(), bluetooth=(), browsing-topics=()',
+          },
         ],
       },
       {

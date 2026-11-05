@@ -4,6 +4,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { rateLimit } from '@/lib/rate-limit'
 import { hasValidBearer } from '@/lib/auth-guards'
 import { apiError, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 import { checkFeature } from '@/lib/plan-guard'
 
 /**
@@ -31,26 +32,6 @@ import { checkFeature } from '@/lib/plan-guard'
 
 const MAX_BATCH = 5000
 const CHUNK = 200
-
-interface IncomingTrade {
-  ticket?: unknown
-  position_id?: unknown
-  positionId?: unknown
-  symbol: string
-  type: 'BUY' | 'SELL'
-  entry_price: number
-  exit_price: number
-  lot_size: number
-  stop_loss?: number
-  take_profit?: number
-  pnl: number
-  commission?: number
-  swap?: number
-  open_time: string
-  close_time: string
-  timeframe?: string
-  strategy?: string
-}
 
 interface PreparedTrade {
   key: number
@@ -167,11 +148,13 @@ async function authorised(req: Request, userId: string, token: string) {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json().catch(() => ({}))) as {
+    const parsed = await readJsonBody<{
       trades?: unknown
       userId?: unknown
       token?: unknown
-    }
+    }>(req, { maxBytes: 1024 * 1024 })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
 
     const userId = typeof body.userId === 'string' ? body.userId : ''
     const token = typeof body.token === 'string' ? body.token : ''

@@ -3,6 +3,7 @@ import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { googlePlayConfigured } from '@/lib/google-play'
 import { syncGoogleSubscription } from '@/lib/google-billing'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import { readJsonBody } from '@/lib/request'
 
 /**
  * Verifies a Google Play purchase and applies the plan it paid for.
@@ -33,10 +34,12 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = (await req.json().catch(() => ({}))) as {
-      purchaseToken?: unknown
-      productId?: unknown
-    }
+    const parsed = await readJsonBody<{ purchaseToken?: unknown; productId?: unknown }>(req, {
+      allowEmpty: true,
+      maxBytes: 8 * 1024,
+    })
+    if (!parsed.ok) return parsed.response
+    const body = parsed.value
 
     let purchaseToken =
       typeof body.purchaseToken === 'string' && body.purchaseToken.trim()
