@@ -17,7 +17,7 @@ dependencies:
   # Pinned by flutter_localizations; gen-l10n generates against this version.
   intl: ^0.20.3
   image_picker: ^1.1.2
-  file_picker: ^8.1.7
+  file_picker: ^13.3.2
   record: ^7.1.2
   just_audio: ^0.9.42
   path_provider: ^2.1.4
