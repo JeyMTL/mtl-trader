@@ -54,6 +54,9 @@ ReportHistory-*.xlsx
 ReportHistory-*.xml
 *.xls
 *.xlsx
+# The mobile import parser's workbook fixture is test data, not a private
+# broker report. Keep this exception after the blanket rule above.
+!mobile_flutter/test/fixtures/*.xlsx
 
 # Local broker exports (personal financial data — never commit)
 trade_data.json
