@@ -8,7 +8,7 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Item | Value |
 | --- | --- |
 | App id | `com.mtltrader.app` |
-| Live version | **1.0.4**, version code **5** on Closed testing – Alpha (4 Nov 2026); **1.0.3 / code 4** was the previous Alpha release |
+| Track version | **1.0.4**, version code **5** uploaded to Closed testing – Alpha on 4 Nov 2026, but **still in Google review** at 19:20 the same evening — testers keep receiving **1.0.3 / code 4** until it is approved |
 | Built | **1.0.4**, code **5** — release-signed `app-release.aab`, 64,216,166 bytes, built 4 Nov 2026 18:48 |
 | Track | Closed testing – Alpha (Active, 178 countries) |
 | Published | 4 Nov 2026 (Console: "Last published on November 4, 2026") |
@@ -91,6 +91,28 @@ link.
 Testers must stay opted in and keep the app installed. Uninstalling or leaving
 the program resets their contribution.
 
+## Why the phone still shows 1.0.3 (4 Nov 2026)
+
+Uploaded is not available. On the Alpha *Releases* tab the new release reads
+**5 (1.0.4) — In review**, while **4 (1.0.3)** reads *Available to selected
+testers · Released Nov 4 2:48 AM*. Google has to approve the bundle before any
+tester — the publisher account included — can install it, so:
+
+- the testing link says *You are a tester* (correct),
+- the app page offers only **Open**, and
+- **Updates available** in Play lists nothing, because Play has no approved
+  newer build for that account.
+
+Nothing to fix: the release simply has not cleared review. Review length is the
+only unknown (hours, occasionally a day or more) and Play notifies by email when
+the release goes live. Confirm by the release line changing to *Available to
+selected testers*; the update then appears in Play within minutes.
+
+The `edits/{id}/tracks` API reports the release as `status: completed` while it
+is still in review — `completed` means the rollout reached 100%, not that Google
+approved it. Review state exists only in the Console, so never read `completed`
+as "testers can install it".
+
 ## The 14-day clock
 
 Play requires **≥12 testers opted in continuously for 14 days** before production
@@ -159,7 +181,15 @@ licence-tester account, and until the Console/API pieces exist:
    lists all four products with their base plans. That covers the three things a
    purchase would otherwise have to discover: the key is valid, the *Google Play
    Android Developer API* is enabled, and the Play permission grant is right.
-5. **Setup → License testing** — add the test phone's account.
+5. ~~License testing~~ — **not needed for the publisher account.** Google treats
+   the publishing account as a licence tester automatically; the test phone is
+   signed in as `jfx064@gmail.com`. Configured at *Manage account → Play apps
+   settings → Monetization settings → License testing* (there is no *Settings*
+   item in the app-scoped sidebar, which is what made it unfindable). The
+   Android Publisher API's `testers` resource only accepts `googleGroups` —
+   `emails` is rejected with *Unknown name "emails"* — so Alpha testers exist
+   solely as the group `mtl-trader-testers@googlegroups.com`, verified
+   `200 {googleGroups: [...]}` on 4 Nov 2026.
 6. Buy each plan once from the Play-installed build; confirm the row in
    `google_play_subscriptions` gets `acknowledged = true` and the plan unlocks.
 
