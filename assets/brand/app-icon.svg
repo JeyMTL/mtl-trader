@@ -3,37 +3,50 @@
   <!--
     The master artwork for every icon (see scripts/make-app-icons.mjs).
 
-    One "M" whose right arm rises toward the equity arrow, with the account bars
-    climbing behind it. Everything is geometry, so the 1024px store icon and the
-    48px launcher tile come from the same outlines.
+    A bold "M" whose left leg, diagonal and rising arm form one ribbon: the arm
+    leaves the valley and becomes the equity arrow at the top right, a thin
+    sweep runs from the bottom-left point under the account bars to the arrow,
+    and four climbing bars sit behind the letter.
 
-    Both mark gradients are userSpaceOnUse: overlapping shapes filled from one
-    gradient map merge without a seam, which is what lets the stem, the chevron
-    and the tail read as one continuous ribbon. The stem and the chevron are
-    clipped at the top so the peak is a single corner, not two mitered cuts.
+    Both mark gradients are userSpaceOnUse so the separate shapes that make the
+    ribbon merge without a seam. The arrow is a single polygon with a notch at
+    the head's upper barb, so the shaft and head never show a join. To change the
+    mark, edit this file and re-run the generator.
   -->
   <defs>
-    <linearGradient id="page" x1="0" y1="0" x2="0.55" y2="1">
-      <stop offset="0" stop-color="#0c1a29"/>
-      <stop offset="1" stop-color="#0a1420"/>
+    <linearGradient id="page" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#0a1b2a"/>
+      <stop offset="1" stop-color="#061220"/>
     </linearGradient>
-    <radialGradient id="halo" cx="0.5" cy="0.44" r="0.62">
-      <stop offset="0" stop-color="#173a56" stop-opacity="0.8"/>
-      <stop offset="1" stop-color="#0b1a28" stop-opacity="0"/>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.6">
+      <stop offset="0" stop-color="#12324b" stop-opacity="0.65"/>
+      <stop offset="1" stop-color="#0a1b2a" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="ice" gradientUnits="userSpaceOnUse" x1="200" y1="240" x2="800" y2="830">
-      <stop offset="0" stop-color="#f4fcff"/>
-      <stop offset="0.26" stop-color="#c3ecfd"/>
-      <stop offset="0.58" stop-color="#57ccf7"/>
-      <stop offset="1" stop-color="#1d97e0"/>
+    <linearGradient id="ice" gradientUnits="userSpaceOnUse" x1="230" y1="240" x2="700" y2="800">
+      <stop offset="0" stop-color="#f7feff"/>
+      <stop offset="0.22" stop-color="#d8f4ff"/>
+      <stop offset="0.55" stop-color="#5ccdf7"/>
+      <stop offset="0.95" stop-color="#1f7ed6"/>
     </linearGradient>
-    <linearGradient id="flow" gradientUnits="userSpaceOnUse" x1="595" y1="585" x2="890" y2="206">
-      <stop offset="0" stop-color="#1c86d8"/>
-      <stop offset="0.55" stop-color="#3fbcf4"/>
-      <stop offset="1" stop-color="#8fe3ff"/>
+    <linearGradient id="flow" gradientUnits="userSpaceOnUse" x1="500" y1="660" x2="880" y2="190">
+      <stop offset="0" stop-color="#1d7ad4"/>
+      <stop offset="0.55" stop-color="#4cc4f5"/>
+      <stop offset="1" stop-color="#a5ebff"/>
     </linearGradient>
-    <clipPath id="peak">
-      <rect x="40" y="252" width="984" height="700"/>
+    <!-- The sweep has its own ramp: it starts where the shaft's gradient is
+         already at its darkest, which vanished into the navy at launcher size. -->
+    <linearGradient id="sweep" gradientUnits="userSpaceOnUse" x1="190" y1="770" x2="820" y2="380">
+      <stop offset="0" stop-color="#2f93e2"/>
+      <stop offset="0.55" stop-color="#55c6f6"/>
+      <stop offset="1" stop-color="#8ce2ff"/>
+    </linearGradient>
+    <linearGradient id="bars" gradientUnits="userSpaceOnUse" x1="0" y1="460" x2="0" y2="810">
+      <stop offset="0" stop-color="#dcf6ff"/>
+      <stop offset="0.4" stop-color="#8ce0fb"/>
+      <stop offset="1" stop-color="#2b8ada"/>
+    </linearGradient>
+    <clipPath id="top">
+      <rect x="150" y="250" width="760" height="620"/>
     </clipPath>
   </defs>
 
@@ -41,27 +54,39 @@
        rectangles stay inside it so nothing else can ever be removed. -->
   <g id="ground">
     <rect width="1024" height="1024" fill="url(#page)"/>
-    <rect width="1024" height="1024" fill="url(#halo)"/>
+    <rect width="1024" height="1024" fill="url(#glow)"/>
   </g>
 
-  <g transform="translate(-24 -14)">
-    <!-- The four account bars, climbing left to right, behind the letter. -->
-    <g fill="url(#ice)">
-      <path d="M480 640 538 660 538 836 480 812Z"/>
-      <path d="M564 612 622 632 622 812 564 792Z"/>
-      <path d="M648 576 706 596 706 790 648 770Z"/>
-      <path d="M732 536 790 556 790 766 732 746Z"/>
-    </g>
-
-    <!-- The M: a vertical stem tapering to the floor point, then the chevron
-         whose right arm rises toward the arrow. -->
-    <g clip-path="url(#peak)">
-      <path fill="url(#ice)" d="M250 252 378 252 378 690 186 808Z"/>
-      <path fill="none" stroke="url(#ice)" stroke-width="132" stroke-linejoin="miter" d="M300 268 505 520 660 360"/>
-    </g>
-
-    <!-- The equity arrow, the one element that sits above the letter. -->
-    <path fill="none" stroke="url(#flow)" stroke-width="76" d="M600 570 812 318"/>
-    <path fill="url(#flow)" d="M884 212 826 396 698 264Z"/>
+  <!-- The four account bars, climbing left to right, behind the letter. -->
+  <g fill="url(#bars)">
+    <path d="M466 606 528 597 530 800 468 808Z"/>
+    <path d="M536 566 600 557 602 792 538 800Z"/>
+    <path d="M608 528 674 519 676 782 610 790Z"/>
+    <path d="M698 458 770 446 772 752 700 762Z"/>
   </g>
+
+  <!-- The sweep from the bottom-left point along the bars' base. It runs in
+       front of the bars and ends under the arrow; the leg, drawn next, covers
+       its start so the two read as one ribbon. -->
+  <path
+    d="M205 750 Q 440 700 800 400"
+    fill="none"
+    stroke="url(#sweep)"
+    stroke-width="46"
+    stroke-linecap="butt"
+  />
+
+  <!-- The M: the leg that tapers to the bottom-left point, then the diagonal
+       into the valley. Same gradient on both, so the join is invisible. -->
+  <g fill="url(#ice)" clip-path="url(#top)">
+    <path d="M244 250 364 250 364 600 185 775 244 600Z"/>
+    <path d="M240 301 360 227 578 581 458 655Z"/>
+  </g>
+
+  <!-- The equity arrow: shaft and head are one outline. The upper barb
+       overhangs the shaft, which is the notch the head keeps in the artwork. -->
+  <path
+    fill="url(#flow)"
+    d="M462 576 748 296 604 220 878 176 862 420 566 668Z"
+  />
 </svg>
