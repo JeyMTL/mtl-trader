@@ -423,11 +423,16 @@ class _HourChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 18,
-              interval: 3,
-              getTitlesWidget: (value, meta) => Text(
-                '${value.toInt()}h',
-                style: TextStyle(color: AppColors.faint, fontSize: 8.5),
-              ),
+              // Only every third hour has room; the chart otherwise prints all
+              // 24 labels on top of each other.
+              getTitlesWidget: (value, meta) {
+                final hour = value.round();
+                if (hour % 3 != 0) return const SizedBox.shrink();
+                return Text(
+                  '${hour}h',
+                  style: TextStyle(color: AppColors.faint, fontSize: 8.5),
+                );
+              },
             ),
           ),
         ),

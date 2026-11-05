@@ -7,9 +7,11 @@ import '../services/journal_api.dart';
 import '../ui/theme.dart';
 import 'account_screen.dart';
 import 'analytics_screen.dart';
+import 'backtest_screen.dart';
 import 'calendar_screen.dart';
 import 'dashboard_screen.dart';
 import 'edge_screen.dart';
+import 'import_screen.dart';
 import 'journal_screen.dart';
 import 'trade_form_screen.dart';
 
@@ -74,6 +76,23 @@ class _AppShellState extends State<AppShell>
     }
   }
 
+  /// Import is reached from the desk and the account tab rather than a sixth
+  /// tab: it is set up once (a statement) and then forgotten, like MT5 sync.
+  Future<void> _openImport() async {
+    final imported = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ImportScreen(api: _api)),
+    );
+    if (imported == true && mounted) _invalidate();
+  }
+
+  /// The backtester runs on the server and keeps its own archive, so nothing in
+  /// the tabs has to reload when it closes.
+  void _openBacktest() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const BacktestScreen()),
+    );
+  }
+
   void _openEdge() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -105,6 +124,7 @@ class _AppShellState extends State<AppShell>
           api: _api,
           onOpenEdge: _openEdge,
           onEdit: (id) => _openTrade(tradeId: id),
+          onOpenImport: _openImport,
         );
       case 1:
         return JournalScreen(
@@ -134,6 +154,8 @@ class _AppShellState extends State<AppShell>
           key: ValueKey('account-$_reload'),
           api: _api,
           onProfileChanged: _invalidate,
+          onOpenImport: _openImport,
+          onOpenBacktest: _openBacktest,
         );
     }
   }

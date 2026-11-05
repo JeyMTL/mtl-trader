@@ -57,13 +57,27 @@ const List<String> _timezoneOptions = [
 ];
 
 class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key, required this.api, this.onProfileChanged});
+  const AccountScreen({
+    super.key,
+    required this.api,
+    this.onProfileChanged,
+    this.onOpenImport,
+    this.onOpenBacktest,
+  });
 
   final JournalApi api;
 
   /// Lets the shell rebuild the desk, journal and edge tabs after a setting
   /// that changes their data (currently the report timezone).
   final VoidCallback? onProfileChanged;
+
+  /// Opens the phone import screen. Supplied by the shell, because importing
+  /// has to reload the other tabs afterwards.
+  final VoidCallback? onOpenImport;
+
+  /// Opens the backtest workbench. Kept here beside import: both are set up from
+  /// the account tab rather than adding a sixth destination to the bar.
+  final VoidCallback? onOpenBacktest;
 
   @override
   State<AccountScreen> createState() => _AccountScreenState();
@@ -555,6 +569,22 @@ class _AccountScreenState extends State<AccountScreen> {
                   icon: const Icon(Icons.credit_card, size: 16),
                   label: const Text('View plans & billing'),
                 ),
+                if (widget.onOpenImport != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenImport,
+                    icon: const Icon(Icons.upload_file, size: 16),
+                    label: const Text('Import trade history'),
+                  ),
+                ],
+                if (widget.onOpenBacktest != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenBacktest,
+                    icon: const Icon(Icons.science_outlined, size: 16),
+                    label: const Text('Backtester (Pro)'),
+                  ),
+                ],
                 if (kMt5SyncEnabled) ...[
                   const SizedBox(height: 8),
                   OutlinedButton.icon(

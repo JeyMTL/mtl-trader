@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config.dart';
+import '../core/import_parser.dart';
+import '../core/plans.dart';
 import '../models/ai_review.dart';
 import '../models/models.dart';
 import '../models/prop_rules.dart';
@@ -295,6 +297,270 @@ class JournalApi {
       }
     }
     await _db.from('trades').delete().eq('user_id', userId);
+  }
+
+  /// Writes parsed history rows, skipping tickets already in the journal.
+  ///
+  /// The web desk inserts straight into `trades`, so the phone does the same:
+  /// RLS, the quota trigger and the duplicate check below are the same gates
+  /// that apply there. One `import_id` groups the batch, so a future "delete
+  /// this import" can find it again.
+  Future<ImportOutcome> importTrades(List<ParsedTrade> trades) async {
+    final id = userId;
+    if (id == null) throw Exception('Your session expired. Sign in again.');
+    if (trades.isEmpty) return const ImportOutcome(imported: 0, skipped: 0);
+
+    // Same repair call the web desk makes on every import: accounts created
+    // before the unlimited 30-day trial change get their allowance raised.
+    // Best effort — it must never block the import.
+    try {
+      await _api('POST', '/api/trial/activate');
+    } catch (_) {}
+
+    var toImport = trades;
+    String? notice;
+
+    // Same allowance rule and same definition of "this month" as the web desk
+    // and the database trigger, so the notice below matches what will actually
+    // be accepted on insert.
+    final maxTrades = _effectiveMaxTrades(await profile());
+    if (maxTrades != -1) {
+      final used = asInt(await _db.rpc('month_trade_count'));
+      final due = maxTrades - used;
+      final remaining = due < 0 ? 0 : due;
+      if (remaining == 0) {
+        throw Exception(
+          'You have reached your monthly limit of $maxTrades trades. '
+          'Upgrade your plan for more.',
+        );
+      }
+      if (remaining < toImport.length) {
+        notice = 'Monthly limit: importing $remaining of ${toImport.length} '
+            'trades. Upgrade your plan to import the rest.';
+        toImport = toImport.sublist(0, remaining);
+      }
+    }
+
+    final tickets =
+        toImport.map((trade) => trade.ticket).whereType<int>().toList();
+    final existing = <int>{};
+    if (tickets.isNotEmpty) {
+      final rows = await _db
+          .from('trades')
+          .select('ticket')
+          .eq('user_id', id)
+          .inFilter('ticket', tickets);
+      for (final row in asList(rows)) {
+        final ticket = asNullableInt(asMap(row)['ticket']);
+        if (ticket != null) existing.add(ticket);
+      }
+    }
+
+    final seen = <int>{};
+    final fresh = toImport.where((trade) {
+      final ticket = trade.ticket;
+      if (ticket == null) return true;
+      if (existing.contains(ticket) || seen.contains(ticket)) return false;
+      seen.add(ticket);
+      return true;
+    }).toList();
+    final skipped = toImport.length - fresh.length;
+
+    if (fresh.isEmpty) {
+      return ImportOutcome(
+        imported: 0,
+        skipped: skipped,
+        notice: notice ??
+            (skipped > 0
+                ? 'All $skipped trades are already in your journal.'
+                : null),
+      );
+    }
+
+    final importId = _uuid();
+    var imported = 0;
+    for (var start = 0; start < fresh.length; start += 100) {
+      final payload = fresh.skip(start).take(100).map((trade) {
+        return <String, dynamic>{
+          'user_id': id,
+          'symbol': trade.symbol,
+          'type': trade.type,
+          'entry_price': trade.entry,
+          'exit_price': trade.exit,
+          'lot_size': trade.lot,
+          'stop_loss': trade.sl == 0 ? null : trade.sl,
+          'take_profit': trade.tp == 0 ? null : trade.tp,
+          'pnl': trade.pnl,
+          'commission': trade.commission,
+          'swap': trade.swap,
+          'open_time': _timestamp(trade.date),
+          'close_time': _timestamp(trade.closeDate),
+          'ticket': trade.ticket,
+          'import_id': importId,
+        };
+      }).where((row) => (row['lot_size'] as double) > 0).toList();
+      if (payload.isEmpty) continue;
+      await _db.from('trades').insert(payload);
+      imported += payload.length;
+    }
+
+    return ImportOutcome(
+      imported: imported,
+      skipped: skipped,
+      notice: notice,
+      importId: importId,
+    );
+  }
+
+  /// Removes one imported statement. The rows share an `import_id`, so the
+  /// whole batch goes at once — the same thing the web desk's import history
+  /// does.
+  Future<void> deleteImport(String importId) async {
+    final id = userId;
+    if (id == null) throw Exception('Your session expired. Sign in again.');
+
+    // Collect attachment paths first: the attachment rows cascade with the
+    // trade, so a list taken after the delete would be empty and the files
+    // would stay in the bucket. Matches the web desk's delete.
+    final rows = await _db
+        .from('trades')
+        .select('id')
+        .eq('user_id', id)
+        .eq('import_id', importId);
+    final ids = asList(rows).map((row) => asMap(row)['id']).toList();
+    if (ids.isNotEmpty) {
+      final media = await _db
+          .from('trade_attachments')
+          .select('storage_path')
+          .inFilter('trade_id', ids);
+      final paths = asList(media)
+          .map((row) => asString(asMap(row)['storage_path']))
+          .whereType<String>()
+          .toList();
+      if (paths.isNotEmpty) {
+        await _db.storage.from(mediaBucket).remove(paths);
+      }
+    }
+
+    await _db
+        .from('trades')
+        .delete()
+        .eq('user_id', id)
+        .eq('import_id', importId);
+  }
+
+  /// Reads a history file with the server's importer — the same code the web
+  /// desk runs — for workbooks the phone cannot decode itself (legacy `.xls`).
+  /// Nothing is written here; the preview goes through [importTrades].
+  Future<List<ParsedTrade>> parseImportFile({
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    final session = _db.auth.currentSession;
+    if (session == null) throw Exception('Your session expired. Sign in again.');
+
+    final boundary = 'mtl${DateTime.now().microsecondsSinceEpoch}';
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
+    try {
+      final request = await client.postUrl(
+        Uri.parse('${AppConfig.apiBaseUrl}/api/import/parse'),
+      );
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer ${session.accessToken}',
+      );
+      request.headers.contentType = ContentType(
+        'multipart',
+        'form-data',
+        parameters: {'boundary': boundary},
+      );
+      final safeName = fileName.replaceAll(RegExp(r'["\r\n]'), ' ');
+      request.add(
+        utf8.encode(
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="file"; filename="$safeName"\r\n'
+          'Content-Type: application/octet-stream\r\n\r\n',
+        ),
+      );
+      request.add(bytes);
+      request.add(utf8.encode('\r\n--$boundary--\r\n'));
+
+      final response = await request.close().timeout(
+            const Duration(seconds: 90),
+          );
+      final body = await response.transform(utf8.decoder).join();
+
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(body);
+      } catch (_) {
+        decoded = null;
+      }
+
+      if (response.statusCode != 200) {
+        final message = decoded is Map && decoded['error'] is String
+            ? decoded['error'] as String
+            : 'Could not read this file. Try exporting it as CSV.';
+        throw Exception(message);
+      }
+
+      final trades = decoded is Map ? decoded['trades'] : null;
+      return asList(trades)
+          .map((row) => ParsedTrade.fromMap(asMap(row)))
+          .toList();
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Mirrors `effectiveMaxTrades` in `src/lib/subscription.ts`: an active trial
+  /// is unlimited, an active paid period uses the stored allowance, and
+  /// anything else has none. `-1` means unlimited, as it does on the web.
+  static int _effectiveMaxTrades(Map<String, dynamic> account) {
+    final status =
+        (asString(account['subscription_status']) ?? '').toLowerCase();
+    final now = DateTime.now();
+
+    if (status == 'trial') {
+      final trialEnd =
+          DateTime.tryParse(asString(account['trial_ends_at']) ?? '');
+      if (trialEnd != null && trialEnd.isAfter(now)) return -1;
+    }
+
+    if (status == 'active') {
+      final tier = asString(account['subscription_tier']);
+      final paid = mobilePlans.any(
+        (plan) => plan.id == tier && plan.price > 0,
+      );
+      final periodEnd =
+          DateTime.tryParse(asString(account['current_period_end']) ?? '');
+      if (paid && periodEnd != null && periodEnd.isAfter(now)) {
+        return asInt(account['max_trades']);
+      }
+    }
+
+    return 0;
+  }
+
+  /// A timestamp Postgres can parse, or null so the column stays empty.
+  static String? _timestamp(String value) {
+    if (value.isEmpty) return null;
+    return DateTime.tryParse(value)?.toIso8601String();
+  }
+
+  /// A v4 UUID, because the app carries no uuid package and `import_id` needs
+  /// one identifier for the whole batch.
+  static String _uuid() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
   Future<PendingAttachment> uploadAttachment({
@@ -607,4 +873,22 @@ class JournalApi {
     if (mimeType.contains('ogg')) return 'ogg';
     return kind == 'image' ? 'jpg' : 'webm';
   }
+}
+
+/// What one import did: rows written, rows skipped as duplicates, and any cap
+/// notice worth showing beside the result.
+class ImportOutcome {
+  const ImportOutcome({
+    required this.imported,
+    required this.skipped,
+    this.notice,
+    this.importId,
+  });
+
+  final int imported;
+  final int skipped;
+  final String? notice;
+
+  /// The batch id written to `trades.import_id`; null when nothing was written.
+  final String? importId;
 }

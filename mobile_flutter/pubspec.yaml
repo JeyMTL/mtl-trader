@@ -25,6 +25,7 @@ dependencies:
   shared_preferences: ^2.5.6
   # Play Billing, for the subscription sold inside the Play-distributed build.
   in_app_purchase: ^3.2.0
+  spreadsheet_decoder: ^2.3.0
 
 dev_dependencies:
   flutter_test:

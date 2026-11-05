@@ -23,11 +23,16 @@ class DashboardScreen extends StatefulWidget {
     required this.api,
     required this.onOpenEdge,
     required this.onEdit,
+    this.onOpenImport,
   });
 
   final JournalApi api;
   final VoidCallback onOpenEdge;
   final ValueChanged<String> onEdit;
+
+  /// Opens the import screen from the empty equity chart. Optional so the
+  /// screen can still be built on its own.
+  final VoidCallback? onOpenImport;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -97,6 +102,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               data: data,
               onOpenEdge: widget.onOpenEdge,
               onEdit: widget.onEdit,
+              onOpenImport: widget.onOpenImport,
             ),
           );
         },
@@ -111,12 +117,14 @@ class _DashboardBody extends StatelessWidget {
     required this.data,
     required this.onOpenEdge,
     required this.onEdit,
+    this.onOpenImport,
   });
 
   final JournalApi api;
   final DashboardData data;
   final VoidCallback onOpenEdge;
   final ValueChanged<String> onEdit;
+  final VoidCallback? onOpenImport;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +144,11 @@ class _DashboardBody extends StatelessWidget {
         ],
         Reveal(
           index: 0,
-          child: _BalanceHero(data: data, summary: summary),
+          child: _BalanceHero(
+            data: data,
+            summary: summary,
+            onOpenImport: onOpenImport,
+          ),
         ),
         const SizedBox(height: 10),
         PropComplianceCard(api: api),
@@ -374,10 +386,15 @@ class _DashboardBody extends StatelessWidget {
 /// The balance is the screen's hero: a counting number over a gradient equity
 /// curve, with a soft gold bloom bleeding in from the corner.
 class _BalanceHero extends StatelessWidget {
-  const _BalanceHero({required this.data, required this.summary});
+  const _BalanceHero({
+    required this.data,
+    required this.summary,
+    this.onOpenImport,
+  });
 
   final DashboardData data;
   final TradeSummary summary;
+  final VoidCallback? onOpenImport;
 
   @override
   Widget build(BuildContext context) {
@@ -467,14 +484,29 @@ class _BalanceHero extends StatelessWidget {
                   height: 116,
                   child: data.equity.isEmpty
                       ? Center(
-                          child: Text(
-                            l10n.importHistoryHint,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppColors.faint,
-                              fontSize: kMinLabelSize,
-                            ),
-                          ),
+                          child: onOpenImport == null
+                              ? Text(
+                                  l10n.importHistoryHint,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppColors.faint,
+                                    fontSize: kMinLabelSize,
+                                  ),
+                                )
+                              // The hint used to be a dead end: it told the
+                              // trader to import, then left the web desk as
+                              // the only way to do it.
+                              : TextButton.icon(
+                                  onPressed: onOpenImport,
+                                  icon: const Icon(
+                                    Icons.upload_file,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    l10n.importHistoryHint,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
                         )
                       : ChartSemantics(
                           label: l10n.a11yEquityCurve(
@@ -719,12 +751,22 @@ class _HourChart extends StatelessWidget {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 16,
-              interval: 6,
-              getTitlesWidget: (value, meta) => Text(
-                '${value.toInt()}h',
-                style: TextStyle(color: AppColors.faint, fontSize: 10.5),
-              ),
+              reservedSize: 18,
+              // A bar chart asks for a title on every group, so 24 hourly
+              // labels all arrived and ran into each other. Print every third
+              // hour; the bars keep their positions and the axis stays legible
+              // on a phone.
+              getTitlesWidget: (value, meta) {
+                final hour = value.round();
+                if (hour % 3 != 0) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    '${hour}h',
+                    style: TextStyle(color: AppColors.faint, fontSize: 10.5),
+                  ),
+                );
+              },
             ),
           ),
         ),
