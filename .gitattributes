@@ -1,0 +1,14 @@
+# Check files out with LF everywhere, so a Windows working copy does not turn
+# every touched file into a whole-file diff (and every commit into a warning).
+* text=auto eol=lf
+
+# Never attempt to normalise binary artefacts.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.aab binary
+*.apk binary
+*.keystore binary
+*.jks binary

@@ -1,0 +1,154 @@
+{
+  "symbol": "EURUSD",
+  "timeframe": "M5",
+  "strategy": {
+    "id": "sma_cross",
+    "name": "SMA cross",
+    "params": {
+      "fast": 20,
+      "slow": 50,
+      "atrPeriod": 14,
+      "stopAtr": 2,
+      "targetAtr": 4
+    }
+  },
+  "config": {
+    "symbol": "EURUSD",
+    "initialBalance": 10000,
+    "riskPercent": 1,
+    "contractSize": 100000,
+    "maxLeverage": 30,
+    "costs": {
+      "spread": 0.0002,
+      "slippage": 0.0001,
+      "commission": 2
+    }
+  },
+  "barCount": 4800,
+  "from": 1735689600000,
+  "to": 1736294400000,
+  "metrics": {
+    "netPnl": 412.4,
+    "returnPct": 4.124,
+    "profitFactor": 1.83,
+    "winRate": 54.7,
+    "trades": 64,
+    "expectancy": 6.44,
+    "maxDrawdownPct": 5.2,
+    "sharpe": 1.12,
+    "exposurePct": 38.5,
+    "avgRMultiple": 0.42
+  },
+  "split": {
+    "ratio": 0.7,
+    "inSample": {
+      "netPnl": 380.1,
+      "returnPct": 3.801,
+      "profitFactor": 2.1,
+      "winRate": 57.8,
+      "trades": 45,
+      "expectancy": 8.45,
+      "maxDrawdownPct": 3.9,
+      "sharpe": 1.4,
+      "exposurePct": 41,
+      "avgRMultiple": 0.55
+    },
+    "outOfSample": {
+      "netPnl": 32.3,
+      "returnPct": 0.323,
+      "profitFactor": 1.2,
+      "winRate": 47.4,
+      "trades": 19,
+      "expectancy": 1.7,
+      "maxDrawdownPct": 5.2,
+      "sharpe": 0.3,
+      "exposurePct": 30,
+      "avgRMultiple": 0.11
+    }
+  },
+  "benchmark": {
+    "initialBalance": 10000,
+    "finalEquity": 10320.5,
+    "netPnl": 320.5,
+    "returnPct": 3.205,
+    "maxDrawdownPct": 1.8,
+    "bars": 4800
+  },
+  "stress": {
+    "simulations": 1000,
+    "seed": 2648231,
+    "returnPct": {
+      "p05": -4.2,
+      "p50": 1.9,
+      "p95": 7.4
+    },
+    "maxDrawdownPct": {
+      "p05": 1.1,
+      "p50": 3.4,
+      "p95": 9.8
+    },
+    "probabilityOfProfit": 0.61,
+    "worseDrawdownRate": 0.42,
+    "trades": 64
+  },
+  "trades": [
+    {
+      "side": "long",
+      "entryTime": 1735689600000,
+      "exitTime": 1735691400000,
+      "entryPrice": 1.0842,
+      "exitPrice": 1.0868,
+      "stopPrice": 1.0822,
+      "takeProfitPrice": 1.0882,
+      "lots": 0.18,
+      "grossPnl": 46.8,
+      "costs": 3.6,
+      "pnl": 43.2,
+      "riskAmount": 36,
+      "rMultiple": 1.2,
+      "barsHeld": 30,
+      "exitReason": "target"
+    },
+    {
+      "side": "short",
+      "entryTime": 1735700000000,
+      "exitTime": 1735701800000,
+      "entryPrice": 1.0871,
+      "exitPrice": 1.0879,
+      "stopPrice": 1.0891,
+      "takeProfitPrice": 1.0831,
+      "lots": 0.16,
+      "grossPnl": -12.8,
+      "costs": 3.2,
+      "pnl": -16,
+      "riskAmount": 32,
+      "rMultiple": -0.5,
+      "barsHeld": 18,
+      "exitReason": "stop"
+    }
+  ],
+  "equityCurve": [
+    {
+      "time": 1735689600000,
+      "equity": 10000,
+      "balance": 10000
+    },
+    {
+      "time": 1735691400000,
+      "equity": 10043.2,
+      "balance": 10043.2
+    },
+    {
+      "time": 1736294400000,
+      "equity": 10412.4,
+      "balance": 10412.4
+    }
+  ],
+  "assumptions": [
+    "Signals are decided on a bar close and filled at the next bar’s open — a bar cannot trade its own close.",
+    "Buy and hold is one fully invested unit of notional equal to the starting balance, no leverage, entered at the first open and sold at the last close with the same costs."
+  ],
+  "warnings": [
+    "Only 64 trades. Below about 30, a win rate or profit factor is noise rather than evidence."
+  ]
+}

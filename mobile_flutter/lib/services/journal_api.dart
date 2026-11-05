@@ -11,6 +11,7 @@ import '../core/plans.dart';
 import '../models/ai_review.dart';
 import '../models/models.dart';
 import '../models/prop_rules.dart';
+import 'api_transport.dart';
 
 /// A decoded, already error-checked response from the web API.
 class _ApiResult {
@@ -22,9 +23,14 @@ class _ApiResult {
 /// Every read and write the Flutter app performs, in one place.
 class JournalApi {
   JournalApi({SupabaseClient? client})
-      : _db = client ?? Supabase.instance.client;
+      : _db = client ?? Supabase.instance.client {
+    _transport = ApiTransport(
+      accessToken: () => _db.auth.currentSession?.accessToken,
+    );
+  }
 
   final SupabaseClient _db;
+  late final ApiTransport _transport;
 
   static const String mediaBucket = 'journal-media';
 
@@ -456,61 +462,18 @@ class JournalApi {
     required String fileName,
     required Uint8List bytes,
   }) async {
-    final session = _db.auth.currentSession;
-    if (session == null) throw Exception('Your session expired. Sign in again.');
-
-    final boundary = 'mtl${DateTime.now().microsecondsSinceEpoch}';
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
     try {
-      final request = await client.postUrl(
-        Uri.parse('${AppConfig.apiBaseUrl}/api/import/parse'),
+      final response = await _transport.upload(
+        '/api/import/parse',
+        fileName: fileName,
+        bytes: bytes,
+        timeout: const Duration(seconds: 90),
       );
-      request.headers.set(
-        HttpHeaders.authorizationHeader,
-        'Bearer ${session.accessToken}',
-      );
-      request.headers.contentType = ContentType(
-        'multipart',
-        'form-data',
-        parameters: {'boundary': boundary},
-      );
-      final safeName = fileName.replaceAll(RegExp(r'["\r\n]'), ' ');
-      request.add(
-        utf8.encode(
-          '--$boundary\r\n'
-          'Content-Disposition: form-data; name="file"; filename="$safeName"\r\n'
-          'Content-Type: application/octet-stream\r\n\r\n',
-        ),
-      );
-      request.add(bytes);
-      request.add(utf8.encode('\r\n--$boundary--\r\n'));
-
-      final response = await request.close().timeout(
-            const Duration(seconds: 90),
-          );
-      final body = await response.transform(utf8.decoder).join();
-
-      dynamic decoded;
-      try {
-        decoded = jsonDecode(body);
-      } catch (_) {
-        decoded = null;
-      }
-
-      if (response.statusCode != 200) {
-        final message = decoded is Map && decoded['error'] is String
-            ? decoded['error'] as String
-            : 'Could not read this file. Try exporting it as CSV.';
-        throw Exception(message);
-      }
-
-      final trades = decoded is Map ? decoded['trades'] : null;
-      return asList(trades)
+      return asList(response.body['trades'])
           .map((row) => ParsedTrade.fromMap(asMap(row)))
           .toList();
-    } finally {
-      client.close(force: true);
+    } on ApiTransportException catch (error) {
+      throw Exception(error.message);
     }
   }
 
@@ -740,52 +703,11 @@ class JournalApi {
     String path, [
     Map<String, dynamic>? body,
   ]) async {
-    final session = _db.auth.currentSession;
-    if (session == null) {
-      throw Exception('Your session expired. Sign in again.');
-    }
-
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
     try {
-      final request = await client.openUrl(
-        method,
-        Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      );
-      request.headers.set(
-        HttpHeaders.authorizationHeader,
-        'Bearer ${session.accessToken}',
-      );
-      if (body != null) {
-        request.headers.contentType = ContentType.json;
-        request.write(jsonEncode(body));
-      }
-
-      final response = await request.close().timeout(
-            const Duration(seconds: 25),
-          );
-      final text = await response.transform(utf8.decoder).join();
-
-      dynamic decoded;
-      try {
-        decoded = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
-      } catch (_) {
-        decoded = <String, dynamic>{};
-      }
-      final map =
-          decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
-
-      if (response.statusCode >= 400) {
-        final message = map['error'];
-        throw Exception(
-          message is String && message.isNotEmpty
-              ? message
-              : 'Request failed (${response.statusCode}). Try again.',
-        );
-      }
-      return _ApiResult(map);
-    } finally {
-      client.close(force: true);
+      final response = await _transport.send(method, path, body: body);
+      return _ApiResult(response.body);
+    } on ApiTransportException catch (error) {
+      throw Exception(error.message);
     }
   }
 

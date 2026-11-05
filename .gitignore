@@ -86,3 +86,6 @@ key.properties
 
 # Rendered store assets keep a throwaway Chrome profile
 store/.chrome-profile/
+
+# Supabase CLI link state (contains project ref)
+supabase/.temp/

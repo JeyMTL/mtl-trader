@@ -1,11 +1,9 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/backtest.dart';
-import '../core/config.dart';
+import 'api_transport.dart';
 
 /// Raised when a backtest request is refused. [message] is written for the
 /// trader and shown verbatim; [upgradeRequired] marks the server's 402, which
@@ -91,11 +89,12 @@ class BacktestRequest {
 /// there either: a downgraded account keeps its own results.
 class BacktestApi {
   BacktestApi({HttpClient? client, String? Function()? accessToken})
-      : _client = client,
-        _accessToken = accessToken ?? _sessionToken;
+      : _transport = ApiTransport(
+          client: client,
+          accessToken: accessToken ?? _sessionToken,
+        );
 
-  final HttpClient? _client;
-  final String? Function() _accessToken;
+  final ApiTransport _transport;
 
   static String? _sessionToken() {
     try {
@@ -158,61 +157,24 @@ class BacktestApi {
     Map<String, dynamic>? body,
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    final token = _accessToken();
-    if (token == null || token.isEmpty) {
-      throw BacktestApiException('Your session expired. Sign in again.');
-    }
-
-    final client = _client ??
-        (HttpClient()..connectionTimeout = const Duration(seconds: 10));
     try {
-      final request = await client.openUrl(
+      final response = await _transport.send(
         method,
-        Uri.parse('${AppConfig.apiBaseUrl}$path'),
+        path,
+        body: body,
+        timeout: timeout,
       );
-      request.headers.set(
-        HttpHeaders.authorizationHeader,
-        'Bearer $token',
-      );
-      if (body != null) {
-        request.headers.contentType = ContentType.json;
-        request.write(jsonEncode(body));
-      }
-
-      final response = await request.close().timeout(timeout);
-      final text = await response.transform(utf8.decoder).join();
-
-      dynamic decoded;
-      try {
-        decoded = text.isEmpty ? null : jsonDecode(text);
-      } catch (_) {
-        decoded = null;
-      }
-      final map =
-          decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
-
-      if (response.statusCode >= 400) {
-        final message = map['error'];
-        throw BacktestApiException(
-          message is String && message.trim().isNotEmpty
-              ? message
-              : 'Request failed (${response.statusCode}). Try again.',
-          upgradeRequired: map['code'] == 'upgrade_required',
-        );
-      }
-      return map;
-    } on BacktestApiException {
-      rethrow;
-    } on TimeoutException {
+      return response.body;
+    } on ApiTransportException catch (error) {
+      // A run has its own timeout advice; everything else keeps the server's
+      // message, or the transport's plain-language network error.
+      final message = error.code == 'timeout'
+          ? 'The run took too long. Try a shorter date range or a larger timeframe.'
+          : error.message;
       throw BacktestApiException(
-        'The run took too long. Try a shorter date range or a larger timeframe.',
+        message,
+        upgradeRequired: error.code == 'upgrade_required',
       );
-    } catch (_) {
-      throw BacktestApiException(
-        'Could not reach the server. Check your connection and try again.',
-      );
-    } finally {
-      if (_client == null) client.close(force: true);
     }
   }
 }
