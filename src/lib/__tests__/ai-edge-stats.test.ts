@@ -52,6 +52,24 @@ describe('computeEdgeStats', () => {
     expect(stats.currentStreak).toBe(-1)
   })
 
+  it('reports the least-bad loss and the smallest win for one-sided journals', () => {
+    const losing = computeEdgeStats([
+      trade({ pnl: -120 }),
+      trade({ pnl: -40 }),
+      trade({ pnl: -75 }),
+    ], 2)
+    expect(losing.best).toBe(-40)
+    expect(losing.worst).toBe(-120)
+
+    const winning = computeEdgeStats([
+      trade({ pnl: 120 }),
+      trade({ pnl: 40 }),
+      trade({ pnl: 75 }),
+    ], 2)
+    expect(winning.best).toBe(120)
+    expect(winning.worst).toBe(40)
+  })
+
   it('flags an insufficient sample', () => {
     const stats = computeEdgeStats([trade({ pnl: 10 })], 10)
     expect(stats.insufficient).toBe(true)

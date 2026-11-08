@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   updates: [] as Row[],
   connection: null as Row | null,
   upsertError: null as { message: string } | null,
+  rateLimitKeys: [] as string[],
   // The sync route now checks entitlement, so the mocked account has to be a
   // live Pro one; otherwise every ingest test would be refused with 402.
   account: {
@@ -122,8 +123,11 @@ vi.mock('@/lib/server-auth', () => ({
 }))
 
 vi.mock('@/lib/rate-limit', () => ({
-  rateLimit: async () => ({ ok: true, remaining: 999, retryAfterMs: 0 }),
-  clientKey: () => 'test',
+  rateLimit: async (key: string) => {
+    state.rateLimitKeys.push(key)
+    return { ok: true, remaining: 999, retryAfterMs: 0 }
+  },
+  clientKey: (_req: Request, scope: string) => `${scope}:test`,
   sweepExpired: () => {},
 }))
 
@@ -176,6 +180,7 @@ beforeEach(() => {
   state.updates = []
   state.connection = null
   state.upsertError = null
+  state.rateLimitKeys = []
   state.account = {
     ...state.account,
     subscription_tier: 'pro',
@@ -304,6 +309,15 @@ describe('sync ingest', () => {
     const res = await postSync({ trades: [closedTrade()] }, 'nope')
     expect(res.status).toBe(401)
     expect(state.upserted).toHaveLength(0)
+  })
+
+  it('does not spend the account bucket before the token is checked', async () => {
+    // `userId` is caller-supplied, so keying the limit on it before authenticating
+    // let anyone exhaust a victim's allowance with unauthenticated requests.
+    const res = await postSync({ trades: [closedTrade()] }, 'nope')
+    expect(res.status).toBe(401)
+    expect(state.rateLimitKeys).not.toContain('sync:u1')
+    expect(state.rateLimitKeys.some((key) => key.startsWith('sync-ip:'))).toBe(true)
   })
 
   it('accepts the supervisor secret without an agent token', async () => {

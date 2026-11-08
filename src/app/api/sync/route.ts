@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/server-auth'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { rateLimit } from '@/lib/rate-limit'
+import { clientKey, rateLimit } from '@/lib/rate-limit'
 import { hasValidBearer } from '@/lib/auth-guards'
 import { apiError, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
@@ -122,7 +122,7 @@ async function authorised(req: Request, userId: string, token: string) {
   // Supervisor: one server-side secret, and it may sync for any customer it
   // holds a connection for. Never accepted from a browser because the header is
   // server-side only.
-  if (hasValidBearer(req.headers.get('authorization') ? req : req, process.env.SYNC_SUPERVISOR_TOKEN)) {
+  if (hasValidBearer(req, process.env.SYNC_SUPERVISOR_TOKEN)) {
     return 'supervisor' as const
   }
 
@@ -168,12 +168,20 @@ export async function POST(req: Request) {
       )
     }
 
-    const limit = await rateLimit(`sync:${userId}`, 240, 60 * 60 * 1000)
-    if (!limit.ok) {
-      return NextResponse.json(
-        { error: 'Too many sync requests. The agent will retry shortly.' },
-        { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
-      )
+    // The caller picks `userId`, so it must not decide the bucket before it has
+    // proved it owns that account: otherwise anyone could burn a victim's hourly
+    // allowance with a few unauthenticated requests. The supervisor is exempt
+    // from the IP bucket because it legitimately syncs many accounts, but every
+    // authenticated caller still gets the per-account limit below.
+    const supervisor = hasValidBearer(req, process.env.SYNC_SUPERVISOR_TOKEN)
+    if (!supervisor) {
+      const ipLimit = await rateLimit(clientKey(req, 'sync-ip'), 1_200, 60 * 60 * 1000)
+      if (!ipLimit.ok) {
+        return NextResponse.json(
+          { error: 'Too many sync requests. The agent will retry shortly.' },
+          { status: 429, headers: { 'Retry-After': String(Math.ceil(ipLimit.retryAfterMs / 1000)) } }
+        )
+      }
     }
 
     const auth = await authorised(req, userId, token)
@@ -182,6 +190,14 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Email verification is required before syncing trades' },
         { status: 403 }
+      )
+    }
+
+    const limit = await rateLimit(`sync:${userId}`, 240, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many sync requests. The agent will retry shortly.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
       )
     }
 
@@ -372,10 +388,16 @@ export async function GET(req: Request) {
         return apiError('sync.token', updateError, 500, 'Could not save the sync token.')
       }
       logEvent('info', 'sync.token.created', { userId })
-      return NextResponse.json({ token, isNew: true })
+      return NextResponse.json(
+        { token, isNew: true },
+        { headers: { 'Cache-Control': 'no-store' } }
+      )
     }
 
-    return NextResponse.json({ token: user.agent_token, isNew: false })
+    return NextResponse.json(
+      { token: user.agent_token, isNew: false },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error: unknown) {
     return apiError('sync.get', error, 500, 'Could not load the sync token.')
   }

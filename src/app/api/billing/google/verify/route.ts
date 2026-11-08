@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { googlePlayConfigured } from '@/lib/google-play'
 import { syncGoogleSubscription } from '@/lib/google-billing'
+import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
 
@@ -26,6 +27,16 @@ export async function POST(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Every call below reaches Google and, when the token is live, the billing
+    // database. The app verifies on start, so a generous cap still stops a loop.
+    const limit = await rateLimit(`google-verify:${user.id}`, 60, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many verification attempts. Try again shortly.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) } }
+      )
+    }
 
     if (!googlePlayConfigured()) {
       return NextResponse.json(
@@ -69,6 +80,15 @@ export async function POST(req: Request) {
       purchaseToken,
       productId: typeof body.productId === 'string' ? body.productId : null,
     })
+
+    if (result.status === 'ignored' && result.conflict) {
+      return apiWarn(
+        'billing.google.token_conflict',
+        'That purchase is already linked to another account. Sign in with the Google account that bought it.',
+        409,
+        { userId: user.id }
+      )
+    }
 
     if (result.status === 'ignored') {
       return apiWarn(

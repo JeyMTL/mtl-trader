@@ -10,7 +10,7 @@
 import { atr, highestBefore, lowestBefore, rsi, sma } from './indicators'
 import type { Bar } from './types'
 
-export type StrategyId = 'sma_cross' | 'donchian_breakout' | 'rsi_reversion'
+export type StrategyId = 'sma_cross' | 'donchian_breakout' | 'rsi_reversion' | 'custom'
 
 export interface Signal {
   action: 'long' | 'short' | 'close'

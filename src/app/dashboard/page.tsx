@@ -2,6 +2,7 @@ import { createServerSupabase, requireServerUser } from '@/lib/supabase-server'
 import { logEvent } from '@/lib/log'
 import { DashboardView, type DashboardRecentTrade } from '@/components/dashboard-view'
 import { PropCompliance } from '@/components/prop-compliance'
+import RulesReminder from '@/components/rules-reminder'
 import {
   EMPTY_SUMMARY,
   EMPTY_TIME_STATS,
@@ -115,6 +116,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4 lg:space-y-5">
+      <RulesReminder />
       <PropCompliance />
       <DashboardView
         summary={summary}

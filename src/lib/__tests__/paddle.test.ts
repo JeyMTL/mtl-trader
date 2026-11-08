@@ -9,6 +9,7 @@ import {
   parseAdjustmentEvent,
   parsePaddleSignature,
   parseTransactionEvent,
+  planForPriceId,
   priceIdFor,
   sellablePlanIds,
 } from '@/lib/paddle'
@@ -73,6 +74,32 @@ describe('paddle configuration', () => {
     expect(priceIdFor('basic', 'year')).toBe('pri_basic_year')
     expect(priceIdFor('pro', 'year')).toBe('pri_pro_year')
     expect(priceIdFor('basic', 'month')).toBe('pri_basic')
+  })
+
+  it('derives the plan and cadence from the price Paddle charged', () => {
+    expect(planForPriceId('pri_pro', ['basic', 'pro'])).toEqual({ planId: 'pro', interval: 'month' })
+    expect(planForPriceId('pri_basic_year', ['basic', 'pro'])).toEqual({
+      planId: 'basic',
+      interval: 'year',
+    })
+
+    // Stale checkout metadata must not override the price that was paid.
+    expect(planForPriceId('pri_pro', ['basic', 'pro'], 'basic')).toEqual({
+      planId: 'pro',
+      interval: 'month',
+    })
+
+    expect(planForPriceId('pri_not_ours', ['basic', 'pro'])).toBeNull()
+    expect(planForPriceId(null, ['basic', 'pro'])).toBeNull()
+
+    // A duplicated price id is ambiguous; the preferred plan resolves it, but
+    // with nothing to prefer the safe answer is to ignore the payment.
+    process.env.PADDLE_PRICE_PRO = 'pri_basic'
+    expect(planForPriceId('pri_basic', ['basic', 'pro'])).toBeNull()
+    expect(planForPriceId('pri_basic', ['basic', 'pro'], 'pro')).toEqual({
+      planId: 'pro',
+      interval: 'month',
+    })
   })
 
   it('sells each cadence independently', () => {

@@ -140,7 +140,7 @@ adb uninstall com.mtltrader.mtl_trader_mobile
 
 ## Release checklist (every build after this)
 
-1. Bump both numbers in `mobile_flutter/pubspec.yaml` — `version: 1.0.4+5`. The number after `+` is the Android version code, and Play rejects one it has already accepted — including a code uploaded into a draft that was later discarded — so it must always increase.
+1. Bump both numbers in `mobile_flutter/pubspec.yaml` — `version: 1.0.6+7`. The number after `+` is the Android version code, and Play rejects one it has already accepted — including a code uploaded into a draft that was later discarded — so it must always increase.
 2. `flutter build appbundle --release --dart-define-from-file=dart_defines.json`
 3. Verify the signer fingerprint (above) — must be `395115FB…`
 4. Install it (`flutter install` or `adb install -r`) and launch it once
@@ -258,7 +258,7 @@ bug, and the console will not tell you which one until you try to submit.
 
 | Asset | Requirement | Source |
 | --- | --- | --- |
-| App icon | 512×512 PNG, no alpha, no rounded corners | `store/icon-512.png` (rendered from `assets/icon/`) |
+| App icon | 512×512 PNG, no alpha, no rounded corners | `store/icon-512.png` (rendered from `assets/brand/app-icon-source.jpg`) |
 | Feature graphic | 1024×500 PNG or JPEG | `store/feature-graphic.png` |
 | Phone screenshots | 2–8 × PNG, 16:9 or 9:16, min 1080px on the long edge | capture, see below |
 | Short description | ≤ 80 characters | `docs/PLAY_LISTING.md` |
@@ -274,6 +274,12 @@ node scripts/make-store-graphics.mjs
 
 It screenshots the HTML with the installed Chrome at exactly 1024×500, so the
 result is reproducible instead of a binary nobody can edit.
+
+The app icon is separate: replace `assets/brand/app-icon-source.jpg` and run
+`node scripts/make-app-icons.mjs`, which rewrites `store/icon-512.png` along with
+every launcher and iOS icon. Uploading the file to the store listing and shipping
+it inside the app are two different steps — the listing icon is the one in
+search results, the launcher icon only changes with a new build.
 
 ### Screenshots
 

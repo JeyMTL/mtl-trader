@@ -36,6 +36,12 @@ export interface Metrics {
   avgBarsHeld: number
   /** Annualised from bar returns; null without enough bars or volatility. */
   sharpe: number | null
+  /** Like Sharpe, but only downside returns count as risk. */
+  sortino: number | null
+  /** Annualised return divided by max drawdown; null without both. */
+  calmar: number | null
+  maxConsecutiveWins: number
+  maxConsecutiveLosses: number
   barCount: number
 }
 
@@ -65,11 +71,34 @@ function average(values: number[]): number {
 }
 
 /**
- * Annualised Sharpe from per-bar equity returns.
+ * Downside deviation for Sortino: the RMS of negative returns about the target
+ * of zero, over every observation.
+ *
+ * The target is what makes this different from the standard deviation of the
+ * losing returns. Subtracting the mean loss would measure how spread out the
+ * losses are, not how far they fall below zero — a run with losses of -1% and
+ * -3% would then report a *smaller* penalty than one with -2% and -2.1%,
+ * inverting the ratio. Upside returns contribute zero, but still count in the
+ * denominator, which is the convention this metric is normally quoted under.
  *
  * Deliberately simple — no risk-free rate, no autocorrelation correction. It is
  * there to compare runs of the same data, not to be quoted as a fund fact.
  */
+function downsideDeviation(returns: number[]): number | null {
+  if (returns.length === 0) return null
+  let sumSquares = 0
+  let losses = 0
+  for (const value of returns) {
+    if (value < 0) {
+      sumSquares += value * value
+      losses += 1
+    }
+  }
+  if (losses === 0) return null
+  const deviation = Math.sqrt(sumSquares / returns.length)
+  return deviation > 0 ? deviation : null
+}
+
 function sharpeRatio(equity: number[], barsPerYear: number | null): number | null {
   if (!barsPerYear || equity.length < 3) return null
   const returns: number[] = []
@@ -87,6 +116,29 @@ function sharpeRatio(equity: number[], barsPerYear: number | null): number | nul
   const deviation = Math.sqrt(variance)
   if (!(deviation > 0)) return null
   return (mean / deviation) * Math.sqrt(barsPerYear)
+}
+
+/** Longest run of trades on one side of zero, for both signs. */
+function streaks(trades: Trade[]): { wins: number; losses: number } {
+  let wins = 0
+  let losses = 0
+  let currentWins = 0
+  let currentLosses = 0
+  for (const trade of trades) {
+    if (trade.pnl > 0) {
+      currentWins += 1
+      currentLosses = 0
+    } else if (trade.pnl < 0) {
+      currentLosses += 1
+      currentWins = 0
+    } else {
+      currentWins = 0
+      currentLosses = 0
+    }
+    if (currentWins > wins) wins = currentWins
+    if (currentLosses > losses) losses = currentLosses
+  }
+  return { wins, losses }
 }
 
 export function computeMetrics(
@@ -125,6 +177,40 @@ export function computeMetrics(
     .map((trade) => trade.rMultiple)
     .filter((value) => Number.isFinite(value))
 
+  const equityReturns: number[] = []
+  for (let index = 1; index < equityCurve.length; index += 1) {
+    const previous = equityCurve[index - 1]
+    const current = equityCurve[index]
+    if (previous === undefined || current === undefined || previous <= 0) continue
+    equityReturns.push(current / previous - 1)
+  }
+  const sortinoDeviation = downsideDeviation(equityReturns)
+  const sortino =
+    barsPerYear && sortinoDeviation && equityReturns.length >= 2
+      ? (average(equityReturns) / sortinoDeviation) * Math.sqrt(barsPerYear)
+      : null
+
+  const returnPct =
+    initialBalance > 0 ? ((finalEquity - initialBalance) / initialBalance) * 100 : 0
+  const maxDrawdownPctValue = maxDrawdownPct
+  const years =
+    barsPerYear && result.barCount > 0 ? result.barCount / barsPerYear : null
+  const annualisedReturnPct =
+    years && years > 0 && finalEquity > 0 && initialBalance > 0
+      ? ((finalEquity / initialBalance) ** (1 / years) - 1) * 100
+      : null
+  const calmar =
+    maxDrawdownPctValue > 0 && annualisedReturnPct !== null
+      ? annualisedReturnPct / maxDrawdownPctValue
+      : null
+  const streaksResult = streaks(trades)
+  const bestTrade = trades.length > 0
+    ? trades.reduce((best, trade) => Math.max(best, trade.pnl), -Infinity)
+    : 0
+  const worstTrade = trades.length > 0
+    ? trades.reduce((worst, trade) => Math.min(worst, trade.pnl), Infinity)
+    : 0
+
   return {
     trades: trades.length,
     wins: wins.length,
@@ -139,14 +225,13 @@ export function computeMetrics(
     expectancy: trades.length > 0 ? netPnl / trades.length : 0,
     avgWin: average(wins.map((trade) => trade.pnl)),
     avgLoss: average(losses.map((trade) => Math.abs(trade.pnl))),
-    bestTrade: trades.length > 0 ? Math.max(...trades.map((trade) => trade.pnl)) : 0,
-    worstTrade: trades.length > 0 ? Math.min(...trades.map((trade) => trade.pnl)) : 0,
+    bestTrade,
+    worstTrade,
     avgRMultiple: rMultiples.length > 0 ? average(rMultiples) : null,
     maxDrawdown,
     maxDrawdownPct,
     recoveryFactor: maxDrawdown > 0 ? netPnl / maxDrawdown : null,
-    returnPct:
-      initialBalance > 0 ? ((finalEquity - initialBalance) / initialBalance) * 100 : 0,
+    returnPct,
     finalEquity,
     exposurePct:
       result.barCount > 1
@@ -154,6 +239,10 @@ export function computeMetrics(
         : 0,
     avgBarsHeld: average(trades.map((trade) => trade.barsHeld)),
     sharpe: sharpeRatio(equityCurve, barsPerYear),
+    sortino,
+    calmar,
+    maxConsecutiveWins: streaksResult.wins,
+    maxConsecutiveLosses: streaksResult.losses,
     barCount: result.barCount,
   }
 }
@@ -184,6 +273,10 @@ export function emptyMetrics(initialBalance: number, barCount = 0): Metrics {
     exposurePct: 0,
     avgBarsHeld: 0,
     sharpe: null,
+    sortino: null,
+    calmar: null,
+    maxConsecutiveWins: 0,
+    maxConsecutiveLosses: 0,
     barCount,
   }
 }

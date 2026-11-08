@@ -86,9 +86,9 @@ class AppPalette {
     faint: Color(0xFF8A94A3),
   );
 
-  /// The mark's own palette: the icon's navy surfaces with its ice accent, so
-  /// the journal can sit beside the logo instead of only in brass. Dark-based,
-  /// so every light-mode assumption in the UI treats it as dark.
+  /// The cool alternative to brass: navy surfaces with an ice accent, for a
+  /// journal that is blue rather than gold. Dark-based, so every light-mode
+  /// assumption in the UI treats it as dark.
   static const AppPalette blue = AppPalette(
     id: 'blue',
     background: Color(0xFF071320),
@@ -117,9 +117,9 @@ class AppPalette {
 class AppColors {
   const AppColors._();
 
-  /// Blue until the saved preference is read: it is the installed icon's
-  /// palette, so a first launch already looks like the app.
-  static AppPalette palette = AppPalette.blue;
+  /// Dark until the saved preference is read: it matches the installed icon's
+  /// black ground, so a first launch already looks like the app.
+  static AppPalette palette = AppPalette.dark;
 
   static Color get background => palette.background;
   static Color get surface => palette.surface;
@@ -140,10 +140,9 @@ class AppColors {
 /// follow-the-device, which resolves to dark or light when it is chosen.
 enum AppTheme { dark, light, blue, system }
 
-/// The mark's blue / dark / light / follow-the-device, remembered across
-/// launches.
+/// Dark / light / blue / follow-the-device, remembered across launches.
 ///
-/// Blue is the default because it is the app icon's own palette: a first launch
+/// Dark is the default because it is the app icon's own ground: a first launch
 /// should look like the app that was installed.
 class ThemeController extends ChangeNotifier {
   ThemeController._();
@@ -152,12 +151,12 @@ class ThemeController extends ChangeNotifier {
 
   static const String storageKey = 'app.theme.v1';
 
-  /// Written the first time this build settles the default. It makes Blue the
-  /// default for installs that picked Dark or Light before Blue was the
-  /// default, without resetting the theme on every later launch.
-  static const String defaultAppliedKey = 'app.theme.default.v2';
+  /// Written the first time this build settles the default. It makes Dark the
+  /// default for an install that stored the old one, without resetting the
+  /// theme on every later launch.
+  static const String defaultAppliedKey = 'app.theme.default.v3';
 
-  AppTheme _theme = AppTheme.blue;
+  AppTheme _theme = AppTheme.dark;
 
   AppTheme get theme => _theme;
 
@@ -168,19 +167,19 @@ class ThemeController extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // One-time switch: an install that stored Dark or Light before Blue
+      // One-time switch: an install that stored Blue or Light before Dark
       // became the default would otherwise never see it. The marker means this
       // happens once, so the choice made after it still sticks.
       if (!(prefs.getBool(defaultAppliedKey) ?? false)) {
         await prefs.setBool(defaultAppliedKey, true);
-        await prefs.setString(storageKey, AppTheme.blue.name);
-        instance._apply(AppTheme.blue, notify: false);
+        await prefs.setString(storageKey, AppTheme.dark.name);
+        instance._apply(AppTheme.dark, notify: false);
         return;
       }
 
       instance._apply(_parse(prefs.getString(storageKey)), notify: false);
     } catch (_) {
-      // A missing or unreadable preference keeps the blue default.
+      // A missing or unreadable preference keeps the dark default.
     }
   }
 
@@ -192,7 +191,7 @@ class ThemeController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(storageKey, theme.name);
       // An explicit pick also settles the default, so a later restore can never
-      // overwrite it with Blue.
+      // overwrite it.
       await prefs.setBool(defaultAppliedKey, true);
     } catch (_) {
       // The switch still applies for this session.
@@ -232,7 +231,7 @@ class ThemeController extends ChangeNotifier {
       case 'system':
         return AppTheme.system;
       default:
-        return AppTheme.blue;
+        return AppTheme.dark;
     }
   }
 }

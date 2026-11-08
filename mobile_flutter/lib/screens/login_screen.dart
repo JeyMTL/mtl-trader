@@ -140,23 +140,21 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // A minimum height, not a fixed one: at a 2x text scale the
-                  // wordmark is twice as tall and a fixed box would clip it.
+                  // The card runs the app's black to its own edge, and the gold
+                  // line is the card's outline — the mark inside carries no rim,
+                  // so there is one luminous line around everything, not two.
                   Container(
-                    constraints: const BoxConstraints(minHeight: 148),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 20,
-                    ),
+                    constraints: const BoxConstraints(minHeight: 168),
+                    padding: const EdgeInsets.all(1.6),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.surface, AppColors.background],
-                      ),
-                      border: Border.all(color: AppColors.border),
+                      gradient: kRimGradient,
                       boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withAlpha(60),
+                          blurRadius: 26,
+                          spreadRadius: 1,
+                        ),
                         BoxShadow(
                           color: AppColors.primary.withAlpha(30),
                           blurRadius: 34,
@@ -164,28 +162,36 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    child: Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        Positioned(
-                          right: -34,
-                          top: -54,
-                          child: Container(
-                            width: 150,
-                            height: 150,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16.5),
+                        color: const Color(0xFF0E1414),
+                      ),
+                      // The bloom lights the mark from behind, centred, so the
+                      // black reads as one panel rather than a stamp beside it.
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 168,
+                            height: 168,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  AppColors.primary.withAlpha(62),
+                                  AppColors.primary.withAlpha(58),
                                   AppColors.primary.withAlpha(0),
                                 ],
                               ),
                             ),
                           ),
-                        ),
-                        const BrandMark(fontSize: 30, showDate: false),
-                      ],
+                          const BrandMark(
+                            fontSize: 84,
+                            showDate: false,
+                            showRim: false,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

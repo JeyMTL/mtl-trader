@@ -34,17 +34,32 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 // Upper bound on the trades read for one review. Recent history is what the
 // model can actually use, and it keeps the request bounded for large journals.
 const REVIEW_TRADE_LIMIT = 1000
+const MAX_CHART_BYTES = 4 * 1024 * 1024
+const VISION_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+/**
+ * Only a real, modestly sized vision image is forwarded. A bogus data URL would
+ * otherwise be sent to the provider as if it were a chart and described as one.
+ */
+function usableChartImage(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const value = raw.trim()
+  const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i.exec(value)
+  if (!match) return undefined
+  if (!VISION_TYPES.has(match[1].toLowerCase())) return undefined
+  const bytes = Math.floor((match[2].replace(/\s/g, '').length * 3) / 4)
+  if (bytes > MAX_CHART_BYTES) return undefined
+  return value
+}
 
 function cacheKey(input: ReviewRequest) {
   return {
     trades: input.trades ?? null,
     question: input.question ?? '',
-    hasImage: Boolean(input.chartImage),
-    summary: {
-      totalTrades: input.totalTrades ?? null,
-      totalPnl: input.totalPnl ?? null,
-      winRate: input.winRate ?? null,
-    },
+    // The image itself, not just its presence: two different charts are two
+    // different reviews, and a boolean here would serve the first chart's
+    // review for the second chart uploaded within the cache window.
+    chartImageHash: input.chartImage ? hashPayload(input.chartImage) : null,
   }
 }
 
@@ -145,24 +160,37 @@ export async function POST(req: Request) {
 
     const supabase = getAdminClient()
 
-    // The analytics page sends summary statistics only; the note-bearing trades
-    // are loaded here, so the browser no longer uploads the whole journal.
-    if (!Array.isArray(input.trades) || input.trades.length === 0) {
-      const { data: tradesForReview, error: tradesError } = await supabase
-        .from('trades')
-        .select('symbol, type, pnl, lot_size, open_time, close_time, created_at, timeframe, strategy, notes, tags')
-        .eq('user_id', user.id)
-        .order('close_time', { ascending: false })
-        .limit(REVIEW_TRADE_LIMIT)
+    // The journal is the only source of evidence. Browser-submitted trades or
+    // summary numbers are deliberately ignored: they could describe a journal
+    // that does not exist, and a review that calls itself "your journal" must be
+    // computed from rows this account actually owns.
+    const { data: tradesForReview, error: tradesError } = await supabase
+      .from('trades')
+      .select('symbol, type, pnl, lot_size, open_time, close_time, created_at, timeframe, strategy, notes, tags')
+      .eq('user_id', user.id)
+      .order('close_time', { ascending: false })
+      .limit(REVIEW_TRADE_LIMIT)
 
-      if (tradesError) {
-        logEvent('warn', 'ai.review.trades', { error: tradesError, userId: user.id })
-      } else if (tradesForReview?.length) {
-        input.trades = tradesForReview as TradeRecord[]
-      }
+    if (tradesError) {
+      logEvent('error', 'ai.review.trades', { error: tradesError, userId: user.id })
+      return apiError(
+        'ai.review.trades',
+        tradesError,
+        500,
+        'Could not read your journal. Please try again.'
+      )
     }
 
-    const summaryHash = hashPayload(cacheKey(input))
+    const chartImage = usableChartImage(input.chartImage)
+    const reviewInput: ReviewRequest = {
+      trades: (tradesForReview ?? []) as TradeRecord[],
+      ...(typeof input.question === 'string' && input.question.trim()
+        ? { question: input.question.trim().slice(0, 500) }
+        : {}),
+      ...(chartImage ? { chartImage } : {}),
+    }
+
+    const summaryHash = hashPayload(cacheKey(reviewInput))
 
     // Serve a recent identical review instead of re-billing the model.
     const since = new Date(Date.now() - CACHE_TTL_MS).toISOString()
@@ -181,7 +209,7 @@ export async function POST(req: Request) {
       // pure arithmetic over the trades already loaded — so recompute them here
       // rather than letting a cached response show fewer sections than a fresh
       // one for the same journal.
-      const cachedInsights = prepareReview(input).insights
+      const cachedInsights = prepareReview(reviewInput).insights
       return NextResponse.json({
         review: cached.review,
         insights: cachedInsights,
@@ -211,7 +239,7 @@ export async function POST(req: Request) {
 
     const provider = createProvider(config)
     const streamRequested = new URL(req.url).searchParams.get('stream') === '1'
-    const prepared = prepareReview(input)
+    const prepared = prepareReview(reviewInput)
 
     // Too little data: never call the model, just return the deterministic note.
     if (prepared.skipped) {
@@ -271,7 +299,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const generated = await generateReview(input, {
+    const generated = await generateReview(reviewInput, {
       complete: (messages, options) => provider.complete(messages, options),
       providerName: provider.name,
       model: provider.model,

@@ -4,7 +4,11 @@ import { apiError } from '@/lib/log'
 
 function csvCell(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value)
-  return `"${text.replace(/"/g, '""')}"`
+  // Quoting does not stop a spreadsheet from evaluating a cell that begins
+  // with a formula marker. Prefix those with an apostrophe so an imported name
+  // or reference is displayed as text instead of executed.
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+  return `"${safe.replace(/"/g, '""')}"`
 }
 
 function toCsv(rows: unknown[][]): string {

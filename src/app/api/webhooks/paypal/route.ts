@@ -98,6 +98,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing PayPal signature headers' }, { status: 400 })
   }
 
+  // PayPal fetches this URL to verify the signature. An attacker-supplied host
+  // would turn the verification call into an SSRF probe, so only PayPal's own
+  // certificate hosts are forwarded.
+  let certHost: string
+  try {
+    const parsed = new URL(certUrl)
+    if (parsed.protocol !== 'https:') throw new Error('not https')
+    certHost = parsed.hostname.toLowerCase()
+  } catch {
+    return NextResponse.json({ error: 'Invalid certificate URL' }, { status: 400 })
+  }
+  if (certHost !== 'paypal.com' && !certHost.endsWith('.paypal.com')) {
+    logEvent('warn', 'paypal.webhook.cert_host', { certHost })
+    return NextResponse.json({ error: 'Invalid certificate URL' }, { status: 400 })
+  }
+
   let event: PayPalWebhookEvent
   try {
     event = JSON.parse(rawBody) as PayPalWebhookEvent

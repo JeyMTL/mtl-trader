@@ -89,6 +89,7 @@ export async function POST(req: Request) {
         symbol: typeof body.symbol === 'string' ? body.symbol : '',
         timeframe: typeof body.timeframe === 'string' ? body.timeframe : undefined,
         strategyId: typeof body.strategyId === 'string' ? body.strategyId : '',
+        ruleSpec: body.ruleSpec,
         params:
           body.params && typeof body.params === 'object'
             ? (body.params as Record<string, unknown>)
@@ -146,6 +147,8 @@ export async function POST(req: Request) {
         split_metrics: report.split,
         benchmark: report.benchmark,
         stress: report.stress,
+        walk_forward: report.walkForward,
+        rule_spec: report.ruleSpec,
         equity_curve: report.equityCurve,
         trades: report.trades.slice(-MAX_TRADES_STORED),
         assumptions: report.assumptions,

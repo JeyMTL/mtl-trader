@@ -126,3 +126,98 @@ export function lowestBefore(values: number[], period: number): (number | null)[
   }
   return out
 }
+
+/** Exponential moving average, seeded with the first value so it exists from bar one. */
+export function ema(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null)
+  if (period < 1 || values.length === 0) return out
+  const multiplier = 2 / (period + 1)
+  let previous = values[0] ?? 0
+  out[0] = previous
+  for (let index = 1; index < values.length; index += 1) {
+    const value = values[index]
+    if (value === undefined) continue
+    previous = (value - previous) * multiplier + previous
+    out[index] = previous
+  }
+  return out
+}
+
+/** Rolling population standard deviation; `null` until `period` values exist. */
+export function standardDeviation(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null)
+  if (period < 1) return out
+  for (let index = period - 1; index < values.length; index += 1) {
+    let sum = 0
+    for (let cursor = index - period + 1; cursor <= index; cursor += 1) {
+      sum += values[cursor] ?? 0
+    }
+    const mean = sum / period
+    let variance = 0
+    for (let cursor = index - period + 1; cursor <= index; cursor += 1) {
+      variance += ((values[cursor] ?? 0) - mean) ** 2
+    }
+    out[index] = Math.sqrt(variance / period)
+  }
+  return out
+}
+
+export interface BollingerBands {
+  middle: (number | null)[]
+  upper: (number | null)[]
+  lower: (number | null)[]
+}
+
+/** Bollinger bands around an SMA, using the given standard-deviation multiple. */
+export function bollinger(
+  values: number[],
+  period: number,
+  multiplier = 2
+): BollingerBands {
+  const middle = sma(values, period)
+  const deviation = standardDeviation(values, period)
+  const upper: (number | null)[] = new Array(values.length).fill(null)
+  const lower: (number | null)[] = new Array(values.length).fill(null)
+  for (let index = 0; index < values.length; index += 1) {
+    const mid = middle[index]
+    const spread = deviation[index]
+    if (mid == null || spread == null) continue
+    upper[index] = mid + spread * multiplier
+    lower[index] = mid - spread * multiplier
+  }
+  return { middle, upper, lower }
+}
+
+export interface MacdLines {
+  macd: (number | null)[]
+  signal: (number | null)[]
+  histogram: (number | null)[]
+}
+
+/**
+ * MACD from three EMAs. `period` is the slow length; the fast and signal lengths
+ * keep the conventional 12:26:9 proportions, so the default of 26 is exactly
+ * 12/26/9 rather than 13/26/9 from rounding half of 26.
+ */
+export function macd(values: number[], period = 26): MacdLines {
+  const slow = Math.max(3, Math.round(period))
+  const fast = Math.max(2, Math.round((slow * 12) / 26))
+  const signalPeriod = Math.max(2, Math.round((slow * 9) / 26))
+  const fastSeries = ema(values, fast)
+  const slowSeries = ema(values, slow)
+  const line: (number | null)[] = values.map((_, index) => {
+    const f = fastSeries[index]
+    const s = slowSeries[index]
+    return f == null || s == null ? null : f - s
+  })
+  const definition = line.map((value) => value ?? 0)
+  const signalSeries = ema(definition, signalPeriod)
+  return {
+    macd: line,
+    signal: signalSeries,
+    histogram: line.map((value, index) => {
+      const sig = signalSeries[index]
+      return value == null || sig == null ? null : value - sig
+    }),
+  }
+}

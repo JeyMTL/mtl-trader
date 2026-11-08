@@ -105,8 +105,10 @@ export function computeEdgeStats(
   let pnl = 0
   let grossWins = 0
   let grossLosses = 0
-  let best = 0
-  let worst = 0
+  // Seeded from the first trade rather than zero: an all-loss journal has a
+  // real "best" (its smallest loss), and an all-win journal a real "worst".
+  let best: number | null = null
+  let worst: number | null = null
   let noteCount = 0
 
   const bySymbol = new Map<string, TradeRecord[]>()
@@ -138,8 +140,8 @@ export function computeEdgeStats(
       currentStreak = currentStreak <= 0 ? currentStreak - 1 : -1
       maxLossStreak = Math.max(maxLossStreak, Math.abs(currentStreak))
     }
-    best = Math.max(best, value)
-    worst = Math.min(worst, value)
+    best = best === null ? value : Math.max(best, value)
+    worst = worst === null ? value : Math.min(worst, value)
     if (trade.notes && trade.notes.trim()) noteCount++
 
     if (trade.symbol) push(bySymbol, trade.symbol, trade)
@@ -164,8 +166,8 @@ export function computeEdgeStats(
     expectancy: count ? pnl / count : 0,
     avgWin: wins ? grossWins / wins : 0,
     avgLoss: losses ? -grossLosses / losses : 0,
-    best,
-    worst,
+    best: best ?? 0,
+    worst: worst ?? 0,
     maxWinStreak,
     maxLossStreak,
     currentStreak,

@@ -49,10 +49,16 @@ export function buyAndHold(
   // number. Interim closes are not tradeable, so no cost is simulated there.
   let peak = initialBalance
   let maxDrawdownPct = 0
-  for (let index = 1; index < bars.length; index += 1) {
+  for (let index = 0; index < bars.length; index += 1) {
     const bar = bars[index]
     if (!bar) continue
-    const value = initialBalance + units * (bar.close - entry)
+    // The last close is the exit, so its mark includes the exit half-spread,
+    // slippage and commission. Without that point a flat market charged only
+    // costs would report a perfect run with no drawdown.
+    const value =
+      index === bars.length - 1
+        ? initialBalance + netPnl
+        : initialBalance + units * (bar.close - entry)
     if (value > peak) peak = value
     const drawdown = peak > 0 ? ((peak - value) / peak) * 100 : 0
     if (drawdown > maxDrawdownPct) maxDrawdownPct = drawdown

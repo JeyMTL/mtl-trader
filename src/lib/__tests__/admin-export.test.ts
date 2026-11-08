@@ -64,6 +64,27 @@ describe('admin payment export', () => {
     expect(row).toContain('"29"')
   })
 
+  it('neutralises spreadsheet formulas in user-supplied fields', async () => {
+    state.rows = [
+      {
+        id: 'req-2',
+        created_at: '2026-06-01T10:00:00Z',
+        status: 'approved',
+        plan_id: 'pro',
+        amount: 29,
+        reference: '=HYPERLINK("https://evil.example")',
+        reviewed_at: null,
+        reviewed_by: null,
+        users: { email: 'trader@example.com', full_name: '=2+2' },
+      },
+    ]
+
+    const res = await GET(request())
+    const body = await res.text()
+    expect(body).toContain(`"'=HYPERLINK(""https://evil.example"")"`)
+    expect(body).toContain(`"'=2+2"`)
+  })
+
   it('rejects callers who are not admins', async () => {
     state.admin = false
     const res = await GET(request())

@@ -3,6 +3,7 @@ import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
+import { checkFeature } from '@/lib/plan-guard'
 import { createProvider, resolveProviderConfig } from '@/lib/ai/providers'
 import { MAX_SUGGEST_IMAGES, buildSuggestionMessages, normalizeSuggestion } from '@/lib/backtest/suggest'
 import type { SuggestionTrade } from '@/lib/backtest/suggest'
@@ -56,6 +57,14 @@ export async function GET(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const gate = await checkFeature(user.id, 'backtest')
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.message, code: 'upgrade_required' },
+        { status: gate.status }
+      )
+    }
 
     const admin = getAdminClient()
     const { data, error } = await admin
@@ -120,6 +129,14 @@ export async function POST(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const gate = await checkFeature(user.id, 'backtest')
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.message, code: 'upgrade_required' },
+        { status: gate.status }
+      )
+    }
 
     // Each call bills the vision model, so this shares the AI review's budget.
     const limit = await rateLimit(`backtest-suggest:${user.id}`, 5, 10 * 60 * 1000)

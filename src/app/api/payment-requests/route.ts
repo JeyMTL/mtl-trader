@@ -24,23 +24,22 @@ export async function POST(req: Request) {
       )
     }
 
-    const parsed = await readJsonBody<{ planId?: unknown; reference?: unknown }>(req, {
+    const parsed = await readJsonBody<{ planId?: unknown }>(req, {
       maxBytes: 8 * 1024,
     })
     if (!parsed.ok) return parsed.response
     const body = parsed.value
     const planId = typeof body.planId === 'string' ? body.planId : ''
-    const requestedReference = typeof body.reference === 'string' ? body.reference.trim() : ''
     const plan = PLAN_MAP.get(planId)
 
     if (!plan) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }
-    if (requestedReference.length > 200) {
-      return NextResponse.json({ error: 'Payment reference cannot exceed 200 characters' }, { status: 400 })
-    }
 
-    const reference = requestedReference || `MTL-${user.id.slice(0, 8).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`
+    // The reference is always minted here. Accepting one from the client let a
+    // user submit another customer's bank reference, which made the admin's
+    // matching queue ambiguous about whose transfer had arrived.
+    const reference = `MTL-${user.id.slice(0, 8).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`
 
     const { error } = await getAdminClient().from('payment_requests').insert({
       user_id: user.id,

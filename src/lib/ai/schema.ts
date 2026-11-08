@@ -85,25 +85,6 @@ function toFindings(value: unknown): ReviewFinding[] {
     .slice(0, MAX_FINDINGS)
 }
 
-function toSimilarSetups(value: unknown): SimilarSetup[] {
-  if (!Array.isArray(value)) return []
-  return value
-    .map((item): SimilarSetup | null => {
-      if (!item || typeof item !== 'object') return null
-      const record = item as Record<string, unknown>
-      const note = asString(record.note)
-      if (!note) return null
-      return {
-        note: note.slice(0, 300),
-        outcome: Number(record.outcome) || 0,
-        when: typeof record.when === 'string' ? record.when : null,
-        score: Number(record.score) || 0,
-      }
-    })
-    .filter((item): item is SimilarSetup => item !== null)
-    .slice(0, MAX_FINDINGS)
-}
-
 /**
  * Parse and normalize a raw model response into a `ReviewResult`.
  * Throws when the response is not usable JSON.
@@ -132,9 +113,10 @@ export function normalizeReview(
     strengths: toFindings(parsed.strengths),
     risks: toFindings(parsed.risks),
     actions: toFindings(parsed.actions),
-    similarSetups: toSimilarSetups(parsed.similarSetups).length
-      ? toSimilarSetups(parsed.similarSetups)
-      : similarSetups,
+    // The matched setups come from the account's own notes, never from the
+    // model: a fabricated "similar setup" would present invented history as
+    // the trader's own.
+    similarSetups: similarSetups.slice(0, MAX_FINDINGS),
     disclaimer: DISCLAIMER,
   }
 }

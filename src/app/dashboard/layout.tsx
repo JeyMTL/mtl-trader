@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   X,
   FlaskConical,
+  BookOpenCheck,
   Lock,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
@@ -38,6 +39,7 @@ const navigation = [
   { name: 'MT5 Sync', href: '/dashboard/sync', icon: RefreshCw },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
+  { name: 'Rules', href: '/dashboard/playbook', icon: BookOpenCheck },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   { name: 'Support', href: '/support', icon: HelpCircle },
@@ -52,6 +54,7 @@ const moreNavigation = [
   { name: 'Import trades', href: '/dashboard/import', icon: Upload },
   { name: 'MT5 auto sync', href: '/dashboard/sync', icon: RefreshCw },
   { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
+  { name: 'Rules', href: '/dashboard/playbook', icon: BookOpenCheck },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   { name: 'Support', href: '/support', icon: HelpCircle },
 ]
@@ -226,6 +229,7 @@ export default function DashboardLayout({
     '/dashboard/settings': 'Settings',
     '/dashboard/payment': 'Payment',
     '/dashboard/admin': 'Admin',
+    '/dashboard/playbook': 'Rules',
   }
   const subRouteTitle = pathname.startsWith('/dashboard/trades/') && pathname.endsWith('/edit')
     ? 'Edit trade'

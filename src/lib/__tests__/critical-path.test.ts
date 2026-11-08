@@ -248,6 +248,33 @@ describe('critical path', () => {
     expect(Number(state.applied[0].p_amount)).not.toBe(313.2)
   })
 
+  it('applies the plan whose price was charged, not the plan in stale checkout data', async () => {
+    await signup()
+
+    const stale = paddleEvent('pro', 'month')
+    stale.data.items = [{ price: { id: 'pri_basic' } }]
+
+    const res = await pay(stale)
+    expect(res.status).toBe(200)
+    expect(state.applied[0]).toMatchObject({
+      name: 'apply_paid_order',
+      p_plan_id: 'basic',
+    })
+    expect(Number(state.applied[0].p_amount)).toBe(12)
+  })
+
+  it('does not grant anything for a price this deployment does not sell', async () => {
+    await signup()
+
+    const unknown = paddleEvent('pro', 'month')
+    unknown.data.items = [{ price: { id: 'pri_one_dollar_test' } }]
+
+    const res = await pay(unknown)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ignored: 'unrecognised_price' })
+    expect(state.applied).toHaveLength(0)
+  })
+
   it('routes a yearly purchase through the annual function at the yearly price', async () => {
     await signup()
     const res = await pay(paddleEvent('basic', 'year'))

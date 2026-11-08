@@ -96,12 +96,19 @@ describe('normalizeReview', () => {
     expect(review.confidence).toBe('low')
   })
 
-  it('falls back to the supplied similar setups when the model omits them', () => {
+  it('uses the journal-matched setups and ignores model-invented history', () => {
     const review = normalizeReview(
-      JSON.stringify({ headline: 'x', strengths: [], risks: [], actions: [] }),
+      JSON.stringify({
+        headline: 'x',
+        strengths: [],
+        risks: [],
+        actions: [],
+        similarSetups: [{ note: 'invented setup', outcome: 999, when: null, score: 1 }],
+      }),
       stats(),
       [{ note: 'london breakout', outcome: 50, when: null, score: 0.5 }]
     )
+    expect(review.similarSetups).toHaveLength(1)
     expect(review.similarSetups[0].note).toBe('london breakout')
   })
 

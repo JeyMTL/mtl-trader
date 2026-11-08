@@ -23,6 +23,8 @@ export interface GoogleSyncResult {
   interval: BillingInterval
   expiresAt: string | null
   applied: boolean
+  /** True when the token is already bound to a different account. */
+  conflict?: boolean
 }
 
 export async function syncGoogleSubscription(params: {
@@ -32,6 +34,38 @@ export async function syncGoogleSubscription(params: {
 }): Promise<GoogleSyncResult> {
   const subscription = await verifyPlaySubscription(params.purchaseToken)
   const admin = getAdminClient()
+
+  // A Play purchase token belongs to exactly one Google account, and therefore
+  // to exactly one subscription. Without this check, a token copied from another
+  // device could be re-verified here: the first grant would be a duplicate, but
+  // a later renewal could land on the wrong account and the two rows would
+  // compete for ownership. Refuse before any entitlement work.
+  const { data: tokenOwners, error: ownerError } = await admin
+    .from('google_play_subscriptions')
+    .select('user_id')
+    .eq('purchase_token', params.purchaseToken)
+
+  if (ownerError) {
+    // Fail closed: a database hiccup must not become an ownership bypass.
+    logEvent('error', 'google.subscription.owner_lookup', {
+      error: ownerError,
+      userId: params.userId,
+    })
+    throw new Error(`Could not check the purchase owner: ${ownerError.message}`)
+  }
+  if ((tokenOwners ?? []).some((row) => String(row.user_id) !== params.userId)) {
+    logEvent('warn', 'google.subscription.token_conflict', {
+      userId: params.userId,
+    })
+    return {
+      status: 'ignored',
+      planId: null,
+      interval: subscription.interval,
+      expiresAt: subscription.expiryTime,
+      applied: false,
+      conflict: true,
+    }
+  }
 
   const productId = subscription.productId
   if (!subscription.planId || !productId) {
@@ -49,7 +83,35 @@ export async function syncGoogleSubscription(params: {
     }
   }
 
+  // Claim the token before granting anything. The pre-check above cannot stop
+  // two concurrent requests from both seeing an unowned token; the unique
+  // index can, but only if the insert happens before `applyPaidOrder`. A
+  // conflict or a failed write must not fall through to a grant.
+  const claim = await recordGoogleSubscription({
+    userId: params.userId,
+    purchaseToken: params.purchaseToken,
+    subscription,
+    acknowledged: subscription.acknowledged,
+  })
+  if (claim === 'conflict') {
+    logEvent('warn', 'google.subscription.token_claim_conflict', {
+      userId: params.userId,
+    })
+    return {
+      status: 'ignored',
+      planId: null,
+      interval: subscription.interval,
+      expiresAt: subscription.expiryTime,
+      applied: false,
+      conflict: true,
+    }
+  }
+  if (claim === 'failed') {
+    throw new Error('Could not record the Google Play purchase before granting it')
+  }
+
   let applied = false
+  let entitlementSettled = false
   if (subscription.active) {
     const amount = priceForPlan(subscription.planId, subscription.interval)
     if (!amount) {
@@ -68,6 +130,14 @@ export async function syncGoogleSubscription(params: {
         providerEventId: `google:${params.purchaseToken}:${subscription.expiryTime ?? subscription.state}`,
       })
       applied = result.applied
+      // A duplicate or a would-downgrade is a settled entitlement: the account
+      // already has at least what this purchase paid for. A mismatch, invalid
+      // plan or unknown account is not, and acknowledging those would tell
+      // Google to keep a payment this deployment never granted.
+      entitlementSettled =
+        result.applied ||
+        result.reason === 'duplicate' ||
+        result.reason === 'would_downgrade'
       logEvent('info', 'google.subscription.applied', {
         userId: params.userId,
         planId: subscription.planId,
@@ -79,9 +149,10 @@ export async function syncGoogleSubscription(params: {
 
   // Google refunds a purchase it never sees acknowledged after three days, so a
   // failure here is a paying customer about to be refunded. The row keeps
-  // `acknowledged: false` and the next sync retries it.
+  // `acknowledged: false` and the next sync retries it. Only acknowledge once
+  // the entitlement behind the purchase has actually been settled.
   let acknowledged = subscription.acknowledged
-  if (!acknowledged && subscription.active) {
+  if (!acknowledged && subscription.active && entitlementSettled) {
     try {
       acknowledged = await acknowledgeSubscription(params.purchaseToken, productId)
       if (!acknowledged) {
@@ -98,12 +169,16 @@ export async function syncGoogleSubscription(params: {
     await admin.from('users').update({ cancel_at_period_end: true }).eq('id', params.userId)
   }
 
-  await recordGoogleSubscription({
-    userId: params.userId,
-    purchaseToken: params.purchaseToken,
-    subscription,
-    acknowledged,
-  })
+  if (acknowledged !== subscription.acknowledged) {
+    // Best effort: the claim already exists and access is granted, so a failed
+    // acknowledgement-state update only means the next sync re-records it.
+    await recordGoogleSubscription({
+      userId: params.userId,
+      purchaseToken: params.purchaseToken,
+      subscription,
+      acknowledged,
+    })
+  }
 
   return {
     status: subscription.active ? 'active' : 'inactive',
@@ -119,7 +194,7 @@ async function recordGoogleSubscription(params: {
   purchaseToken: string
   subscription: PlaySubscription
   acknowledged: boolean
-}): Promise<void> {
+}): Promise<'recorded' | 'conflict' | 'failed'> {
   const { error } = await getAdminClient().from('google_play_subscriptions').upsert(
     {
       user_id: params.userId,
@@ -134,9 +209,14 @@ async function recordGoogleSubscription(params: {
     },
     { onConflict: 'user_id' }
   )
-  if (error) {
-    logEvent('error', 'google.subscription.record', { error, userId: params.userId })
-  }
+  if (!error) return 'recorded'
+
+  const duplicate =
+    error.code === '23505' || /duplicate key|unique constraint/i.test(error.message)
+  if (duplicate) return 'conflict'
+
+  logEvent('error', 'google.subscription.record', { error, userId: params.userId })
+  return 'failed'
 }
 
 /**

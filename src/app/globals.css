@@ -64,7 +64,7 @@
   --warning: #8a6520;
 }
 
-/* The mark's own palette: the icon's navy surfaces with its ice accent. It is
+/* The cool alternative to brass: navy surfaces with an ice accent. It is
    dark-based, so none of the :root.light overrides below apply to it. */
 :root.blue {
   --background: #071320;

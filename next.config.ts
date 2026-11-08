@@ -14,7 +14,10 @@ const CONTENT_SECURITY_POLICY = [
   // origins are allowed site-wide even though only that page uses them.
   `script-src 'self' 'unsafe-inline' https://cdn.paddle.com${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.supabase.co",
+  // /api/avatar redirects to Gravatar, so its picture origins have to be
+  // allowed or every customer without an uploaded avatar gets a broken image
+  // and falls straight to initials.
+  "img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://www.gravatar.com https://secure.gravatar.com",
   "media-src 'self' blob: https://*.supabase.co",
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com",

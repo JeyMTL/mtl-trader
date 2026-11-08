@@ -8,18 +8,23 @@ import {
   Info,
   Loader2,
   Play,
+  Sparkles,
   Trash2,
   Upload,
+  Wand2,
 } from 'lucide-react'
 import { authedFetch } from '@/lib/api'
 import { useToast } from '@/components/toast'
 import BacktestJournal from '@/components/backtest-journal'
 import BacktestSuggest, { type AppliedSuggestion } from '@/components/backtest-suggest'
+import BacktestCustom, { type CompiledBacktest } from '@/components/backtest-custom'
 import { STRATEGIES, matchStrategyByLabel } from '@/lib/backtest/strategies'
 import type { Benchmark } from '@/lib/backtest/benchmark'
 import type { Metrics } from '@/lib/backtest/metrics'
+import type { RuleSpec } from '@/lib/backtest/rules'
 import type { StressSummary } from '@/lib/backtest/stress'
 import type { Trade } from '@/lib/backtest/types'
+import type { WalkForwardSummary } from '@/lib/backtest/walk-forward'
 
 /**
  * Backtest workbench.
@@ -45,8 +50,10 @@ interface Report {
   to: number
   metrics: Metrics
   split: { ratio: number; inSample: Metrics; outOfSample: Metrics } | null
+  walkForward?: WalkForwardSummary | null
   benchmark: Benchmark | null
   stress: StressSummary | null
+  ruleSpec?: RuleSpec | null
   trades: Trade[]
   equityCurve: EquityPoint[]
   assumptions: string[]
@@ -75,6 +82,8 @@ interface SavedRunRow extends RunSummary {
   split_metrics?: Report['split']
   benchmark?: Report['benchmark']
   stress?: Report['stress']
+  walk_forward?: Report['walkForward']
+  rule_spec?: Report['ruleSpec']
 }
 
 const defaultStrategy = STRATEGIES[0]!
@@ -170,6 +179,9 @@ function BacktestWorkbench() {
   const [splitRatio, setSplitRatio] = useState(0.7)
   const [timezoneOffsetMinutes, setTimezoneOffsetMinutes] = useState(0)
 
+  const [tab, setTab] = useState<'library' | 'custom'>('library')
+  const [compiled, setCompiled] = useState<CompiledBacktest | null>(null)
+
   const [report, setReport] = useState<Report | null>(null)
   const [runs, setRuns] = useState<RunSummary[]>([])
   const [busy, setBusy] = useState(false)
@@ -200,6 +212,7 @@ function BacktestWorkbench() {
   }, [loadRuns])
 
   const chooseStrategy = (id: string) => {
+    setCompiled(null)
     setStrategyId(id)
     setParams(defaultsFor(id))
   }
@@ -217,6 +230,8 @@ function BacktestWorkbench() {
       const value = suggestion.params[spec.key]
       next[spec.key] = Number.isFinite(value) ? value : spec.defaultValue
     }
+    setCompiled(null)
+    setTab('library')
     setStrategyId(target.id)
     setParams(next)
     if (suggestion.symbol) setSymbol(suggestion.symbol)
@@ -253,8 +268,9 @@ function BacktestWorkbench() {
           name,
           symbol,
           timeframe,
-          strategyId,
-          params,
+          strategyId: compiled ? 'custom' : strategyId,
+          params: compiled ? {} : params,
+          ruleSpec: compiled?.spec,
           initialBalance,
           riskPercent,
           contractSize,
@@ -297,14 +313,20 @@ function BacktestWorkbench() {
       setReport({
         symbol: row.symbol,
         timeframe: row.timeframe,
-        strategy: { id: row.strategy_id, name: row.strategy_id, params: row.strategy_params },
+        strategy: {
+          id: row.strategy_id,
+          name: row.rule_spec?.name || row.strategy_id,
+          params: row.strategy_params,
+        },
         barCount: row.bar_count,
         from: new Date(row.period_start).getTime(),
         to: new Date(row.period_end).getTime(),
         metrics: row.metrics,
         split: row.split_metrics ?? null,
+        walkForward: row.walk_forward ?? null,
         benchmark: row.benchmark ?? null,
         stress: row.stress ?? null,
+        ruleSpec: row.rule_spec ?? null,
         trades: row.trades ?? [],
         equityCurve: row.equity_curve ?? [],
         assumptions: row.assumptions ?? [],
@@ -343,7 +365,49 @@ function BacktestWorkbench() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+      <div className="flex w-fit gap-1 rounded-lg border border-border bg-surface p-1">
+        <button
+          type="button"
+          onClick={() => setTab('library')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            tab === 'library' ? 'bg-primary/15 text-primary' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <FlaskConical className="h-3.5 w-3.5" /> Rule library
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('custom')}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            tab === 'custom' ? 'bg-primary/15 text-primary' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Wand2 className="h-3.5 w-3.5" /> Custom backtest
+        </button>
+      </div>
+
+      {tab === 'custom' && (
+        <BacktestCustom
+          initialSymbol={symbol}
+          onUse={(payload) => {
+            setCompiled(payload)
+            setStrategyId('custom')
+            setParams({})
+            setTimeframe(payload.spec.timeframe)
+            if (payload.spec.name) setName(payload.spec.name)
+            setTab('library')
+            toast('Rules compiled. Check them, then run.', { tone: 'success' })
+          }}
+        />
+      )}
+
+      <div
+        className={
+          tab === 'custom'
+            ? 'hidden'
+            : 'grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]'
+        }
+      >
         {/* ---------------------------------------------------------- form */}
         <div className="space-y-4">
           <section className="rounded-xl border border-border bg-surface p-5">
@@ -384,7 +448,45 @@ function BacktestWorkbench() {
           <section className="rounded-xl border border-border bg-surface p-5">
             <h2 className="mb-4 text-sm font-semibold text-white">2. Strategy</h2>
 
-            <BacktestSuggest onApply={applySuggestion} />
+            {compiled ? (
+              <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-white">
+                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      {compiled.spec.name}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-gray-400">
+                      {compiled.spec.summary || 'Compiled from your description.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompiled(null)
+                      setStrategyId(defaultStrategy.id)
+                      setParams(defaultsFor(defaultStrategy.id))
+                    }}
+                    className="shrink-0 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-gray-400 transition-colors hover:text-white"
+                  >
+                    Replace
+                  </button>
+                </div>
+                <ul className="mt-2.5 space-y-1 border-t border-primary/20 pt-2.5">
+                  {compiled.rules.map((rule) => (
+                    <li
+                      key={rule}
+                      className="flex gap-1.5 text-[11px] leading-relaxed text-gray-300"
+                    >
+                      <span className="shrink-0 text-primary">›</span>
+                      <span>{rule}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <BacktestSuggest onApply={applySuggestion} />
+            )}
 
             <label className="mb-2 block text-sm font-medium text-gray-400" htmlFor="run-name">
               Run name
@@ -417,11 +519,19 @@ function BacktestWorkbench() {
                   id="timeframe"
                   value={timeframe}
                   onChange={(event) => setTimeframe(event.target.value.toUpperCase())}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-white placeholder-gray-500 focus:border-primary focus:outline-none"
+                  disabled={Boolean(compiled)}
+                  title={
+                    compiled
+                      ? 'Set when the rules were compiled. Replace the strategy to change it.'
+                      : undefined
+                  }
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-white placeholder-gray-500 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
             </div>
 
+            {!compiled && (
+              <>
             <label className="mb-2 block text-sm font-medium text-gray-400" htmlFor="strategy">
               Rules
             </label>
@@ -468,6 +578,8 @@ function BacktestWorkbench() {
                 </div>
               ))}
             </div>
+              </>
+            )}
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5">
@@ -572,6 +684,26 @@ function BacktestWorkbench() {
                   </span>
                 </div>
 
+                {report.ruleSpec && (
+                  <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                      Custom rules that ran
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-gray-300">
+                      {report.ruleSpec.summary}
+                    </p>
+                    {(report.ruleSpec.notes ?? []).length > 0 && (
+                      <ul className="mt-1.5 space-y-0.5">
+                        {(report.ruleSpec.notes ?? []).map((note) => (
+                          <li key={note} className="text-[11px] text-gray-500">
+                            · {note}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 <MetricGrid metrics={report.metrics} />
               </div>
 
@@ -648,6 +780,8 @@ function BacktestWorkbench() {
                 </div>
               )}
 
+              <WalkForwardPanel data={report.walkForward ?? null} />
+
               <RobustnessPanel
                 benchmark={report.benchmark}
                 stress={report.stress}
@@ -671,7 +805,11 @@ function BacktestWorkbench() {
               {report.trades.length > 0 && (
                 <div className="rounded-xl border border-border bg-surface p-5">
                   <h2 className="mb-3 text-sm font-semibold text-white">
-                    Trades ({report.trades.length})
+                    Trades{' '}
+                    <span className="font-normal text-gray-500">
+                      (showing {Math.min(100, report.trades.length)} of{' '}
+                      {report.metrics.trades})
+                    </span>
                   </h2>
                   <div className="max-h-80 overflow-auto">
                     <table className="w-full text-xs">
@@ -765,6 +903,70 @@ function BacktestWorkbench() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Consecutive windows, same rules, same starting balance.
+ *
+ * Kept apart from the in-sample split because it answers a different question:
+ * not "does it hold after the cut" but "does it hold every time the period is
+ * cut". A table of losing folds is the most useful thing on this page.
+ */
+function WalkForwardPanel({ data }: { data: WalkForwardSummary | null }) {
+  if (!data) return null
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-5">
+      <h2 className="text-sm font-semibold text-white">Rolling windows</h2>
+      <p className="mb-3 mt-1 text-xs leading-relaxed text-gray-500">
+        The same rules, replayed on {data.folds.length} consecutive slices of the file from
+        the same balance. No parameters are refitted — this measures consistency, not a
+        walk-forward optimisation.
+      </p>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-500">
+              <th className="pb-2 font-medium">Window</th>
+              <th className="pb-2 font-medium">Trades</th>
+              <th className="pb-2 font-medium">Return</th>
+              <th className="pb-2 font-medium">Max DD</th>
+            </tr>
+          </thead>
+          <tbody className="text-gray-300">
+            {data.folds.map((fold) => (
+              <tr key={fold.index} className="border-t border-border">
+                <td className="py-2">
+                  {fold.index}{' '}
+                  <span className="text-xs text-gray-500">
+                    {day(fold.from)} → {day(fold.to)}
+                  </span>
+                </td>
+                <td className="py-2">{fold.metrics.trades}</td>
+                <td
+                  className={`py-2 ${
+                    fold.metrics.returnPct >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}
+                >
+                  {pct(fold.metrics.returnPct, 2)}
+                </td>
+                <td className="py-2">{pct(fold.metrics.maxDrawdownPct, 2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 text-xs leading-relaxed text-gray-500">
+        <span className={data.allProfitable ? 'text-green-400' : 'text-gray-300'}>
+          {data.profitableFolds} of {data.folds.length} windows profitable
+        </span>{' '}
+        · median {pct(data.medianReturnPct, 2)} · worst {pct(data.worstReturnPct, 2)} · best{' '}
+        {pct(data.bestReturnPct, 2)}.
+      </p>
     </div>
   )
 }
@@ -875,6 +1077,11 @@ function MetricGrid({ metrics }: { metrics: Metrics }) {
     { label: 'Expectancy', value: money(metrics.expectancy) },
     { label: 'Max drawdown', value: pct(metrics.maxDrawdownPct, 2), tone: 'bad' },
     { label: 'Sharpe', value: metrics.sharpe === null ? '—' : metrics.sharpe.toFixed(2) },
+    // Nullish, not `=== null`: a run saved before these metrics existed has no
+    // field at all, and reading it as undefined must show a dash, not crash.
+    { label: 'Sortino', value: metrics.sortino == null ? '—' : metrics.sortino.toFixed(2) },
+    { label: 'Calmar', value: metrics.calmar == null ? '—' : metrics.calmar.toFixed(2) },
+    { label: 'Longest loss run', value: metrics.maxConsecutiveLosses == null ? '—' : String(metrics.maxConsecutiveLosses) },
     { label: 'Exposure', value: pct(metrics.exposurePct, 0) },
     { label: 'Avg R', value: metrics.avgRMultiple === null ? '—' : metrics.avgRMultiple.toFixed(2) },
   ]

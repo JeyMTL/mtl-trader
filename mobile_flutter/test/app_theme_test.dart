@@ -16,7 +16,7 @@ void main() {
     expect(AppPalette.blue.id, isNot(AppPalette.light.id));
     expect(AppPalette.dark.isLight, isFalse);
     expect(AppPalette.light.isLight, isTrue);
-    // The blue theme is the mark's navy, so it has to stay dark: every
+    // The blue theme is dark-based, so it has to stay dark: every
     // light-mode rule in the UI keys off this.
     expect(AppPalette.blue.isLight, isFalse);
 
@@ -52,23 +52,23 @@ void main() {
     expect(AppColors.text, AppPalette.dark.text);
   });
 
-  test('a fresh install starts on blue', () async {
+  test('a fresh install starts on dark', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
 
     await ThemeController.restore();
 
-    expect(ThemeController.instance.theme, AppTheme.blue);
-    expect(AppColors.palette, AppPalette.blue);
+    expect(ThemeController.instance.theme, AppTheme.dark);
+    expect(AppColors.palette, AppPalette.dark);
   });
 
-  test('an older stored theme is switched to blue once', () async {
+  test('an older stored theme is switched to dark once', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{
       ThemeController.storageKey: 'light',
     });
 
-    // The first launch after Blue became the default moves the install over.
+    // The first launch after Dark became the default moves the install over.
     await ThemeController.restore();
-    expect(ThemeController.instance.theme, AppTheme.blue);
+    expect(ThemeController.instance.theme, AppTheme.dark);
 
     // A choice made after that is respected on the next launch.
     await ThemeController.instance.setTheme(AppTheme.light);
@@ -79,7 +79,7 @@ void main() {
 
     // Leave the controller on the default so later tests start from a known
     // mode instead of inheriting this one.
-    await ThemeController.instance.setTheme(AppTheme.blue);
+    await ThemeController.instance.setTheme(AppTheme.dark);
   });
 
   test('a chosen mode survives a restart', () async {

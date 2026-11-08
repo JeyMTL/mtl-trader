@@ -5,6 +5,7 @@ import { isDuplicatePurchase } from '@/lib/subscription'
 import { PLANS } from '@/lib/plans'
 import { createCheckoutTransaction, paddleConfigured, priceIdFor, sellablePlanIds } from '@/lib/paddle'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import { rateLimit } from '@/lib/rate-limit'
 import { readJsonBody } from '@/lib/request'
 import type { BillingInterval } from '@/types'
 
@@ -49,6 +50,20 @@ export async function POST(req: Request) {
   try {
     const authUser = await getAuthUser(req)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // One shared budget with the PayPal route: a checkout attempt costs a live
+    // processor call whichever provider it targets, and an abandoned loop should
+    // not be able to create an unlimited trail of transactions.
+    const limit = await rateLimit(`checkout:${authUser.id}`, 10, 60 * 60 * 1000)
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: 'Too many checkout attempts. Try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) },
+        }
+      )
+    }
 
     const parsed = await readJsonBody<{
       planId?: unknown

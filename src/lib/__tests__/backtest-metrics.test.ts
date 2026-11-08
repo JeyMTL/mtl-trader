@@ -100,6 +100,28 @@ describe('metrics', () => {
     expect(Number.isFinite(moving.sharpe!)).toBe(true)
   })
 
+  it('measures Sortino downside risk from zero, not from the mean loss', () => {
+    // One losing bar is enough to define downside risk. Averaging losses and
+    // taking their standard deviation made this null (or far too small).
+    const values = [10_000, 10_100, 10_050, 10_200]
+    const metrics = computeMetrics(result([], values), 10_000, 252)
+    expect(metrics.sortino).not.toBeNull()
+
+    const returns = values.slice(1).map((value, index) => value / values[index]! - 1)
+    const mean = returns.reduce((total, value) => total + value, 0) / returns.length
+    const downside = Math.sqrt(
+      returns.reduce((total, value) => total + (value < 0 ? value * value : 0), 0) /
+        returns.length
+    )
+    expect(metrics.sortino).toBeCloseTo((mean / downside) * Math.sqrt(252), 6)
+  })
+
+  it('keeps the true best and worst trade when every trade loses', () => {
+    const metrics = computeMetrics(result([-10, -30], [10_000, 9_990]), 10_000)
+    expect(metrics.bestTrade).toBe(-10)
+    expect(metrics.worstTrade).toBe(-30)
+  })
+
   it('derives bars per year from the median spacing', () => {
     const hourly = Array.from({ length: 10 }, (_, index) => ({ time: start + index * 3_600_000 }))
     expect(barsPerYearFrom(hourly)).toBeCloseTo(365 * 24, 0)

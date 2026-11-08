@@ -53,8 +53,10 @@ MTL Trader is a record-keeping and analysis tool for trades you place yourself. 
 | App icon (512×512, 32-bit PNG, no alpha) | `store/icon-512.png` | 512×512, RGB, no alpha channel |
 | Feature graphic (1024×500) | `store/feature-graphic.png` | 1024×500, RGB |
 
-Regenerate either after editing its source with
-`node scripts/make-store-graphics.mjs`.
+Regenerate the feature graphic after editing `store/feature-graphic.html` with
+`node scripts/make-store-graphics.mjs`. The icon is rendered from the approved
+artwork at `assets/brand/app-icon-source.jpg`: replace that picture, then run
+`node scripts/make-app-icons.mjs`, which rewrites `store/icon-512.png`.
 
 ## Screenshots (2–8, 1080×1920)
 

@@ -30,6 +30,11 @@ interface Bucket {
 const fallbackBuckets = new Map<string, Bucket>()
 
 function fallbackRateLimit(key: string, limit: number, windowMs: number, now: number): RateLimitResult {
+  // The fallback map is process-global. Without this, a long-lived instance
+  // serving many spoofed IPs while the database is unavailable would grow it
+  // forever; sweep only when it is large, so the normal path stays O(1).
+  if (fallbackBuckets.size > 1_000) sweepExpired(now)
+
   const bucket = fallbackBuckets.get(key)
   if (!bucket || bucket.resetAt <= now) {
     fallbackBuckets.set(key, { count: 1, resetAt: now + windowMs })

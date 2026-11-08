@@ -64,6 +64,40 @@ export function priceIdFor(planId: string, interval: BillingInterval = 'month'):
 }
 
 /**
+ * The plan and cadence a price id belongs to.
+ *
+ * The price id is the only proof that the customer paid the configured amount:
+ * `custom_data` is copied from the checkout request and could be stale after an
+ * upgrade. Matching the id against this deployment's catalogue means the plan
+ * applied is the plan whose price Paddle actually charged.
+ *
+ * `preferredPlanId` (usually the plan named in custom data) breaks a tie when a
+ * deployment accidentally points two plans at the same price. If the match is
+ * ambiguous and the preferred plan is not one of them, this returns null rather
+ * than guessing: ignoring a payment for a human to resolve is safer than
+ * granting the wrong plan.
+ */
+export function planForPriceId(
+  priceId: string | null,
+  planIds: string[],
+  preferredPlanId: string | null = null
+): { planId: string; interval: BillingInterval } | null {
+  if (!priceId) return null
+
+  const intervals: BillingInterval[] = ['month', 'year']
+  const matches: Array<{ planId: string; interval: BillingInterval }> = []
+  for (const planId of planIds) {
+    for (const interval of intervals) {
+      if (priceIdFor(planId, interval) === priceId) matches.push({ planId, interval })
+    }
+  }
+
+  const preferred = matches.find((match) => match.planId === preferredPlanId)
+  if (preferred) return preferred
+  return matches.length === 1 ? matches[0] : null
+}
+
+/**
  * Plans whose yearly price id is also one of the monthly ones.
  *
  * A yearly price is its own catalogue entry, so all four ids must differ.

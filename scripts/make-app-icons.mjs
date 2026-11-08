@@ -1,65 +1,81 @@
 /**
- * Generates every app icon from the vector master.
+ * Generates every app icon from the master artwork.
  *
- * The master is `assets/brand/app-icon.svg`, so the mark is geometry rather than
- * a photographed mockup. It is rasterised once at 1024px and every smaller icon
- * is a single clean reduction of that, instead of a compound resample of a small
- * tile.
+ * The master is a picture, not a drawing: the approved artwork sits at
+ * `assets/brand/app-icon-source.jpg` (`.png` works too) and every icon below is
+ * one clean reduction of it, cut from a single 1024px square. Nothing is redrawn
+ * here, so what was approved is what ships.
  *
  * Pipeline:
- *   1. rasterise the SVG at 1024px, flattened onto the artwork's own navy
- *   2. read that navy from a corner pixel
+ *   1. reduce the source to a 1024px square, flattened onto its own ground
+ *   2. read the ground colour from a corner pixel
  *   3. downsample every icon from that one master
  *
- * Step 2 matters: the colour fills every inset panel and the Android background
- * layer, so a launcher never shows a lighter square floating inside its mask.
+ * Step 2 matters: that colour fills the Android background layer, so a launcher
+ * never shows a lighter square floating inside its mask.
  *
- * To change the mark, edit the SVG and re-run; nothing else needs touching.
+ * The transparent logo renders are keyed off the same ground, because a picture
+ * of a mark has no separate background layer to strip.
+ *
+ * To change the mark, replace the source picture and re-run; nothing else needs
+ * touching.
  *
  * Run: node scripts/make-app-icons.mjs
  * Requires: sharp (already in node_modules)
  */
 
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import sharp from 'sharp'
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
-const SVG = join(ROOT, 'assets/brand/app-icon.svg')
 const MASTER_1024 = join(ROOT, 'assets/brand/app-icon-1024.png')
+
+/** The approved artwork, in the order it is looked for. */
+const SOURCE_NAMES = [
+  'assets/brand/app-icon-source.png',
+  'assets/brand/app-icon-source.jpg',
+  'assets/brand/app-icon-source.jpeg',
+]
+const SOURCE = SOURCE_NAMES.map((name) => join(ROOT, name)).find((path) => existsSync(path))
 
 /** The single master every icon is reduced from. */
 const MASTER_SIDE = 1024
 
-/** Rasterise well above the master, then reduce once, so curve flattening and
- *  gradient banding never survive into the output pixels. */
-const DENSITY = 384
-
-/** The navy the artwork is drawn on — the fallback if a render has no pixel to
- *  sample. */
-const FALLBACK_FACE = '#0b1a28'
-
-/** Maskable web icons can be cropped to a circle, so the art is inset. */
-const MASKABLE_INSET = 0.82
+/** The ground the artwork is drawn on — the fallback if a render has no pixel
+ *  to sample. */
+const FALLBACK_FACE = '#131210'
 
 /**
- * Adaptive icons crop to a mask and only guarantee the inner 72dp of 108dp, so
- * the art is drawn slightly inside that safe zone and the rest is filled with
- * the artwork's own navy — which is also the background layer, so the two meet
- * invisibly.
+ * How far a pixel has to be from the ground before it counts as artwork.
+ *
+ * The source is a JPEG, so the ground is not one exact value: near it is noise.
+ * At or below KEY_CLEAR a pixel is background, at or above KEY_SOLID it is
+ * opaque, and the band between keeps the anti-aliased edge instead of a jagged
+ * cut-out. No part of the mark is anywhere near the ground, so nothing is lost.
  */
-const ADAPTIVE_CONTENT = 0.9
+const KEY_CLEAR = 18
+const KEY_SOLID = 60
 
+/** Reduces the source to the one square every icon comes from, and reports the
+ *  ground colour it is drawn on. */
 async function buildMaster() {
-  const square = await sharp(SVG, { density: DENSITY })
+  if (!SOURCE) {
+    throw new Error(
+      `missing master artwork: expected ${SOURCE_NAMES.join(', ')}`,
+    )
+  }
+
+  const square = await sharp(SOURCE)
     .resize(MASTER_SIDE, MASTER_SIDE, { fit: 'cover', kernel: 'lanczos3' })
     .flatten({ background: FALLBACK_FACE })
     .png({ compressionLevel: 9 })
     .toBuffer()
 
-  // The corner pixel is the artwork's own navy — the mark is inset from it — and
-  // that exact colour has to fill the inset panels and the Android background
-  // layer, or a launcher draws a lighter square inside its mask.
+  // The corner pixel is the artwork's own ground — the mark is inset from it —
+  // and that exact colour has to fill the Android background layer, or a
+  // launcher draws a lighter square inside its mask.
   const { data, info } = await sharp(square).raw().toBuffer({ resolveWithObject: true })
   if (info.channels < 3) throw new Error('master should render as RGB')
   const face = { r: data[0], g: data[1], b: data[2], alpha: 1 }
@@ -67,28 +83,51 @@ async function buildMaster() {
   return { square, face }
 }
 
-async function writePng(path, source, size, { inset = 1, face }) {
-  await mkdir(dirname(path), { recursive: true })
+/** The same square with the ground keyed out, for the cut-out logo renders. */
+async function keyedCutout(face) {
+  const { data } = await sharp(SOURCE)
+    .resize(MASTER_SIDE, MASTER_SIDE, { fit: 'cover', kernel: 'lanczos3' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
 
-  let pipeline
-  if (inset < 1) {
-    const inner = Math.round(size * inset)
-    // No feathered edge is needed: the master's own background is the fill
-    // colour, so the inset panel dissolves into it.
-    const art = await sharp(source).resize(inner, inner, { kernel: 'lanczos3' }).png().toBuffer()
-
-    pipeline = sharp({ create: { width: size, height: size, channels: 4, background: face } }).composite([
-      { input: art, top: Math.round((size - inner) / 2), left: Math.round((size - inner) / 2), blend: 'over' },
-    ])
-  } else {
-    pipeline = sharp(source).resize(size, size, { kernel: 'lanczos3' })
+  for (let i = 0; i < data.length; i += 4) {
+    const distance = Math.hypot(
+      data[i] - face.r,
+      data[i + 1] - face.g,
+      data[i + 2] - face.b,
+    )
+    const alpha =
+      distance <= KEY_CLEAR
+        ? 0
+        : distance >= KEY_SOLID
+          ? 255
+          : Math.round(((distance - KEY_CLEAR) / (KEY_SOLID - KEY_CLEAR)) * 255)
+    data[i + 3] = Math.min(data[i + 3], alpha)
   }
+
+  return sharp(data, { raw: { width: MASTER_SIDE, height: MASTER_SIDE, channels: 4 } })
+    .png({ compressionLevel: 9 })
+    .toBuffer()
+}
+
+async function writePng(path, source, size, face) {
+  await mkdir(dirname(path), { recursive: true })
 
   // Opaque on purpose: the App Store rejects an icon with an alpha channel, and
   // every launcher applies its own mask over an opaque square.
-  await pipeline
+  await sharp(source)
+    .resize(size, size, { kernel: 'lanczos3' })
     .flatten({ background: face })
     .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toFile(path)
+}
+
+async function writeCutout(path, cutout, size) {
+  await mkdir(dirname(path), { recursive: true })
+  await sharp(cutout)
+    .resize(size, size, { kernel: 'lanczos3' })
+    .png({ compressionLevel: 9 })
     .toFile(path)
 }
 
@@ -119,7 +158,9 @@ const ANDROID = {
   'mipmap-xxxhdpi/ic_launcher.png': 192,
 }
 
-/** Adaptive icon foreground: 108dp canvas, mark in the middle 62%. */
+/** Adaptive icon foreground: a 108dp canvas. The supplied artwork already sits
+ *  well inside its own tile, so it is not inset a second time — Android's mask
+ *  crops the ground, which is the same colour as the background layer. */
 const ADAPTIVE = {
   'drawable-mdpi/ic_launcher_foreground.png': 108,
   'drawable-hdpi/ic_launcher_foreground.png': 162,
@@ -138,20 +179,12 @@ const ADAPTIVE_XML = `<?xml version="1.0" encoding="utf-8"?>
 </adaptive-icon>
 `
 
-/** The artwork without its background, for the cut-out logo render. The ground
- *  is one identifiable group in the SVG, and failing loudly beats quietly
- *  writing an opaque file and calling it transparent. */
-async function markOnlySvg() {
-  const source = await readFile(SVG, 'utf8')
-  const stripped = source.replace(/\s*<g id="ground">[\s\S]*?<\/g>/, '')
-  if (stripped === source) throw new Error('app-icon.svg has no <g id="ground"> group to strip')
-  return stripped
-}
-
 async function main() {
   const { square, face } = await buildMaster()
-  const cutoutSource = await markOnlySvg()
-  console.log(`vector master: ${MASTER_SIDE}px, face rgb(${face.r}, ${face.g}, ${face.b})`)
+  const cutout = await keyedCutout(face)
+  console.log(
+    `master: ${basename(SOURCE)} -> ${MASTER_SIDE}px, ground rgb(${face.r}, ${face.g}, ${face.b})`,
+  )
 
   await writeFile(MASTER_1024, square)
 
@@ -160,15 +193,15 @@ async function main() {
 
   let count = 0
   for (const [name, size] of Object.entries(IOS)) {
-    await writePng(join(iconSet, name), square, size, { face })
+    await writePng(join(iconSet, name), square, size, face)
     count += 1
   }
   for (const [name, size] of Object.entries(ANDROID)) {
-    await writePng(join(res, name), square, size, { face })
+    await writePng(join(res, name), square, size, face)
     count += 1
   }
   for (const [name, size] of Object.entries(ADAPTIVE)) {
-    await writePng(join(res, name), square, size, { inset: ADAPTIVE_CONTENT, face })
+    await writePng(join(res, name), square, size, face)
     count += 1
   }
 
@@ -177,9 +210,9 @@ async function main() {
   await mkdir(anydpi, { recursive: true })
   await writeFile(join(anydpi, 'ic_launcher.xml'), ADAPTIVE_XML, 'utf8')
   await writeFile(join(anydpi, 'ic_launcher_round.xml'), ADAPTIVE_XML, 'utf8')
-  // The adaptive background must be the same navy the foreground is padded with,
-  // so no seam shows where a launcher draws the two layers together — and so the
-  // icon never reads as a light square on a dark home screen.
+  // The adaptive background must be the same ground the foreground carries, or
+  // a seam shows where a launcher draws the two layers together — and the icon
+  // must never read as a light square on a dark home screen.
   const hex = `#${[face.r, face.g, face.b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`
   await writeFile(
     join(res, 'values/ic_launcher_background.xml'),
@@ -187,42 +220,40 @@ async function main() {
     'utf8',
   )
 
-  await writePng(join(ROOT, 'public/icon-192.png'), square, 192, { face })
-  await writePng(join(ROOT, 'public/icon-512.png'), square, 512, { face })
-  await writePng(join(ROOT, 'public/icon-512-maskable.png'), square, 512, { inset: MASKABLE_INSET, face })
-  await writePng(join(ROOT, 'public/apple-touch-icon.png'), square, 180, { face })
-  count += 4
+  await writePng(join(ROOT, 'public/icon-192.png'), square, 192, face)
+  await writePng(join(ROOT, 'public/icon-512.png'), square, 512, face)
+  // A maskable icon may be cropped to a circle; the artwork's own margins are
+  // already wide enough that no second inset is needed.
+  await writePng(join(ROOT, 'public/icon-512-maskable.png'), square, 512, face)
+  await writePng(join(ROOT, 'public/apple-touch-icon.png'), square, 180, face)
+  // The Play Console listing icon is a separate upload from the APK's icons.
+  await writePng(join(ROOT, 'store/icon-512.png'), square, 512, face)
+  count += 5
 
   // The in-app mark, bundled by the Flutter app (see pubspec.yaml).
-  await writePng(join(ROOT, 'mobile_flutter/assets/brand/app_icon.png'), square, 512, { face })
+  await writePng(join(ROOT, 'mobile_flutter/assets/brand/app_icon.png'), square, 512, face)
   count += 1
 
   // Plain pictures of the mark, for anywhere it is used as a logo rather than a
   // launcher tile: the square tile itself, and the same art cut out of its
   // ground so it can sit on any background.
-  await writePng(join(ROOT, 'assets/brand/logo-1024.png'), square, 1024, { face })
-  await sharp(Buffer.from(cutoutSource), { density: DENSITY })
-    .resize(MASTER_SIDE, MASTER_SIDE, { fit: 'cover', kernel: 'lanczos3' })
-    .png({ compressionLevel: 9 })
-    .toFile(join(ROOT, 'assets/brand/logo-transparent-1024.png'))
+  await writePng(join(ROOT, 'assets/brand/logo-1024.png'), square, 1024, face)
+  await writeCutout(join(ROOT, 'assets/brand/logo-transparent-1024.png'), cutout, 1024)
   count += 2
 
   // The sizes a logo is actually asked for: 512 is what the Play listing and
   // most profile uploads want, 256 and 128 cover headers and avatars. Each is a
   // single reduction of the same master, never a resize of another icon.
   for (const size of [512, 256, 128]) {
-    await writePng(join(ROOT, `assets/brand/logo-${size}.png`), square, size, { face })
+    await writePng(join(ROOT, `assets/brand/logo-${size}.png`), square, size, face)
     count += 1
   }
   for (const size of [512, 256]) {
-    await sharp(Buffer.from(cutoutSource), { density: DENSITY })
-      .resize(size, size, { fit: 'cover', kernel: 'lanczos3' })
-      .png({ compressionLevel: 9 })
-      .toFile(join(ROOT, `assets/brand/logo-transparent-${size}.png`))
+    await writeCutout(join(ROOT, `assets/brand/logo-transparent-${size}.png`), cutout, size)
     count += 1
   }
 
-  // A favicon is read at 16-32px, where the thin bars turn to noise. Embedding a
+  // A favicon is read at 16-32px, where thin detail turns to noise. Embedding a
   // 64px PNG in the SVG keeps the real artwork and stays crisp on retina tabs.
   const faviconPng = await sharp(square).resize(64, 64, { kernel: 'lanczos3' }).png({ compressionLevel: 9 }).toBuffer()
   await writeFile(

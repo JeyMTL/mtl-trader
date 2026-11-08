@@ -44,7 +44,10 @@ export async function POST(req: Request) {
     }
 
     logEvent('info', 'sync.rotate', { userId: user.id })
-    return NextResponse.json({ token, rotated: true })
+    return NextResponse.json(
+      { token, rotated: true },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error: unknown) {
     return apiError('sync.rotate', error, 500, 'Could not rotate the sync token.')
   }

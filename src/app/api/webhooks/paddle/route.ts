@@ -7,7 +7,7 @@ import {
   paddleCurrency,
   parseAdjustmentEvent,
   parseTransactionEvent,
-  priceIdFor,
+  planForPriceId,
   webhookSecretConfigured,
 } from '@/lib/paddle'
 import { apiError, logEvent } from '@/lib/log'
@@ -22,8 +22,11 @@ import { readRawBody } from '@/lib/request'
  *
  * Access is granted by `transaction.completed` only. The amount applied comes
  * from the plan catalogue, not the transaction total, since Paddle adds sales tax
- * on top; the transaction must instead carry the price id this deployment
- * configured for that plan.
+ * on top. The plan itself is derived from the price id on the transaction, not
+ * from the `custom_data` the checkout request asked for: the price id is what
+ * Paddle actually charged, so a stale, swapped or missing plan id cannot buy a
+ * different tier. A transaction whose price is not in this deployment's
+ * catalogue is acknowledged and ignored for a human to review.
  */
 
 export const runtime = 'nodejs'
@@ -85,7 +88,30 @@ async function handleTransactionCompleted(data: unknown, eventId?: string) {
     return NextResponse.json({ received: true, ignored: 'not_completed' })
   }
 
-  const target = await resolveTarget(transaction)
+  // The price id decides the plan and cadence. A missing, unknown or ambiguous
+  // price is acknowledged without granting anything: Paddle retries a non-2xx
+  // forever, and a guessed plan would be worse than a payment support can see.
+  const priceMatch = planForPriceId(transaction.priceId, PAID_PLANS, transaction.planId)
+  if (!priceMatch) {
+    logEvent('warn', 'paddle.webhook.unrecognised_price', {
+      transactionId: transaction.transactionId,
+      planId: transaction.planId,
+      interval: transaction.interval,
+      priceId: transaction.priceId,
+    })
+    return NextResponse.json({ received: true, ignored: 'unrecognised_price' })
+  }
+  if (transaction.currency && transaction.currency.toUpperCase() !== paddleCurrency()) {
+    // Informational only: the price id already proves the configured price. It is
+    // logged so a currency mismatch in the catalogue is visible, not used to
+    // refuse a correctly priced payment.
+    logEvent('warn', 'paddle.webhook.currency_mismatch', {
+      transactionId: transaction.transactionId,
+      currency: transaction.currency,
+    })
+  }
+
+  const target = await resolveTarget(transaction, priceMatch.planId)
   if (!target) {
     logEvent('warn', 'paddle.webhook.unresolved_transaction', {
       transactionId: transaction.transactionId,
@@ -94,33 +120,11 @@ async function handleTransactionCompleted(data: unknown, eventId?: string) {
     return NextResponse.json({ received: true, ignored: 'unresolved_transaction' })
   }
 
-  // The price id is what proves the customer paid for this plan. A missing id is
-  // tolerated (older payloads), a mismatched one is not.
-  const expectedPrice = priceIdFor(target.planId, transaction.interval)
-  if (expectedPrice && transaction.priceId && transaction.priceId !== expectedPrice) {
-    logEvent('warn', 'paddle.webhook.price_mismatch', {
-      transactionId: transaction.transactionId,
-      planId: target.planId,
-      interval: transaction.interval,
-      priceId: transaction.priceId,
-    })
-    return NextResponse.json({ received: true, ignored: 'price_mismatch' })
-  }
-
-  const currency = paddleCurrency()
-  if (transaction.currency && transaction.currency.toUpperCase() !== currency) {
-    logEvent('warn', 'paddle.webhook.currency_mismatch', {
-      transactionId: transaction.transactionId,
-      currency: transaction.currency,
-    })
-    return NextResponse.json({ received: true, ignored: 'currency_mismatch' })
-  }
-
   // The catalogue price for the cadence bought, not `totalCents`: Paddle collects
   // tax on top. A missing price means this deployment never configured that
   // combination, so the payment is acknowledged and left for a human instead of
   // being applied with a guessed period length.
-  const amount = priceForPlan(target.planId, transaction.interval)
+  const amount = priceForPlan(target.planId, priceMatch.interval)
   if (!amount) {
     logEvent('error', 'paddle.webhook.missing_price', {
       transactionId: transaction.transactionId,
@@ -134,7 +138,7 @@ async function handleTransactionCompleted(data: unknown, eventId?: string) {
     userId: target.userId,
     planId: target.planId,
     amount,
-    interval: transaction.interval,
+    interval: priceMatch.interval,
     provider: 'paddle',
     providerEventId: `paddle:transaction:${transaction.transactionId}`,
   })
@@ -144,7 +148,7 @@ async function handleTransactionCompleted(data: unknown, eventId?: string) {
     eventId,
     userId: target.userId,
     planId: target.planId,
-    interval: transaction.interval,
+    interval: priceMatch.interval,
     result: result.reason,
   })
 
@@ -160,26 +164,25 @@ async function handleTransactionCompleted(data: unknown, eventId?: string) {
 }
 
 /**
- * Finds the account and plan behind a transaction.
+ * Finds the account behind a transaction.
  *
- * `custom_data` is authoritative and is copied onto the subscription, so a
- * renewal carries it too. The fallbacks exist for the case Paddle omits it: the
- * subscription row we recorded on the first payment, then the tier the account
- * is already on.
+ * `custom_data` is copied onto the subscription by Paddle, so it is normally
+ * present even on a renewal. If it is not, the subscription row we recorded on
+ * the first payment identifies the account. The plan never comes from here: it
+ * comes from the price id, so a missing custom plan cannot silently fall back to
+ * whatever tier the account happened to hold.
  */
-async function resolveTarget(transaction: {
-  userId: string | null
-  planId: string | null
-  subscriptionId: string | null
-}): Promise<{ userId: string; planId: string } | null> {
-  const admin = getAdminClient()
+async function resolveTarget(
+  transaction: {
+    userId: string | null
+    subscriptionId: string | null
+  },
+  planId: string
+): Promise<{ userId: string; planId: string } | null> {
   let userId = transaction.userId
-  let planId = transaction.planId && PAID_PLANS.includes(transaction.planId)
-    ? transaction.planId
-    : null
 
   if (!userId && transaction.subscriptionId) {
-    const { data } = await admin
+    const { data } = await getAdminClient()
       .from('billing_subscriptions')
       .select('user_id')
       .eq('provider', 'paddle')
@@ -188,18 +191,7 @@ async function resolveTarget(transaction: {
     if (data?.user_id) userId = String(data.user_id)
   }
 
-  if (userId && !planId) {
-    const { data } = await admin
-      .from('users')
-      .select('subscription_tier')
-      .eq('id', userId)
-      .maybeSingle()
-    if (typeof data?.subscription_tier === 'string' && PAID_PLANS.includes(data.subscription_tier)) {
-      planId = data.subscription_tier
-    }
-  }
-
-  if (!userId || !planId) return null
+  if (!userId) return null
   return { userId, planId }
 }
 

@@ -42,12 +42,23 @@ export async function GET(req: Request) {
       return apiError('account.export', failure.error, 500, 'Could not prepare your export.')
     }
 
+    // Never export server-side credentials such as the sync agent token or the
+    // billing customer id: a data export is not a secrets backup, and a leaked
+    // download must not hand over write access to the account. Strip them from
+    // a copy instead of naming columns, so the export keeps working as the
+    // profile grows.
+    const safeProfile = profile.data ? { ...profile.data } : null
+    if (safeProfile) {
+      delete safeProfile.agent_token
+      delete safeProfile.stripe_customer_id
+    }
+
     const payload = {
       exportedAt: new Date().toISOString(),
       account: {
         id: userId,
         email: user.email,
-        profile: profile.data,
+        profile: safeProfile,
       },
       trades: trades.data ?? [],
       deposits: deposits.data ?? [],

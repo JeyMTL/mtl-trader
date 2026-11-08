@@ -12,8 +12,16 @@ import { buyAndHold, type Benchmark } from './benchmark'
 import { parseBarsCsv, type ParseOptions } from './csv'
 import { simulate } from './engine'
 import { barsPerYearFrom, computeMetrics, emptyMetrics, type Metrics } from './metrics'
+import {
+  compileRuleStrategy,
+  describeRuleSpec,
+  normalizeRuleSpec,
+  normalizeTimeframe,
+  type RuleSpec,
+} from './rules'
 import { stressTest, type StressSummary } from './stress'
-import { getStrategy, normalizeParams, type StrategyId } from './strategies'
+import { getStrategy, normalizeParams, type StrategyId, type StrategyDefinition } from './strategies'
+import { walkForward, type WalkForwardSummary } from './walk-forward'
 import type { Bar, BacktestConfig, EquityPoint, Trade } from './types'
 
 export interface BacktestRequest {
@@ -22,6 +30,8 @@ export interface BacktestRequest {
   timeframe?: string
   strategyId: string
   params?: Record<string, unknown>
+  /** Required when `strategyId` is `custom`: the compiled, declarative rules. */
+  ruleSpec?: unknown
   initialBalance?: number
   riskPercent?: number
   contractSize?: number
@@ -44,10 +54,14 @@ export interface BacktestReport {
   to: number
   metrics: Metrics
   split: { ratio: number; inSample: Metrics; outOfSample: Metrics } | null
+  /** The same rules replayed over consecutive windows, from the same balance. */
+  walkForward: WalkForwardSummary | null
   /** Owning the instrument over the same bars, with the same costs. */
   benchmark: Benchmark | null
   /** The same trades reshuffled, to separate an edge from a lucky order. */
   stress: StressSummary | null
+  /** Present only for a custom run: the rules that actually executed. */
+  ruleSpec: RuleSpec | null
   trades: Trade[]
   equityCurve: EquityPoint[]
   assumptions: string[]
@@ -112,10 +126,46 @@ function assumptionsFor(
   return list
 }
 
+function customAssumptions(ruleSpec: RuleSpec): string[] {
+  const list = [
+    `Custom strategy: ${describeRuleSpec(ruleSpec).join(' ')}`,
+    'These rules were compiled from a written description by a model and stored with the run as data. They are interpreted by this engine — no model output is executed.',
+  ]
+  if (ruleSpec.higherTimeframe) {
+    list.push(
+      `Higher-timeframe bars are formed in fixed blocks from the first uploaded ${ruleSpec.timeframe} bar, not by exchange session. A different file start can shift the confirmation bar.`
+    )
+  }
+  if (ruleSpec.notes.length > 0) {
+    list.push(`Interpretations made while compiling: ${ruleSpec.notes.join('; ')}`)
+  }
+  return list
+}
+
 export function runBacktest(request: BacktestRequest): BacktestReport {
-  const definition = getStrategy(request.strategyId)
-  if (!definition) {
-    throw new Error(`Unknown strategy: ${request.strategyId}`)
+  // A custom run is data, not code: the spec is interpreted by the same engine.
+  // A missing spec is refused rather than quietly swapped for a built-in.
+  let ruleSpec: RuleSpec | null = null
+  let definition: StrategyDefinition
+  if (request.strategyId === 'custom') {
+    if (request.ruleSpec === undefined || request.ruleSpec === null) {
+      throw new Error('The custom strategy was not included with the run. Compile it again.')
+    }
+    ruleSpec = normalizeRuleSpec(request.ruleSpec)
+    // The spec's higher timeframe is expressed in primary bars, so replaying it
+    // against a differently-labelled file would aggregate the wrong number of
+    // bars. Refuse instead of silently testing rules the trader did not see.
+    const requested = request.timeframe?.trim()
+    if (requested && normalizeTimeframe(requested) !== ruleSpec.timeframe) {
+      throw new Error(
+        `This custom strategy was compiled for ${ruleSpec.timeframe}. Recompile it for ${normalizeTimeframe(requested)}, or run it on ${ruleSpec.timeframe} data.`
+      )
+    }
+    definition = compileRuleStrategy(ruleSpec)
+  } else {
+    const builtIn = getStrategy(request.strategyId)
+    if (!builtIn) throw new Error(`Unknown strategy: ${request.strategyId}`)
+    definition = builtIn
   }
 
   const params = normalizeParams(definition, request.params)
@@ -152,11 +202,12 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
   const full = simulate(bars, definition, params, config)
   const metrics = computeMetrics(full, initialBalance, barsPerYear)
 
-  // Two questions a positive curve cannot answer: would owning the instrument
-  // have paid better, and is the result an artefact of the order the trades
-  // happened to arrive in?
+  // Three questions a positive curve cannot answer: would owning the instrument
+  // have paid better, is the result an artefact of the order the trades arrived
+  // in, and does it survive being cut into consecutive windows?
   const benchmark = buyAndHold(bars, initialBalance, config.costs)
   const stress = stressTest(full.trades, initialBalance, metrics.maxDrawdownPct)
+  const rolling = walkForward(bars, definition, params, config)
 
   const ratio = Math.min(0.9, Math.max(0.5, request.splitRatio ?? 0.7))
   const splitIndex = Math.floor(bars.length * ratio)
@@ -202,10 +253,15 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
       `More than half of ${stress.simulations.toLocaleString('en-US')} reshuffles of these trades lost money — the result depends heavily on the order they arrived in.`
     )
   }
+  if (rolling && rolling.consistency < 0.5) {
+    warnings.push(
+      `Only ${rolling.profitableFolds} of ${rolling.folds.length} consecutive windows were profitable. A result that lives in one stretch of history is a fit, not an edge.`
+    )
+  }
 
   return {
     symbol: config.symbol,
-    timeframe: request.timeframe?.trim() || 'M1',
+    timeframe: request.timeframe?.trim() || ruleSpec?.timeframe || 'M1',
     strategy: { id: definition.id, name: definition.name, params },
     config,
     barCount: bars.length,
@@ -213,11 +269,16 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
     to: full.to,
     metrics,
     split,
+    walkForward: rolling,
     benchmark,
     stress,
+    ruleSpec,
     trades: full.trades,
     equityCurve: downsample(full.equity),
-    assumptions: assumptionsFor(config, request.timezoneOffsetMinutes ?? 0, full.leverageCapped),
+    assumptions: [
+      ...assumptionsFor(config, request.timezoneOffsetMinutes ?? 0, full.leverageCapped),
+      ...(ruleSpec ? customAssumptions(ruleSpec) : []),
+    ],
     warnings,
   }
 }

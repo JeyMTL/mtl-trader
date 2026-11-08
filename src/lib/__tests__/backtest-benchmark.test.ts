@@ -44,6 +44,17 @@ describe('buy and hold', () => {
     expect(result.returnPct).toBeCloseTo(10, 6)
   })
 
+  it('includes the exit cost in the final drawdown', () => {
+    const result = buyAndHold(bars([100, 100]), 10_000, {
+      spread: 0,
+      slippage: 0,
+      commission: 10,
+    })!
+
+    expect(result.netPnl).toBeCloseTo(-10, 6)
+    expect(result.maxDrawdownPct).toBeCloseTo(0.1, 6)
+  })
+
   it('returns null when there is nothing to hold', () => {
     expect(buyAndHold(bars([100]), 10_000, free)).toBeNull()
     expect(buyAndHold(bars([100, 110]), 0, free)).toBeNull()

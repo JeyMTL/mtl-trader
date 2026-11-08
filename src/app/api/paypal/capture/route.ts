@@ -5,6 +5,22 @@ import { rateLimit } from '@/lib/rate-limit'
 import { apiError, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
 
+interface PayPalOrder {
+  id?: string
+  status?: string
+  purchase_units?: Array<{
+    custom_id?: string
+    amount?: { value?: string; currency_code?: string }
+    payments?: {
+      captures?: Array<{
+        id?: string
+        status?: string
+        amount?: { value?: string; currency_code?: string }
+      }>
+    }
+  }>
+}
+
 export async function POST(req: Request) {
   try {
     const authUser = await getAuthUser(req)
@@ -35,40 +51,105 @@ export async function POST(req: Request) {
 
     const accessToken = await getPayPalAccessToken()
 
-    const response = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${orderId}/capture`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    })
+    // Read the order before capturing it. Capture actually charges the buyer, so
+    // the order's owner must be established first: checking `custom_id` after a
+    // capture meant an authenticated caller could charge someone else's order
+    // before being told it was forbidden.
+    const orderResponse = await fetch(
+      `${PAYPAL_BASE}/v2/checkout/orders/${encodeURIComponent(orderId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )
+    const order = (await orderResponse.json().catch(() => ({}))) as PayPalOrder
 
-    const data = await response.json()
-
-    if (data.status !== 'COMPLETED') {
-      logEvent('warn', 'paypal.capture.incomplete', { orderId, status: data.status, userId: authUser.id })
-      return NextResponse.json({ error: 'Payment not completed' }, { status: 400 })
+    if (!orderResponse.ok) {
+      logEvent('warn', 'paypal.capture.order_lookup', {
+        orderId,
+        status: orderResponse.status,
+        userId: authUser.id,
+      })
+      return NextResponse.json(
+        { error: 'Could not load that order.' },
+        { status: orderResponse.status === 404 ? 404 : 502 }
+      )
     }
 
-    const purchaseUnit = data.purchase_units?.[0]
-    const parsed = parseCustomId(purchaseUnit?.custom_id)
+    const orderUnit = order.purchase_units?.[0]
+    const parsed = parseCustomId(orderUnit?.custom_id)
     if (!parsed) {
       return NextResponse.json({ error: 'Invalid order metadata' }, { status: 400 })
     }
 
-    // Only the account owner may capture their own order
+    // Only the account owner may capture their own order.
     if (authUser.id !== parsed.userId) {
+      logEvent('warn', 'paypal.capture.foreign_order', {
+        orderId,
+        userId: authUser.id,
+      })
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // A retried success page may find the order already captured. Reuse that
+    // result instead of calling capture again, which PayPal would reject.
+    let completed = order
+    if (order.status !== 'COMPLETED') {
+      const response = await fetch(
+        `${PAYPAL_BASE}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      completed = (await response.json().catch(() => ({}))) as PayPalOrder
+      if (!response.ok || completed.status !== 'COMPLETED') {
+        logEvent('warn', 'paypal.capture.incomplete', {
+          orderId,
+          status: completed.status,
+          userId: authUser.id,
+        })
+        return NextResponse.json({ error: 'Payment not completed' }, { status: 400 })
+      }
+    }
+
+    const purchaseUnit = completed.purchase_units?.[0] ?? orderUnit
+    const capture = purchaseUnit?.payments?.captures?.[0]
+    const currency = capture?.amount?.currency_code ?? purchaseUnit?.amount?.currency_code
+    if (currency && currency.toUpperCase() !== 'USD') {
+      logEvent('warn', 'paypal.capture.currency', { orderId, currency, userId: authUser.id })
+      return NextResponse.json({ error: 'Unexpected currency' }, { status: 400 })
+    }
+
+    // The capture is the money that actually moved; the order amount is what was
+    // requested. If PayPal reports both and they disagree, applying either one
+    // would grant an entitlement the payment did not buy.
+    const orderedAmount = purchaseUnit?.amount?.value ?? orderUnit?.amount?.value
+    const capturedAmount = capture?.amount?.value
+    if (capturedAmount && orderedAmount && Number(capturedAmount) !== Number(orderedAmount)) {
+      logEvent('warn', 'paypal.capture.amount_mismatch', {
+        orderId,
+        orderedAmount,
+        capturedAmount,
+        userId: authUser.id,
+      })
+      return NextResponse.json({ error: 'Payment amount mismatch' }, { status: 400 })
+    }
+
+    const amount = capturedAmount ?? orderedAmount
+    if (typeof amount !== 'string' || !amount) {
+      return NextResponse.json({ error: 'Payment amount missing' }, { status: 400 })
     }
 
     // The capture id matches the id the webhook and reconciliation use, so all
     // three paths de-dupe against the same payment_events row.
-    const captureId = purchaseUnit?.payments?.captures?.[0]?.id
+    const captureId = capture?.id
 
     const result = await applyPaidOrder({
       userId: parsed.userId,
       planId: parsed.planId,
-      amount: purchaseUnit?.amount?.value ?? '0',
+      amount,
       provider: 'paypal',
       providerEventId: `paypal:capture:${captureId || orderId}`,
     })

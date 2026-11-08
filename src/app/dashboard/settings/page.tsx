@@ -673,7 +673,7 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="py-4 border-b border-border">
                   <p className="text-sm font-medium text-white">Theme</p>
-                  <p className="text-xs text-gray-400">Graphite, paper, or the mark&apos;s own navy and ice.</p>
+                  <p className="text-xs text-gray-400">Graphite, paper, or a cool navy blue.</p>
                   <div className="mt-3 grid grid-cols-3 gap-2">
                     {THEMES.map((option) => (
                       <button

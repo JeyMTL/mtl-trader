@@ -3,9 +3,8 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
 /**
- * The three appearances. `blue` is the mark's own palette: the icon's navy
- * surfaces with its ice accent, so the app can sit next to the logo instead of
- * only in brass.
+ * The three appearances. `dark` is the default and matches the icon's black
+ * ground; `blue` is the cool alternative — navy surfaces with an ice accent.
  */
 export type Theme = 'dark' | 'light' | 'blue'
 
