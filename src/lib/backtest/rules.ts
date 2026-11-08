@@ -105,7 +105,16 @@ export interface RuleSpec {
 
 export const MAX_RULE_CONDITIONS = 4
 export const MAX_COMPILE_DESCRIPTION = 4_000
-export const MAX_COMPILE_IMAGES = 2
+export const MAX_COMPILE_IMAGES = 4
+/**
+ * Charts and a voice note share one JSON body, and the platform caps a function
+ * request at ~4.5 MB. Base64 adds a third on top, so the ceiling has to be on the
+ * sum rather than per file: two 4 MB charts already cannot be uploaded at once,
+ * and refusing here returns a sentence instead of a platform 413.
+ */
+export const MAX_COMPILE_ATTACHMENT_BYTES = 3_000_000
+/** The trader's standing definition of an acceptable setup, carried per compile. */
+export const MAX_COMPILE_CRITERIA = 2_000
 export const MAX_RULE_NOTES = 6
 export const MAX_RULE_NAME = 60
 export const MAX_RULE_SUMMARY = 400
@@ -200,6 +209,22 @@ function asString(value: unknown): string {
 function asFinite(value: unknown): number | null {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * Cleans the saved acceptance criteria before they reach a prompt.
+ *
+ * Control characters are replaced rather than removed so a pasted block keeps
+ * its line breaks, and the length is capped because these words are prepended to
+ * every compile and billed every time.
+ */
+export function normalizeCriteria(raw: unknown): string {
+  if (typeof raw !== 'string') return ''
+  return raw
+    .replace(/\r\n/g, '\n')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ' ')
+    .trim()
+    .slice(0, MAX_COMPILE_CRITERIA)
 }
 
 function normalizeOperand(raw: unknown): RuleOperand | null {
@@ -728,9 +753,11 @@ export function buildCompileMessages(
     higherTimeframe?: string | null
     stopLoss?: string | null
     symbol?: string | null
+    criteria?: string | null
   },
   images: string[] = []
 ): PromptMessage[] {
+  const criteria = normalizeCriteria(input.criteria)
   const seriesCatalog = SERIES_KEYS.map((key) => {
     if (key === 'macd' || key === 'macd_signal' || key === 'macd_histogram') {
       return `${key} (period = slow length, default 26)`
@@ -752,6 +779,9 @@ export function buildCompileMessages(
     'The higher timeframe is optional. Only set it when the trader describes confirmation on a slower timeframe; mark those operands with "timeframe": "higher".',
     'Everything is decided on the close of a bar and filled at the next open. Do not describe intrabar or news-event behaviour.',
     'If part of the description is discretionary (feel, news, "wait for confirmation"), say so in notes and encode the closest mechanical rule.',
+    criteria
+      ? 'The trader also keeps a standing definition of what counts as an acceptable setup. Treat it as a constraint on what you encode, and prefer it to any convention of your own. Anything it requires that the available series cannot express must be named in notes — never dropped silently.'
+      : '',
     'Reply with a single JSON object and nothing else, shaped exactly like this:',
     JSON.stringify({
       name: 'short strategy name',
@@ -770,7 +800,9 @@ export function buildCompileMessages(
     images.length > 0
       ? `${images.length} chart screenshot(s) are attached. Read the visible structure, indicator names and marked levels to resolve the description; say in notes if the image is not a chart or is unclear.`
       : 'No screenshot is attached; work from the text alone.',
-  ].join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   const user = [
     `Symbol: ${input.symbol?.trim() || 'not specified'}`,
@@ -780,7 +812,9 @@ export function buildCompileMessages(
     '',
     'The trader’s description of the strategy:',
     input.description.slice(0, MAX_COMPILE_DESCRIPTION),
-    '',
+    ...(criteria
+      ? ['', 'The trader’s standing acceptance criteria for a valid setup:', criteria, '']
+      : []),
     'Return the JSON object now.',
   ].join('\n')
 

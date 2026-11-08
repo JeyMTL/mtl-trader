@@ -27,6 +27,7 @@ financial advice.
 | `schema.ts` | JSON schema, tolerant extractor, strict normalizer, sample guard | 1 |
 | `prompt.ts` | System/user prompt, compact stats, in-context examples | 1 / 3 |
 | `providers.ts` | Gemini, Anthropic, OpenAI-compatible gateways; vision; streaming | 2 / 3 |
+| `transcribe.ts` | Voice-note speech-to-text on Gemini's native endpoint | 3 |
 | `review.ts` | Orchestrator (`prepareReview`, `generateReview`) | — |
 | `cache.ts` | Stable hashing so identical journals reuse a review | 1 |
 | `outcomes.ts` | Before/after comparison to track whether advice helped | 3 |
@@ -114,6 +115,27 @@ it can read, with their note and screenshot counts.
 - The note and the image are never logged; only the symbol, the chosen strategy
   and how many screenshots were sent.
 
+### `POST /api/backtest/transcribe`
+
+Turns a voice note into text for the custom strategy compiler.
+
+Body `{ "audio": "data:audio/wav;base64,…" }` → `{ "transcript": "…" }`.
+
+- Gated on the `backtest` entitlement, rate limited to 10 per 10 minutes per user.
+- Accepts the audio formats Gemini reads (WAV, MP3, OGG, MP4/M4A, AAC, FLAC, AIFF)
+  up to 3 MB. **WebM/Opus is deliberately not accepted**: the browser records
+  16 kHz mono WAV instead (`src/lib/voice-note.ts`), so the upload does not depend
+  on which recorder a browser ships.
+- The transcript is clamped to 4,000 characters and returned as text. The browser
+  drops it into the description field, where a misheard trading term can be
+  corrected before anything is compiled; the recording itself is never stored.
+- Silence comes back as a sentence ("Nothing intelligible was in that
+  recording"), not as an empty description.
+- Needs `GEMINI_API_KEY` even when reviews are served by another provider, since
+  the compatibility endpoint takes no audio parts. Unconfigured → 503.
+- The recording and its text are never logged; only the byte count and the
+  transcript length.
+
 ## Configuration
 
 See `.env.example`. Any one of these enables the review:
@@ -128,6 +150,16 @@ half-configured gateway cannot post a journal to a URL nobody chose.
 
 Shared overrides: `AI_MODEL`, `AI_VISION_MODEL`. With none set, the review
 returns 503 and the rest of the app is unaffected.
+
+The one exception to that precedence is voice transcription: it is Gemini-only
+regardless of the review provider, because audio has to go to the native
+`generateContent` endpoint rather than the compatibility layer. It resolves
+`GEMINI_TRANSCRIBE_MODEL` → `GEMINI_VISION_MODEL` → `GEMINI_MODEL` → the pinned
+default, and refuses (503, with a message that says so) when `GEMINI_API_KEY` is
+missing.
+
+To force the free path even while a paid key sits in the environment, set
+`AI_PROVIDER=gemini` — an explicit provider wins over every key.
 
 ### Running it for free
 

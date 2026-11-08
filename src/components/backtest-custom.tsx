@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
+  BookOpenCheck,
   ImagePlus,
   Loader2,
+  Mic,
+  Save,
   Sparkles,
+  Square,
   Trash2,
   Wand2,
   AlertTriangle,
@@ -12,6 +16,8 @@ import {
 } from 'lucide-react'
 import { authedFetch } from '@/lib/api'
 import { useToast } from '@/components/toast'
+import { supabase } from '@/lib/supabase'
+import { MAX_VOICE_SECONDS, startVoiceNote, voiceNoteSupported, type VoiceRecorder } from '@/lib/voice-note'
 import type { RuleSpec } from '@/lib/backtest/rules'
 
 /**
@@ -33,10 +39,24 @@ export interface CompiledBacktest {
   disclaimer: string
 }
 
-const MAX_IMAGES = 2
+/**
+ * These mirror MAX_COMPILE_IMAGES, MAX_COMPILE_CRITERIA and
+ * MAX_COMPILE_ATTACHMENT_BYTES on the server. They are duplicated rather than
+ * imported because the rule module drags the whole engine into this bundle.
+ */
+const MAX_IMAGES = 4
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
+const MAX_CRITERIA = 2_000
+const ATTACHMENT_BUDGET = 3_000_000
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const TIMEFRAMES = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1']
+
+/** Rough byte size of a base64 data URL, for the shared attachment budget. */
+function dataUrlBytes(dataUrl: string): number {
+  const comma = dataUrl.indexOf(',')
+  if (comma === -1) return 0
+  return Math.floor(((dataUrl.length - comma - 1) * 3) / 4)
+}
 
 function minutesFor(timeframe: string): number | null {
   const match = /^(M|H|D|W)(\d+)$/.exec(timeframe)
@@ -91,6 +111,14 @@ export default function BacktestCustom({
   const [error, setError] = useState('')
   const [result, setResult] = useState<CompiledBacktest | null>(null)
   const [meta, setMeta] = useState<{ images: number; skipped: number; model: string } | null>(null)
+  const [criteria, setCriteria] = useState('')
+  const [criteriaState, setCriteriaState] = useState<'loading' | 'saving' | ''>('loading')
+  const [recording, setRecording] = useState(false)
+  const [recordSeconds, setRecordSeconds] = useState(0)
+  const [transcribing, setTranscribing] = useState(false)
+  const recorderRef = useRef<VoiceRecorder | null>(null)
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const cutoffRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const pickImages = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
@@ -98,6 +126,7 @@ export default function BacktestCustom({
     if (files.length === 0) return
 
     const next = [...images]
+    let total = next.reduce((sum, image) => sum + dataUrlBytes(image.dataUrl), 0)
     for (const file of files) {
       if (next.length >= MAX_IMAGES) {
         toast(`Up to ${MAX_IMAGES} charts.`, { tone: 'error' })
@@ -111,13 +140,157 @@ export default function BacktestCustom({
         toast(`${file.name} is over 4 MB. Crop it to the setup.`, { tone: 'error' })
         continue
       }
+      // Charts and a recording travel in one request, so the ceiling is on the
+      // sum: base64 is a third larger again than the file on disk.
+      if (total + file.size > ATTACHMENT_BUDGET) {
+        toast('Those charts are too large to send together. Remove one, or crop it.', {
+          tone: 'error',
+        })
+        break
+      }
       try {
         next.push({ name: file.name, dataUrl: await readAsDataUrl(file) })
+        total += file.size
       } catch {
         toast('Could not read that image.', { tone: 'error' })
       }
     }
     setImages(next)
+  }
+
+  // The compiler is stateless, so the trader's own definition of an acceptable
+  // setup is kept on the playbook row and sent with every description.
+  useEffect(() => {
+    let active = true
+    async function load() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!active) return
+        if (!user) return
+        const { data } = await supabase
+          .from('playbooks')
+          .select('backtest_brief')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (!active) return
+        const stored = (data as { backtest_brief?: string | null } | null)?.backtest_brief
+        if (typeof stored === 'string') setCriteria(stored)
+      } catch {
+        // An unreachable playbook is not an error: the field simply starts empty.
+      } finally {
+        if (active) setCriteriaState('')
+      }
+    }
+    void load()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Releasing the microphone on unmount keeps the browser's recording indicator
+  // from outliving the panel.
+  useEffect(() => {
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current)
+      if (cutoffRef.current) clearTimeout(cutoffRef.current)
+      recorderRef.current?.cancel()
+      recorderRef.current = null
+    }
+  }, [])
+
+  const saveCriteria = async () => {
+    setCriteriaState('saving')
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        toast('Sign in again to save that.', { tone: 'error' })
+        return
+      }
+      const { error: saveError } = await supabase.from('playbooks').upsert(
+        {
+          user_id: user.id,
+          backtest_brief: criteria.trim().slice(0, MAX_CRITERIA),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
+      if (saveError) {
+        toast('Could not save that: ' + saveError.message, { tone: 'error' })
+        return
+      }
+      setCriteria(criteria.trim().slice(0, MAX_CRITERIA))
+      toast('Acceptance criteria saved.', { tone: 'success' })
+    } catch {
+      toast('Could not reach the server.', { tone: 'error' })
+    } finally {
+      setCriteriaState('')
+    }
+  }
+
+  const stopRecording = async () => {
+    const handle = recorderRef.current
+    recorderRef.current = null
+    if (tickRef.current) clearInterval(tickRef.current)
+    if (cutoffRef.current) clearTimeout(cutoffRef.current)
+    tickRef.current = null
+    cutoffRef.current = null
+    setRecording(false)
+    if (!handle) return
+
+    setTranscribing(true)
+    setError('')
+    try {
+      const clip = await handle.stop()
+      const response = await authedFetch('/api/backtest/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio: clip.dataUrl }),
+      })
+      const data = (await response.json()) as { transcript?: string; error?: string }
+      if (!response.ok || !data.transcript) {
+        setError(data.error || 'Could not use that recording.')
+        return
+      }
+      // The transcript becomes text in the description rather than an opaque
+      // attachment: a misheard trading term is fixable before anything compiles.
+      const transcript = data.transcript
+      setDescription((current) => {
+        const existing = current.trim()
+        return (existing ? `${existing}\n\n${transcript}` : transcript).slice(0, 4_000)
+      })
+      toast('Voice note added to the description.', { tone: 'success' })
+    } catch {
+      setError('Could not use that recording. Type the explanation instead.')
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  const beginRecording = async () => {
+    setError('')
+    if (!voiceNoteSupported()) {
+      setError('This browser cannot record audio. Type the explanation instead.')
+      return
+    }
+    try {
+      const handle = await startVoiceNote()
+      recorderRef.current = handle
+      setRecording(true)
+      setRecordSeconds(0)
+      tickRef.current = setInterval(() => setRecordSeconds((value) => value + 1), 1_000)
+      cutoffRef.current = setTimeout(() => void stopRecording(), MAX_VOICE_SECONDS * 1_000)
+    } catch (recordError) {
+      const message = recordError instanceof Error ? recordError.message : ''
+      setError(
+        message.toLowerCase().includes('permission') || message.toLowerCase().includes('denied')
+          ? 'Microphone access was blocked. Allow it, or type the explanation instead.'
+          : message || 'Could not start recording. Type the explanation instead.'
+      )
+    }
   }
 
   const compile = async () => {
@@ -138,6 +311,7 @@ export default function BacktestCustom({
           timeframe,
           higherTimeframe: higherTimeframe || null,
           stopLoss,
+          criteria: criteria.trim() || null,
           images: images.map((image) => image.dataUrl),
         }),
       })
@@ -307,6 +481,45 @@ export default function BacktestCustom({
           </p>
         </div>
 
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-gray-400">Spoken explanation</span>
+            <span className="text-[11px] text-gray-500">{MAX_VOICE_SECONDS}s max</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {recording ? (
+              <button
+                type="button"
+                onClick={() => void stopRecording()}
+                className="flex items-center gap-2 rounded-lg border border-danger/50 bg-danger/10 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-danger/20"
+              >
+                <Square className="h-3 w-3" /> Stop and transcribe · {recordSeconds}s
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void beginRecording()}
+                disabled={transcribing}
+                className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-primary/50 hover:text-white disabled:opacity-50"
+              >
+                {transcribing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Mic className="h-3.5 w-3.5" />
+                )}
+                {transcribing ? 'Transcribing…' : 'Record a voice note'}
+              </button>
+            )}
+          </div>
+
+          <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+            Say the parts a paragraph loses — what you actually count as a valid gap or a
+            sweep. It is transcribed into the description above as text you can correct, so
+            the recording itself is never stored.
+          </p>
+        </div>
+
         <button
           type="button"
           onClick={() => void compile()}
@@ -322,6 +535,46 @@ export default function BacktestCustom({
             {error}
           </p>
         )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+          <BookOpenCheck className="h-4 w-4 text-primary" />
+          What I count as acceptable
+        </h2>
+        <p className="mt-1 text-xs leading-relaxed text-gray-500">
+          Your standing definition of a valid setup, saved once and sent with every compile
+          so you are not retyping it. Anything in it that the engine cannot express comes
+          back in the notes.
+        </p>
+
+        <textarea
+          value={criteria}
+          onChange={(event) => setCriteria(event.target.value)}
+          rows={5}
+          maxLength={MAX_CRITERIA}
+          placeholder="e.g. A fair value gap only counts if the middle candle displaced through the prior swing high, the gap is wider than the last 20 bars' average range, and price has not traded back through it. Only in the first two hours of London."
+          className="mt-3 w-full resize-y rounded-lg border border-border bg-background px-4 py-3 text-sm leading-relaxed text-white placeholder-gray-600 focus:border-primary focus:outline-none"
+        />
+
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[11px] text-gray-500">
+            {criteria.length}/{MAX_CRITERIA}
+          </span>
+          <button
+            type="button"
+            onClick={() => void saveCriteria()}
+            disabled={criteriaState !== ''}
+            className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-primary/50 hover:text-white disabled:opacity-50"
+          >
+            {criteriaState === 'saving' ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            {criteriaState === 'saving' ? 'Saving…' : 'Save criteria'}
+          </button>
+        </div>
       </div>
 
       {result && (

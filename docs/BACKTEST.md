@@ -125,6 +125,59 @@ would be guessing from the symbol alone. Limits: 5 suggestions per 10 minutes pe
 user, and the provider must be configured (`GEMINI_API_KEY` or
 `ANTHROPIC_API_KEY`); without it the panel says so instead of failing silently.
 
+## Writing a strategy in your own words
+
+The workbench has a **Write the strategy you want tested** panel for setups the
+built-in strategies do not cover. You describe what has to happen before entry,
+pick the timeframes, and the model compiles it into the same declarative spec the
+engine runs — a list of comparisons, a stop and a target. Nothing you write is
+executed as code, and the plain-English rules that come back are yours to check
+before a bar is simulated.
+
+What the vocabulary can hold:
+
+- **Series:** price, SMA, EMA, RSI, ATR, highest/lowest over N bars, MACD and
+  Bollinger bands, each optionally read from the confirmation timeframe or up to
+  20 bars back.
+- **Comparisons:** above, below, crosses above, crosses below. Operands are single
+  values, so there is no arithmetic between them.
+- **Limit:** four conditions per side. Anything beyond that is dropped.
+
+So a fair value gap compiles exactly (`low` above `high` two bars ago), and a
+sweep-and-reclaim compiles as a bar piercing the prior N-bar extreme and closing
+back inside it. What cannot be expressed: session or killzone anchoring (there is
+no time-of-day filter), a gap's midpoint, whether a gap is still unfilled, or a
+candle's size relative to ATR. The compiler names those in **notes** rather than
+pretending it encoded them.
+
+### Your standing criteria
+
+The compiler is stateless — it sees only what is sent with the request. The
+**What I count as acceptable** field is where your own definition lives ("what I
+count as a valid gap"). It is saved on the playbook row
+(`playbooks.backtest_brief`, migration `20261121_backtest_brief.sql`) and sent
+with every description. It is a constraint on what gets encoded, not a rule list:
+whatever it asks for that cannot be expressed comes back in the notes.
+
+### Charts and voice notes
+
+Up to four screenshots (PNG, JPEG, WebP) can be attached. They are evidence for
+the compile step only — the engine never sees them, so a picture can disambiguate
+which series you meant but cannot add a rule the vocabulary lacks.
+
+A voice note carries the nuance a short paragraph loses. It is recorded in the
+browser as 16 kHz mono WAV capped at 60 seconds (`MediaRecorder`'s WebM is not a
+format the model accepts), transcribed, and **inserted into the description as
+text** — so a misheard trading term is fixable before anything is compiled. The
+recording is never stored. Transcription needs `GEMINI_API_KEY` even when the
+review provider is Anthropic, because that is the only audio-capable vendor
+configured here; without the key the panel says so instead of dropping the note.
+
+Charts and a recording share one request body. The budget is 3 MB of attachments
+before base64 (`MAX_COMPILE_ATTACHMENT_BYTES`), because the platform caps a
+function request at ~4.5 MB and base64 adds a third on top — so the panel refuses
+an oversized set with a sentence instead of a 413 from the edge.
+
 ## Storage
 
 Saved runs live in `public.backtests` (migration `20261106_backtests.sql`) with

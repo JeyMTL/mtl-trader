@@ -6,12 +6,15 @@ import { readJsonBody } from '@/lib/request'
 import { createProvider, resolveProviderConfig } from '@/lib/ai/providers'
 import { checkFeature } from '@/lib/plan-guard'
 import {
+  MAX_COMPILE_ATTACHMENT_BYTES,
+  MAX_COMPILE_CRITERIA,
   MAX_COMPILE_DESCRIPTION,
   MAX_COMPILE_IMAGES,
   RULE_SPEC_DISCLAIMER,
   buildCompileMessages,
   describeRuleSpec,
   higherTimeframeRatio,
+  normalizeCriteria,
   normalizeRuleSpec,
   normalizeTimeframe,
 } from '@/lib/backtest/rules'
@@ -19,7 +22,7 @@ import {
 /**
  * Custom backtest compiler.
  *
- * POST { description, timeframe, higherTimeframe?, stopLoss?, symbol?, images? }
+ * POST { description, timeframe, higherTimeframe?, stopLoss?, symbol?, criteria?, images? }
  *   -> the same description turned into a declarative rule spec, plus that spec
  *      in plain English for the trader to check before running anything.
  *
@@ -28,6 +31,11 @@ import {
  * models actually accept are forwarded; anything else is counted and dropped,
  * because a screenshot silently replaced by "[unreadable image]" would make the
  * model describe a chart it never saw.
+ *
+ * `criteria` is the trader's saved definition of an acceptable setup. It is sent
+ * by the browser rather than read from the database here: it is their own prompt
+ * input, the panel already shows it, and keeping the route free of a second
+ * lookup means a playbook read failure cannot break a compile.
  *
  * This call is gated exactly like a backtest run: compiling is part of the Pro
  * workbench, and the model call costs money.
@@ -39,9 +47,15 @@ export const maxDuration = 60
 
 const VISION_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
-const MAX_BODY_BYTES = 10 * 1024 * 1024
+/** Just above the attachment budget once base64 and the text are added. */
+const MAX_BODY_BYTES = 4_400_000
 
-function usableImage(raw: unknown): string | null {
+interface UsableImage {
+  dataUrl: string
+  bytes: number
+}
+
+function usableImage(raw: unknown): UsableImage | null {
   if (typeof raw !== 'string') return null
   const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i.exec(raw.trim())
   if (!match) return null
@@ -49,7 +63,7 @@ function usableImage(raw: unknown): string | null {
   if (!VISION_TYPES.has(mime)) return null
   const bytes = Math.floor((match[2].replace(/\s/g, '').length * 3) / 4)
   if (bytes > MAX_IMAGE_BYTES) return null
-  return raw.trim()
+  return { dataUrl: raw.trim(), bytes }
 }
 
 export async function POST(req: Request) {
@@ -99,10 +113,27 @@ export async function POST(req: Request) {
 
     const rawImages = Array.isArray(body.images) ? body.images : []
     const images: string[] = []
+    let attachmentBytes = 0
+    let overBudget = false
     for (const candidate of rawImages) {
       if (images.length >= MAX_COMPILE_IMAGES) break
       const image = usableImage(candidate)
-      if (image) images.push(image)
+      if (!image) continue
+      // Dropping a chart the trader attached would compile rules from less than
+      // they sent, so a budget breach is refused rather than trimmed.
+      if (attachmentBytes + image.bytes > MAX_COMPILE_ATTACHMENT_BYTES) {
+        overBudget = true
+        break
+      }
+      attachmentBytes += image.bytes
+      images.push(image.dataUrl)
+    }
+    if (overBudget) {
+      return apiWarn(
+        'backtest.compile.attachments',
+        'Those attachments are too large to send at once. Use fewer or smaller charts and try again.',
+        400
+      )
     }
     const skippedImages = rawImages.length - images.length
 
@@ -126,6 +157,8 @@ export async function POST(req: Request) {
       )
     }
 
+    const criteria = normalizeCriteria(body.criteria)
+
     const provider = createProvider(config)
     let raw: string
     try {
@@ -137,6 +170,7 @@ export async function POST(req: Request) {
             higherTimeframe,
             stopLoss: typeof body.stopLoss === 'string' ? body.stopLoss : null,
             symbol: typeof body.symbol === 'string' ? body.symbol : null,
+            criteria,
           },
           images
         ),
@@ -164,13 +198,15 @@ export async function POST(req: Request) {
     spec.timeframe = timeframe
     spec.higherTimeframe = higherTimeframe
 
-    // Never log the description or the images — only the shape of the result.
+    // Never log the description, the criteria or the images — only the shape of
+    // the result.
     logEvent('info', 'backtest.compile', {
       userId: user.id,
       conditions: spec.longEntry.length + spec.shortEntry.length + spec.exit.length,
       higherTimeframe: spec.higherTimeframe,
       images: images.length,
       skippedImages,
+      criteriaChars: criteria.length,
     })
 
     return NextResponse.json(
@@ -183,6 +219,8 @@ export async function POST(req: Request) {
           model: provider.model,
           images: images.length,
           skippedImages,
+          criteriaChars: criteria.length,
+          criteriaLimit: MAX_COMPILE_CRITERIA,
           generatedAt: new Date().toISOString(),
         },
       },
