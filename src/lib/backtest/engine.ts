@@ -76,6 +76,10 @@ export function simulate(
   let pendingExit = false
   let exposureBars = 0
   let leverageCapped = false
+  // Counted rather than guessed at: when a bar spans both levels the engine takes
+  // the stop, and how often that happened is the honest size of the error that
+  // assumption introduces.
+  let ambiguousExits = 0
 
   const trades: Trade[] = []
   const equity: SimulationResult['equity'] = []
@@ -164,17 +168,19 @@ export function simulate(
     if (side === 'long') {
       if (bar.open <= stopPrice) return closePosition(bar, bar.open, index, 'stop')
       if (bar.open >= takeProfitPrice) return closePosition(bar, bar.open, index, 'target')
-      if (bar.low <= stopPrice) return closePosition(bar, stopPrice, index, 'stop')
-      if (bar.high >= takeProfitPrice) {
-        return closePosition(bar, takeProfitPrice, index, 'target')
-      }
+      const hitStop = bar.low <= stopPrice
+      const hitTarget = bar.high >= takeProfitPrice
+      if (hitStop && hitTarget) ambiguousExits += 1
+      if (hitStop) return closePosition(bar, stopPrice, index, 'stop')
+      if (hitTarget) return closePosition(bar, takeProfitPrice, index, 'target')
     } else {
       if (bar.open >= stopPrice) return closePosition(bar, bar.open, index, 'stop')
       if (bar.open <= takeProfitPrice) return closePosition(bar, bar.open, index, 'target')
-      if (bar.high >= stopPrice) return closePosition(bar, stopPrice, index, 'stop')
-      if (bar.low <= takeProfitPrice) {
-        return closePosition(bar, takeProfitPrice, index, 'target')
-      }
+      const hitStop = bar.high >= stopPrice
+      const hitTarget = bar.low <= takeProfitPrice
+      if (hitStop && hitTarget) ambiguousExits += 1
+      if (hitStop) return closePosition(bar, stopPrice, index, 'stop')
+      if (hitTarget) return closePosition(bar, takeProfitPrice, index, 'target')
     }
   }
 
@@ -255,5 +261,6 @@ export function simulate(
     from: bars[0]?.time ?? 0,
     to: last?.time ?? 0,
     leverageCapped,
+    ambiguousExits,
   }
 }

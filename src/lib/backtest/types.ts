@@ -82,4 +82,10 @@ export interface SimulationResult {
   to: number
   /** True when the leverage cap, not the risk size, decided a position's size. */
   leverageCapped: boolean
+  /**
+   * Trades closed on a bar that touched both the stop and the target. The order
+   * is unknowable without tick data, so these are where the stop-first
+   * assumption actually changed the result.
+   */
+  ambiguousExits?: number
 }

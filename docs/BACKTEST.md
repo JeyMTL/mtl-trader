@@ -136,19 +136,31 @@ before a bar is simulated.
 
 What the vocabulary can hold:
 
-- **Series:** price, SMA, EMA, RSI, ATR, highest/lowest over N bars, MACD and
-  Bollinger bands, each optionally read from the confirmation timeframe or up to
-  20 bars back.
-- **Comparisons:** above, below, crosses above, crosses below. Operands are single
-  values, so there is no arithmetic between them.
-- **Limit:** four conditions per side. Anything beyond that is dropped.
+- **Series:** price, SMA, EMA, RSI, ATR, highest/lowest over N bars, MACD,
+  Bollinger bands, and the live three-bar gap levels — `fvg_*` for the bullish
+  imbalance below the market, `ifvg_*` for the bearish one above — each
+  optionally read from the confirmation timeframe or up to 20 bars back.
+- **Arithmetic:** an operand can be an expression of `add`, `sub`, `mul` or
+  `div` over two operands, nested up to three deep. That is what makes a gap's
+  midpoint and "wider than 1.5 × ATR" expressible instead of approximated. A
+  division by zero yields *no value*, so the condition is false rather than
+  accidentally true.
+- **Comparisons:** above, below, crosses above, crosses below.
+- **Sessions:** up to four windows on the UTC clock. A bar outside every window
+  cannot open a trade, which is how a killzone requirement is enforced. Exits are
+  never blocked by a window, so a position opened inside it can still close.
+- **Limit:** six conditions per side. Anything beyond that is dropped.
 
-So a fair value gap compiles exactly (`low` above `high` two bars ago), and a
-sweep-and-reclaim compiles as a bar piercing the prior N-bar extreme and closing
-back inside it. What cannot be expressed: session or killzone anchoring (there is
-no time-of-day filter), a gap's midpoint, whether a gap is still unfilled, or a
-candle's size relative to ATR. The compiler names those in **notes** rather than
-pretending it encoded them.
+So an ICT setup is no longer only a description of the idea. A bullish gap is
+`low` above `high` two bars ago; the unfilled gap's midpoint is `fvg_mid`, which
+stays valid through a retracement and disappears only when price trades through
+the far edge; and "only in the London killzone" is a session window. A sweep and
+reclaim is a bar piercing the prior N-bar extreme and closing back inside it.
+
+What still cannot be expressed: the *order* of two events inside a single bar (no
+"displacement, then reclaim" sequence), tick-level fills, and judgment that was
+never mechanical. The compiler names those in **notes** rather than pretending it
+encoded them.
 
 ### Your standing criteria
 

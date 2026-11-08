@@ -201,6 +201,7 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
 
   const full = simulate(bars, definition, params, config)
   const metrics = computeMetrics(full, initialBalance, barsPerYear)
+  const ambiguous = full.ambiguousExits ?? 0
 
   // Three questions a positive curve cannot answer: would owning the instrument
   // have paid better, is the result an artefact of the order the trades arrived
@@ -253,6 +254,11 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
       `More than half of ${stress.simulations.toLocaleString('en-US')} reshuffles of these trades lost money — the result depends heavily on the order they arrived in.`
     )
   }
+  if (ambiguous > 0 && full.trades.length > 0 && ambiguous / full.trades.length > 0.25) {
+    warnings.push(
+      `${ambiguous} of ${full.trades.length} trades closed on a bar that spanned both the stop and the target. The stop-first assumption decided those, so read this curve as the pessimistic end of a range rather than a point estimate.`
+    )
+  }
   if (rolling && rolling.consistency < 0.5) {
     warnings.push(
       `Only ${rolling.profitableFolds} of ${rolling.folds.length} consecutive windows were profitable. A result that lives in one stretch of history is a fit, not an edge.`
@@ -277,6 +283,11 @@ export function runBacktest(request: BacktestRequest): BacktestReport {
     equityCurve: downsample(full.equity),
     assumptions: [
       ...assumptionsFor(config, request.timezoneOffsetMinutes ?? 0, full.leverageCapped),
+      ...(ambiguous > 0
+        ? [
+            `${ambiguous} of ${full.trades.length} trades were closed on a bar that touched both the stop and the target. Tick data would be needed to know which came first; the engine assumed the stop, so those trades are the largest single source of error in this result.`,
+          ]
+        : []),
       ...(ruleSpec ? customAssumptions(ruleSpec) : []),
     ],
     warnings,

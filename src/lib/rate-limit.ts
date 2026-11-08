@@ -12,8 +12,13 @@ import { logEvent } from '@/lib/log'
  *
  * If the RPC is unavailable (migration not applied yet, or the database is
  * briefly unreachable) we fall back to per-instance buckets rather than failing
- * the request. That fallback is a speed bump, not a guarantee — the same caveat
- * the old implementation had.
+ * the request, because locking every customer out of a working app over a
+ * database blip is worse than a weaker limit.
+ *
+ * The fallback is bounded rather than trusted. Per-key buckets are per process,
+ * so on their own they let one instance serve unlimited distinct keys — the
+ * aggregate ceiling below is what stops an outage from becoming an open door,
+ * and the distinct log event is what stops an outage from being invisible.
  */
 
 export interface RateLimitResult {
@@ -28,6 +33,14 @@ interface Bucket {
 }
 
 const fallbackBuckets = new Map<string, Bucket>()
+/**
+ * Total fallback decisions one process may make per minute while the RPC is down.
+ * High enough that a real outage still serves normal traffic, low enough that a
+ * single instance cannot become an unmetered proxy for the whole app.
+ */
+const DEGRADED_CEILING = 3_000
+let degradedWindow = -1
+let degradedCount = 0
 
 function fallbackRateLimit(key: string, limit: number, windowMs: number, now: number): RateLimitResult {
   // The fallback map is process-global. Without this, a long-lived instance
@@ -76,15 +89,40 @@ export async function rateLimit(
       retryAfterMs: Math.max(0, Number(row.retry_after_ms ?? 0)),
     }
   } catch (error: unknown) {
-    logEvent('warn', 'rate_limit.fallback', { error, key })
+    const window = Math.floor(now / 60_000)
+    if (window !== degradedWindow) {
+      degradedWindow = window
+      degradedCount = 0
+    }
+    if (degradedCount >= DEGRADED_CEILING) {
+      return { ok: false, remaining: 0, retryAfterMs: 60_000 - (now % 60_000) }
+    }
+    degradedCount += 1
+    logEvent('warn', 'rate_limit.degraded', { error, key })
     return fallbackRateLimit(key, limit, windowMs, now)
   }
 }
 
-/** Best-effort client identity for unauthenticated routes. */
+/**
+ * Client identity for unauthenticated routes.
+ *
+ * `x-forwarded-for` is caller-controlled: the edge appends to whatever was sent,
+ * so its *first* entry can be a value the client chose, and keying on it lets
+ * anyone mint unlimited buckets by rotating a fake IP. Vercel's own header and
+ * `x-real-ip` are written at the edge and cannot be spoofed, so they win; only
+ * if both are missing is the last forwarded hop used, which is the one the edge
+ * added rather than the one the caller invented.
+ */
 export function clientKey(req: Request, scope: string): string {
-  const forwarded = req.headers.get('x-forwarded-for') || ''
-  const ip = forwarded.split(',')[0].trim() || req.headers.get('x-real-ip') || 'unknown'
+  const platform = req.headers.get('x-vercel-forwarded-for')
+  const real = req.headers.get('x-real-ip')
+  const forwarded = (req.headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  const ip =
+    platform?.split(',')[0]?.trim() || real?.trim() || forwarded[forwarded.length - 1] || 'unknown'
   return `${scope}:${ip}`
 }
 

@@ -39,6 +39,14 @@ export type RuleSeries =
   | 'bb_upper'
   | 'bb_middle'
   | 'bb_lower'
+  /** Most recent bullish three-bar imbalance price has not filled. */
+  | 'fvg_top'
+  | 'fvg_mid'
+  | 'fvg_bottom'
+  /** The same for a bearish imbalance, which sits above the market. */
+  | 'ifvg_top'
+  | 'ifvg_mid'
+  | 'ifvg_bottom'
 
 export type RuleComparison =
   | 'above'
@@ -47,6 +55,22 @@ export type RuleComparison =
   | 'crosses_below'
 
 export type RuleTimeframe = 'primary' | 'higher'
+
+export type RuleMathOp = 'add' | 'sub' | 'mul' | 'div'
+
+/**
+ * Arithmetic between two operands.
+ *
+ * Single values were the original limit: a gap's midpoint and "wider than 1.5 ×
+ * ATR" are both one division or multiplication away, and without them an ICT
+ * description had to be approximated. Nesting is capped rather than unbounded so
+ * a hostile or confused reply cannot build an expression tree worth evaluating.
+ */
+export interface RuleMath {
+  op: RuleMathOp
+  left: RuleOperand
+  right: RuleOperand
+}
 
 export interface RuleOperand {
   series?: RuleSeries
@@ -59,6 +83,14 @@ export interface RuleOperand {
   timeframe?: RuleTimeframe
   /** A constant, used instead of `series`. */
   value?: number
+  /** Arithmetic over two operands, used instead of `series` and `value`. */
+  expr?: RuleMath
+}
+
+/** A tradeable window on the UTC clock, in minutes past midnight. */
+export interface RuleSessionWindow {
+  start: number
+  end: number
 }
 
 export interface RuleCondition {
@@ -92,6 +124,8 @@ export interface RuleSpec {
   timeframe: string
   /** Confirmation timeframe, aggregated from the uploaded primary bars. */
   higherTimeframe: string | null
+  /** Entry windows in minutes past midnight UTC. Empty means any hour. */
+  sessions: RuleSessionWindow[]
   side: RuleSide
   longEntry: RuleCondition[]
   shortEntry: RuleCondition[]
@@ -103,7 +137,11 @@ export interface RuleSpec {
   notes: string[]
 }
 
-export const MAX_RULE_CONDITIONS = 4
+export const MAX_RULE_CONDITIONS = 6
+/** Enough for a killzone plus an overnight session, and no more. */
+export const MAX_RULE_SESSIONS = 4
+/** Expression nesting: deep enough for "half of (a + b)", shallow enough to audit. */
+export const MAX_RULE_MATH_DEPTH = 3
 export const MAX_COMPILE_DESCRIPTION = 4_000
 export const MAX_COMPILE_IMAGES = 4
 /**
@@ -140,10 +178,17 @@ const SERIES_LABELS: Record<RuleSeries, string> = {
   bb_upper: 'upper band',
   bb_middle: 'middle band',
   bb_lower: 'lower band',
+  fvg_top: 'unfilled bullish gap top',
+  fvg_mid: 'unfilled bullish gap midpoint',
+  fvg_bottom: 'unfilled bullish gap bottom',
+  ifvg_top: 'unfilled bearish gap top',
+  ifvg_mid: 'unfilled bearish gap midpoint',
+  ifvg_bottom: 'unfilled bearish gap bottom',
 }
 
 const SERIES_KEYS = Object.keys(SERIES_LABELS) as RuleSeries[]
 const COMPARISONS: RuleComparison[] = ['above', 'below', 'crosses_above', 'crosses_below']
+const MATH_OPS: RuleMathOp[] = ['add', 'sub', 'mul', 'div']
 const STOP_TYPES: RuleStopType[] = ['atr', 'percent', 'points', 'swing']
 const TARGET_TYPES: RuleTargetType[] = ['r', 'atr', 'percent']
 
@@ -227,9 +272,19 @@ export function normalizeCriteria(raw: unknown): string {
     .slice(0, MAX_COMPILE_CRITERIA)
 }
 
-function normalizeOperand(raw: unknown): RuleOperand | null {
-  if (!raw || typeof raw !== 'object') return null
+function normalizeOperand(raw: unknown, depth = 0): RuleOperand | null {
+  if (!raw || typeof raw !== 'object' || depth > MAX_RULE_MATH_DEPTH) return null
   const input = raw as Record<string, unknown>
+
+  if (input.expr && typeof input.expr === 'object') {
+    const node = input.expr as Record<string, unknown>
+    const op = asString(node.op).toLowerCase() as RuleMathOp
+    if (!MATH_OPS.includes(op)) return null
+    const left = normalizeOperand(node.left, depth + 1)
+    const right = normalizeOperand(node.right, depth + 1)
+    if (!left || !right) return null
+    return { expr: { op, left, right } }
+  }
 
   const constant = asFinite(input.value)
   if (constant !== null && input.value !== undefined) return { value: constant }
@@ -281,6 +336,31 @@ function normalizeConditions(raw: unknown): RuleCondition[] {
     .map((condition) => normalizeCondition(condition))
     .filter((condition): condition is RuleCondition => condition !== null)
     .slice(0, MAX_RULE_CONDITIONS)
+}
+
+/**
+ * Session windows, clamped to the UTC day.
+ *
+ * `start === end` is dropped rather than read as "all day": a zero-length
+ * window is much more likely to be a model mistake than a request always to
+ * trade, and guessing wrong would silently delete a killzone requirement.
+ */
+function normalizeSessions(raw: unknown): RuleSessionWindow[] {
+  if (!Array.isArray(raw)) return []
+  const windows: RuleSessionWindow[] = []
+  for (const candidate of raw) {
+    if (!candidate || typeof candidate !== 'object') continue
+    const input = candidate as Record<string, unknown>
+    const start = asFinite(input.start)
+    const end = asFinite(input.end)
+    if (start === null || end === null) continue
+    const from = clamp(Math.round(start), 0, 1_439)
+    const to = clamp(Math.round(end), 0, 1_439)
+    if (from === to) continue
+    windows.push({ start: from, end: to })
+    if (windows.length >= MAX_RULE_SESSIONS) break
+  }
+  return windows
 }
 
 function normalizeStop(raw: unknown): RuleStop {
@@ -357,6 +437,8 @@ export function normalizeRuleSpec(raw: unknown): RuleSpec {
   if (side === 'both' && !resolvesLong) side = 'short'
   if (side === 'both' && !resolvesShort) side = 'long'
 
+  const sessions = normalizeSessions(input.sessions ?? input.session_windows)
+
   const notes = Array.isArray(input.notes)
     ? input.notes
         .map((note) => asString(note).slice(0, 200))
@@ -369,6 +451,7 @@ export function normalizeRuleSpec(raw: unknown): RuleSpec {
     summary,
     timeframe: primary,
     higherTimeframe,
+    sessions,
     side,
     longEntry,
     shortEntry,
@@ -470,6 +553,8 @@ interface PreparedFrame {
   /** Primary index -> usable index in this frame, or -1 when not yet formed. */
   indexFor: (primaryIndex: number) => number
   cache: Map<string, (number | null)[]>
+  /** Gap levels are computed once per lookback, then reused by all six series. */
+  gaps: Map<number, GapLevels>
 }
 
 function prepareFrame(bars: Bar[], ratio: number | null): PreparedFrame {
@@ -478,6 +563,7 @@ function prepareFrame(bars: Bar[], ratio: number | null): PreparedFrame {
       bars,
       indexFor: (index) => index,
       cache: new Map(),
+      gaps: new Map(),
     }
   }
   return {
@@ -486,6 +572,7 @@ function prepareFrame(bars: Bar[], ratio: number | null): PreparedFrame {
     // closed are visible, which is the previous block.
     indexFor: (index) => Math.floor(index / ratio) - 1,
     cache: new Map(),
+    gaps: new Map(),
   }
 }
 
@@ -498,7 +585,95 @@ function frameFor(operand: RuleOperand, primary: PreparedFrame, higher: Prepared
 function defaultPeriodFor(series: RuleSeries | undefined): number {
   if (series === 'macd' || series === 'macd_signal' || series === 'macd_histogram') return 26
   if (series === 'bb_upper' || series === 'bb_middle' || series === 'bb_lower') return 20
+  // For a gap series the period is the lookback, not an indicator length.
+  if (series?.startsWith('fvg_') || series?.startsWith('ifvg_')) return 20
   return 14
+}
+
+export interface GapLevels {
+  fvg_top: (number | null)[]
+  fvg_mid: (number | null)[]
+  fvg_bottom: (number | null)[]
+  ifvg_top: (number | null)[]
+  ifvg_mid: (number | null)[]
+  ifvg_bottom: (number | null)[]
+}
+
+/**
+ * The most recent three-bar imbalance price has not filled, per bar.
+ *
+ * Three-bar gaps are not something a comparison can find on its own: "the low of
+ * candle three is above the high of candle one" is true on one bar and then never
+ * again, so there is no level to trade from afterwards. This tracks each gap
+ * forward and drops it only when price trades through its far edge — a genuine
+ * fill. A bar that merely trades into the gap leaves it live, which is what makes
+ * "enter at the midpoint of the unfilled gap" expressible at all.
+ *
+ * Complexity is linear in bars times the number of gaps still open, and the
+ * lookback bounds that: no more than one gap can open per bar, and old ones are
+ * dropped as they age out.
+ */
+export function gapLevels(bars: Bar[], lookback: number): GapLevels {
+  const column = () => new Array<number | null>(bars.length).fill(null)
+  const levels: GapLevels = {
+    fvg_top: column(),
+    fvg_mid: column(),
+    fvg_bottom: column(),
+    ifvg_top: column(),
+    ifvg_mid: column(),
+    ifvg_bottom: column(),
+  }
+
+  interface OpenGap {
+    index: number
+    top: number
+    bottom: number
+  }
+
+  const bullish: OpenGap[] = []
+  const bearish: OpenGap[] = []
+
+  for (let index = 0; index < bars.length; index += 1) {
+    const bar = bars[index]
+    if (!bar) continue
+
+    for (let cursor = bullish.length - 1; cursor >= 0; cursor -= 1) {
+      const gap = bullish[cursor]
+      if (gap && bar.low <= gap.bottom) bullish.splice(cursor, 1)
+    }
+    for (let cursor = bearish.length - 1; cursor >= 0; cursor -= 1) {
+      const gap = bearish[cursor]
+      if (gap && bar.high >= gap.top) bearish.splice(cursor, 1)
+    }
+
+    if (index >= 2) {
+      const first = bars[index - 2]
+      if (first) {
+        // Bullish imbalance: candle three's low never traded into candle one's high.
+        if (bar.low > first.high) bullish.push({ index, top: bar.low, bottom: first.high })
+        if (bar.high < first.low) bearish.push({ index, top: first.low, bottom: bar.high })
+      }
+    }
+
+    while (bullish.length > 0 && index - (bullish[0]?.index ?? 0) > lookback) bullish.shift()
+    while (bearish.length > 0 && index - (bearish[0]?.index ?? 0) > lookback) bearish.shift()
+
+    const lowest = bullish[bullish.length - 1]
+    if (lowest) {
+      levels.fvg_top[index] = lowest.top
+      levels.fvg_bottom[index] = lowest.bottom
+      levels.fvg_mid[index] = (lowest.top + lowest.bottom) / 2
+    }
+
+    const highest = bearish[bearish.length - 1]
+    if (highest) {
+      levels.ifvg_top[index] = highest.top
+      levels.ifvg_bottom[index] = highest.bottom
+      levels.ifvg_mid[index] = (highest.top + highest.bottom) / 2
+    }
+  }
+
+  return levels
 }
 
 function valueOf(
@@ -507,6 +682,26 @@ function valueOf(
   higher: PreparedFrame | null,
   index: number
 ): number | null {
+  if (operand.expr) {
+    const left = valueOf(operand.expr.left, primary, higher, index)
+    const right = valueOf(operand.expr.right, primary, higher, index)
+    if (left === null || right === null) return null
+    switch (operand.expr.op) {
+      case 'add':
+        return left + right
+      case 'sub':
+        return left - right
+      case 'mul':
+        return left * right
+      case 'div':
+        // A zero denominator is a missing value, not infinity: treating it as a
+        // number would make every comparison against it fire.
+        return right === 0 ? null : left / right
+      default:
+        return null
+    }
+  }
+
   if (typeof operand.value === 'number' && Number.isFinite(operand.value)) {
     return operand.value
   }
@@ -519,10 +714,20 @@ function valueOf(
 
   const period = operand.period ?? defaultPeriodFor(operand.series)
   const multiplier = operand.multiplier ?? 2
-  const key = `${operand.series}:${period}:${multiplier}`
+  const isGap = operand.series.startsWith('fvg_') || operand.series.startsWith('ifvg_')
+  const key = isGap ? `gap:${period}:${operand.series}` : `${operand.series}:${period}:${multiplier}`
   let series = frame.cache.get(key)
   if (!series) {
-    series = seriesValues(frame.bars, operand.series, period, multiplier)
+    if (isGap) {
+      let levels = frame.gaps.get(period)
+      if (!levels) {
+        levels = gapLevels(frame.bars, period)
+        frame.gaps.set(period, levels)
+      }
+      series = levels[operand.series as keyof GapLevels]
+    } else {
+      series = seriesValues(frame.bars, operand.series, period, multiplier)
+    }
     frame.cache.set(key, series)
   }
   return series[mapped] ?? null
@@ -594,6 +799,10 @@ export function compileRuleStrategy(spec: RuleSpec): StrategyDefinition {
           return { action: 'close' as const }
         }
 
+        // A killzone is an entry filter, not an exit filter: a position opened
+        // inside the window must still be able to close once it has passed.
+        if (spec.sessions.length > 0 && !inSession(spec.sessions, bar.time)) return null
+
         const wantsLong =
           (spec.side === 'long' || spec.side === 'both') &&
           spec.longEntry.length > 0 &&
@@ -661,7 +870,24 @@ export function compileRuleStrategy(spec: RuleSpec): StrategyDefinition {
 // Human-readable rules
 // ---------------------------------------------------------------------------
 
+/** True when the bar's UTC time of day falls inside any of the windows. */
+export function inSession(sessions: RuleSessionWindow[], time: number): boolean {
+  if (sessions.length === 0) return true
+  const minutes = Math.floor(((((time % 86_400_000) + 86_400_000) % 86_400_000) / 60_000))
+  return sessions.some((window) =>
+    window.start < window.end
+      ? minutes >= window.start && minutes < window.end
+      : // An end before the start is an overnight window.
+        minutes >= window.start || minutes < window.end
+  )
+}
+
+const MATH_SYMBOLS: Record<RuleMathOp, string> = { add: '+', sub: '−', mul: '×', div: '÷' }
+
 function operandLabel(operand: RuleOperand): string {
+  if (operand.expr) {
+    return `(${operandLabel(operand.expr.left)} ${MATH_SYMBOLS[operand.expr.op]} ${operandLabel(operand.expr.right)})`
+  }
   if (typeof operand.value === 'number' && Number.isFinite(operand.value)) {
     return String(operand.value)
   }
@@ -673,6 +899,11 @@ function operandLabel(operand: RuleOperand): string {
   const offset = operand.offset ? ` ${operand.offset} bar${operand.offset === 1 ? '' : 's'} ago` : ''
   const frame = operand.timeframe === 'higher' ? ' (higher TF)' : ''
   return `${base}${withPeriod}${offset}${frame}`
+}
+
+/** `minutes past midnight` -> `HH:MM`, for the rules shown back to the trader. */
+function clockLabel(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
 const OP_LABELS: Record<RuleComparison, string> = {
@@ -731,6 +962,12 @@ export function describeRuleSpec(spec: RuleSpec): string[] {
   if (spec.shortEntry.length > 0) {
     lines.push(`Short when ${spec.shortEntry.map(conditionLabel).join(' and ')}.`)
   }
+  if (spec.sessions.length > 0) {
+    const windows = spec.sessions
+      .map((window) => `${clockLabel(window.start)}–${clockLabel(window.end)}`)
+      .join(', ')
+    lines.push(`Only opens trades between ${windows} UTC.`)
+  }
   if (spec.exit.length > 0) {
     lines.push(`Close the position when ${spec.exit.map(conditionLabel).join(' and ')}.`)
   }
@@ -774,6 +1011,9 @@ export function buildCompileMessages(
     'Available comparisons: above, below, crosses_above, crosses_below.',
     'An operand is either {"series": "<name>", "period": <number>, "offset": <number>, "timeframe": "primary"|"higher"} or {"value": <number>}.',
     'A condition is {"left": operand, "op": comparison, "right": operand}.',
+    'An operand may also be arithmetic: {"expr": {"op": "add"|"sub"|"mul"|"div", "left": operand, "right": operand}}, nested at most 3 deep. Use it when a level is not one series — a gap midpoint, or a gap wider than 1.5 × ATR.',
+    'fvg_top / fvg_mid / fvg_bottom are the most recent bullish three-bar gap price has not filled; ifvg_* is the bearish equivalent above the market. Here period is how many bars back to look, not an indicator length.',
+    'Sessions are optional: [{"start": <minute of the UTC day>, "end": <minute>}]. A bar outside every window cannot open a trade. Use them for killzone rules, and say in notes that the times are UTC.',
     `Use at most ${MAX_RULE_CONDITIONS} conditions per entry side, and only as many as the description actually requires.`,
     'Stops: {"type": "atr"|"percent"|"points"|"swing", "value": number, "period": number}. Use "swing" for a stop beyond the recent low/high. Targets: {"type": "r"|"atr"|"percent", "value": number}.',
     'The higher timeframe is optional. Only set it when the trader describes confirmation on a slower timeframe; mark those operands with "timeframe": "higher".',
@@ -788,6 +1028,7 @@ export function buildCompileMessages(
       summary: 'one or two plain sentences',
       timeframe: 'M15',
       higherTimeframe: null,
+      sessions: [],
       side: 'both',
       longEntry: [{ left: { series: 'ema', period: 20 }, op: 'crosses_above', right: { series: 'ema', period: 50 } }],
       shortEntry: [{ left: { series: 'ema', period: 20 }, op: 'crosses_below', right: { series: 'ema', period: 50 } }],
