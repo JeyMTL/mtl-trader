@@ -95,6 +95,12 @@ export async function GET() {
       // sandbox key left in production: it takes test cards and grants real
       // access, and nothing else in the app can tell the two apart.
       paddle: paddleStatus(),
+      // Same rule as `paddle`: presence only. Without PAYPAL_WEBHOOK_ID (or the
+      // client credentials) the webhook cannot verify a signature and answers
+      // 503, so the durable upgrade path is disabled and the success-page
+      // capture is the only way an order gets applied. Nothing else in the app
+      // says so, which is exactly why it belongs here.
+      paypal: paypalStatus(),
       // Like `features`, reported but not part of `status`: a pending migration
       // is a known, fixable state, and paging every fifteen minutes until
       // someone pastes SQL would train the alert away. `missing` names the file.
@@ -161,6 +167,26 @@ function paddleStatus() {
     // Paddle charges a month's price for a year that the webhook then refuses.
     // Plan ids only, never a price id, so this stays safe to publish.
     annualReusesMonthlyPrice: annualPriceCollisions(['basic', 'pro']),
+  }
+}
+
+/**
+ * PayPal config: three separate facts, none of them a value.
+ *
+ * Whether checkout can authenticate at all, whether the webhook is registered
+ * (without it the signature check cannot run and the route fails closed), and
+ * which environment the credentials point at — a sandbox app in production takes
+ * no real money, and that is invisible from every other surface.
+ */
+function paypalStatus() {
+  const clientId = (process.env.PAYPAL_CLIENT_ID || '').trim()
+  const clientSecret = (process.env.PAYPAL_CLIENT_SECRET || '').trim()
+  const base = (process.env.PAYPAL_API_BASE || '').trim()
+
+  return {
+    configured: Boolean(clientId && clientSecret),
+    environment: base.includes('sandbox') ? 'sandbox' : 'live',
+    webhook: Boolean((process.env.PAYPAL_WEBHOOK_ID || '').trim()),
   }
 }
 

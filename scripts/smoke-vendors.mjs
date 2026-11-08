@@ -13,6 +13,10 @@
  *   SMOKE_BASE_URL=... node scripts/smoke-vendors.mjs
  *
  * Exit code is 1 if any route answered with a status it should never give.
+ *
+ * A 503 that means "this endpoint is not configured" is reported as CONFIG, not
+ * as a failure: it is still fail-closed, but it is an operator's problem rather
+ * than a bug, and conflating the two trains people to ignore the harness.
  */
 
 const base = (process.argv[2] || process.env.SMOKE_BASE_URL || '').replace(/\/+$/, '')
@@ -31,7 +35,7 @@ const checks = [
     path: '/api/webhooks/paddle',
     body: { event_type: 'subscription.created', data: { id: 'sub_fake' } },
     headers: json,
-    expect: [400, 401, 403],
+    expect: [400, 401, 403, 503],
   },
   {
     name: 'paypal webhook rejects an unsigned body',
@@ -39,7 +43,7 @@ const checks = [
     path: '/api/webhooks/paypal',
     body: { event_type: 'PAYMENT.CAPTURE.COMPLETED' },
     headers: json,
-    expect: [400, 401, 403],
+    expect: [400, 401, 403, 503],
   },
   {
     name: 'paypal capture needs an owner',
@@ -121,10 +125,29 @@ for (const check of checks) {
 
   const ok = check.expect.includes(status)
   if (!ok) failures += 1
-  const verdict = ok ? 'PASS' : 'FAIL'
+  const unconfigured = status === 503
+  const verdict = ok ? (unconfigured ? 'CONFIG' : 'PASS') : 'FAIL'
   console.log(
     `${verdict}  ${String(status).padStart(3)}  ${check.name}  (expected ${check.expect.join('/')})${detail ? `\n        ${detail}` : ''}`
   )
+}
+
+// Presence only, straight from the deployment's own health probe: this is where
+// a disabled webhook or a sandbox key in production becomes visible.
+try {
+  const health = await (await fetch(`${base}/api/health`)).json()
+  console.log('\nDeployment configuration (presence only):')
+  console.log(`  ai      ${health.ai?.configured ? health.ai.provider : 'not configured'}`)
+  console.log(
+    `  paddle  ${health.paddle?.configured ? `${health.paddle.keyEnvironment} key, api ${health.paddle.api}, webhook ${Boolean(health.paddle.webhookSecret)}` : 'not configured'}`
+  )
+  console.log(
+    health.paypal
+      ? `  paypal  ${health.paypal.configured ? `${health.paypal.environment} credentials, webhook ${Boolean(health.paypal.webhook)}` : 'credentials missing'}`
+      : '  paypal  not reported by this deployment'
+  )
+} catch (error) {
+  console.log(`\n  could not read /api/health: ${error instanceof Error ? error.message : error}`)
 }
 
 console.log(
