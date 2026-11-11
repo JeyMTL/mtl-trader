@@ -12,6 +12,7 @@ import '../core/format.dart';
 import '../services/backtest_api.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'custom_backtest_screen.dart';
 
 /// The API refuses bodies over 4,000,000 characters; refuse the file first so
 /// the trader learns it here instead of after an upload.
@@ -59,6 +60,10 @@ class _BacktestScreenState extends State<BacktestScreen> {
   final List<TextEditingController> _retired = [];
 
   String _strategyId = backtestStrategies.first.id;
+
+  /// Rules compiled from a plain-language description. When present they replace
+  /// the library strategy: the run is sent as `custom` with this spec.
+  CompiledBacktest? _compiled;
   String? _fileName;
   BacktestReport? _report;
   List<SavedBacktestRun> _runs = const [];
@@ -114,8 +119,32 @@ class _BacktestScreenState extends State<BacktestScreen> {
 
   void _chooseStrategy(String id) {
     setState(() {
+      _compiled = null;
       _loadStrategy(id);
       _report = null;
+    });
+  }
+
+  /// Opens the custom workbench. The compiled rules stay on this screen so the
+  /// trader can check them beside the costs before pressing Run.
+  Future<void> _openCustom() async {
+    final compiled = await Navigator.of(context).push<CompiledBacktest>(
+      MaterialPageRoute(
+        builder: (_) => CustomBacktestScreen(
+          api: _api,
+          symbol: _symbol.text.trim(),
+          timeframe: _timeframe.text.trim().toUpperCase(),
+        ),
+      ),
+    );
+    if (compiled == null || !mounted) return;
+    setState(() {
+      _compiled = compiled;
+      _timeframe.text = compiled.timeframe;
+      if (_name.text.trim().isEmpty) _name.text = compiled.name;
+      _report = null;
+      _error = null;
+      _upgradeRequired = false;
     });
   }
 
@@ -219,7 +248,8 @@ class _BacktestScreenState extends State<BacktestScreen> {
           csv: _csv.text,
           symbol: _symbol.text.trim().toUpperCase(),
           timeframe: _timeframe.text.trim().toUpperCase(),
-          strategyId: _strategyId,
+          strategyId: _compiled == null ? _strategyId : 'custom',
+          ruleSpec: _compiled?.spec,
           params: _params(),
           name: _name.text.trim(),
           initialBalance: _numeric(_balance),
@@ -329,6 +359,12 @@ class _BacktestScreenState extends State<BacktestScreen> {
             'Replay a rule-based strategy over your own MT5 bar data, with '
             'costs and the fill assumptions printed on the result.',
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.5),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _openCustom,
+            icon: const Icon(Icons.auto_fix_high, size: 17),
+            label: const Text('Custom backtest'),
           ),
           const SizedBox(height: 14),
           _barsCard(),
@@ -575,46 +611,94 @@ class _BacktestScreenState extends State<BacktestScreen> {
             ),
           ]),
           const SizedBox(height: 12),
-          _fieldLabel('Rules'),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(AppRadius.field),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _strategyId,
-                dropdownColor: AppColors.surfaceAlt,
-                style: TextStyle(color: AppColors.text, fontSize: 13.5),
-                icon: Icon(Icons.expand_more, size: 18, color: AppColors.faint),
-                items: [
-                  for (final strategy in backtestStrategies)
-                    DropdownMenuItem(
-                      value: strategy.id,
-                      child: Text(strategy.name),
-                    ),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (value) {
-                        if (value != null) _chooseStrategy(value);
-                      },
+          if (_compiled == null) ...[
+            _fieldLabel('Rules'),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(AppRadius.field),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: _strategyId,
+                  dropdownColor: AppColors.surfaceAlt,
+                  style: TextStyle(color: AppColors.text, fontSize: 13.5),
+                  icon: Icon(Icons.expand_more, size: 18, color: AppColors.faint),
+                  items: [
+                    for (final strategy in backtestStrategies)
+                      DropdownMenuItem(
+                        value: strategy.id,
+                        child: Text(strategy.name),
+                      ),
+                  ],
+                  onChanged: _busy
+                      ? null
+                      : (value) {
+                          if (value != null) _chooseStrategy(value);
+                        },
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            definition.description,
-            style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.5),
-          ),
-          const SizedBox(height: 10),
-          _fieldPairs([
-            for (final spec in definition.params)
-              _numberField(spec.label, _paramControllers[spec.key]!),
-          ]),
+            const SizedBox(height: 8),
+            Text(
+              definition.description,
+              style:
+                  TextStyle(color: AppColors.faint, fontSize: 11, height: 1.5),
+            ),
+            const SizedBox(height: 10),
+            _fieldPairs([
+              for (final spec in definition.params)
+                _numberField(spec.label, _paramControllers[spec.key]!),
+            ]),
+          ] else ...[
+            _fieldLabel('Compiled rules'),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(AppRadius.field),
+                border: Border.all(color: AppColors.primary.withAlpha(70)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _compiled!.name,
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  for (final rule in _compiled!.rules)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '· $rule',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() => _compiled = null),
+              icon: const Icon(Icons.library_books_outlined, size: 15),
+              label: const Text('Use a library strategy instead'),
+            ),
+          ],
         ],
       ),
     );

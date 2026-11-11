@@ -134,24 +134,29 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                       ),
                     ),
                   ),
+                  // Flexible rather than a fixed pill: at the largest system
+                  // text size the label wraps beside the title instead of
+                  // pushing the row past the card's edge.
                   if (status != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: accent.withAlpha(30),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        switch (level) {
-                          PropLevel.breach => 'Rule breached',
-                          PropLevel.warning => 'Close to a limit',
-                          PropLevel.ok => 'Within rules',
-                        },
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: kMinLabelSize,
-                          fontWeight: FontWeight.w700,
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: accent.withAlpha(30),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          switch (level) {
+                            PropLevel.breach => 'Rule breached',
+                            PropLevel.warning => 'Close to a limit',
+                            PropLevel.ok => 'Within rules',
+                          },
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: kMinLabelSize,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -186,7 +191,9 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                         ? 'Today’s loss has reached the daily limit — most firms require you to stop for the day.'
                         : status.status == 'breach_drawdown'
                             ? 'The drawdown limit has been reached. Check the firm’s rules before opening another trade.'
-                            : 'You are within 20% of a rule limit. Position size and stop distance matter more than the next setup.',
+                            : status.status == 'breach_consistency'
+                                ? 'One day is carrying more than the consistency limit allows. The evaluation can be refused even after hitting the target — spread the gain across more days.'
+                                : 'You are within 20% of a rule limit. Position size and stop distance matter more than the next setup.',
                     style:
                         TextStyle(color: accent, fontSize: 11.5, height: 1.45),
                   ),
@@ -228,6 +235,23 @@ class _PropComplianceCardState extends State<PropComplianceCard> {
                       '${status.tradingDays}/${status.minTradingDays} qualifying days',
                   tone: AppColors.primary,
                 ),
+                if (status.consistencyPct > 0) ...[
+                  const SizedBox(height: 8),
+                  _Meter(
+                    label: 'Consistency',
+                    used: status.consistency,
+                    limit: status.consistencyPct,
+                    percentUnits: true,
+                    detail:
+                        'Best day ${money(status.bestDayPnl)} · maximum '
+                        '${percent(status.consistencyPct)} of total profit',
+                    tone: status.status == 'breach_consistency'
+                        ? AppColors.danger
+                        : status.status == 'warn_consistency'
+                            ? AppColors.primary
+                            : AppColors.success,
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -294,6 +318,7 @@ class _Meter extends StatelessWidget {
     required this.limit,
     required this.detail,
     required this.tone,
+    this.percentUnits = false,
   });
 
   final String label;
@@ -301,6 +326,12 @@ class _Meter extends StatelessWidget {
   final double limit;
   final String detail;
   final Color tone;
+
+  /// The consistency meter measures percentages, not currency.
+  final bool percentUnits;
+
+  String _format(double value) =>
+      percentUnits ? percent(value) : money(value);
 
   @override
   Widget build(BuildContext context) {
@@ -320,12 +351,15 @@ class _Meter extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
-              '${money(used)} / ${money(limit)}',
-              style: TextStyle(
-                color: AppColors.muted,
-                fontSize: kMinLabelSize,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            Flexible(
+              child: Text(
+                '${_format(used)} / ${_format(limit)}',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: kMinLabelSize,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
           ],
@@ -374,6 +408,7 @@ class _RulesFormState extends State<_RulesForm> {
   late final TextEditingController _drawdown;
   late final TextEditingController _target;
   late final TextEditingController _days;
+  late final TextEditingController _consistency;
 
   @override
   void initState() {
@@ -387,6 +422,8 @@ class _RulesFormState extends State<_RulesForm> {
     _drawdown = TextEditingController(text: _trim(initial.maxDrawdownPct));
     _target = TextEditingController(text: _trim(initial.profitTargetPct));
     _days = TextEditingController(text: '${initial.minTradingDays}');
+    _consistency =
+        TextEditingController(text: _trim(initial.consistencyPct));
   }
 
   static String _trim(double value) => value == value.roundToDouble()
@@ -400,6 +437,7 @@ class _RulesFormState extends State<_RulesForm> {
     _drawdown.dispose();
     _target.dispose();
     _days.dispose();
+    _consistency.dispose();
     super.dispose();
   }
 
@@ -410,6 +448,8 @@ class _RulesFormState extends State<_RulesForm> {
       maxDrawdownPct: double.tryParse(_drawdown.text) ?? _rules.maxDrawdownPct,
       profitTargetPct: double.tryParse(_target.text) ?? _rules.profitTargetPct,
       minTradingDays: int.tryParse(_days.text) ?? _rules.minTradingDays,
+      consistencyPct:
+          double.tryParse(_consistency.text) ?? _rules.consistencyPct,
     );
   }
 
@@ -463,6 +503,20 @@ class _RulesFormState extends State<_RulesForm> {
               const SizedBox(width: 8),
               Expanded(child: _number('Min trading days', _days, 'days')),
             ],
+          ),
+          const SizedBox(height: 8),
+          _number('Consistency limit', _consistency, '%'),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'No single day may make more than this share of the total gain. '
+              'Most firms publish 20–40%.',
+              style: TextStyle(
+                color: AppColors.faint,
+                fontSize: kMinLabelSize,
+                height: 1.4,
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           SwitchListTile.adaptive(

@@ -25,7 +25,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { HelpCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { effectiveMaxTrades } from '@/lib/subscription'
+import { effectiveMaxTrades, subscriptionState } from '@/lib/subscription'
 import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
 import { Avatar } from '@/components/avatar'
@@ -120,7 +120,9 @@ export default function DashboardLayout({
 
       setUser({
         tier: data.subscription_tier || 'free',
-        status: data.subscription_status || 'trial',
+        // Resolved against the clock: a period that ended yesterday must read as
+        // ended even if the daily expiry job has not rewritten the row yet.
+        status: subscriptionState(data),
         isAdmin: data.is_admin === true,
         maxTrades: effectiveMaxTrades(data),
         tradesUsed: count,
@@ -182,8 +184,11 @@ export default function DashboardLayout({
     ? null
     : Math.max(0, user.maxTrades - user.tradesUsed)
 
-  const isPro = user?.tier === 'pro'
-  const isBasic = user?.tier === 'basic'
+  // A stored `pro` tier outlives the period it was paid for, so the tier only
+  // counts while the account is actually active (or on a live trial).
+  const planLive = user?.status === 'active' || user?.status === 'trial'
+  const isPro = planLive && user?.tier === 'pro'
+  const isBasic = planLive && user?.tier === 'basic'
 
   // The backtester is Pro, and a live trial counts. Hiding the entry beats a
   // nav item that answers 402: the server still refuses a direct URL, so this is

@@ -68,9 +68,9 @@ unzip -p build/app/outputs/bundle/release/app-release.aab base/manifest/AndroidM
 **The 1.0.4+5 bundle passed all three on 4 Nov 2026:** `versionCode="5"`,
 `versionName="1.0.4"`, `READ_MEDIA` count `0`, and `keytool -printcert -jarfile`
 reports `CN=MTL Trader, O=MTL Trader, L=Nairobi, C=KE`, SHA384withRSA — the
-release key, not the debug fallback. `--dart-define=PLAY_BUILD=true` was on the
-build line; whether it actually reached the runtime is what the first purchase
-proves, because a `PLAY_BUILD=false` build shows no subscriptions at all.
+release key, not the debug fallback. The app now sells every subscription through
+Google Play in all builds, so `--dart-define=PLAY_BUILD=true` is optional: it is
+harmless if your build line already passes it, but nothing reads it any more.
 
 ## How a tester installs
 

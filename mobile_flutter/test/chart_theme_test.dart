@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Color;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtl_trader_mobile/core/chart_theme.dart';
 import 'package:mtl_trader_mobile/core/indicators.dart';
@@ -45,6 +46,15 @@ void main() {
     );
     expect(decoded.id, 'ink');
     expect(decoded.logScale, isTrue);
+  });
+
+  test('the green/black candle scheme is offered', () {
+    expect(ChartStyle.presets.map((preset) => preset.id), contains('classic'));
+    expect(ChartStyle.classic.bull, const Color(0xFF4CAF50));
+    expect(ChartStyle.classic.bear, const Color(0xFF131722));
+    expect(ChartStyle.classic.isLight, isTrue);
+    // The style sheet picks colours from the palette, so black must be in it.
+    expect(ChartStyle.candlePalette, contains(const Color(0xFF131722)));
   });
 
   test('per-instrument storage keys are distinct', () {

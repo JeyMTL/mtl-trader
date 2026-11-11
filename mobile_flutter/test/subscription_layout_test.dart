@@ -81,7 +81,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a monthly subscriber gets the yearly switch, not a dead button',
+  testWidgets('a Play-only build without the store explains disabled buttons',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -92,6 +92,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // There is no Paddle/card fallback in the phone app: the plan buttons stay
+    // off until Google Play offers a product, and the screen says so.
+    expect(
+      find.text('Google Play is not available on this device.'),
+      findsWidgets,
+    );
+
     // Buying the month they already own is the mistake: the button is off.
     final repeat = tester.widget<ElevatedButton>(
       find.widgetWithText(ElevatedButton, 'Current plan'),
@@ -101,10 +108,11 @@ void main() {
     await tester.tap(find.text('Annual · 2 months free'));
     await tester.pumpAndSettle();
 
-    // Switching cadence stays open, and is what the server allows.
+    // Switching cadence is a different Play base plan, so it stays off until a
+    // product is actually sellable on this device.
     final upgrade = tester.widget<ElevatedButton>(
       find.widgetWithText(ElevatedButton, 'Switch to annual'),
     );
-    expect(upgrade.onPressed, isNotNull);
+    expect(upgrade.onPressed, isNull);
   });
 }

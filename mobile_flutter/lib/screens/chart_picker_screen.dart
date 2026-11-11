@@ -14,6 +14,7 @@ import '../core/chart_sessions.dart';
 import '../core/chart_theme.dart';
 import '../core/chart_view.dart';
 import '../core/indicators.dart';
+import '../core/trade_exit.dart' show ResolvedExit;
 import '../core/instruments.dart';
 import '../services/journal_api.dart';
 import '../services/market_data.dart';
@@ -33,6 +34,7 @@ class ChartSelection {
     this.take,
     this.entryTime,
     this.exitTime,
+    this.direction,
   });
 
   final double? entry;
@@ -41,6 +43,10 @@ class ChartSelection {
   final double? take;
   final DateTime? entryTime;
   final DateTime? exitTime;
+
+  /// `BUY` or `SELL` when the levels came from a long/short position tool, so
+  /// the form follows the side of the box rather than the side it opened with.
+  final String? direction;
 
   bool get isEmpty =>
       entry == null && exit == null && stop == null && take == null;
@@ -129,7 +135,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   DateTime? _entryTime;
   DateTime? _exitTime;
 
-  bool get _isBuy => widget.direction.toUpperCase() != 'SELL';
+  /// Set when the levels came from a position tool: the box knows its own side,
+  /// which may be the opposite of the one the form opened with.
+  String? _selectionDirection;
+
+  bool get _isBuy =>
+      (_selectionDirection ?? widget.direction).toUpperCase() != 'SELL';
 
   bool get _timeInvalid =>
       _entryTime != null &&
@@ -232,6 +243,15 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   void _deleteDrawing(int index) {
     if (index < 0 || index >= _drawings.length) return;
     _commitDrawings([..._drawings]..removeAt(index));
+  }
+
+  /// The selected drawing when it is a position tool — the only kind that
+  /// carries a complete trade plan.
+  ChartDrawing? get _selectedPosition {
+    final index = _selectedDrawing;
+    if (index == null || index < 0 || index >= _drawings.length) return null;
+    final drawing = _drawings[index];
+    return drawing.isPosition ? drawing : null;
   }
 
   @override
@@ -367,8 +387,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       _active = switch (marker) {
         Marker.entry => Marker.stop,
         Marker.stop => Marker.take,
-        Marker.take => Marker.exit,
-        Marker.exit => Marker.exit,
+        // The exit is not pinned here: it is wherever the market hit the stop
+        // or the target first.
+        Marker.take => Marker.take,
+        Marker.exit => Marker.take,
       };
     });
   }
@@ -685,6 +707,17 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       draftStart: _draftStart,
       onDraw: _onDraw,
       selectedDrawing: _selectedDrawing,
+      // Resolved once per build, not per frame: the canvas repaints on every
+      // pan, and the first-touch scan does not depend on the viewport.
+      positionOutcomes: [
+        for (final drawing in _drawings)
+          drawing.isPosition
+              ? resolvePositionOutcome(
+                  drawing: drawing,
+                  candles: _visibleCandles,
+                )
+              : null,
+      ],
       onDrawingSelected: (index) => setState(() => _selectedDrawing = index),
       onDrawingMoved: _moveDrawing,
       onDrawingMoveEnd: _finishDrawingMove,
@@ -1037,11 +1070,17 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   }
 
   Widget _drawingBanner() {
-    final hint = _drawingTool == DrawingTool.trend
-        ? (_draftStart == null
-            ? 'Tap the first point of the trend line.'
-            : 'Tap the second point to finish the line.')
-        : 'Tap a price for the horizontal ray.';
+    final hint = switch (_drawingTool) {
+      DrawingTool.trend => _draftStart == null
+          ? 'Tap the first point of the trend line.'
+          : 'Tap the second point to finish the line.',
+      DrawingTool.ray => 'Tap a price for the horizontal ray.',
+      DrawingTool.longPosition =>
+        'Tap an entry for the long. Stop and target start at 1:2 — drag the lines to set them.',
+      DrawingTool.shortPosition =>
+        'Tap an entry for the short. Stop and target start at 1:2 — drag the lines to set them.',
+      DrawingTool.none => '',
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -1080,46 +1119,73 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       context: context,
       backgroundColor: AppColors.surface,
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.timeline, size: 20),
-              title: const Text('Trend line'),
-              subtitle: const Text('Tap two points on the chart'),
-              onTap: () => Navigator.of(sheetContext).pop('trend'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.horizontal_rule, size: 20),
-              title: const Text('Horizontal ray'),
-              subtitle: const Text('Tap a price on the chart'),
-              onTap: () => Navigator.of(sheetContext).pop('ray'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.undo, size: 20),
-              title: const Text('Undo last drawing'),
-              enabled: _drawings.isNotEmpty,
-              onTap: () => Navigator.of(sheetContext).pop('undo'),
-            ),
-            if (_selectedDrawing != null)
+        // Seven rows now: scroll rather than overflow on a short phone.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               ListTile(
-                leading: const Icon(Icons.delete_forever, size: 20),
-                title: const Text('Delete selected drawing'),
-                subtitle: const Text('Long-press a line to select it'),
-                onTap: () => Navigator.of(sheetContext).pop('delete'),
+                leading: const Icon(Icons.timeline, size: 20),
+                title: const Text('Trend line'),
+                subtitle: const Text('Tap two points on the chart'),
+                onTap: () => Navigator.of(sheetContext).pop('trend'),
               ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, size: 20),
-              title: const Text('Clear drawings'),
-              enabled: _drawings.isNotEmpty,
-              onTap: () => Navigator.of(sheetContext).pop('clear'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.close, size: 20),
-              title: const Text('Turn off drawing'),
-              onTap: () => Navigator.of(sheetContext).pop('off'),
-            ),
-          ],
+              ListTile(
+                leading: const Icon(Icons.trending_up, size: 20),
+                title: const Text('Long position'),
+                subtitle: const Text(
+                  'Entry, stop and target in one box — drag each line to set it',
+                ),
+                onTap: () => Navigator.of(sheetContext).pop('long'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.trending_down, size: 20),
+                title: const Text('Short position'),
+                subtitle: const Text(
+                  'Entry, stop and target in one box — drag each line to set it',
+                ),
+                onTap: () => Navigator.of(sheetContext).pop('short'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.horizontal_rule, size: 20),
+                title: const Text('Horizontal ray'),
+                subtitle: const Text('Tap a price on the chart'),
+                onTap: () => Navigator.of(sheetContext).pop('ray'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.undo, size: 20),
+                title: const Text('Undo last drawing'),
+                enabled: _drawings.isNotEmpty,
+                onTap: () => Navigator.of(sheetContext).pop('undo'),
+              ),
+              if (_selectedPosition != null)
+                ListTile(
+                  leading: const Icon(Icons.playlist_add_check, size: 20),
+                  title: const Text('Use these levels for the trade'),
+                  subtitle:
+                      const Text('Copies entry, stop and target to the form'),
+                  onTap: () => Navigator.of(sheetContext).pop('apply-position'),
+                ),
+              if (_selectedDrawing != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_forever, size: 20),
+                  title: const Text('Delete selected drawing'),
+                  subtitle: const Text('Long-press a line to select it'),
+                  onTap: () => Navigator.of(sheetContext).pop('delete'),
+                ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, size: 20),
+                title: const Text('Clear drawings'),
+                enabled: _drawings.isNotEmpty,
+                onTap: () => Navigator.of(sheetContext).pop('clear'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.close, size: 20),
+                title: const Text('Turn off drawing'),
+                onTap: () => Navigator.of(sheetContext).pop('off'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1129,6 +1195,31 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         _drawingTool = action == 'trend' ? DrawingTool.trend : DrawingTool.ray;
         _draftStart = null;
       });
+      return;
+    }
+    if (action == 'long' || action == 'short') {
+      setState(() {
+        _drawingTool = action == 'long'
+            ? DrawingTool.longPosition
+            : DrawingTool.shortPosition;
+        _draftStart = null;
+      });
+      return;
+    }
+    if (action == 'apply-position') {
+      final position = _selectedPosition;
+      if (position == null) return;
+      setState(() {
+        _entry = position.entry;
+        _stop = position.stop;
+        _take = position.target;
+        _entryTime =
+            DateTime.fromMillisecondsSinceEpoch(position.startMs, isUtc: true);
+        _selectionDirection =
+            position.side == PositionSide.short ? 'SELL' : 'BUY';
+      });
+      // The confirm sheet is the last step, exactly as it is for pinned levels.
+      await _confirmLevels();
       return;
     }
     if (action == 'delete') {
@@ -1153,14 +1244,61 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     }
   }
 
-  /// A tap in drawing mode: rays are immediate, trend lines take two taps. The
-  /// point is stored as a candle time so it survives a new window or session.
+  /// A starting stop distance for a new position tool: two average candle
+  /// ranges, floored so a quiet five-minute chart still gets a visible box, and
+  /// capped so one spike cannot put the stop half a screen away.
+  double _defaultRisk(double price) {
+    if (_candles.isEmpty) return price * 0.005;
+    final recent = _candles.length > 40
+        ? _candles.sublist(_candles.length - 40)
+        : _candles;
+    var range = 0.0;
+    for (final candle in recent) {
+      range += candle.high - candle.low;
+    }
+    final average = range / recent.length;
+    return (average * 2).clamp(price * 0.0005, price * 0.03).toDouble();
+  }
+
+  /// Adds a position tool and selects it, so its handles are visible without a
+  /// second tap — the levels are the point of the tool.
+  void _addPosition(ChartDrawing drawing) {
+    final next = [..._drawings, drawing];
+    setState(() {
+      _drawings = next;
+      _selectedDrawing = next.length - 1;
+    });
+    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+  }
+
+  /// A tap in drawing mode: rays and positions are immediate, trend lines take
+  /// two taps. The point is stored as a candle time so it survives a new window
+  /// or session.
   void _onDraw(double index, double price) {
     if (_candles.isEmpty) return;
     final candle = _candles[index.round().clamp(0, _candles.length - 1)];
     final timeMs = candle.time.millisecondsSinceEpoch;
     if (_drawingTool == DrawingTool.ray) {
       _commitDrawings([..._drawings, ChartDrawing.ray(price: price)]);
+      return;
+    }
+    if (_drawingTool == DrawingTool.longPosition ||
+        _drawingTool == DrawingTool.shortPosition) {
+      final long = _drawingTool == DrawingTool.longPosition;
+      final risk = _defaultRisk(price);
+      _addPosition(
+        ChartDrawing.position(
+          side: long ? PositionSide.long : PositionSide.short,
+          startMs: timeMs,
+          entry: price,
+          stop: long ? price - risk : price + risk,
+          target: long ? price + risk * 2 : price - risk * 2,
+        ),
+      );
+      setState(() {
+        _drawingTool = DrawingTool.none;
+        _draftStart = null;
+      });
       return;
     }
     if (_drawingTool != DrawingTool.trend) return;
@@ -1303,23 +1441,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                     title: 'Theme',
                     trailing: style.name,
                     children: [
-                      Row(
+                      // Wraps instead of squeezing: five presets in one row
+                      // left each swatch too narrow to read.
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
-                          for (var i = 0;
-                              i < ChartStyle.presets.length;
-                              i++) ...[
-                            if (i > 0) const SizedBox(width: 8),
-                            Expanded(
-                              child: _ThemeSwatch(
-                                style: ChartStyle.presets[i],
-                                selected: ChartStyle.presets[i].id ==
-                                        style.id &&
-                                    ChartStyle.presets[i].bull == style.bull &&
-                                    ChartStyle.presets[i].bear == style.bear,
-                                onTap: () => onChanged(ChartStyle.presets[i]),
-                              ),
+                          for (final preset in ChartStyle.presets)
+                            _ThemeSwatch(
+                              style: preset,
+                              selected: preset.id == style.id &&
+                                  preset.bull == style.bull &&
+                                  preset.bear == style.bear,
+                              onTap: () => onChanged(preset),
                             ),
-                          ],
                         ],
                       ),
                     ],
@@ -2053,11 +2188,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           SectionTitle(
             title: 'Levels',
             subtitle:
-                'Tap a row, then tap the chart where that level sat. Hold a line to move it — for entry and exit the time moves too. Nothing reaches the form until you confirm.',
-            trailing: _entry == null &&
-                    _stop == null &&
-                    _take == null &&
-                    _exit == null
+                'Tap a row, then tap the chart where that level sat. Hold a line to move it — for entry the time moves too. Nothing reaches the form until you confirm.',
+            trailing: _entry == null && _stop == null && _take == null
                 ? null
                 : TextButton(
                     onPressed: _reset,
@@ -2104,17 +2236,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             onSelect: () => setState(() => _active = Marker.take),
             onClear: _take == null ? null : () => _clear(Marker.take),
           ),
-          const SizedBox(height: 6),
-          _LevelRow(
-            label: 'Exit',
-            price: _exit,
-            time: _exitTime,
-            instrument: instrument,
-            color: AppColors.muted,
-            active: _active == Marker.exit,
-            onSelect: () => setState(() => _active = Marker.exit),
-            onClear: _exit == null ? null : () => _clear(Marker.exit),
-          ),
         ],
       ),
     );
@@ -2160,13 +2281,14 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   /// The last step: the levels only reach the trade form after this sheet is
   /// confirmed, so a stray tap on the chart cannot overwrite a typed price.
   Future<void> _confirmLevels() async {
+    // The exit is deliberately left out: the trade form finds it from the
+    // candles after entry, so a hand-pinned exit cannot turn a loss into a win.
     final selection = ChartSelection(
       entry: _entry,
-      exit: _exit,
       stop: _stop,
       take: _take,
       entryTime: _entryTime,
-      exitTime: _exitTime,
+      direction: _selectionDirection ?? widget.direction,
     );
     if (selection.isEmpty || _timeInvalid) return;
 
@@ -2216,12 +2338,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 selection.take,
                 null,
                 AppColors.success,
-              ),
-              _confirmRow(
-                'Exit',
-                selection.exit,
-                selection.exitTime,
-                AppColors.muted,
               ),
               const SizedBox(height: 14),
               ElevatedButton(
@@ -2313,6 +2429,7 @@ class _ChartCanvas extends StatefulWidget {
     required this.drawings,
     required this.draftStart,
     required this.selectedDrawing,
+    required this.positionOutcomes,
     required this.onDrawingSelected,
     required this.onDrawingMoved,
     required this.onDrawingMoveEnd,
@@ -2348,6 +2465,7 @@ class _ChartCanvas extends StatefulWidget {
   final List<ChartDrawing> drawings;
   final DrawingDraft? draftStart;
   final int? selectedDrawing;
+  final List<ResolvedExit?> positionOutcomes;
   final ValueChanged<int?> onDrawingSelected;
   final void Function(int index, ChartDrawing drawing) onDrawingMoved;
   final VoidCallback onDrawingMoveEnd;
@@ -2754,6 +2872,24 @@ class _ChartCanvasState extends State<_ChartCanvas>
       if (price == null) return null;
       return (_yFor(price) - local.dy).abs();
     }
+    if (drawing.isPosition) {
+      final start = _indexForTime(drawing.startMs);
+      // An anchor older than the loaded window draws from the left edge, so a
+      // tap anywhere on the box still finds it.
+      if (start == null &&
+          drawing.startMs > widget.candles.last.time.millisecondsSinceEpoch) {
+        return null;
+      }
+      final left = start == null ? 0.0 : _xForIndex(start, plotW);
+      if (local.dx < left - 12) return null;
+      var best = double.infinity;
+      for (final level in PositionLevel.values) {
+        final price = drawing.levelFor(level);
+        if (price == null) continue;
+        best = math.min(best, (_yFor(price) - local.dy).abs());
+      }
+      return best.isFinite ? best : null;
+    }
     final start = _indexForTime(drawing.startMs);
     final end = _indexForTime(drawing.endMs);
     if (start == null || end == null) return null;
@@ -2808,6 +2944,19 @@ class _ChartCanvasState extends State<_ChartCanvas>
       return candles[moved].time.millisecondsSinceEpoch;
     }
 
+    if (original.isPosition) {
+      // Grabbing one of the three lines moves only that level; grabbing the box
+      // itself moves all of them together, which is how the levels are set.
+      final level = _dragLevel;
+      if (level != null) {
+        return original.copyWithLevel(level, _priceFor(local));
+      }
+      return original.shifted(
+        priceDelta: priceDelta,
+        startMs: shiftTime(original.startMs),
+      );
+    }
+
     return ChartDrawing.trend(
       startMs: shiftTime(original.startMs),
       startPrice: original.startPrice + priceDelta,
@@ -2816,14 +2965,34 @@ class _ChartCanvasState extends State<_ChartCanvas>
     );
   }
 
+  /// The position level under the finger, or null when the drag should move the
+  /// whole box instead of one line.
+  PositionLevel? _nearestPositionLevel(ChartDrawing drawing, Offset local) {
+    PositionLevel? best;
+    var bestDistance = 26.0;
+    for (final level in PositionLevel.values) {
+      final price = drawing.levelFor(level);
+      if (price == null) continue;
+      final dy = (_yFor(price) - local.dy).abs();
+      if (dy < bestDistance) {
+        bestDistance = dy;
+        best = level;
+      }
+    }
+    return best;
+  }
+
   void _startDrag(Offset local) {
     final drawing = _nearestDrawing(local);
     if (drawing != null) {
+      final original = widget.drawings[drawing];
       setState(() {
         _crosshair = null;
         _drawingIndex = drawing;
-        _drawingOriginal = widget.drawings[drawing];
+        _drawingOriginal = original;
         _dragOrigin = local;
+        _dragLevel =
+            original.isPosition ? _nearestPositionLevel(original, local) : null;
       });
       widget.onDrawingSelected(drawing);
       return;
@@ -2841,6 +3010,8 @@ class _ChartCanvasState extends State<_ChartCanvas>
       widget.onDrawingSelected(null);
     }
   }
+
+  PositionLevel? _dragLevel;
 
   void _updateDrag(Offset local) {
     final drawing = _drawingOriginal;
@@ -2872,6 +3043,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
       setState(() {
         _drawingIndex = null;
         _drawingOriginal = null;
+        _dragLevel = null;
       });
       widget.onDrawingMoveEnd();
       return;
@@ -2957,6 +3129,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       drawings: widget.drawings,
                       draftStart: widget.draftStart,
                       selectedDrawing: widget.selectedDrawing,
+                      positionOutcomes: widget.positionOutcomes,
                       style: widget.style,
                       symbol: widget.symbol,
                     ),
@@ -3498,6 +3671,7 @@ CustomPainter debugChartPainter({
     style: style,
     symbol: symbol,
     selectedDrawing: null,
+    positionOutcomes: const [],
   );
 }
 

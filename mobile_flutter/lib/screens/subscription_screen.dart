@@ -3,11 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../core/config.dart';
 import '../core/format.dart';
 import '../core/plans.dart';
+import '../core/subscription.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../services/play_billing.dart';
@@ -15,16 +14,13 @@ import '../services/telemetry.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
-/// Plan cards and whichever purchase path this build is allowed to use.
+/// Plan cards and the purchase path the phone app uses.
 ///
-/// A side-loaded or web-linked build opens the hosted card checkout in the
-/// device browser: the processor collects the card, the webhook applies the
-/// payment, and the account refreshes when the trader comes back.
-///
-/// The Play build sells through Google Play instead, because a Play-distributed
-/// app may not send buyers to an external checkout for the same subscription.
-/// Play's sheet collects the payment, and the purchase token is verified by the
-/// server before any plan changes. Nothing card-related touches either path.
+/// The mobile app sells through Google Play, full stop: a Play-distributed app
+/// may not send buyers to an external checkout (the old card/Paddle page) for
+/// the same subscription. Play's sheet collects the payment, and the purchase
+/// token is verified by the server before any plan changes. The web version is a
+/// separate Next.js app and keeps its hosted card checkout.
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key, required this.api});
 
@@ -52,6 +48,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   /// limits and its features are identical either way.
   bool _yearly = false;
 
+  /// Scrolls the lapsed-account notice down to the plan cards.
+  final ScrollController _scroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -59,13 +58,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // The first step of the funnel that matters: someone opening the paywall is
     // the closest thing to intent we can observe before a payment exists.
     Telemetry.event('paywall_view', {'cadence': _yearly ? 'year' : 'month'});
-    if (AppConfig.playBuild) unawaited(_initPlay());
+    unawaited(_initPlay());
   }
 
   @override
   void dispose() {
     _playPurchases?.cancel();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  void _showPlans() {
+    if (!_scroll.hasClients) return;
+    _scroll.animateTo(
+      _scroll.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+    );
   }
 
   Future<void> _refresh() async {
@@ -81,54 +90,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  Future<void> _subscribe(String planId, String interval) async {
-    if (_busy != null) return;
-    Telemetry.event('checkout_started', {'plan': planId, 'interval': interval});
-    setState(() {
-      _busy = planId;
-      _error = null;
-    });
-
-    try {
-      final url = await widget.api.startCardSubscription(
-        planId,
-        interval: interval,
-      );
-      final opened = await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      );
-      if (!mounted) return;
-      if (!opened) {
-        setState(
-          () => _error =
-              'Could not open the payment page. Check your browser and try again.',
-        );
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Finish the payment in your browser, then come back and refresh.',
-          ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      setState(
-        () => _error = error.toString().replaceFirst('Exception: ', ''),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = null);
-    }
-  }
-
   // --------------------------------------------------------- Google Play
 
   /// Loads the Play catalogue and starts listening for purchases.
   ///
-  /// Only the Play build does this: everywhere else the subscription is sold
-  /// through the hosted card checkout and Play has nothing to sell.
+  /// Play is the app's only purchase path, so a device where the store is
+  /// unavailable gets an explanation instead of a browser checkout.
   Future<void> _initPlay() async {
     final play = PlayBilling();
     late final Map<String, ProductDetails> products;
@@ -282,32 +249,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           }
 
           final profile = snapshot.data ?? const <String, dynamic>{};
-          final tier =
-              (asString(profile['subscription_tier']) ?? 'free').toLowerCase();
-          final status = (asString(profile['subscription_status']) ?? 'trial')
-              .toLowerCase();
-          final periodEnd = asDate(profile['current_period_end']);
-          final trialEnd = asDate(profile['trial_ends_at']);
-          final maxTrades = asInt(profile['max_trades']);
-          final active = status == 'active';
-          final trial = status == 'trial';
+          final info = SubscriptionInfo.fromProfile(profile);
+          final tier = info.tier;
+          final active = info.state == SubscriptionState.active;
 
           return RefreshIndicator(
             onRefresh: _refresh,
             color: AppColors.primary,
             backgroundColor: AppColors.surface,
             child: ListView(
+              controller: _scroll,
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 28),
               children: [
-                _currentPlan(
-                  tier: tier,
-                  status: status,
-                  maxTrades: maxTrades,
-                  periodEnd: periodEnd,
-                  trialEnd: trialEnd,
-                  active: active,
-                  trial: trial,
-                ),
+                _currentPlan(info),
+                if (info.ended) ...[
+                  const SizedBox(height: 10),
+                  _endedNotice(info),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 10),
                   FlatCard(
@@ -339,16 +297,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 const SizedBox(height: 10),
                 SectionTitle(
                   title: 'Plans',
-                  subtitle: AppConfig.playBuild
-                      ? (_yearly
-                          ? 'Billed by Google Play once a year. Cancel any time in Play Store → Payments and subscriptions, and keep access until the period ends.'
-                          : 'Billed by Google Play monthly. Cancel any time in Play Store → Payments and subscriptions, and keep access until the period ends.')
-                      : (_yearly
-                          ? 'A yearly card subscription renews once a year. Cancel any time and keep access until the period ends.'
-                          : 'A card subscription renews monthly. Cancel any time and keep access until the period ends.'),
+                  subtitle: _yearly
+                      ? 'Billed by Google Play once a year. Cancel any time in Play Store → Payments and subscriptions, and keep access until the period ends.'
+                      : 'Billed by Google Play monthly. Cancel any time in Play Store → Payments and subscriptions, and keep access until the period ends.',
                 ),
-                // Both builds sell their own cadence: card checkout on the web,
-                // Play Billing in the Play build, which sells annual plans too.
+                // Play sells each cadence as its own base plan, so the toggle
+                // only chooses what is charged.
                 const SizedBox(height: 8),
                 _cadenceToggle(),
                 const SizedBox(height: 10),
@@ -361,19 +315,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                   const SizedBox(height: 10),
                 ],
-                if (AppConfig.playBuild)
-                  Center(
-                    child: TextButton(
-                      onPressed: _play == null || _restoring
-                          ? null
-                          : _restorePurchases,
-                      child: Text(
-                        _restoring
-                            ? 'Checking Google Play…'
-                            : 'Restore purchases',
-                      ),
+                Center(
+                  child: TextButton(
+                    onPressed: _play == null || _restoring
+                        ? null
+                        : _restorePurchases,
+                    child: Text(
+                      _restoring
+                          ? 'Checking Google Play…'
+                          : 'Restore purchases',
                     ),
                   ),
+                ),
                 FlatCard(
                   padding: EdgeInsets.all(12),
                   child: Row(
@@ -387,15 +340,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          AppConfig.playBuild
-                              ? 'Payment is handled by Google Play, which stores '
-                                  'your card and renews the plan. Cancel any time in '
-                                  'Play Store → Payments and subscriptions; access '
-                                  'runs to the end of the period you paid for.'
-                              : 'Checkout opens in your browser through our payment '
-                                  'provider. Your card is stored by them, never by this '
-                                  'app. PayPal and bank transfer remain one-time 30-day '
-                                  'options on the web.',
+                          'Payment is handled by Google Play, which stores '
+                          'your card and renews the plan. Cancel any time in '
+                          'Play Store → Payments and subscriptions; access '
+                          'runs to the end of the period you paid for.',
                           style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 10.5,
@@ -458,24 +406,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Widget _currentPlan({
-    required String tier,
-    required String status,
-    required int maxTrades,
-    required DateTime? periodEnd,
-    required DateTime? trialEnd,
-    required bool active,
-    required bool trial,
-  }) {
-    final label = active
-        ? (tier == 'pro'
-            ? 'Pro'
-            : tier == 'basic'
-                ? 'Basic'
-                : 'Paid')
-        : trial
-            ? 'Free trial'
-            : 'Free';
+  Widget _currentPlan(SubscriptionInfo info) {
+    final active = info.state == SubscriptionState.active;
+    final trial = info.state == SubscriptionState.trial;
 
     return FlatCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -496,7 +429,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ),
               ),
               Pill(
-                text: label.toUpperCase(),
+                text: info.planLabel.toUpperCase(),
                 tone: active
                     ? Tone.positive
                     : trial
@@ -507,15 +440,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            active
-                ? 'Active'
-                : trial
-                    ? 'Trial'
-                    : status == 'cancelled'
-                        ? 'Cancelled'
-                        : 'Expired',
+            info.statusLabel,
             style: tabular.copyWith(
-              color: active || trial ? AppColors.success : AppColors.danger,
+              color: info.hasAccess ? AppColors.success : AppColors.danger,
               fontSize: 18,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.3,
@@ -523,23 +450,77 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            maxTrades <= 0 ? 'Unlimited trades' : '$maxTrades trades / month',
+            info.maxTrades <= 0
+                ? 'Unlimited trades'
+                : '${info.maxTrades} trades / month',
             style: TextStyle(color: AppColors.muted, fontSize: 11.5),
           ),
-          if (trial && trialEnd != null) ...[
+          if (trial && info.trialEndsAt != null) ...[
             const SizedBox(height: 2),
             Text(
-              'Trial ends ${DateFormat('d MMM yyyy').format(trialEnd)}',
+              'Trial ends ${DateFormat('d MMM yyyy').format(info.trialEndsAt!)}',
               style: TextStyle(color: AppColors.faint, fontSize: 10.5),
             ),
           ],
-          if (active && periodEnd != null) ...[
+          if (active && info.periodEndsAt != null) ...[
             const SizedBox(height: 2),
             Text(
-              'Paid through ${DateFormat('d MMM yyyy').format(periodEnd)}',
+              info.cancelAtPeriodEnd
+                  ? 'Renewal stopped · access until '
+                      '${DateFormat('d MMM yyyy').format(info.periodEndsAt!)}'
+                  : 'Paid through '
+                      '${DateFormat('d MMM yyyy').format(info.periodEndsAt!)}',
               style: TextStyle(color: AppColors.faint, fontSize: 10.5),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// The one message a lapsed account must not miss: access is over and renewing
+  /// is the only way back in. It sits directly under the plan card and owns the
+  /// only button that scrolls to the plans.
+  Widget _endedNotice(SubscriptionInfo info) {
+    return FlatCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      borderColor: AppColors.danger.withAlpha(110),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_outline, size: 16, color: AppColors.danger),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  info.endedTitle,
+                  style: TextStyle(
+                    color: AppColors.danger,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            info.endedBody,
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 11.5,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _showPlans,
+              child: Text(info.callToAction),
+            ),
+          ),
         ],
       ),
     );
@@ -557,12 +538,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     required bool busy,
     required ProductDetails? product,
   }) {
-    final canBuy = (!current || _yearly) && enabled && product != null;
+    final sellable = product;
+    final canBuy = canBuyWithPlay(
+      current: current,
+      yearly: _yearly,
+      enabled: enabled,
+      hasProduct: sellable != null,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ElevatedButton(
-          onPressed: canBuy ? () => _buyWithPlay(product) : null,
+          onPressed: canBuy && sellable != null
+              ? () => _buyWithPlay(sellable)
+              : null,
           child: busy
               ? SizedBox(
                   width: 18,
@@ -605,14 +594,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // the one purchase the server allows on the plan they already own, and it
     // stacks onto the days they have left. Re-buying the same month is the
     // mistake this disables.
-    final canBuy = !current || _yearly;
     // Play owns the price display. The store price can differ from our list
     // price by country, tax and promotions, and showing ours next to the amount
     // Google actually charges is the kind of mismatch that turns into a support
     // ticket and a refund request.
-    final playProduct = AppConfig.playBuild
-        ? _playProducts[playProductIdFor(plan.id, _yearly ? 'year' : 'month')]
-        : null;
+    final playProduct =
+        _playProducts[playProductIdFor(plan.id, _yearly ? 'year' : 'month')];
     return FlatCard(
       borderColor:
           plan.popular ? AppColors.primary.withAlpha(90) : AppColors.border,
@@ -721,37 +708,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
             ),
           const SizedBox(height: 8),
-          // The purchase path is build-specific. A Play-distributed app may not
-          // send buyers to an external checkout for this subscription, so it
-          // sells through Play instead; everything else keeps the card
-          // checkout, which keeps the revenue share at the processor's rate.
-          if (AppConfig.playBuild)
-            _googlePlayButton(
-              current: current,
-              enabled: enabled,
-              busy: busy,
-              product: playProduct,
-            )
-          else
-            ElevatedButton(
-              onPressed: !canBuy || !enabled
-                  ? null
-                  : () => _subscribe(plan.id, _yearly ? 'year' : 'month'),
-              child: busy
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.ink,
-                      ),
-                    )
-                  : Text(
-                      current
-                          ? (_yearly ? 'Switch to annual' : 'Current plan')
-                          : 'Subscribe with card',
-                    ),
-            ),
+          // Play is the phone app's only purchase path: a Play-distributed app
+          // may not send buyers to an external checkout for this subscription.
+          _googlePlayButton(
+            current: current,
+            enabled: enabled,
+            busy: busy,
+            product: playProduct,
+          ),
         ],
       ),
     );

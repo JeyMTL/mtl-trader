@@ -303,6 +303,24 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
   }
   const canSave = !missing.symbol && !missing.entry && !missing.exit && !missing.lots
 
+  // A stop or target on the wrong side of entry is what makes a losing sell
+  // look like a profitable one: the broker fills the level the trader actually
+  // pinned, not the direction in the dropdown. Say which side belongs where
+  // instead of saving a number the market never gave.
+  const levelError = (() => {
+    if (Number.isNaN(numbers.entry)) return ''
+    const buy = form.type === 'BUY'
+    if (!Number.isNaN(numbers.stop)) {
+      if (buy && numbers.stop >= numbers.entry) return 'For a BUY the stop loss must be below the entry.'
+      if (!buy && numbers.stop <= numbers.entry) return 'For a SELL the stop loss must be above the entry.'
+    }
+    if (!Number.isNaN(numbers.target)) {
+      if (buy && numbers.target <= numbers.entry) return 'For a BUY the take profit must be above the entry.'
+      if (!buy && numbers.target >= numbers.entry) return 'For a SELL the take profit must be below the entry.'
+    }
+    return ''
+  })()
+
   const handleSubmit = async () => {
     if (saving) return
     if (!canSave) {
@@ -311,6 +329,10 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
     }
     if (windowInvalid) {
       setError('The exit time cannot be before the entry time.')
+      return
+    }
+    if (levelError) {
+      setError(levelError)
       return
     }
     setSaving(true)

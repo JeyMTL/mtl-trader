@@ -5,10 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/config.dart';
 import '../core/features.dart';
+import '../core/subscription.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/language_picker.dart';
-import '../ui/perf_overlay.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'subscription_screen.dart';
@@ -63,6 +63,7 @@ class AccountScreen extends StatefulWidget {
     this.onProfileChanged,
     this.onOpenImport,
     this.onOpenBacktest,
+    this.onOpenPropFirm,
   });
 
   final JournalApi api;
@@ -78,6 +79,10 @@ class AccountScreen extends StatefulWidget {
   /// Opens the backtest workbench. Kept here beside import: both are set up from
   /// the account tab rather than adding a sixth destination to the bar.
   final VoidCallback? onOpenBacktest;
+
+  /// Opens the prop-firm evaluation. It has its own screen instead of a card on
+  /// the desk, so the rule headroom is not buried among the dashboard tiles.
+  final VoidCallback? onOpenPropFirm;
 
   @override
   State<AccountScreen> createState() => _AccountScreenState();
@@ -140,12 +145,14 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       if (await launchUrl(uri)) return;
     } catch (_) {
-      // Falls through to the address below.
+      // Falls through to the message below. The address stays out of the UI.
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('No mail app found. Write to jfx064@gmail.com'),
+        content: Text(
+          'No mail app was found. Install one and tap the button again.',
+        ),
       ),
     );
   }
@@ -370,24 +377,10 @@ class _AccountScreenState extends State<AccountScreen> {
               widget.api.currentUser?.email ??
               'Signed in';
           final name = asString(profile['full_name']);
-          final tier =
-              (asString(profile['subscription_tier']) ?? 'free').toLowerCase();
-          final status = (asString(profile['subscription_status']) ?? 'trial')
-              .toLowerCase();
-          final maxTrades = asInt(profile['max_trades']);
           final timezone = asString(profile['timezone']) ?? 'UTC';
-          final trialEnds = asDate(profile['trial_ends_at']);
-          final periodEnds = asDate(profile['current_period_end']);
-
-          final plan = status == 'active'
-              ? (tier == 'pro'
-                  ? 'Pro'
-                  : tier == 'basic'
-                      ? 'Basic'
-                      : 'Paid')
-              : status == 'trial'
-                  ? 'Free trial'
-                  : 'Free';
+          // Resolved against the clock, not just the stored row: a period that
+          // ended yesterday must read as ended even before the expiry job runs.
+          final info = SubscriptionInfo.fromProfile(profile);
 
           return RefreshIndicator(
             onRefresh: _refresh,
@@ -476,10 +469,10 @@ class _AccountScreenState extends State<AccountScreen> {
                         ),
                       ),
                       Pill(
-                        text: plan.toUpperCase(),
-                        tone: status == 'active'
+                        text: info.planLabel.toUpperCase(),
+                        tone: info.state == SubscriptionState.active
                             ? Tone.positive
-                            : status == 'trial'
+                            : info.state == SubscriptionState.trial
                                 ? Tone.neutral
                                 : Tone.negative,
                       ),
@@ -500,27 +493,24 @@ class _AccountScreenState extends State<AccountScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         child: Column(
                           children: [
-                            LabelValue(label: 'Plan', value: plan),
+                            LabelValue(
+                              label: 'Plan',
+                              value: info.planLabel,
+                            ),
                             const ListDivider(),
                             LabelValue(
                               label: 'Status',
-                              value: status == 'active'
-                                  ? 'Active'
-                                  : status == 'trial'
-                                      ? 'Trial'
-                                      : status == 'cancelled'
-                                          ? 'Cancelled'
-                                          : 'Expired',
-                              valueColor:
-                                  status == 'active' || status == 'trial'
-                                      ? AppColors.success
-                                      : AppColors.danger,
+                              value: info.statusLabel,
+                              valueColor: info.hasAccess
+                                  ? AppColors.success
+                                  : AppColors.danger,
                             ),
                             const ListDivider(),
                             LabelValue(
                               label: 'Trade limit / month',
-                              value:
-                                  maxTrades <= 0 ? 'Unlimited' : '$maxTrades',
+                              value: info.maxTrades <= 0
+                                  ? 'Unlimited'
+                                  : '${info.maxTrades}',
                             ),
                             const ListDivider(),
                             LabelValue(
@@ -540,20 +530,24 @@ class _AccountScreenState extends State<AccountScreen> {
                                 child: const Text('Change'),
                               ),
                             ),
-                            if (status == 'trial' && trialEnds != null) ...[
+                            if (info.state == SubscriptionState.trial &&
+                                info.trialEndsAt != null) ...[
                               const ListDivider(),
                               LabelValue(
                                 label: 'Trial ends',
-                                value:
-                                    DateFormat('d MMM yyyy').format(trialEnds),
+                                value: DateFormat('d MMM yyyy')
+                                    .format(info.trialEndsAt!),
                               ),
                             ],
-                            if (status == 'active' && periodEnds != null) ...[
+                            if (info.state == SubscriptionState.active &&
+                                info.periodEndsAt != null) ...[
                               const ListDivider(),
                               LabelValue(
-                                label: 'Paid through',
-                                value:
-                                    DateFormat('d MMM yyyy').format(periodEnds),
+                                label: info.cancelAtPeriodEnd
+                                    ? 'Access until'
+                                    : 'Paid through',
+                                value: DateFormat('d MMM yyyy')
+                                    .format(info.periodEndsAt!),
                               ),
                             ],
                           ],
@@ -563,12 +557,58 @@ class _AccountScreenState extends State<AccountScreen> {
                     ],
                   ),
                 ),
+                if (info.ended) ...[
+                  const SizedBox(height: 10),
+                  FlatCard(
+                    borderColor: AppColors.danger.withAlpha(110),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          info.endedTitle,
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          info.endedBody,
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11.5,
+                            height: 1.45,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _openPlans,
+                            child: Text(info.callToAction),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: _openPlans,
                   icon: const Icon(Icons.credit_card, size: 16),
-                  label: const Text('View plans & billing'),
+                  label: Text(
+                    info.hasAccess ? 'View plans & billing' : 'Buy a subscription',
+                  ),
                 ),
+                if (widget.onOpenPropFirm != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenPropFirm,
+                    icon: const Icon(Icons.verified_user_outlined, size: 16),
+                    label: const Text('Prop firm simulation'),
+                  ),
+                ],
                 if (widget.onOpenImport != null) ...[
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
@@ -604,37 +644,24 @@ class _AccountScreenState extends State<AccountScreen> {
                             'Questions, bugs, or something the journal should do. Every message is read.',
                       ),
                       const SizedBox(height: 10),
-                      LabelValue(
-                        label: 'Email support',
-                        value: 'jfx064@gmail.com',
-                        trailing: TextButton(
+                      // No address is shown. The button hands the mail app the
+                      // destination, so support mail is one tap and the address
+                      // is not on screen (or in a screenshot) for scrapers.
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
                           onPressed: _emailSupport,
-                          style: TextButton.styleFrom(
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Write'),
+                          icon: const Icon(Icons.mail_outline, size: 16),
+                          label: const Text('Email support'),
                         ),
                       ),
-                      const ListDivider(),
-                      LabelValue(
-                        label: 'Rate MTL Trader',
-                        value: 'One tap in the store',
-                        trailing: TextButton(
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
                           onPressed: _rateApp,
-                          style: TextButton.styleFrom(
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Rate'),
+                          icon: const Icon(Icons.star_outline, size: 16),
+                          label: const Text('Rate MTL Trader'),
                         ),
                       ),
                     ],
@@ -674,28 +701,9 @@ class _AccountScreenState extends State<AccountScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SectionTitle(
-                        title: 'About & diagnostics',
-                        subtitle:
-                            'Frame times measured on this phone, and where your journal media lives.',
+                        title: 'About',
+                        subtitle: 'Where your journal media lives.',
                       ),
-                      ValueListenableBuilder<bool>(
-                        valueListenable: FrameOverlaySettings.visible,
-                        builder: (context, visible, _) => SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          value: visible,
-                          onChanged: FrameOverlaySettings.set,
-                          title: Text(
-                            'Frame time overlay',
-                            style: TextStyle(
-                              color: AppColors.text,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const ListDivider(),
                       const SizedBox(height: 10),
                       Text(
                         'Private media',

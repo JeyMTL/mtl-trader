@@ -1,11 +1,8 @@
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/config.dart';
 import '../core/import_parser.dart';
 import '../core/plans.dart';
 import '../models/ai_review.dart';
@@ -708,69 +705,6 @@ class JournalApi {
       return _ApiResult(response.body);
     } on ApiTransportException catch (error) {
       throw Exception(error.message);
-    }
-  }
-
-  /// Starts a card subscription and returns the hosted checkout URL. The app
-  /// opens it in the browser; the webhook applies the payment, so closing the
-  /// app mid-flow loses nothing.
-  ///
-  /// It talks to this app's own checkout endpoint rather than to Paddle
-  /// directly, so the price ids, webhook and merchant-of-record setup stay a
-  /// server concern and the app never carries payment credentials.
-  Future<String> startCardSubscription(
-    String planId, {
-    String interval = 'month',
-  }) async {
-    final session = _db.auth.currentSession;
-    final id = userId;
-    if (session == null || id == null) {
-      throw Exception('Your session expired. Sign in again.');
-    }
-
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
-    try {
-      final request = await client.postUrl(
-        Uri.parse('${AppConfig.apiBaseUrl}/api/checkout/card'),
-      );
-      request.headers.contentType = ContentType.json;
-      request.headers.set(
-        HttpHeaders.authorizationHeader,
-        'Bearer ${session.accessToken}',
-      );
-      // The cadence travels with the payment so the webhook knows whether to
-      // grant 30 days or a full year. Without it every purchase is monthly.
-      request.write(
-        jsonEncode({'planId': planId, 'userId': id, 'interval': interval}),
-      );
-
-      final response = await request.close().timeout(
-            const Duration(seconds: 25),
-          );
-      final body = await response.transform(utf8.decoder).join();
-
-      dynamic decoded;
-      try {
-        decoded = jsonDecode(body);
-      } catch (_) {
-        decoded = null;
-      }
-
-      if (response.statusCode != 200) {
-        final message = decoded is Map && decoded['error'] is String
-            ? decoded['error'] as String
-            : 'Could not start the card checkout.';
-        throw Exception(message);
-      }
-
-      final url = decoded is Map ? decoded['url'] : null;
-      if (url is! String || url.isEmpty) {
-        throw Exception('The payment page did not open. Please try again.');
-      }
-      return url;
-    } finally {
-      client.close(force: true);
     }
   }
 

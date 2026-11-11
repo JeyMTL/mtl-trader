@@ -8,6 +8,7 @@ const valid = {
   trailing_drawdown: true,
   profit_target_pct: 10,
   min_trading_days: 5,
+  consistency_pct: 30,
   started_on: '2026-06-01',
 }
 
@@ -42,6 +43,13 @@ describe('parsePropRules', () => {
     expect(parsePropRules({ ...valid, max_drawdown_pct: 150 }).ok).toBe(false)
     expect(parsePropRules({ ...valid, profit_target_pct: -1 }).ok).toBe(false)
     expect(parsePropRules({ ...valid, min_trading_days: 400 }).ok).toBe(false)
+    expect(parsePropRules({ ...valid, consistency_pct: 0 }).ok).toBe(false)
+    expect(parsePropRules({ ...valid, consistency_pct: 120 }).ok).toBe(false)
+  })
+
+  it('defaults the consistency limit when a client does not send one', () => {
+    const parsed = parsePropRules({ ...valid, consistency_pct: undefined })
+    expect(parsed.ok && parsed.value.consistency_pct).toBe(30)
   })
 
   it('rounds the account size to cents and the days to a whole number', () => {
@@ -67,5 +75,7 @@ describe('propStatusLevel', () => {
     expect(propStatusLevel('warn_drawdown')).toBe('warning')
     expect(propStatusLevel('breach_daily')).toBe('breach')
     expect(propStatusLevel('breach_drawdown')).toBe('breach')
+    expect(propStatusLevel('breach_consistency')).toBe('breach')
+    expect(propStatusLevel('warn_consistency')).toBe('warning')
   })
 })

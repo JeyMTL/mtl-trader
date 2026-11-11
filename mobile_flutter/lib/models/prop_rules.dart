@@ -11,6 +11,7 @@ class PropRules {
     required this.trailingDrawdown,
     required this.profitTargetPct,
     required this.minTradingDays,
+    required this.consistencyPct,
     required this.startedOn,
   });
 
@@ -20,6 +21,9 @@ class PropRules {
   final bool trailingDrawdown;
   final double profitTargetPct;
   final int minTradingDays;
+
+  /// The largest share of the total gain one day may produce, in percent.
+  final double consistencyPct;
 
   /// `YYYY-MM-DD`.
   final String startedOn;
@@ -38,6 +42,7 @@ class PropRules {
         trailingDrawdown: true,
         profitTargetPct: 10,
         minTradingDays: 5,
+        consistencyPct: 30,
         startedOn: isoToday(),
       );
 
@@ -48,6 +53,7 @@ class PropRules {
         trailingDrawdown: map['trailing_drawdown'] != false,
         profitTargetPct: _double(map['profit_target_pct'], 10),
         minTradingDays: _int(map['min_trading_days'], 5),
+        consistencyPct: _double(map['consistency_pct'], 30),
         startedOn: map['started_on']?.toString() ?? isoToday(),
       );
 
@@ -58,6 +64,7 @@ class PropRules {
         'trailing_drawdown': trailingDrawdown,
         'profit_target_pct': profitTargetPct,
         'min_trading_days': minTradingDays,
+        'consistency_pct': consistencyPct,
         'started_on': startedOn,
       };
 
@@ -76,6 +83,9 @@ class PropRules {
     if (minTradingDays < 0 || minTradingDays > 60) {
       return 'Minimum trading days must be between 0 and 60.';
     }
+    if (consistencyPct <= 0 || consistencyPct > 100) {
+      return 'Consistency limit must be between 0 and 100%.';
+    }
     return null;
   }
 
@@ -86,6 +96,7 @@ class PropRules {
     bool? trailingDrawdown,
     double? profitTargetPct,
     int? minTradingDays,
+    double? consistencyPct,
     String? startedOn,
   }) =>
       PropRules(
@@ -95,6 +106,7 @@ class PropRules {
         trailingDrawdown: trailingDrawdown ?? this.trailingDrawdown,
         profitTargetPct: profitTargetPct ?? this.profitTargetPct,
         minTradingDays: minTradingDays ?? this.minTradingDays,
+        consistencyPct: consistencyPct ?? this.consistencyPct,
         startedOn: startedOn ?? this.startedOn,
       );
 }
@@ -114,6 +126,9 @@ class PropStatus {
     required this.drawdownHeadroom,
     required this.profitTarget,
     required this.profitProgress,
+    required this.bestDayPnl,
+    required this.consistency,
+    required this.consistencyPct,
     required this.tradingDays,
     required this.minTradingDays,
     required this.trailingDrawdown,
@@ -132,6 +147,16 @@ class PropStatus {
   final double drawdownHeadroom;
   final double profitTarget;
   final double profitProgress;
+
+  /// The best single day inside the evaluation.
+  final double bestDayPnl;
+
+  /// That day's share of the total gain, in percent.
+  final double consistency;
+
+  /// The firm's limit for that share; 0 when the column is not yet applied.
+  final double consistencyPct;
+
   final int tradingDays;
   final int minTradingDays;
   final bool trailingDrawdown;
@@ -141,10 +166,14 @@ class PropStatus {
   final String status;
 
   PropLevel get level {
-    if (status == 'breach_daily' || status == 'breach_drawdown') {
+    if (status == 'breach_daily' ||
+        status == 'breach_drawdown' ||
+        status == 'breach_consistency') {
       return PropLevel.breach;
     }
-    if (status == 'warn_daily' || status == 'warn_drawdown') {
+    if (status == 'warn_daily' ||
+        status == 'warn_drawdown' ||
+        status == 'warn_consistency') {
       return PropLevel.warning;
     }
     return PropLevel.ok;
@@ -162,6 +191,9 @@ class PropStatus {
         drawdownHeadroom: _double(map['drawdown_headroom']),
         profitTarget: _double(map['profit_target']),
         profitProgress: _double(map['profit_progress']),
+        bestDayPnl: _double(map['best_day_pnl']),
+        consistency: _double(map['consistency']),
+        consistencyPct: _double(map['consistency_pct']),
         tradingDays: _int(map['trading_days']),
         minTradingDays: _int(map['min_trading_days']),
         trailingDrawdown: map['trailing_drawdown'] != false,

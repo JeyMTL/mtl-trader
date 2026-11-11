@@ -72,20 +72,25 @@ function Meter({
   used,
   limit,
   tone,
+  percentUnits = false,
 }: {
   label: string
   detail: string
   used: number
   limit: number
   tone: 'ok' | 'warning' | 'breach'
+  /** The consistency meter measures percentages, not currency. */
+  percentUnits?: boolean
 }) {
+  const format = (value: number) =>
+    percentUnits ? `${value.toFixed(1)}%` : formatCurrency(value)
   const pct = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0
   return (
     <div className="rounded-lg border border-border bg-background p-3">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
         <p className="text-xs tabular-nums text-gray-400">
-          {formatCurrency(used)} / {formatCurrency(limit)}
+          {format(used)} / {format(limit)}
         </p>
       </div>
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-light">
@@ -267,6 +272,13 @@ export function PropCompliance() {
               value={form.min_trading_days}
               onChange={(value) => setForm({ ...form, min_trading_days: value })}
             />
+            <Field
+              label="Consistency limit"
+              suffix="%"
+              step="1"
+              value={form.consistency_pct}
+              onChange={(value) => setForm({ ...form, consistency_pct: value })}
+            />
             <label className="flex items-end gap-2 pb-2">
               <input
                 type="checkbox"
@@ -322,7 +334,9 @@ export function PropCompliance() {
                   ? 'Today’s loss has reached the daily limit — most firms require you to stop for the day.'
                   : status.status === 'breach_drawdown'
                     ? 'The drawdown limit has been reached. Check the firm’s rules before opening another trade.'
-                    : 'You are within 20% of a rule limit. Position size and stop distance matter more than the next setup.'}
+                    : status.status === 'breach_consistency'
+                      ? 'One day is carrying more than the consistency limit allows. The evaluation can be refused even after hitting the target — spread the gain across more days.'
+                      : 'You are within 20% of a rule limit. Position size and stop distance matter more than the next setup.'}
               </p>
             )}
 
@@ -348,6 +362,22 @@ export function PropCompliance() {
                 tone="ok"
                 detail={`${status.trading_days}/${status.min_trading_days} qualifying days`}
               />
+              {status.consistency_pct > 0 && (
+                <Meter
+                  label="Consistency"
+                  used={status.consistency}
+                  limit={status.consistency_pct}
+                  percentUnits
+                  tone={
+                    status.status === 'breach_consistency'
+                      ? 'breach'
+                      : status.status === 'warn_consistency'
+                        ? 'warning'
+                        : 'ok'
+                  }
+                  detail={`Best day ${formatCurrency(status.best_day_pnl)} · maximum ${status.consistency_pct}% of total profit`}
+                />
+              )}
             </div>
 
             <p className="text-[11px] text-gray-500">

@@ -148,11 +148,11 @@ adb uninstall com.mtltrader.mtl_trader_mobile
 
 ## Google Play Billing
 
-The Play build sells the subscription through Google Play. The card checkout
-(Paddle) stays on the website and in side-loaded builds, because a
-Play-distributed app may not send buyers to an external checkout for the same
-digital subscription. Google keeps 15% of a subscription sold through Play
-(10% service fee + 5% billing fee); Paddle keeps about 5% on the website.
+The app sells the subscription through Google Play — there is no external card
+checkout in any mobile build, because a Play-distributed app may not send buyers
+to one for the same digital subscription. The card checkout (Paddle) stays on the
+website only. Google keeps 15% of a subscription sold through Play (10% service
+fee + 5% billing fee); Paddle keeps about 5% on the website.
 
 | Piece | Where |
 | --- | --- |

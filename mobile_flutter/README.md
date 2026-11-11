@@ -7,12 +7,12 @@ A native, flat-design Flutter client for the same Supabase journal as the web ap
 - **Desk** — balance, net P&L, win rate, profit factor, max drawdown, equity curve, time edge and the latest journal entries.
 - **Journal** — searchable, paged trade list with entry → exit time windows and photo/voice-note counts.
 - **Chart pinning** — every instrument ships in the app (forex majors, crosses and exotics, metals, indices, crypto, energy); tap the candle chart to fill entry, stop, target and exit prices and the entry/exit times instead of typing them. Spot forex and crypto charts are live and refresh every minute; exchange-traded instruments are delayed.
-- **New / edit entry** — instrument, direction, prices, size, SL/TP, commission, swap, strategy, notes, tags, entry and exit date/time, live P&L, plus:
+- **New / edit entry** — instrument, direction, entry price, size, SL/TP, commission, swap, strategy, notes, tags, entry time, live P&L — the exit is found from the candles after entry (whichever of SL/TP the market hit first) instead of being typed — plus:
   - multiple chart screenshots (camera or gallery),
   - a voice note recorded in the app,
   - an existing audio file.
 - **Edge** — best/worst entry hour, best/weakest session, 24-hour P&L chart and the session table.
-- **Subscription** — plan cards, the current plan and paid-through date, and a hosted card checkout (Paddle) that opens in the browser and renews monthly. Cancelling keeps the paid period and stops the card.
+- **Subscription** — plan cards, the current plan and paid-through date, sold through Google Play Billing (no external card checkout). Cancelling keeps the paid period; a lapsed plan reads as ended and offers Buy a subscription.
 - **Account** — plan, status, trade limit, editable report timezone and sign out.
 
 The design is deliberately quiet: dark surfaces, 14 px cards with hairline borders, a single gold accent, rounded chips and 12 px fields and buttons. Depth comes from surface steps and spacing rather than gradients, shadows or glows.
@@ -94,7 +94,7 @@ Verify what a build was signed with before uploading:
 
 The URL and anon key are the same values as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the web app's `.env.local`. No service-role key is used on the device.
 
-Card checkout starts on the web API, so pass `--dart-define=API_BASE_URL=https://your-domain` when the deployment is not the production URL. The Paddle key and webhook secret live only in that server's environment; nothing secret ships in the app.
+The other API calls (backtest, prop rules, market candles) go through the web API, so pass `--dart-define=API_BASE_URL=https://your-domain` when the deployment is not the production URL. Purchases themselves run through Google Play; no payment credential ships in the app.
 
 ## Run from Android Studio or VS Code
 

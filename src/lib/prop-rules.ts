@@ -14,6 +14,12 @@ export interface PropRules {
   trailing_drawdown: boolean
   profit_target_pct: number
   min_trading_days: number
+  /**
+   * The largest share of the total gain one trading day may produce, e.g. `30`
+   * for a 30% consistency rule. Most firms publish one; a negative or zero
+   * total has nothing to measure, so the rule only speaks once in profit.
+   */
+  consistency_pct: number
   /** `YYYY-MM-DD`, the day the evaluation started. */
   started_on: string
 }
@@ -24,6 +30,8 @@ export type PropStatusLevel =
   | 'breach_daily'
   | 'warn_drawdown'
   | 'breach_drawdown'
+  | 'warn_consistency'
+  | 'breach_consistency'
 
 /** What `prop_status()` computes; amounts are in the account's currency. */
 export interface PropStatus {
@@ -39,6 +47,10 @@ export interface PropStatus {
   drawdown_headroom: number
   profit_target: number
   profit_progress: number
+  best_day_pnl: number
+  /** Actual share of total profit made by the best day, in percent. */
+  consistency: number
+  consistency_pct: number
   trading_days: number
   min_trading_days: number
   trailing_drawdown: boolean
@@ -55,6 +67,7 @@ export const DEFAULT_PROP_RULES: PropRules = {
   trailing_drawdown: true,
   profit_target_pct: 10,
   min_trading_days: 5,
+  consistency_pct: 30,
   started_on: new Date().toISOString().slice(0, 10),
 }
 
@@ -108,6 +121,16 @@ export function parsePropRules(input: unknown): ParseResult {
     return { ok: false, error: 'Minimum trading days must be between 0 and 60.' }
   }
 
+  // Optional so a client that predates the rule (or a saved form without the
+  // field) keeps the previous behaviour instead of failing to save.
+  const consistency =
+    record.consistency_pct === undefined || record.consistency_pct === null
+      ? DEFAULT_PROP_RULES.consistency_pct
+      : number(record.consistency_pct)
+  if (!Number.isFinite(consistency) || consistency <= 0 || consistency > 100) {
+    return { ok: false, error: 'Consistency limit must be between 0 and 100%.' }
+  }
+
   const startedOn = isoDay(record.started_on) ?? new Date().toISOString().slice(0, 10)
 
   return {
@@ -119,6 +142,7 @@ export function parsePropRules(input: unknown): ParseResult {
       trailing_drawdown: record.trailing_drawdown !== false,
       profit_target_pct: target,
       min_trading_days: Math.round(minDays),
+      consistency_pct: consistency,
       started_on: startedOn,
     },
   }
@@ -126,7 +150,19 @@ export function parsePropRules(input: unknown): ParseResult {
 
 /** Three-way read of the SQL status, so the card colours itself correctly. */
 export function propStatusLevel(status: string | undefined): 'ok' | 'warning' | 'breach' {
-  if (status === 'breach_daily' || status === 'breach_drawdown') return 'breach'
-  if (status === 'warn_daily' || status === 'warn_drawdown') return 'warning'
+  if (
+    status === 'breach_daily' ||
+    status === 'breach_drawdown' ||
+    status === 'breach_consistency'
+  ) {
+    return 'breach'
+  }
+  if (
+    status === 'warn_daily' ||
+    status === 'warn_drawdown' ||
+    status === 'warn_consistency'
+  ) {
+    return 'warning'
+  }
   return 'ok'
 }

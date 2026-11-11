@@ -8,6 +8,7 @@ import '../../core/chart_scale.dart';
 import '../../core/chart_sessions.dart';
 import '../../core/chart_theme.dart';
 import '../../core/indicators.dart';
+import '../../core/trade_exit.dart' show ResolvedExit;
 import '../../services/market_data.dart';
 import '../theme.dart';
 import 'chart_marker.dart';
@@ -36,6 +37,7 @@ class TradingChartPainter extends CustomPainter {
     required this.style,
     required this.symbol,
     required this.selectedDrawing,
+    required this.positionOutcomes,
   });
 
   static const double height = 380;
@@ -112,6 +114,10 @@ class TradingChartPainter extends CustomPainter {
   final ChartStyle style;
   final String symbol;
   final int? selectedDrawing;
+
+  /// Where each position tool was taken out of its zones, aligned with
+  /// [drawings]; null for every other kind of drawing and for an open idea.
+  final List<ResolvedExit?> positionOutcomes;
 
   /// Nearest candle x for an epoch-millisecond time, or null when the drawing
   /// sits outside the loaded series (then it is simply not drawn).
@@ -289,7 +295,9 @@ class TradingChartPainter extends CustomPainter {
           cx + bodyWidth / 2,
           math.max(openY, closeY) + 0.8,
         );
-        canvas.drawRect(body, Paint()..color = color.withAlpha(210));
+        // Opaque, like a TradingView body: the black/green scheme reads as
+        // solid black rather than a grey that lets the session tint through.
+        canvas.drawRect(body, Paint()..color = color);
       }
     } else {
       final line = Path();
@@ -561,6 +569,18 @@ class TradingChartPainter extends CustomPainter {
             Paint()..color = drawingColor,
           );
         }
+      } else if (drawing.kind == DrawingKind.position) {
+        _paintPosition(
+          canvas,
+          drawing,
+          selected: selected,
+          outcome: d < positionOutcomes.length ? positionOutcomes[d] : null,
+          size: size,
+          plotW: plotW,
+          priceTop: panes.priceTop,
+          plotH: plotH,
+          y: y,
+        );
       } else {
         final x1 = _xForTime(drawing.startMs, plotW);
         final x2 = _xForTime(drawing.endMs, plotW);
@@ -765,11 +785,12 @@ class TradingChartPainter extends CustomPainter {
     double plotW,
     double cy,
     String text,
-    Color color,
-  ) {
+    Color color, {
+    Color? textColor,
+  }) {
     final painter = _painter(
       text,
-      color: style.background,
+      color: textColor ?? style.background,
       size: 8.5,
       weight: FontWeight.w700,
     );
@@ -785,6 +806,169 @@ class TradingChartPainter extends CustomPainter {
         rect.center.dy - painter.height / 2,
       ),
     );
+  }
+
+  /// TradingView's long/short position: a profit zone between entry and target,
+  /// the mirrored loss zone between entry and stop, three level lines and one
+  /// price badge per level on the axis.
+  void _paintPosition(
+    Canvas canvas,
+    ChartDrawing drawing, {
+    required bool selected,
+    required ResolvedExit? outcome,
+    required Size size,
+    required double plotW,
+    required double priceTop,
+    required double plotH,
+    required double Function(double price) y,
+  }) {
+    final entry = drawing.entry;
+    final stop = drawing.stop;
+    final target = drawing.target;
+    if (entry == null || stop == null || target == null) return;
+
+    final firstMs = candles.first.time.millisecondsSinceEpoch;
+    double left;
+    final found = _xForTime(drawing.startMs, plotW);
+    if (found != null) {
+      left = found;
+    } else if (drawing.startMs < firstMs) {
+      // The anchor scrolled off the left edge: keep drawing from the edge so a
+      // position placed yesterday still guards the setup being watched today.
+      left = 0;
+    } else {
+      return;
+    }
+    final right = plotW;
+    if (right - left < 1) return;
+
+    final entryY = y(entry);
+    final stopY = y(stop);
+    final targetY = y(target);
+
+    // Zones are clipped to the price pane: a level dragged past the top of the
+    // chart must not paint its tint across the volume bars.
+    Rect? zone(double a, double b) {
+      final top = math.max(priceTop, math.min(a, b));
+      final bottom = math.min(priceTop + plotH, math.max(a, b));
+      if (bottom - top < 0.5) return null;
+      return Rect.fromLTRB(left, top, right, bottom);
+    }
+
+    final profitZone = zone(entryY, targetY);
+    if (profitZone != null) {
+      canvas.drawRect(
+        profitZone,
+        Paint()..color = positionProfitColor.withAlpha(style.isLight ? 34 : 46),
+      );
+    }
+    final lossZone = zone(entryY, stopY);
+    if (lossZone != null) {
+      canvas.drawRect(
+        lossZone,
+        Paint()..color = positionLossColor.withAlpha(style.isLight ? 28 : 40),
+      );
+    }
+    final outline = zone(stopY, targetY);
+    if (outline != null) {
+      canvas.drawRect(
+        outline,
+        Paint()
+          ..color = positionEntryColor.withAlpha(selected ? 190 : 90)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = selected ? 1.4 : 0.9,
+      );
+    }
+
+    void level(double priceY, Color color) {
+      if (priceY < priceTop || priceY > priceTop + plotH) return;
+      canvas.drawLine(
+        Offset(left, priceY),
+        Offset(right, priceY),
+        Paint()
+          ..color = color.withAlpha(selected ? 255 : 215)
+          ..strokeWidth = selected ? 1.7 : 1.1,
+      );
+    }
+
+    level(stopY, positionLossColor);
+    level(targetY, positionProfitColor);
+    // The entry line follows the chart's text colour, as TradingView's does.
+    level(entryY, style.text.withAlpha(200));
+
+    void tag(double priceY, double price, Color color) {
+      if (priceY < priceTop - 8 || priceY > priceTop + plotH + 8) return;
+      _axisTag(
+        canvas,
+        size,
+        plotW,
+        priceY,
+        price.toStringAsFixed(decimals),
+        color,
+        textColor: const Color(0xFFFFFFFF),
+      );
+    }
+
+    tag(stopY, stop, positionLossColor);
+    tag(targetY, target, positionProfitColor);
+    tag(entryY, entry, positionEntryColor);
+
+    // The exit: the candle whose range left a zone vertically, marked with the
+    // price it crossed and the result in risk units.
+    if (outcome != null) {
+      final exitX = _xForTime(outcome.time.millisecondsSinceEpoch, plotW);
+      final exitY = y(outcome.price);
+      if (exitX != null &&
+          exitX >= left &&
+          exitY >= priceTop &&
+          exitY <= priceTop + plotH) {
+        final color =
+            outcome.isTakeProfit ? positionProfitColor : positionLossColor;
+        _dashed(
+          canvas,
+          Offset(exitX, entryY),
+          Offset(exitX, exitY),
+          color.withAlpha(180),
+        );
+        canvas.drawCircle(
+          Offset(exitX, exitY),
+          6,
+          Paint()..color = color.withAlpha(70),
+        );
+        canvas.drawCircle(Offset(exitX, exitY), 3.5, Paint()..color = color);
+
+        final r = realisedR(drawing: drawing, exit: outcome);
+        final label = '${outcome.isTakeProfit ? 'TP' : 'SL'} '
+            '${outcome.price.toStringAsFixed(decimals)}'
+            '${r == null ? '' : ' · ${r >= 0 ? '+' : ''}${r.toStringAsFixed(1)}R'}';
+        final textWidth =
+            _painter(label, color: color, size: 8.5, weight: FontWeight.w700)
+                .width;
+        final chipX = (exitX + 6)
+            .clamp(0.0, math.max(0.0, plotW - textWidth - 6))
+            .toDouble();
+        _chip(canvas, label, Offset(chipX, exitY - 18), color);
+      }
+    }
+
+    if (!selected) return;
+    for (final handle in <(double, Color)>[
+      (entryY, positionEntryColor),
+      (stopY, positionLossColor),
+      (targetY, positionProfitColor),
+    ]) {
+      if (handle.$1 < priceTop || handle.$1 > priceTop + plotH) continue;
+      final center = Offset(right - 5, handle.$1);
+      canvas.drawCircle(center, 4.5, Paint()..color = handle.$2);
+      canvas.drawCircle(
+        center,
+        4.5,
+        Paint()
+          ..color = const Color(0xFFFFFFFF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
   }
 
   void _bottomTag(Canvas canvas, Size size, double cx, String text) {
@@ -988,6 +1172,9 @@ class TradingChartPainter extends CustomPainter {
         oldDelegate.maxPrice != maxPrice ||
         oldDelegate.interval != interval ||
         oldDelegate.style != style ||
-        oldDelegate.symbol != symbol;
+        oldDelegate.symbol != symbol ||
+        oldDelegate.drawings != drawings ||
+        oldDelegate.draftStart != draftStart ||
+        oldDelegate.selectedDrawing != selectedDrawing;
   }
 }

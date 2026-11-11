@@ -8,8 +8,10 @@ import '../core/format.dart';
 import '../core/instruments.dart';
 import '../core/pnl.dart';
 import '../core/strategy_colors.dart';
+import '../core/trade_exit.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../services/market_data.dart';
 import '../services/telemetry.dart';
 import '../services/media_service.dart';
 import '../ui/theme.dart';
@@ -38,7 +40,6 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
 
   final _symbol = TextEditingController();
   final _entry = TextEditingController();
-  final _exit = TextEditingController();
   final _lots = TextEditingController();
   final _stop = TextEditingController();
   final _take = TextEditingController();
@@ -51,6 +52,12 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
   String _type = 'BUY';
   DateTime? _openTime;
   DateTime? _closeTime;
+
+  /// Where the market closed the trade, found from the candles after entry —
+  /// never typed in. A saved trade keeps the price the broker already recorded.
+  double? _exitPrice;
+  ExitReason? _exitReason;
+  bool _resolvingExit = false;
   List<String> _tags = const [];
   List<PendingAttachment> _pending = const [];
   List<MediaAttachment> _existing = const [];
@@ -132,7 +139,6 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     for (final controller in [
       _symbol,
       _entry,
-      _exit,
       _lots,
       _stop,
       _take,
@@ -155,7 +161,8 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       setState(() {
         _symbol.text = asString(trade['symbol']) ?? '';
         _entry.text = _numberText(trade['entry_price']);
-        _exit.text = _numberText(trade['exit_price']);
+        _exitPrice = asNullableDouble(trade['exit_price']);
+        _exitReason = null;
         _lots.text = _numberText(trade['lot_size']);
         _stop.text = _numberText(trade['stop_loss']);
         _take.text = _numberText(trade['take_profit']);
@@ -195,7 +202,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
 
   double? get _pnl {
     final entry = _valueOf(_entry);
-    final exit = _valueOf(_exit);
+    final exit = _exitPrice;
     final lots = _valueOf(_lots);
     if (entry == null || exit == null || lots == null) return null;
     return calculatePnl(
@@ -211,12 +218,169 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
 
   double? get _pips {
     final entry = _valueOf(_entry);
-    final exit = _valueOf(_exit);
+    final exit = _exitPrice;
     if (entry == null || exit == null) return null;
     final size = pipSize(
       _symbol.text.trim().isEmpty ? 'EURUSD' : _symbol.text.trim(),
     );
     return (_type == 'SELL' ? entry - exit : exit - entry) / size;
+  }
+
+  /// A stop or target on the wrong side of entry is a typo that would book a
+  /// profit (or a loss) the market never offered. It blocks Save; the message
+  /// spells out which side belongs to BUY and which to SELL.
+  String? get _levelError {
+    final entry = _valueOf(_entry);
+    final stop = _valueOf(_stop);
+    final take = _valueOf(_take);
+    if (entry == null) return null;
+    final buy = _type == 'BUY';
+    if (stop != null) {
+      if (buy && stop >= entry) {
+        return 'For a BUY the stop loss must be below the entry.';
+      }
+      if (!buy && stop <= entry) {
+        return 'For a SELL the stop loss must be above the entry.';
+      }
+    }
+    if (take != null) {
+      if (buy && take <= entry) {
+        return 'For a BUY the take profit must be above the entry.';
+      }
+      if (!buy && take >= entry) {
+        return 'For a SELL the take profit must be below the entry.';
+      }
+    }
+    return null;
+  }
+
+  /// Levels are optional (the trade is then marked at the latest price), but
+  /// saying so up front beats an exit that looks missing.
+  String? get _levelsHint => _valueOf(_stop) == null && _valueOf(_take) == null
+      ? 'Add a stop loss or a take profit, or the exit is marked at the latest price.'
+      : null;
+
+  /// Walks the candles forward from the entry and records where the market
+  /// closed the trade: the target or the stop, whichever printed first.
+  ///
+  /// The window is read in week-long pieces: that keeps the candle size fine
+  /// enough (15-minute bars) to tell which level printed first, while staying
+  /// well inside the route's 62-day and 5,000-candle limits. It stops as soon as
+  /// a level is hit. A trade that never reached either level keeps the latest
+  /// close and says so.
+  Future<bool> _resolveExitFromMarket({bool announce = false}) async {
+    if (_resolvingExit) return _exitPrice != null;
+    final entry = _valueOf(_entry);
+    final instrument = inferInstrument(_symbol.text);
+    final opened = _openTime;
+
+    if (entry == null || instrument == null || opened == null) {
+      if (announce) {
+        setState(() {
+          _error = instrument == null
+              ? 'Pick a symbol from the list first, then find the exit.'
+              : opened == null
+                  ? 'Set the opened time — the candles after it decide the exit.'
+                  : 'Enter the entry price first.';
+        });
+      }
+      return false;
+    }
+
+    final to = DateTime.now().toUtc();
+    final from = opened.toUtc();
+    if (!from.isBefore(to)) {
+      setState(
+          () => _error = 'The opened time is in the future. Pick a past time.');
+      return false;
+    }
+
+    setState(() {
+      _resolvingExit = true;
+      _error = null;
+    });
+
+    final service = MarketDataService();
+    try {
+      const chunk = Duration(days: 7);
+      final collected = <Candle>[];
+      ResolvedExit? resolved;
+      var cursor = from;
+      var guard = 0;
+
+      // 60 weeks covers entries a year back; anything older than the feed's
+      // history cannot be resolved from candles at all.
+      while (cursor.isBefore(to) && guard < 60) {
+        guard++;
+        var end = cursor.add(chunk);
+        if (end.isAfter(to)) end = to;
+        final span = end.difference(cursor);
+        var interval = defaultIntervalFor(span);
+        if (candleCountFor(span, interval) == null) {
+          interval = ChartInterval.oneDay;
+        }
+        final candles = await service.candles(
+          instrument,
+          interval,
+          from: cursor,
+          to: end,
+          force: true,
+        );
+        // Adjacent windows share their boundary bar; a duplicate would let the
+        // same candle decide twice.
+        final seen = collected.map((bar) => bar.time).toSet();
+        collected.addAll(candles.where((bar) => !seen.contains(bar.time)));
+
+        resolved = resolveExit(
+          type: _type,
+          entry: entry,
+          stop: _valueOf(_stop),
+          take: _valueOf(_take),
+          entryTime: from,
+          candles: collected,
+        );
+        if (resolved != null && resolved.reason != ExitReason.latestPrice) {
+          break;
+        }
+        cursor = end;
+      }
+
+      if (!mounted) return false;
+      if (resolved == null) {
+        setState(() {
+          _error =
+              'No candles were returned for that time. Check the symbol and '
+              'the opened time, then try again.';
+        });
+        return false;
+      }
+
+      setState(() {
+        _exitPrice = resolved!.price;
+        _closeTime = resolved.time.toLocal();
+        _exitReason = resolved.reason;
+      });
+      if (announce) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(resolved.label)),
+        );
+      }
+      return true;
+    } on MarketDataException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+      return false;
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'The candles could not be read. Check your connection '
+              'and try again.',
+        );
+      }
+      return false;
+    } finally {
+      service.close();
+      if (mounted) setState(() => _resolvingExit = false);
+    }
   }
 
   bool get _windowInvalid =>
@@ -584,7 +748,6 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
           instrument: instrument,
           direction: _type,
           entry: _valueOf(_entry),
-          exit: _valueOf(_exit),
           stop: _valueOf(_stop),
           take: _valueOf(_take),
         ),
@@ -592,6 +755,10 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     );
     if (selection == null || !mounted) return;
     setState(() {
+      // A long/short position tool carries its own side; follow it, so picking
+      // a short box never fills a long trade with the stop on the wrong side.
+      final direction = selection.direction?.toUpperCase();
+      if (direction == 'SELL' || direction == 'BUY') _type = direction!;
       if (selection.entry != null) {
         _entry.text = chartPrice(selection.entry!, instrument);
       }
@@ -601,12 +768,78 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       if (selection.take != null) {
         _take.text = chartPrice(selection.take!, instrument);
       }
-      if (selection.exit != null) {
-        _exit.text = chartPrice(selection.exit!, instrument);
-      }
+      // The exit is not a level to pin: it is where the market hit the stop or
+      // the target first, so the app finds it from the candles afterwards.
       if (selection.entryTime != null) _openTime = selection.entryTime;
-      if (selection.exitTime != null) _closeTime = selection.exitTime;
+      _exitPrice = null;
+      _exitReason = null;
+      _closeTime = null;
     });
+    if (_levelsHint == null) unawaited(_resolveExitFromMarket());
+  }
+
+  /// The exit, as the market delivered it. It is not a text field on purpose:
+  /// a typed exit is where a losing sell turns into a "profit".
+  Widget _exitRow() {
+    final price = _exitPrice;
+    final reason = _exitReason;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            price == null
+                ? 'Not found yet'
+                : chartPrice(
+                    price,
+                    inferInstrument(_symbol.text) ?? inferInstrument('EURUSD')!,
+                  ),
+            style: tabular.copyWith(
+              color: price == null ? AppColors.faint : AppColors.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            price == null
+                ? 'The app reads the candles after entry and takes whichever '
+                    'of the two levels the market hit first.'
+                : '${reason?.label ?? 'Saved exit'}'
+                    '${_closeTime == null ? '' : ' · ${dayOf(_closeTime)} ${timeOf(_closeTime)}'}',
+            style: TextStyle(
+              color: price == null ? AppColors.faint : AppColors.muted,
+              fontSize: kMinLabelSize,
+              height: 1.4,
+            ),
+          ),
+          // Its own line, full width: at a 2x text size a side-by-side button
+          // is what pushed this row past the card edge.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _resolvingExit
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: () => _resolveExitFromMarket(announce: true),
+                    child: Text(price == null ? 'Find exit' : 'Find again'),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// A quiet label above a group of fields, so one card can hold prices, levels
@@ -644,6 +877,11 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       setState(() => _error = 'The exit time cannot be before the entry time.');
       return;
     }
+    final levelError = _levelError;
+    if (levelError != null) {
+      setState(() => _error = levelError);
+      return;
+    }
     final userId = _userId;
     if (userId == null) {
       setState(() => _error = 'Your session expired. Sign in again.');
@@ -651,15 +889,29 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     }
 
     final entry = _valueOf(_entry);
-    final exit = _valueOf(_exit);
     final lots = _valueOf(_lots);
-    if (entry == null || exit == null || lots == null) {
+    if (entry == null || lots == null) {
       setState(
-        () => _error =
-            'Enter the entry price, the exit price and the size before saving.',
+        () => _error = 'Enter the entry price and the size before saving.',
       );
       return;
     }
+    // The exit is read from the market, never typed. A saved trade that was
+    // reopened keeps its broker exit and needs no second lookup.
+    if (_exitPrice == null) {
+      if (_openTime == null) {
+        setState(
+          () =>
+              _error = 'Set the opened time — the candles after it decide the '
+                  'exit price and time.',
+        );
+        return;
+      }
+      final resolved = await _resolveExitFromMarket();
+      if (!resolved || _exitPrice == null) return;
+    }
+    if (!mounted) return;
+    final exit = _exitPrice!;
 
     FocusScope.of(context).unfocus();
     setState(() {
@@ -967,26 +1219,11 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   // Laid out as one 2x4 grid they read as a single block of
                   // numbers, and the broker costs were mixed in with the trade.
                   _fieldGroup('Prices'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _NumberField(
-                          controller: _entry,
-                          label: 'Entry price',
-                          positive: true,
-                          onChanged: () => setState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _NumberField(
-                          controller: _exit,
-                          label: 'Exit price',
-                          positive: true,
-                          onChanged: () => setState(() {}),
-                        ),
-                      ),
-                    ],
+                  _NumberField(
+                    controller: _entry,
+                    label: 'Entry price',
+                    positive: true,
+                    onChanged: () => setState(() {}),
                   ),
                   _fieldGroup('Stop & target'),
                   Row(
@@ -1008,6 +1245,32 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       ),
                     ],
                   ),
+                  if (_levelError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        _levelError!,
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontSize: kMinLabelSize,
+                          height: 1.4,
+                        ),
+                      ),
+                    )
+                  else if (_levelsHint != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        _levelsHint!,
+                        style: TextStyle(
+                          color: AppColors.faint,
+                          fontSize: kMinLabelSize,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  _fieldGroup('Exit'),
+                  _exitRow(),
                   _fieldGroup('Size & costs'),
                   _NumberField(
                     controller: _lots,
@@ -1062,15 +1325,14 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                         : () => setState(() => _openTime = null),
                   ),
                   const SizedBox(height: 6),
+                  // The close is not picked by hand: it is the candle on which
+                  // the stop or the target was reached.
                   _WindowRow(
                     label: 'Closed',
                     value: _closeTime == null
-                        ? 'Not set'
+                        ? 'Found with the exit'
                         : '${dayOf(_closeTime)} · ${timeOf(_closeTime)}',
-                    onTap: () => _pickWindow(open: false),
-                    onClear: _closeTime == null
-                        ? null
-                        : () => setState(() => _closeTime = null),
+                    onTap: () => _resolveExitFromMarket(announce: true),
                   ),
                   const SizedBox(height: 8),
                   Row(

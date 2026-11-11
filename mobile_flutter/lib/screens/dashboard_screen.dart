@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 
 import '../core/edge.dart';
 import '../core/format.dart';
+import '../core/subscription.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/a11y.dart';
 import '../ui/brand.dart';
 import '../ui/motion.dart';
-import '../ui/prop_compliance.dart';
 import '../ui/shimmer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -70,13 +70,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            onPressed: _refresh,
-            tooltip: AppLocalizations.of(context).refresh,
-            icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
-          ),
-        ],
+        // No refresh action: pull-to-refresh already covers the list, and the
+        // top-right button did nothing a trader could point at.
       ),
       body: FutureBuilder<DashboardData>(
         future: _future,
@@ -138,6 +133,9 @@ class _DashboardBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 110),
       children: [
+        // A lapsed plan is the first thing on the desk, not a detail inside
+        // Account: access has stopped and renewing is the only way back in.
+        _SubscriptionNotice(api: api),
         if (summary.totalTrades == 0) ...[
           _StartCard(onOpenEdge: onOpenEdge),
           const SizedBox(height: 10),
@@ -150,8 +148,6 @@ class _DashboardBody extends StatelessWidget {
             onOpenImport: onOpenImport,
           ),
         ),
-        const SizedBox(height: 10),
-        PropComplianceCard(api: api),
         const SizedBox(height: 10),
         Reveal(
           index: 1,
@@ -1314,4 +1310,90 @@ double _maxDrawdown(List<EquityPoint> points, double deposits) {
     }
   }
   return worst;
+}
+
+/// A single, unmissable line for an account whose plan has run out.
+///
+/// The desk is where the app opens, so this is where access stopping has to be
+/// visible. It reads the profile itself rather than blocking the dashboard on a
+/// second request: a slow profile lookup leaves the numbers on screen.
+class _SubscriptionNotice extends StatefulWidget {
+  const _SubscriptionNotice({required this.api});
+
+  final JournalApi api;
+
+  @override
+  State<_SubscriptionNotice> createState() => _SubscriptionNoticeState();
+}
+
+class _SubscriptionNoticeState extends State<_SubscriptionNotice> {
+  late Future<SubscriptionInfo> _future = _load();
+
+  Future<SubscriptionInfo> _load() async =>
+      SubscriptionInfo.fromProfile(await widget.api.profile());
+
+  Future<void> _openPlans() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SubscriptionScreen(api: widget.api),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _future = _load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SubscriptionInfo>(
+      future: _future,
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        if (info == null || !info.ended) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: FlatCard(
+            borderColor: AppColors.danger.withAlpha(110),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.lock_outline, size: 15, color: AppColors.danger),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        info.endedTitle,
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  info.endedBody,
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11.5,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _openPlans,
+                    child: Text(info.callToAction),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

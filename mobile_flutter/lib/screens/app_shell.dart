@@ -13,6 +13,7 @@ import 'dashboard_screen.dart';
 import 'edge_screen.dart';
 import 'import_screen.dart';
 import 'journal_screen.dart';
+import 'prop_firm_screen.dart';
 import 'trade_form_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -93,6 +94,12 @@ class _AppShellState extends State<AppShell>
     );
   }
 
+  void _openPropFirm() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PropFirmScreen(api: _api)),
+    );
+  }
+
   void _openEdge() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -156,6 +163,7 @@ class _AppShellState extends State<AppShell>
           onProfileChanged: _invalidate,
           onOpenImport: _openImport,
           onOpenBacktest: _openBacktest,
+          onOpenPropFirm: _openPropFirm,
         );
     }
   }

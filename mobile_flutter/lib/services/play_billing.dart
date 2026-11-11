@@ -29,6 +29,20 @@ const Map<String, PlayCatalogEntry> playCatalog = {
 String playProductIdFor(String planId, String interval) =>
     '${planId}_$interval';
 
+/// Whether a plan card's Play button may start a purchase.
+///
+/// A plan already owned cannot be bought again at the same cadence; switching a
+/// monthly subscriber to the yearly base plan is allowed and stacks the days.
+/// Without a sellable product (Play unavailable, or the plan not on sale in this
+/// country) there is nothing to buy, so the button stays disabled.
+bool canBuyWithPlay({
+  required bool current,
+  required bool yearly,
+  required bool enabled,
+  required bool hasProduct,
+}) =>
+    hasProduct && enabled && (!current || yearly);
+
 /// Thin wrapper over Play Billing.
 ///
 /// It deliberately holds no billing state of its own: what the trader owns is

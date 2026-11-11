@@ -252,6 +252,22 @@ class ChartStyle {
     bear: Color(0xFFF23645),
   );
 
+  /// White canvas with green up candles and solid black down candles — the
+  /// scheme most TradingView screenshots use. The black bear also reads on the
+  /// light grid without competing with the session shading.
+  static const ChartStyle classic = ChartStyle(
+    id: 'classic',
+    name: 'Classic',
+    background: Color(0xFFFFFFFF),
+    grid: Color(0xFFE8EBF0),
+    axis: Color(0xFFD3D8E0),
+    text: Color(0xFF131722),
+    muted: Color(0xFF5D6675),
+    crosshair: Color(0xFF9AA3B0),
+    bull: Color(0xFF4CAF50),
+    bear: Color(0xFF131722),
+  );
+
   /// Black canvas, near-white bars — the monochrome look of a newsprint chart.
   static const ChartStyle mono = ChartStyle(
     id: 'mono',
@@ -270,6 +286,7 @@ class ChartStyle {
     ink,
     slate,
     paper,
+    classic,
     mono,
   ];
 
@@ -286,6 +303,8 @@ class ChartStyle {
     Color(0xFFEF5350),
     Color(0xFF98A1B0),
     Color(0xFFEDF0F5),
+    // Solid black for the green/black scheme; only sensible on a light canvas.
+    Color(0xFF131722),
   ];
 
   /// Storage key for the global style.

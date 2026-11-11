@@ -11,7 +11,6 @@ import 'core/language_packs.dart';
 import 'core/locale.dart';
 import 'screens/auth_gate.dart';
 import 'services/telemetry.dart';
-import 'ui/perf_overlay.dart';
 import 'ui/theme.dart';
 
 Future<void> main() async {
@@ -44,9 +43,6 @@ Future<void> main() async {
   unawaited(LanguagePacks.instance.ensureActivePack(
     LocaleController.instance.code,
   ));
-  // Off unless someone turned it on; a diagnostic must never be the reason a
-  // launch is slow.
-  await FrameOverlaySettings.restore();
 
   // Crash reporting, installed before the first frame so a failure while the
   // widget tree boots is still counted. `presentError` comes second so the red
@@ -94,14 +90,12 @@ class MtlTraderApp extends StatelessWidget {
           // InheritedWidget, so a switch has to rebuild the tree. The key makes
           // Flutter discard the subtree instead of keeping const widgets that
           // still hold the old colours or the old strings.
-          home: PerfOverlay(
-            child: KeyedSubtree(
-              key: ValueKey<String>(
-                'theme-${appearance.name}-$language-'
-                '${LanguagePacks.instance.generation}',
-              ),
-              child: const AuthGate(),
+          home: KeyedSubtree(
+            key: ValueKey<String>(
+              'theme-${appearance.name}-$language-'
+              '${LanguagePacks.instance.generation}',
             ),
+            child: const AuthGate(),
           ),
         );
       },

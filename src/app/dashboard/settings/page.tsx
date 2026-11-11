@@ -9,6 +9,7 @@ import { useToast } from '@/components/toast'
 import { Avatar } from '@/components/avatar'
 import { deleteAvatarByUrl, uploadAvatar, validateAvatarFile } from '@/lib/avatar-upload'
 import { PLANS } from '@/lib/plans'
+import { subscriptionState, type SubscriptionState } from '@/lib/subscription'
 
 const BASIC_PRICE = PLANS.find(p => p.id === 'basic')?.price ?? 0
 const PRO_PRICE = PLANS.find(p => p.id === 'pro')?.price ?? 0
@@ -60,6 +61,9 @@ export default function SettingsPage() {
     stripeCustomerId: '' as string | null,
     currentPeriodEnd: null as string | null,
     cancelAtPeriodEnd: false,
+    // Resolved against the clock, so a period that ended yesterday reads as
+    // ended even before the expiry job rewrites the row.
+    liveState: 'trial' as SubscriptionState,
   })
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile>({
@@ -125,6 +129,7 @@ export default function SettingsPage() {
         stripeCustomerId: userData.stripe_customer_id,
         currentPeriodEnd: userData.current_period_end ?? null,
         cancelAtPeriodEnd: userData.cancel_at_period_end === true,
+        liveState: subscriptionState(userData),
       })
     } else {
       setProfile(prev => ({ ...prev, email: user.email || '' }))
@@ -720,29 +725,54 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-white">
-                      {userPlan.tier === 'pro' ? 'Pro Plan' : userPlan.tier === 'basic' ? 'Basic Plan' : '14-Day Free Trial'}
+                      {userPlan.liveState === 'trial'
+                        ? '14-Day Free Trial'
+                        : userPlan.tier === 'pro'
+                          ? 'Pro Plan'
+                          : userPlan.tier === 'basic'
+                            ? 'Basic Plan'
+                            : 'No active plan'}
                     </h3>
                     <p className="text-sm text-gray-400">
-                      {userPlan.tier === 'free'
+                      {userPlan.liveState === 'trial'
                         ? 'Unlimited trades for 14 days, then choose a paid plan'
-                        : 'Unlimited trades'}
+                        : userPlan.liveState === 'active'
+                          ? 'Unlimited trades'
+                          : 'The journal is read-only until you buy a subscription'}
                     </p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    userPlan.status === 'active'
+                    userPlan.liveState === 'active'
                       ? 'bg-success/20 text-success'
-                      : userPlan.status === 'trial'
+                      : userPlan.liveState === 'trial'
                       ? 'bg-primary/20 text-primary'
                       : 'bg-danger/20 text-danger'
                   }`}>
-                    {userPlan.status === 'active' ? 'Active' :
-                     userPlan.status === 'trial' ? 'Trial' :
-                     userPlan.status === 'cancelled' ? 'Cancelled' : 'Expired'}
+                    {userPlan.liveState === 'active' ? 'Active' :
+                     userPlan.liveState === 'trial' ? 'Trial' :
+                     userPlan.liveState === 'cancelled' ? 'Cancelled' : 'Subscription ended'}
                   </span>
                 </div>
               </div>
 
-              {userPlan.tier !== 'free' && userPlan.status === 'active' && (
+              {(userPlan.liveState === 'expired' || userPlan.liveState === 'cancelled') && (
+                <div className="flex flex-col gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-danger">Your subscription has ended</p>
+                    <p className="mt-1 text-sm text-gray-400">
+                      Buy a subscription to keep recording trades and using analytics. Your journal is safe — nothing was deleted.
+                    </p>
+                  </div>
+                  <a
+                    href="/pricing"
+                    className="shrink-0 rounded-lg bg-primary px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                  >
+                    Buy a subscription
+                  </a>
+                </div>
+              )}
+
+              {userPlan.tier !== 'free' && userPlan.liveState === 'active' && (
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-surface-light border border-border rounded-xl p-4">
                   <p className="text-sm text-gray-400">
                     {userPlan.cancelAtPeriodEnd

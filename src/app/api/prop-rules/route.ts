@@ -30,13 +30,28 @@ export async function GET(req: Request) {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: rules, error } = await getAdminClient()
+    const baseColumns =
+      'account_size, max_daily_loss_pct, max_drawdown_pct, trailing_drawdown, profit_target_pct, min_trading_days, started_on'
+    const first = await getAdminClient()
       .from('prop_rules')
-      .select(
-        'account_size, max_daily_loss_pct, max_drawdown_pct, trailing_drawdown, profit_target_pct, min_trading_days, started_on'
-      )
+      .select(`${baseColumns}, consistency_pct`)
       .eq('user_id', user.id)
       .maybeSingle()
+    let rules: Record<string, unknown> | null = first.data as Record<string, unknown> | null
+    let error = first.error
+
+    // The consistency column arrived after the first prop-rules migration. A
+    // database that has not applied it yet still gets its monitor, just without
+    // that one rule, instead of an error on every visit.
+    if (error && /consistency_pct/.test(error.message)) {
+      const fallback = await getAdminClient()
+        .from('prop_rules')
+        .select(baseColumns)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      rules = fallback.data as Record<string, unknown> | null
+      error = fallback.error
+    }
 
     if (error) {
       // A database that predates the migration is not a failure: the card
@@ -77,12 +92,26 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: parsed.error }, { status: 400 })
     }
 
-    const { error } = await getAdminClient()
+    let { error } = await getAdminClient()
       .from('prop_rules')
       .upsert(
         { user_id: user.id, ...parsed.value, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       )
+
+    // Saving on a database without the consistency column: keep the rest of the
+    // rules rather than refusing the whole form over one optional limit.
+    if (error && /consistency_pct/.test(error.message)) {
+      const rest: Record<string, unknown> = { ...parsed.value }
+      delete rest.consistency_pct
+      const retry = await getAdminClient()
+        .from('prop_rules')
+        .upsert(
+          { user_id: user.id, ...rest, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        )
+      error = retry.error
+    }
 
     if (error) {
       if (/prop_rules/.test(error.message)) {
