@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtl_trader_mobile/core/chart_sessions.dart';
+import 'package:mtl_trader_mobile/core/chart_zone.dart';
 
 /// 2026-11-02 is a Monday, so week boundaries land where the tests expect.
 DateTime utc(int day, int hour, [int minute = 0]) =>
@@ -198,6 +199,55 @@ void main() {
       expect(
         periodSeparatorIndices([utc(2, 0)], SeparatorGrain.day),
         isEmpty,
+      );
+    });
+  });
+
+  group("separators in the trader's clock", () {
+    test('a New York chart breaks the day at New York midnight', () {
+      final zone = ChartZone('America/New_York', 'New York');
+      final times = [
+        for (var hour = 2; hour <= 9; hour++)
+          DateTime.utc(2026, 7, 15, hour),
+      ];
+      // 04:00 UTC is midnight in New York during daylight saving.
+      expect(
+        periodSeparatorIndices(
+          times,
+          SeparatorGrain.day,
+          wallTime: zone.wall,
+        ).toList(),
+        [2],
+      );
+    });
+
+    test('a UTC chart breaks the day at UTC midnight', () {
+      final times = [
+        DateTime.utc(2026, 7, 15, 22),
+        DateTime.utc(2026, 7, 15, 23),
+        DateTime.utc(2026, 7, 16, 0),
+        DateTime.utc(2026, 7, 16, 1),
+      ];
+      expect(
+        periodSeparatorIndices(
+          times,
+          SeparatorGrain.day,
+          wallTime: ChartZone.utc.wall,
+        ).toList(),
+        [2],
+      );
+    });
+
+    test('session shading stays on UTC hours whatever the phone shows', () {
+      final johannesburg = ChartZone('Africa/Johannesburg', 'Johannesburg');
+      // London opens at 07:00 UTC, which is 09:00 on a South African clock.
+      final opens = DateTime.utc(2026, 7, 15, 7);
+      expect(TradingSession.london.contains(opens), isTrue);
+      expect(johannesburg.wall(opens).hour, 9);
+      // And the band before it still belongs to Asia.
+      expect(
+        TradingSession.london.contains(DateTime.utc(2026, 7, 15, 6, 59)),
+        isFalse,
       );
     });
   });

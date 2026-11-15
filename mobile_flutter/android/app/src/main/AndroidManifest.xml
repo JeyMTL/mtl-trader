@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:label="MTL Trader"
@@ -40,6 +41,20 @@
                 <data android:scheme="com.mtltrader.app" android:host="login-callback"/>
             </intent-filter>
         </activity>
+        <!-- Covers MetaTrader 5 while the journal's soft lock is active. The
+             system binds this service; the BIND permission keeps other apps out. -->
+        <service
+            android:name=".Mt5FreezeService"
+            android:label="@string/mt5_freezer_label"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/mt5_freeze_service" />
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

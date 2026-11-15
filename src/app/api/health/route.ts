@@ -10,6 +10,7 @@ import {
 import { getAdminClient } from '@/lib/server-auth'
 import { resolveProviderConfig } from '@/lib/ai/providers'
 import { annualPriceCollisions, paddleEnvironment, priceIdFor } from '@/lib/paddle'
+import { googlePlayConfigured, playPackageName } from '@/lib/google-play'
 
 /**
  * Liveness and configuration probe.
@@ -101,6 +102,13 @@ export async function GET() {
       // capture is the only way an order gets applied. Nothing else in the app
       // says so, which is exactly why it belongs here.
       paypal: paypalStatus(),
+      // Same rule as `paddle`: presence only. Without the service-account key
+      // `/api/billing/google/verify` answers 503, which a customer meets only
+      // after tapping Subscribe — so the mobile purchase path dead-ends
+      // silently. The package name is public on the store listing, and it is
+      // included because a key minted for another package is just as useless
+      // and looks identical from the outside.
+      googlePlay: googlePlayStatus(),
       // Like `features`, reported but not part of `status`: a pending migration
       // is a known, fixable state, and paging every fifteen minutes until
       // someone pastes SQL would train the alert away. `missing` names the file.
@@ -116,6 +124,13 @@ export async function GET() {
       headers: { 'Cache-Control': 'no-store' },
     }
   )
+}
+
+/**
+ * Google Play billing config, read the way the verify route reads it.
+ */
+function googlePlayStatus() {
+  return { configured: googlePlayConfigured(), package: playPackageName() }
 }
 
 /**

@@ -92,3 +92,20 @@ store/.chrome-profile/
 
 # Supabase CLI link state (contains project ref)
 supabase/.temp/
+
+# MT5 build output
+mt5/*.ex5
+mt5/*_compile.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Local run output from the dev server and supervisor
+.dev-server.log
+.supervisor.log
+.diag/
+.phone-now.png
+
+# MT5 compiler output
+mt5/compile.log

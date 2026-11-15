@@ -97,6 +97,21 @@ class LanguagePacks extends ChangeNotifier {
 
   final Future<String> Function(Uri uri) _fetch;
 
+  /// Packs are a few kilobytes on a static host, so a second attempt costs
+  /// almost nothing. A dropped first connection is common on mobile data and
+  /// must not be reported to the trader as a language that cannot be
+  /// downloaded.
+  static const Duration _retryDelay = Duration(milliseconds: 300);
+
+  Future<String> _fetchWithRetry(Uri uri) async {
+    try {
+      return await _fetch(uri);
+    } catch (_) {
+      await Future<void>.delayed(_retryDelay);
+      return _fetch(uri);
+    }
+  }
+
   final Map<String, LanguagePack> _installed = <String, LanguagePack>{};
   final Map<String, LanguagePackInfo> _available = <String, LanguagePackInfo>{};
   final Set<String> _installing = <String>{};
@@ -174,7 +189,8 @@ class LanguagePacks extends ChangeNotifier {
   /// keeps the cached list (or shows no download offer at all).
   Future<void> refreshManifest() async {
     try {
-      final body = await _fetch(Uri.parse('${AppConfig.apiBaseUrl}$manifestPath'));
+      final body =
+          await _fetchWithRetry(Uri.parse('${AppConfig.apiBaseUrl}$manifestPath'));
       final decoded = jsonDecode(body);
       final rows = decoded is Map<String, dynamic> ? decoded['packs'] : null;
       if (rows is! List) return;
@@ -210,7 +226,9 @@ class LanguagePacks extends ChangeNotifier {
     _errors.remove(code);
     notifyListeners();
     try {
-      final body = await _fetch(Uri.parse('${AppConfig.apiBaseUrl}/locales/$code.json'));
+      final body = await _fetchWithRetry(
+        Uri.parse('${AppConfig.apiBaseUrl}/locales/$code.json'),
+      );
       final decoded = jsonDecode(body);
       if (decoded is! Map<String, dynamic>) throw const FormatException('pack');
       final messages = _decodeMessages(jsonEncode(decoded['messages']));
@@ -358,7 +376,13 @@ class LanguagePacks extends ChangeNotifier {
       final request = await client.getUrl(uri);
       final response =
           await request.close().timeout(const Duration(seconds: 20));
-      final text = await response.transform(utf8.decoder).join();
+      // A body that stalls mid-transfer would otherwise wait forever, leaving
+      // the row spinning with no error and no way back. Reading it has to have
+      // a deadline of its own.
+      final text = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 20));
       if (response.statusCode >= 400) {
         throw HttpException('pack not published', uri: uri);
       }

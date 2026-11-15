@@ -13,6 +13,7 @@ import '../core/chart_scale.dart';
 import '../core/chart_sessions.dart';
 import '../core/chart_theme.dart';
 import '../core/chart_view.dart';
+import '../core/chart_zone.dart';
 import '../core/indicators.dart';
 import '../core/trade_exit.dart' show ResolvedExit;
 import '../core/instruments.dart';
@@ -81,12 +82,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   ChartInterval _interval = ChartInterval.fiveMinutes;
 
-  /// Drawing tools: trend lines and horizontal rays.
-  DrawingTool _drawingTool = DrawingTool.none;
+  /// Lines and boxes the trader has drawn on this instrument.
   List<ChartDrawing> _drawings = const [];
-  DrawingDraft? _draftStart;
 
-  /// Drawing under the trader's finger, selected for drag or delete.
+  /// Drawing under the trader's finger, selected for drag, edit or delete.
   int? _selectedDrawing;
 
   /// Window the trader entered. Both null means the live tail.
@@ -245,15 +244,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     _commitDrawings([..._drawings]..removeAt(index));
   }
 
-  /// The selected drawing when it is a position tool — the only kind that
-  /// carries a complete trade plan.
-  ChartDrawing? get _selectedPosition {
-    final index = _selectedDrawing;
-    if (index == null || index < 0 || index >= _drawings.length) return null;
-    final drawing = _drawings[index];
-    return drawing.isPosition ? drawing : null;
-  }
-
   @override
   void dispose() {
     _refreshTimer?.cancel();
@@ -379,22 +369,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     }
   }
 
-  void _pin(Marker marker, double price, DateTime time) {
-    setState(() {
-      _setLevel(marker, price);
-      if (marker == Marker.entry) _entryTime = time;
-      if (marker == Marker.exit) _exitTime = time;
-      _active = switch (marker) {
-        Marker.entry => Marker.stop,
-        Marker.stop => Marker.take,
-        // The exit is not pinned here: it is wherever the market hit the stop
-        // or the target first.
-        Marker.take => Marker.take,
-        Marker.exit => Marker.take,
-      };
-    });
-  }
-
   /// Applies a drag from the canvas. Entry and exit are points on the chart, so
   /// their time moves with the price; stop and take only carry a price.
   void _levelMoved(Marker marker, double price, DateTime? time) {
@@ -460,18 +434,18 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         actions: [
           IconButton(
             tooltip: 'Drawing tools',
-            onPressed: _openDrawingSheet,
-            icon: const Icon(Icons.draw_outlined, size: 20),
+            onPressed: _openDrawingTools,
+            icon: Icon(Icons.draw_outlined, size: 20),
           ),
           IconButton(
             tooltip: 'Market replay',
             onPressed: _candles.length < 12 ? null : _toggleReplayMode,
-            icon: const Icon(Icons.replay, size: 20),
+            icon: Icon(Icons.replay, size: 20),
           ),
           IconButton(
             tooltip: 'Chart style',
             onPressed: _openStyleSheet,
-            icon: const Icon(Icons.tune, size: 20),
+            icon: Icon(Icons.tune, size: 20),
           ),
           // A break between the tools that change the chart and the one that
           // only changes how it fills the screen. Clearing the levels lives in
@@ -486,7 +460,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           IconButton(
             tooltip: 'Fullscreen',
             onPressed: _candles.isEmpty ? null : _toggleFullscreen,
-            icon: const Icon(Icons.fullscreen, size: 21),
+            icon: Icon(Icons.fullscreen, size: 21),
           ),
         ],
       ),
@@ -499,10 +473,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 _header(instrument),
                 const SizedBox(height: 8),
                 _timeFrame(),
-                if (_drawingTool != DrawingTool.none) ...[
-                  const SizedBox(height: 6),
-                  _drawingBanner(),
-                ],
                 if (_replay != null) ...[
                   const SizedBox(height: 6),
                   _replayStrip(),
@@ -514,6 +484,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   child: Column(
                     children: [
                       _chartPanel(instrument),
+                      _tradeBar(),
                       _chartFooter(),
                     ],
                   ),
@@ -558,6 +529,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             Expanded(
               child: _chartPanel(widget.instrument, expand: true),
             ),
+            _tradeBar(),
             _fullscreenControls(),
           ],
         ),
@@ -606,8 +578,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             ),
           ),
           IconButton(
-            tooltip: 'Drawing tools',
-            onPressed: _openDrawingSheet,
+            tooltip: 'Chart tools',
+            onPressed: _openDrawingTools,
             icon: Icon(Icons.draw_outlined, size: 20, color: _style.muted),
           ),
           IconButton(
@@ -651,7 +623,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Tap to set ${_labelFor(_active)} · hold a line to move it and its time',
+                  'Drag a level line to move it and its time',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: _style.muted, fontSize: 9.5),
@@ -683,7 +655,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       );
     }
     if (_error != null) return _chartError(expand: expand);
-    return _ChartCanvas(
+    final canvas = _ChartCanvas(
       candles: _visibleCandles,
       interval: _interval,
       decimals: instrument.decimals,
@@ -700,13 +672,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       entryTime: _entryTime,
       exitTime: _exitTime,
       onSelect: (marker) => setState(() => _active = marker),
-      onPin: _pin,
       onLevelMoved: _levelMoved,
-      drawTool: _drawingTool,
       drawings: _drawings,
-      draftStart: _draftStart,
-      onDraw: _onDraw,
       selectedDrawing: _selectedDrawing,
+      onDrawingTapped: _openDrawingActions,
       // Resolved once per build, not per frame: the canvas repaints on every
       // pan, and the first-touch scan does not depend on the viewport.
       positionOutcomes: [
@@ -723,6 +692,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       onDrawingMoveEnd: _finishDrawingMove,
       onReachStart: _loadingOlder ? null : _loadOlder,
     );
+
+    return canvas;
   }
 
   Future<void> _jumpToDate() async {
@@ -1069,162 +1040,179 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     );
   }
 
-  Widget _drawingBanner() {
-    final hint = switch (_drawingTool) {
-      DrawingTool.trend => _draftStart == null
-          ? 'Tap the first point of the trend line.'
-          : 'Tap the second point to finish the line.',
-      DrawingTool.ray => 'Tap a price for the horizontal ray.',
-      DrawingTool.longPosition =>
-        'Tap an entry for the long. Stop and target start at 1:2 — drag the lines to set them.',
-      DrawingTool.shortPosition =>
-        'Tap an entry for the short. Stop and target start at 1:2 — drag the lines to set them.',
-      DrawingTool.none => '',
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withAlpha(20),
-        borderRadius: BorderRadius.circular(AppRadius.field),
-        border: Border.all(color: AppColors.primary.withAlpha(70)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.draw_outlined, size: 14, color: AppColors.primaryLight),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              hint,
-              style: TextStyle(
-                color: AppColors.primaryLight,
-                fontSize: 10.5,
-                height: 1.35,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => setState(() {
-              _drawingTool = DrawingTool.none;
-              _draftStart = null;
-            }),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openDrawingSheet() async {
+  /// The tools hub, laid out like TradingView's analysis panel: the objects
+  /// first, then what can be done to the one that is selected.
+  ///
+  /// Tools no longer arm a tap. Choosing one places the object on the chart
+  /// immediately and the trader drags it into place — which is what stops a
+  /// stray tap on the chart from starting a point.
+  Future<void> _openDrawingTools() async {
+    final selected = _selectedDrawing;
+    final hasSelection =
+        selected != null && selected >= 0 && selected < _drawings.length;
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.surface,
-      builder: (sheetContext) => SafeArea(
-        // Seven rows now: scroll rather than overflow on a short phone.
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.timeline, size: 20),
-                title: const Text('Trend line'),
-                subtitle: const Text('Tap two points on the chart'),
-                onTap: () => Navigator.of(sheetContext).pop('trend'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.trending_up, size: 20),
-                title: const Text('Long position'),
-                subtitle: const Text(
-                  'Entry, stop and target in one box — drag each line to set it',
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        void pick(String value) => Navigator.of(sheetContext).pop(value);
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Chart tools',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => pick('close'),
+                      icon: Icon(
+                        Icons.close,
+                        size: 18,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
                 ),
-                onTap: () => Navigator.of(sheetContext).pop('long'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.trending_down, size: 20),
-                title: const Text('Short position'),
-                subtitle: const Text(
-                  'Entry, stop and target in one box — drag each line to set it',
+                Text(
+                  'Pick a tool and it lands on the chart — drag it to calibrate '
+                  'the levels. Tap any object for edit, clone or delete.',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 10.5,
+                    height: 1.4,
+                  ),
                 ),
-                onTap: () => Navigator.of(sheetContext).pop('short'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.horizontal_rule, size: 20),
-                title: const Text('Horizontal ray'),
-                subtitle: const Text('Tap a price on the chart'),
-                onTap: () => Navigator.of(sheetContext).pop('ray'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.undo, size: 20),
-                title: const Text('Undo last drawing'),
-                enabled: _drawings.isNotEmpty,
-                onTap: () => Navigator.of(sheetContext).pop('undo'),
-              ),
-              if (_selectedPosition != null)
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.trending_up,
+                        label: 'Long position',
+                        subtitle: 'Profit above entry',
+                        onTap: () => pick('long'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.trending_down,
+                        label: 'Short position',
+                        subtitle: 'Profit below entry',
+                        onTap: () => pick('short'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.show_chart,
+                        label: 'Trend line',
+                        subtitle: 'Two points',
+                        onTap: () => pick('trend'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.horizontal_rule,
+                        label: 'Horizontal ray',
+                        subtitle: 'One price',
+                        onTap: () => pick('ray'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (hasSelection) ...[
+                  const SizedBox(height: 14),
+                  _sheetLabel('SELECTED OBJECT'),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _toolCard(
+                          icon: Icons.edit_outlined,
+                          label: 'Edit',
+                          subtitle: 'Set levels',
+                          onTap: () => pick('edit'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _toolCard(
+                          icon: Icons.copy_all_outlined,
+                          label: 'Clone',
+                          subtitle: 'Copy it',
+                          onTap: () => pick('clone'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _toolCard(
+                          icon: Icons.delete_outline,
+                          label: 'Delete',
+                          subtitle: 'Remove',
+                          tone: AppColors.danger,
+                          onTap: () => pick('delete'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 14),
+                _sheetLabel('MANAGE'),
                 ListTile(
-                  leading: const Icon(Icons.playlist_add_check, size: 20),
-                  title: const Text('Use these levels for the trade'),
-                  subtitle:
-                      const Text('Copies entry, stop and target to the form'),
-                  onTap: () => Navigator.of(sheetContext).pop('apply-position'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.undo, size: 20),
+                  title: const Text('Undo last drawing'),
+                  enabled: _drawings.isNotEmpty,
+                  onTap: () => pick('undo'),
                 ),
-              if (_selectedDrawing != null)
                 ListTile(
-                  leading: const Icon(Icons.delete_forever, size: 20),
-                  title: const Text('Delete selected drawing'),
-                  subtitle: const Text('Long-press a line to select it'),
-                  onTap: () => Navigator.of(sheetContext).pop('delete'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.delete_sweep_outlined, size: 20),
+                  title: const Text('Clear all drawings'),
+                  enabled: _drawings.isNotEmpty,
+                  onTap: () => pick('clear'),
                 ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, size: 20),
-                title: const Text('Clear drawings'),
-                enabled: _drawings.isNotEmpty,
-                onTap: () => Navigator.of(sheetContext).pop('clear'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.close, size: 20),
-                title: const Text('Turn off drawing'),
-                onTap: () => Navigator.of(sheetContext).pop('off'),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
-    if (!mounted || action == null) return;
-    if (action == 'trend' || action == 'ray') {
-      setState(() {
-        _drawingTool = action == 'trend' ? DrawingTool.trend : DrawingTool.ray;
-        _draftStart = null;
-      });
+    if (!mounted || action == null || action == 'close') return;
+    if (action == 'long') {
+      _addPosition(PositionSide.long);
       return;
     }
-    if (action == 'long' || action == 'short') {
-      setState(() {
-        _drawingTool = action == 'long'
-            ? DrawingTool.longPosition
-            : DrawingTool.shortPosition;
-        _draftStart = null;
-      });
+    if (action == 'short') {
+      _addPosition(PositionSide.short);
       return;
     }
-    if (action == 'apply-position') {
-      final position = _selectedPosition;
-      if (position == null) return;
-      setState(() {
-        _entry = position.entry;
-        _stop = position.stop;
-        _take = position.target;
-        _entryTime =
-            DateTime.fromMillisecondsSinceEpoch(position.startMs, isUtc: true);
-        _selectionDirection =
-            position.side == PositionSide.short ? 'SELL' : 'BUY';
-      });
-      // The confirm sheet is the last step, exactly as it is for pinned levels.
-      await _confirmLevels();
+    if (action == 'trend') {
+      _addTrend();
       return;
     }
-    if (action == 'delete') {
-      final index = _selectedDrawing;
-      if (index != null) _deleteDrawing(index);
+    if (action == 'ray') {
+      _addRay();
       return;
     }
     if (action == 'undo' && _drawings.isNotEmpty) {
@@ -1232,17 +1220,85 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       return;
     }
     if (action == 'clear') {
-      setState(() => _draftStart = null);
       _commitDrawings(const []);
       return;
     }
-    if (action == 'off') {
-      setState(() {
-        _drawingTool = DrawingTool.none;
-        _draftStart = null;
-      });
+    if (!hasSelection) return;
+    if (action == 'edit') {
+      await _editDrawing(selected);
+      return;
     }
+    if (action == 'clone') {
+      _cloneDrawing(selected);
+      return;
+    }
+    if (action == 'delete') _deleteDrawing(selected);
   }
+
+  /// One tile in the tools hub: an icon, a name and what it does.
+  Widget _toolCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+    Color? tone,
+  }) {
+    final color = tone ?? AppColors.text;
+    return Material(
+      color: AppColors.surfaceAlt,
+      borderRadius: BorderRadius.circular(AppRadius.field),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.field),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 21, color: color),
+              const SizedBox(height: 7),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.faint,
+                  fontSize: 9,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sheetLabel(String text) => Text(
+        text,
+        style: TextStyle(
+          color: AppColors.faint,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.1,
+        ),
+      );
 
   /// A starting stop distance for a new position tool: two average candle
   /// ranges, floored so a quiet five-minute chart still gets a visible box, and
@@ -1260,9 +1316,61 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     return (average * 2).clamp(price * 0.0005, price * 0.03).toDouble();
   }
 
-  /// Adds a position tool and selects it, so its handles are visible without a
+  /// Places a long or short position box across the recent candles.
+  ///
+  /// The tool used to arm a mode and create the box wherever the trader tapped,
+  /// so a stray tap marked a point. Now the tool places the box itself: the
+  /// levels are on screen at once and the trader drags them, the way
+  /// TradingView's position tool behaves.
+  ///
+  /// The box ends on the newest candle instead of running right forever. A
+  /// calibration is a record of the move it was drawn on, not a level projected
+  /// across the days that come after it.
+  void _addPosition(PositionSide side) {
+    final candles = _visibleCandles;
+    if (candles.isEmpty) return;
+    final last = candles.last;
+    final from = (candles.length - 24).clamp(0, candles.length - 1);
+    final risk = _defaultRisk(last.close);
+    final long = side == PositionSide.long;
+    _addDrawing(
+      ChartDrawing.position(
+        side: side,
+        startMs: candles[from].time.millisecondsSinceEpoch,
+        endMs: last.time.millisecondsSinceEpoch,
+        entry: last.close,
+        stop: long ? last.close - risk : last.close + risk,
+        target: long ? last.close + risk * 2 : last.close - risk * 2,
+      ),
+    );
+  }
+
+  /// A trend line across the recent window, ready to be dragged into place.
+  void _addTrend() {
+    final candles = _visibleCandles;
+    if (candles.length < 2) return;
+    final last = candles.last;
+    final from = (candles.length - 24).clamp(0, candles.length - 1);
+    _addDrawing(
+      ChartDrawing.trend(
+        startMs: candles[from].time.millisecondsSinceEpoch,
+        startPrice: candles[from].close,
+        endMs: last.time.millisecondsSinceEpoch,
+        endPrice: last.close,
+      ),
+    );
+  }
+
+  /// A horizontal ray at the last price.
+  void _addRay() {
+    final last = _lastVisible;
+    if (last == null) return;
+    _addDrawing(ChartDrawing.ray(price: last.close));
+  }
+
+  /// Adds a drawing and selects it, so its handles are visible without a
   /// second tap — the levels are the point of the tool.
-  void _addPosition(ChartDrawing drawing) {
+  void _addDrawing(ChartDrawing drawing) {
     final next = [..._drawings, drawing];
     setState(() {
       _drawings = next;
@@ -1271,52 +1379,537 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
   }
 
-  /// A tap in drawing mode: rays and positions are immediate, trend lines take
-  /// two taps. The point is stored as a candle time so it survives a new window
-  /// or session.
-  void _onDraw(double index, double price) {
-    if (_candles.isEmpty) return;
-    final candle = _candles[index.round().clamp(0, _candles.length - 1)];
-    final timeMs = candle.time.millisecondsSinceEpoch;
-    if (_drawingTool == DrawingTool.ray) {
-      _commitDrawings([..._drawings, ChartDrawing.ray(price: price)]);
-      return;
-    }
-    if (_drawingTool == DrawingTool.longPosition ||
-        _drawingTool == DrawingTool.shortPosition) {
-      final long = _drawingTool == DrawingTool.longPosition;
-      final risk = _defaultRisk(price);
-      _addPosition(
-        ChartDrawing.position(
-          side: long ? PositionSide.long : PositionSide.short,
-          startMs: timeMs,
-          entry: price,
-          stop: long ? price - risk : price + risk,
-          target: long ? price + risk * 2 : price - risk * 2,
+  /// Copies a drawing, nudged a fraction of its own risk so the copy is visible
+  /// next to the original instead of hidden under it.
+  void _cloneDrawing(int index) {
+    if (index < 0 || index >= _drawings.length) return;
+    final source = _drawings[index];
+    final last = _lastVisible;
+    final base = last?.close ?? source.entry ?? source.startPrice;
+    final nudge = _defaultRisk(base) * 0.3;
+
+    final copy = switch (source.kind) {
+      DrawingKind.ray =>
+        ChartDrawing.ray(price: (source.price ?? base) + nudge),
+      DrawingKind.trend => ChartDrawing.trend(
+          startMs: source.startMs,
+          startPrice: source.startPrice + nudge,
+          endMs: source.endMs,
+          endPrice: source.endPrice + nudge,
         ),
-      );
-      setState(() {
-        _drawingTool = DrawingTool.none;
-        _draftStart = null;
-      });
-      return;
+      DrawingKind.position => ChartDrawing.position(
+          side: source.side ?? PositionSide.long,
+          startMs: source.startMs,
+          endMs: source.endMs,
+          entry: (source.entry ?? base) + nudge,
+          stop: (source.stop ?? base) + nudge,
+          target: (source.target ?? base) + nudge,
+        ),
+    };
+    _addDrawing(copy);
+  }
+
+  String _drawingTitle(ChartDrawing drawing) {
+    switch (drawing.kind) {
+      case DrawingKind.ray:
+        return 'Horizontal ray';
+      case DrawingKind.trend:
+        return 'Trend line';
+      case DrawingKind.position:
+        return drawing.side == PositionSide.short
+            ? 'Short position'
+            : 'Long position';
     }
-    if (_drawingTool != DrawingTool.trend) return;
-    final start = _draftStart;
-    if (start == null) {
-      setState(() => _draftStart = DrawingDraft(timeMs: timeMs, price: price));
-      return;
-    }
-    _commitDrawings([
-      ..._drawings,
-      ChartDrawing.trend(
-        startMs: start.timeMs,
-        startPrice: start.price,
-        endMs: timeMs,
-        endPrice: price,
+  }
+
+  String _positionSummary(ChartDrawing drawing) {
+    final decimals = widget.instrument.decimals;
+    final entry = drawing.entry;
+    final stop = drawing.stop;
+    final target = drawing.target;
+    final risk = drawing.rewardRatio;
+    String fmt(double? value) =>
+        value == null ? '—' : value.toStringAsFixed(decimals);
+    return 'Entry ${fmt(entry)} · Stop ${fmt(stop)} · Target ${fmt(target)}'
+        '${risk == null ? '' : ' · ${risk.toStringAsFixed(1)}R'}';
+  }
+
+  /// What tapping an object offers: TradingView's edit, clone and delete.
+  Future<void> _openDrawingActions(int index) async {
+    if (index < 0 || index >= _drawings.length) return;
+    final drawing = _drawings[index];
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _drawingTitle(drawing),
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+              if (drawing.isPosition) ...[
+                Text(
+                  _positionSummary(drawing),
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: _toolCard(
+                      icon: Icons.edit_outlined,
+                      label: 'Edit',
+                      subtitle: 'Set levels',
+                      onTap: () => Navigator.of(sheetContext).pop('edit'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _toolCard(
+                      icon: Icons.copy_all_outlined,
+                      label: 'Clone',
+                      subtitle: 'Copy it',
+                      onTap: () => Navigator.of(sheetContext).pop('clone'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _toolCard(
+                      icon: Icons.delete_outline,
+                      label: 'Delete',
+                      subtitle: 'Remove',
+                      tone: AppColors.danger,
+                      onTap: () => Navigator.of(sheetContext).pop('delete'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
-    ]);
-    setState(() => _draftStart = null);
+    );
+    if (!mounted || action == null) return;
+    if (action == 'edit') {
+      await _editDrawing(index);
+      return;
+    }
+    if (action == 'clone') {
+      _cloneDrawing(index);
+      return;
+    }
+    if (action == 'delete') _deleteDrawing(index);
+  }
+
+  /// The object's settings: its prices, and for a position its side. Times are
+  /// still moved by dragging on the chart, where they can be seen against the
+  /// candles.
+  Future<void> _editDrawing(int index) async {
+    if (index < 0 || index >= _drawings.length) return;
+    final drawing = _drawings[index];
+    final decimals = widget.instrument.decimals;
+    String fmt(double value) => value.toStringAsFixed(decimals);
+
+    final priceFields = <String, TextEditingController>{};
+    if (drawing.kind == DrawingKind.ray) {
+      priceFields['Price'] = TextEditingController(
+        text: fmt(drawing.price ?? 0),
+      );
+    } else if (drawing.isPosition) {
+      priceFields['Entry'] = TextEditingController(
+        text: fmt(drawing.entry ?? 0),
+      );
+      priceFields['Stop'] = TextEditingController(
+        text: fmt(drawing.stop ?? 0),
+      );
+      priceFields['Target'] = TextEditingController(
+        text: fmt(drawing.target ?? 0),
+      );
+    } else {
+      priceFields['Start price'] = TextEditingController(
+        text: fmt(drawing.startPrice),
+      );
+      priceFields['End price'] = TextEditingController(
+        text: fmt(drawing.endPrice),
+      );
+    }
+    var side = drawing.side ?? PositionSide.long;
+
+    double read(String label, double fallback) {
+      final raw = priceFields[label]?.text.trim() ?? '';
+      final value = double.tryParse(raw);
+      return value == null || value <= 0 ? fallback : value;
+    }
+
+    final edited = await showModalBottomSheet<ChartDrawing>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void flip(PositionSide next) {
+              if (next == side) return;
+              side = next;
+              // Flipping the side mirrors the levels, so the box keeps the same
+              // risk and reward instead of pointing the stop and target the
+              // wrong way round.
+              final mirrored = drawing.withSide(next);
+              if (mirrored.entry != null) {
+                priceFields['Entry']!.text = fmt(mirrored.entry!);
+              }
+              if (mirrored.stop != null) {
+                priceFields['Stop']!.text = fmt(mirrored.stop!);
+              }
+              if (mirrored.target != null) {
+                priceFields['Target']!.text = fmt(mirrored.target!);
+              }
+              setSheetState(() {});
+            }
+
+            ChartDrawing build() {
+              if (drawing.kind == DrawingKind.ray) {
+                return ChartDrawing.ray(
+                  price: read('Price', drawing.price ?? 0),
+                );
+              }
+              if (drawing.isPosition) {
+                return ChartDrawing.position(
+                  side: side,
+                  startMs: drawing.startMs,
+                  endMs: drawing.endMs,
+                  entry: read('Entry', drawing.entry ?? 0),
+                  stop: read('Stop', drawing.stop ?? 0),
+                  target: read('Target', drawing.target ?? 0),
+                );
+              }
+              return ChartDrawing.trend(
+                startMs: drawing.startMs,
+                startPrice: read('Start price', drawing.startPrice),
+                endMs: drawing.endMs,
+                endPrice: read('End price', drawing.endPrice),
+              );
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Edit ${_drawingTitle(drawing).toLowerCase()}',
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (drawing.isPosition) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _sideChip(
+                                label: 'Long',
+                                selected: side == PositionSide.long,
+                                color: AppColors.success,
+                                onTap: () => flip(PositionSide.long),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _sideChip(
+                                label: 'Short',
+                                selected: side == PositionSide.short,
+                                color: AppColors.danger,
+                                onTap: () => flip(PositionSide.short),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      for (final field in priceFields.entries) ...[
+                        Text(
+                          field.key,
+                          style: TextStyle(
+                            color: AppColors.faint,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: field.value,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      Text(
+                        'Times are moved by dragging the object on the chart.',
+                        style: TextStyle(
+                          color: AppColors.faint,
+                          fontSize: 10,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () =>
+                                  Navigator.of(sheetContext).pop(build()),
+                              child: const Text('Save'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    for (final controller in priceFields.values) {
+      controller.dispose();
+    }
+    if (edited == null || !mounted) return;
+    final next = [..._drawings];
+    next[index] = edited;
+    setState(() {
+      _drawings = next;
+      _selectedDrawing = index;
+    });
+    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+  }
+
+  Widget _sideChip({
+    required String label,
+    required bool selected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected ? color.withAlpha(38) : AppColors.surfaceAlt,
+      borderRadius: BorderRadius.circular(AppRadius.field),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        onTap: onTap,
+        child: Container(
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.field),
+            border: Border.all(
+              color: selected ? color : AppColors.border,
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? color : AppColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The position tool the BUY/SELL buttons act on: the selected box, or the
+  /// most recent one when nothing is selected.
+  ({int index, ChartDrawing drawing})? _activePosition() {
+    final selected = _selectedDrawing;
+    if (selected != null &&
+        selected >= 0 &&
+        selected < _drawings.length &&
+        _drawings[selected].isPosition) {
+      return (index: selected, drawing: _drawings[selected]);
+    }
+    for (var i = _drawings.length - 1; i >= 0; i--) {
+      if (_drawings[i].isPosition) return (index: i, drawing: _drawings[i]);
+    }
+    return null;
+  }
+
+  /// BUY or SELL: points the calibration the way the button says and carries
+  /// its entry, stop and target into the trade form.
+  Future<void> _tradeFromDrawing(PositionSide side) async {
+    final active = _activePosition();
+    if (active == null) return;
+    final drawing = active.drawing.withSide(side);
+    final next = [..._drawings];
+    next[active.index] = drawing;
+    setState(() {
+      _drawings = next;
+      _selectedDrawing = active.index;
+      _entry = drawing.entry;
+      _stop = drawing.stop;
+      _take = drawing.target;
+      _entryTime = DateTime.fromMillisecondsSinceEpoch(
+        drawing.startMs,
+        isUtc: true,
+      );
+      _selectionDirection = side == PositionSide.short ? 'SELL' : 'BUY';
+    });
+    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+    await _confirmLevels();
+  }
+
+  /// The BUY / SELL bar that sits under the chart.
+  ///
+  /// Docked rather than floating: a button over the candles hid the bars it was
+  /// meant to trade and sat under the thumb while panning. Full width keeps the
+  /// tap that turns a calibration into a trade the largest target on screen.
+  Widget _tradeBar() {
+    final active = _activePosition();
+    final ready = active != null && !_loading && _error == null;
+    final price = active?.drawing.entry;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: _style.background,
+        border: Border(top: BorderSide(color: _style.grid.withAlpha(110))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _tradeButton(
+              label: 'SELL',
+              price: price,
+              color: AppColors.danger,
+              enabled: ready,
+              onTap: () => _tradeFromDrawing(PositionSide.short),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _tradeButton(
+              label: 'BUY',
+              price: price,
+              color: AppColors.success,
+              enabled: ready,
+              onTap: () => _tradeFromDrawing(PositionSide.long),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tradeButton({
+    required String label,
+    required double? price,
+    required Color color,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    final decimals = widget.instrument.decimals;
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.field),
+          onTap: enabled ? onTap : null,
+          child: Container(
+            height: 46,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  if (price != null) ...[
+                    const SizedBox(width: 7),
+                    Text(
+                      price.toStringAsFixed(decimals),
+                      style: TextStyle(
+                        color: AppColors.ink.withAlpha(180),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _toggleFullscreen() {
@@ -1327,55 +1920,92 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     );
   }
 
+  /// Picks the clock the chart is drawn in. The device clock is the default;
+  /// every IANA zone the bundled database knows is searchable.
+  Future<ChartZone?> _pickZone(ChartZone current) {
+    return showModalBottomSheet<ChartZone>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (_) => _ZoneSheet(current: current),
+    );
+  }
+
   Future<void> _openStyleSheet() async {
+    var page = _SettingsPage.home;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
-      builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return _styleSheet(
-              _style,
-              (next) {
-                ChartStyle.current = next;
-                // Persist in the background; the sheet repaints immediately. The
-                // per-instrument layout is what reopening this symbol restores.
-                unawaited(ChartStyle.save());
-                unawaited(
-                  ChartStyle.saveLayout(widget.instrument.symbol, next),
-                );
-                if (!mounted) return;
-                _style = next;
-                setSheetState(() {});
-                setState(() {});
-              },
-              onClose: () => Navigator.of(context).pop(),
-            );
-          },
+      builder: (sheetContext) {
+        return SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.92,
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              return _styleSheet(
+                _style,
+                (next) {
+                  ChartStyle.current = next;
+                  // Persist in the background; the sheet repaints immediately. The
+                  // per-instrument layout is what reopening this symbol restores.
+                  unawaited(ChartStyle.save());
+                  unawaited(
+                    ChartStyle.saveLayout(widget.instrument.symbol, next),
+                  );
+                  if (!mounted) return;
+                  _style = next;
+                  setSheetState(() {});
+                  setState(() {});
+                },
+                page: page,
+                onNavigate: (next) => setSheetState(() => page = next),
+                onClose: () => Navigator.of(context).pop(),
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  /// The chart style sheet.
-  ///
-  /// Settings are grouped into cards — theme, chart type, indicators, colours,
-  /// sessions, display — because the previous flat column was one long list of
-  /// switches with section labels lost between them. Within a card the rows
-  /// share one rhythm and hairline dividers, and a control that only belongs to
-  /// the switch above it (a study's period, an indicator's lengths) tucks under
-  /// that row instead of sitting loose in the list.
+  /// The chart settings sheet, laid out the way TradingView does it: a short
+  /// list of groups that open into a page of their own, every row naming the
+  /// setting with its live value on the right. The previous sheet was one long
+  /// scroll of switches, so finding a setting meant hunting by feel; the group
+  /// list is the map.
   Widget _styleSheet(
     ChartStyle style,
     ValueChanged<ChartStyle> onChanged, {
+    required _SettingsPage page,
+    required ValueChanged<_SettingsPage> onNavigate,
     required VoidCallback onClose,
   }) {
-    final studies = style.studies;
     return SafeArea(
       top: false,
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        children: [
+          _settingsHeader(page, onNavigate, onClose),
+          Flexible(
+            child: page == _SettingsPage.home
+                ? _settingsHome(style, onChanged, onNavigate)
+                : _settingsBody(page, style, onChanged),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsHeader(
+    _SettingsPage page,
+    ValueChanged<_SettingsPage> onNavigate,
+    VoidCallback onClose,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Column(
         children: [
           const SizedBox(height: 8),
           Container(
@@ -1387,322 +2017,44 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 6, 2),
+            padding: const EdgeInsets.fromLTRB(4, 2, 8, 2),
             child: Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Chart style',
-                        style: TextStyle(
-                          color: AppColors.text,
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${widget.instrument.symbol} · remembered for this market',
-                        style: TextStyle(
-                          color: AppColors.faint,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                IconButton(
+                  tooltip: page == _SettingsPage.home ? 'Close' : 'Back',
+                  onPressed: page == _SettingsPage.home
+                      ? onClose
+                      : () => onNavigate(_SettingsPage.home),
+                  icon: Icon(
+                    page == _SettingsPage.home ? Icons.close : Icons.arrow_back,
+                    size: 20,
+                    color: AppColors.text,
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: () => onChanged(ChartStyle.ink),
-                  icon: const Icon(Icons.restart_alt, size: 16),
-                  label: const Text('Reset'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.muted,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    textStyle: const TextStyle(
-                      fontSize: 12.5,
+                Expanded(
+                  child: Text(
+                    page.title,
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ),
+                TextButton(
+                  onPressed: onClose,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primaryLight,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    textStyle: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child: const Text('Done'),
+                ),
               ],
-            ),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SettingsSection(
-                    title: 'Theme',
-                    trailing: style.name,
-                    children: [
-                      // Wraps instead of squeezing: five presets in one row
-                      // left each swatch too narrow to read.
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final preset in ChartStyle.presets)
-                            _ThemeSwatch(
-                              style: preset,
-                              selected: preset.id == style.id &&
-                                  preset.bull == style.bull &&
-                                  preset.bear == style.bear,
-                              onTap: () => onChanged(preset),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  SettingsSection(
-                    title: 'Chart type',
-                    children: [
-                      _segmented(
-                        selected: style.chartType,
-                        options: [
-                          for (final type in ChartType.values)
-                            (value: type, label: type.label),
-                        ],
-                        onSelect: (type) =>
-                            onChanged(style.copyWith(chartType: type)),
-                      ),
-                    ],
-                  ),
-                  SettingsSection(
-                    title: 'Indicators',
-                    trailing: studies.isEmpty ? 'none' : '${studies.length} on',
-                    children: [
-                      for (final study in OverlayStudy.values) ...[
-                        _switchRow(
-                          studyLabel(
-                            study,
-                            period: style.periodFor(study),
-                          ),
-                          studies.contains(study),
-                          (value) => onChanged(
-                            style.copyWith(
-                              studies: value
-                                  ? {...studies, study}
-                                  : ({...studies}..remove(study)),
-                            ),
-                          ),
-                        ),
-                        if (studies.contains(study))
-                          _tucked(
-                            _labelledControl(
-                              'Period',
-                              _stepper(
-                                value: style.periodFor(study),
-                                min: 2,
-                                max: 400,
-                                onChanged: (value) => onChanged(
-                                  style.copyWith(
-                                    studyPeriods: {
-                                      ...style.studyPeriods,
-                                      study.name: value,
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                      _switchRow(
-                        'Volume',
-                        style.showVolume,
-                        (value) => onChanged(style.copyWith(showVolume: value)),
-                      ),
-                      const SizedBox(height: 6),
-                      _subLabel('Lower pane'),
-                      const SizedBox(height: 6),
-                      _segmented(
-                        selected: style.oscillator,
-                        options: [
-                          for (final oscillator in Oscillator.values)
-                            (value: oscillator, label: oscillator.label),
-                        ],
-                        onSelect: (oscillator) => onChanged(
-                          style.copyWith(oscillator: oscillator),
-                        ),
-                      ),
-                      if (style.oscillator == Oscillator.rsi)
-                        _tucked(
-                          _labelledControl(
-                            'RSI period',
-                            _stepper(
-                              value: style.rsiPeriod,
-                              min: 2,
-                              max: 100,
-                              onChanged: (value) => onChanged(
-                                style.copyWith(rsiPeriod: value),
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (style.oscillator == Oscillator.macd) ...[
-                        _tucked(
-                          _labelledControl(
-                            'Fast',
-                            _stepper(
-                              value: style.macdFast,
-                              min: 2,
-                              max: 60,
-                              onChanged: (value) => onChanged(
-                                style.copyWith(macdFast: value),
-                              ),
-                            ),
-                          ),
-                        ),
-                        _tucked(
-                          _labelledControl(
-                            'Slow',
-                            _stepper(
-                              value: style.macdSlow,
-                              min: 3,
-                              max: 120,
-                              onChanged: (value) => onChanged(
-                                style.copyWith(macdSlow: value),
-                              ),
-                            ),
-                          ),
-                        ),
-                        _tucked(
-                          _labelledControl(
-                            'Signal',
-                            _stepper(
-                              value: style.macdSignal,
-                              min: 2,
-                              max: 60,
-                              onChanged: (value) => onChanged(
-                                style.copyWith(macdSignal: value),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  SettingsSection(
-                    title: 'Candle colours',
-                    children: [
-                      _colorRow('Up', style.bull, (color) {
-                        onChanged(style.copyWith(bull: color));
-                      }),
-                      _colorRow('Down', style.bear, (color) {
-                        onChanged(style.copyWith(bear: color));
-                      }),
-                    ],
-                  ),
-                  SettingsSection(
-                    title: 'Sessions',
-                    children: [
-                      _switchRow(
-                        'Session shading',
-                        style.showSessions,
-                        (value) =>
-                            onChanged(style.copyWith(showSessions: value)),
-                      ),
-                      if (style.showSessions)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              for (final session in TradingSession.values)
-                                _StylePill(
-                                  label: session.label,
-                                  selected: style.sessions.contains(session),
-                                  accent: session.tint,
-                                  onTap: () {
-                                    final next = <TradingSession>{
-                                      ...style.sessions,
-                                    };
-                                    if (next.contains(session)) {
-                                      next.remove(session);
-                                    } else {
-                                      next.add(session);
-                                    }
-                                    onChanged(style.copyWith(sessions: next));
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-                      _hairline(),
-                      _switchRow(
-                        'Session break lines',
-                        style.showSessionBreaks,
-                        (value) => onChanged(
-                          style.copyWith(showSessionBreaks: value),
-                        ),
-                      ),
-                      _hairline(),
-                      _switchRow(
-                        'Period separators',
-                        style.showSeparators,
-                        (value) =>
-                            onChanged(style.copyWith(showSeparators: value)),
-                      ),
-                      if (style.showSeparators)
-                        _tucked(
-                          _segmented(
-                            selected: style.separatorGrain,
-                            options: [
-                              for (final grain in SeparatorGrain.values)
-                                (value: grain, label: grain.label),
-                            ],
-                            onSelect: (grain) => onChanged(
-                              style.copyWith(separatorGrain: grain),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  SettingsSection(
-                    title: 'Display',
-                    children: [
-                      _switchRow(
-                        'Grid lines',
-                        style.showGrid,
-                        (value) => onChanged(style.copyWith(showGrid: value)),
-                      ),
-                      _hairline(),
-                      _switchRow(
-                        'Crosshair',
-                        style.showCrosshair,
-                        (value) =>
-                            onChanged(style.copyWith(showCrosshair: value)),
-                      ),
-                      _hairline(),
-                      _switchRow(
-                        'Watermark',
-                        style.showWatermark,
-                        (value) =>
-                            onChanged(style.copyWith(showWatermark: value)),
-                      ),
-                      _hairline(),
-                      _switchRow(
-                        'Logarithmic price axis',
-                        style.logScale,
-                        (value) => onChanged(style.copyWith(logScale: value)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-            child: ElevatedButton(
-              onPressed: onClose,
-              child: const Text('Done'),
             ),
           ),
         ],
@@ -1710,11 +2062,629 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     );
   }
 
-  Widget _hairline() => Container(
-        height: 1,
-        margin: const EdgeInsets.symmetric(vertical: 1),
-        color: AppColors.border.withAlpha(130),
+  Widget _settingsHome(
+    ChartStyle style,
+    ValueChanged<ChartStyle> onChanged,
+    ValueChanged<_SettingsPage> onNavigate,
+  ) {
+    final studies = style.studies;
+    return ListView(
+      padding: const EdgeInsets.only(top: 4, bottom: 26),
+      children: [
+        _settingsEntry(
+          _SettingsPage.appearance,
+          Icons.palette_outlined,
+          '${style.chartType.label} · ${style.name}',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
+          _SettingsPage.scales,
+          Icons.straighten,
+          style.logScale ? 'Logarithmic' : 'Linear',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
+          _SettingsPage.grid,
+          Icons.grid_4x4,
+          style.showGrid ? 'On' : 'Off',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
+          _SettingsPage.watermark,
+          Icons.branding_watermark_outlined,
+          style.showWatermark ? 'On' : 'Off',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
+          _SettingsPage.events,
+          Icons.event_note_outlined,
+          _eventsSummary(style),
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
+          _SettingsPage.indicators,
+          Icons.show_chart,
+          studies.isEmpty ? 'None' : '${studies.length} on',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
+          _SettingsPage.timeZone,
+          Icons.schedule,
+          style.zone.describe(),
+          onNavigate,
+        ),
+        const SizedBox(height: 22),
+        _settingsDivider(),
+        _settingsAction(
+          'Reset settings',
+          Icons.restart_alt,
+          onTap: () => onChanged(ChartStyle.ink.copyWith(zoneId: style.zoneId)),
+        ),
+      ],
+    );
+  }
+
+  String _eventsSummary(ChartStyle style) {
+    final parts = <String>[
+      if (style.showSessions) 'Sessions',
+      if (style.showSeparators) '${style.separatorGrain.label} lines',
+    ];
+    return parts.isEmpty ? 'Off' : parts.join(' · ');
+  }
+
+  Widget _settingsEntry(
+    _SettingsPage page,
+    IconData icon,
+    String value,
+    ValueChanged<_SettingsPage> onNavigate,
+  ) {
+    return _settingsRow(
+      title: page.title,
+      value: value,
+      leading: Icon(icon, size: 20, color: AppColors.muted),
+      onTap: () => onNavigate(page),
+    );
+  }
+
+  Widget _settingsBody(
+    _SettingsPage page,
+    ChartStyle style,
+    ValueChanged<ChartStyle> onChanged,
+  ) {
+    switch (page) {
+      case _SettingsPage.appearance:
+        return _appearanceSettings(style, onChanged);
+      case _SettingsPage.scales:
+        return _scalesSettings(style, onChanged);
+      case _SettingsPage.grid:
+        return _gridSettings(style, onChanged);
+      case _SettingsPage.watermark:
+        return _watermarkSettings(style, onChanged);
+      case _SettingsPage.events:
+        return _eventsSettings(style, onChanged);
+      case _SettingsPage.indicators:
+        return _indicatorSettings(style, onChanged);
+      case _SettingsPage.timeZone:
+        return _timeZoneSettings(style, onChanged);
+      case _SettingsPage.home:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _appearanceSettings(
+    ChartStyle style,
+    ValueChanged<ChartStyle> onChanged,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Theme'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final preset in ChartStyle.presets)
+                _ThemeSwatch(
+                  style: preset,
+                  selected: preset.id == style.id &&
+                      preset.bull == style.bull &&
+                      preset.bear == style.bear,
+                  onTap: () => onChanged(preset),
+                ),
+            ],
+          ),
+        ),
+        _settingsGroupLabel('Chart'),
+        _settingsControlRow(
+          'Chart type',
+          _segmented(
+            selected: style.chartType,
+            options: [
+              for (final type in ChartType.values)
+                (value: type, label: type.label),
+            ],
+            onSelect: (type) => onChanged(style.copyWith(chartType: type)),
+          ),
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Volume',
+          subtitle: 'Traded size under the candles',
+          value: style.showVolume,
+          onChanged: (value) => onChanged(style.copyWith(showVolume: value)),
+        ),
+        _settingsGroupLabel('Candle colours'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _colorRow('Up', style.bull, (color) {
+            onChanged(style.copyWith(bull: color));
+          }),
+        ),
+        _settingsDivider(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _colorRow('Down', style.bear, (color) {
+            onChanged(style.copyWith(bear: color));
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _scalesSettings(ChartStyle style, ValueChanged<ChartStyle> onChanged) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Price axis'),
+        _settingsSwitch(
+          'Logarithmic price axis',
+          subtitle: 'Equal percentage moves take equal room, which is how '
+              'index and crypto charts are read.',
+          value: style.logScale,
+          onChanged: (value) => onChanged(style.copyWith(logScale: value)),
+        ),
+        _settingsDivider(),
+        _settingsRow(
+          title: 'Scale position',
+          subtitle: 'The price axis sits on the right, as on TradingView.',
+          value: 'Right',
+        ),
+      ],
+    );
+  }
+
+  Widget _gridSettings(ChartStyle style, ValueChanged<ChartStyle> onChanged) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Grid'),
+        _settingsSwitch(
+          'Grid lines',
+          subtitle: 'Horizontal price lines and vertical time lines.',
+          value: style.showGrid,
+          onChanged: (value) => onChanged(style.copyWith(showGrid: value)),
+        ),
+      ],
+    );
+  }
+
+  Widget _watermarkSettings(
+    ChartStyle style,
+    ValueChanged<ChartStyle> onChanged,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Watermark'),
+        _settingsSwitch(
+          'Symbol watermark',
+          subtitle: 'A faint ticker behind the candles, easy to read off a '
+              'screenshot.',
+          value: style.showWatermark,
+          onChanged: (value) => onChanged(style.copyWith(showWatermark: value)),
+        ),
+      ],
+    );
+  }
+
+  Widget _eventsSettings(ChartStyle style, ValueChanged<ChartStyle> onChanged) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Sessions'),
+        _settingsSwitch(
+          'Session shading',
+          subtitle: 'Bands for the UTC trading sessions.',
+          value: style.showSessions,
+          onChanged: (value) => onChanged(style.copyWith(showSessions: value)),
+        ),
+        if (style.showSessions)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final session in TradingSession.values)
+                  _StylePill(
+                    label: session.label,
+                    selected: style.sessions.contains(session),
+                    accent: session.tint,
+                    onTap: () {
+                      final next = <TradingSession>{...style.sessions};
+                      if (next.contains(session)) {
+                        next.remove(session);
+                      } else {
+                        next.add(session);
+                      }
+                      onChanged(style.copyWith(sessions: next));
+                    },
+                  ),
+              ],
+            ),
+          ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Session break lines',
+          subtitle: 'A rule where one session hands over to the next.',
+          value: style.showSessionBreaks,
+          onChanged: (value) =>
+              onChanged(style.copyWith(showSessionBreaks: value)),
+        ),
+        _settingsGroupLabel('Periods'),
+        _settingsSwitch(
+          'Period separators',
+          subtitle: 'A rule where a new day, week or month starts.',
+          value: style.showSeparators,
+          onChanged: (value) =>
+              onChanged(style.copyWith(showSeparators: value)),
+        ),
+        if (style.showSeparators)
+          _settingsControlRow(
+            'Separator period',
+            _segmented(
+              selected: style.separatorGrain,
+              options: [
+                for (final grain in SeparatorGrain.values)
+                  (value: grain, label: grain.label),
+              ],
+              onSelect: (grain) =>
+                  onChanged(style.copyWith(separatorGrain: grain)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _indicatorSettings(
+    ChartStyle style,
+    ValueChanged<ChartStyle> onChanged,
+  ) {
+    final studies = style.studies;
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Overlays'),
+        for (final study in OverlayStudy.values) ...[
+          _settingsSwitch(
+            studyLabel(study, period: style.periodFor(study)),
+            value: studies.contains(study),
+            onChanged: (value) => onChanged(
+              style.copyWith(
+                studies:
+                    value ? {...studies, study} : ({...studies}..remove(study)),
+              ),
+            ),
+          ),
+          if (studies.contains(study))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              child: _labelledControl(
+                'Period',
+                _stepper(
+                  value: style.periodFor(study),
+                  min: 2,
+                  max: 400,
+                  onChanged: (value) => onChanged(
+                    style.copyWith(
+                      studyPeriods: {
+                        ...style.studyPeriods,
+                        study.name: value,
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          _settingsDivider(),
+        ],
+        _settingsGroupLabel('Lower pane'),
+        _settingsControlRow(
+          'Oscillator',
+          _segmented(
+            selected: style.oscillator,
+            options: [
+              for (final oscillator in Oscillator.values)
+                (value: oscillator, label: oscillator.label),
+            ],
+            onSelect: (oscillator) =>
+                onChanged(style.copyWith(oscillator: oscillator)),
+          ),
+        ),
+        if (style.oscillator == Oscillator.rsi)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: _labelledControl(
+              'RSI period',
+              _stepper(
+                value: style.rsiPeriod,
+                min: 2,
+                max: 100,
+                onChanged: (value) =>
+                    onChanged(style.copyWith(rsiPeriod: value)),
+              ),
+            ),
+          ),
+        if (style.oscillator == Oscillator.macd) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: _labelledControl(
+              'Fast',
+              _stepper(
+                value: style.macdFast,
+                min: 2,
+                max: 60,
+                onChanged: (value) =>
+                    onChanged(style.copyWith(macdFast: value)),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: _labelledControl(
+              'Slow',
+              _stepper(
+                value: style.macdSlow,
+                min: 3,
+                max: 120,
+                onChanged: (value) =>
+                    onChanged(style.copyWith(macdSlow: value)),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: _labelledControl(
+              'Signal',
+              _stepper(
+                value: style.macdSignal,
+                min: 2,
+                max: 60,
+                onChanged: (value) =>
+                    onChanged(style.copyWith(macdSignal: value)),
+              ),
+            ),
+          ),
+        ],
+        _settingsDivider(),
+        _settingsSwitch(
+          'Crosshair',
+          subtitle: 'The tracking line and its price tag.',
+          value: style.showCrosshair,
+          onChanged: (value) => onChanged(style.copyWith(showCrosshair: value)),
+        ),
+      ],
+    );
+  }
+
+  Widget _timeZoneSettings(
+    ChartStyle style,
+    ValueChanged<ChartStyle> onChanged,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Chart clock'),
+        _settingsRow(
+          title: 'Time zone',
+          subtitle: style.zone.describe(),
+          value: 'Change',
+          trailing: Icon(
+            Icons.chevron_right,
+            size: 20,
+            color: AppColors.muted,
+          ),
+          onTap: () async {
+            final zone = await _pickZone(style.zone);
+            if (zone == null) return;
+            onChanged(style.copyWith(zoneId: zone.id));
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+          child: Text(
+            'The price axis and the day, week and month separators follow this '
+            'clock. Session shading stays on UTC market hours, so London opens '
+            'at 07:00 UTC wherever you trade from.',
+            style: TextStyle(
+              color: AppColors.faint,
+              fontSize: 11.5,
+              height: 1.45,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _settingsGroupLabel(String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+        child: Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            color: AppColors.muted,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.9,
+          ),
+        ),
       );
+
+  Widget _settingsDivider() => Container(
+        height: 1,
+        margin: const EdgeInsets.only(left: 20),
+        color: AppColors.border.withAlpha(120),
+      );
+
+  Widget _settingsRow({
+    required String title,
+    String? subtitle,
+    String? value,
+    Widget? leading,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
+        child: Row(
+          children: [
+            if (leading != null) ...[leading, const SizedBox(width: 14)],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: AppColors.faint,
+                        fontSize: 11.5,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (value != null) ...[
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: AppColors.faint,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+            if (trailing != null) ...[const SizedBox(width: 6), trailing],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsSwitch(
+    String title, {
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return _settingsRow(
+      title: title,
+      subtitle: subtitle,
+      onTap: () => onChanged(!value),
+      trailing: SizedBox(
+        width: 48,
+        height: 28,
+        child: FittedBox(
+          child: Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: Colors.white,
+            activeTrackColor: AppColors.primary,
+            inactiveThumbColor: AppColors.muted,
+            inactiveTrackColor: AppColors.surfaceAlt,
+            trackOutlineColor: WidgetStateProperty.all(AppColors.borderStrong),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsControlRow(String title, Widget control) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          control,
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsAction(
+    String title,
+    IconData icon, {
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: AppColors.danger),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: AppColors.danger,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _subLabel(String text) => Text(
         text,
@@ -1724,21 +2694,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           fontWeight: FontWeight.w600,
         ),
       );
-
-  /// A control that only exists because of the row above it, indented under a
-  /// rule so it reads as that row's detail rather than a new setting.
-  Widget _tucked(Widget child) {
-    return Container(
-      margin: const EdgeInsets.only(top: 2, bottom: 6),
-      padding: const EdgeInsets.only(left: 10),
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(color: AppColors.border, width: 2),
-        ),
-      ),
-      child: child,
-    );
-  }
 
   Widget _labelledControl(String label, Widget control) {
     return Padding(
@@ -1843,32 +2798,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       quickPicks: ChartStyle.candlePalette,
     );
     if (picked != null) onPick(picked);
-  }
-
-  Widget _switchRow(String title, bool value, ValueChanged<bool> onChanged) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 44),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                color: AppColors.text,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _chartError({bool expand = false}) {
@@ -2129,7 +3058,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           const SizedBox(width: 5),
           Expanded(
             child: Text(
-              'Drag to scroll · pinch to zoom · tap to set ${_labelFor(_active)} · long-press a line to move it',
+              'Drag to scroll · pinch to zoom · drag a level line to move it'
+              ' · tap an object for edit, clone or delete · '
+              '${_style.zone.describe()}',
               style: TextStyle(
                 color: AppColors.faint,
                 fontSize: 9.5,
@@ -2140,19 +3071,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         ],
       ),
     );
-  }
-
-  String _labelFor(Marker marker) {
-    switch (marker) {
-      case Marker.entry:
-        return 'entry';
-      case Marker.stop:
-        return 'stop';
-      case Marker.take:
-        return 'target';
-      case Marker.exit:
-        return 'exit';
-    }
   }
 
   Widget _disclaimer() {
@@ -2188,7 +3106,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           SectionTitle(
             title: 'Levels',
             subtitle:
-                'Tap a row, then tap the chart where that level sat. Hold a line to move it — for entry the time moves too. Nothing reaches the form until you confirm.',
+                'Drag a line on the chart to place a level — for entry the time moves too. Everything reaches the form only once you confirm.',
             trailing: _entry == null && _stop == null && _take == null
                 ? null
                 : TextButton(
@@ -2423,17 +3341,14 @@ class _ChartCanvas extends StatefulWidget {
     required this.entryTime,
     required this.exitTime,
     required this.onSelect,
-    required this.onPin,
     required this.onLevelMoved,
-    required this.drawTool,
     required this.drawings,
-    required this.draftStart,
     required this.selectedDrawing,
     required this.positionOutcomes,
     required this.onDrawingSelected,
+    required this.onDrawingTapped,
     required this.onDrawingMoved,
     required this.onDrawingMoveEnd,
-    required this.onDraw,
     this.height,
     this.onReachStart,
   });
@@ -2459,17 +3374,16 @@ class _ChartCanvas extends StatefulWidget {
   final DateTime? entryTime;
   final DateTime? exitTime;
   final ValueChanged<Marker> onSelect;
-  final void Function(Marker marker, double price, DateTime time) onPin;
   final void Function(Marker marker, double price, DateTime? time) onLevelMoved;
-  final DrawingTool drawTool;
   final List<ChartDrawing> drawings;
-  final DrawingDraft? draftStart;
   final int? selectedDrawing;
   final List<ResolvedExit?> positionOutcomes;
   final ValueChanged<int?> onDrawingSelected;
+
+  /// A tap landed on an object: the screen offers edit, clone and delete.
+  final ValueChanged<int> onDrawingTapped;
   final void Function(int index, ChartDrawing drawing) onDrawingMoved;
   final VoidCallback onDrawingMoveEnd;
-  final void Function(double index, double price) onDraw;
 
   @override
   State<_ChartCanvas> createState() => _ChartCanvasState();
@@ -2697,29 +3611,23 @@ class _ChartCanvasState extends State<_ChartCanvas>
     if (widget.candles.isEmpty) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     if (plotW <= 0 || local.dx > plotW) return;
-    if (widget.drawTool == DrawingTool.none && widget.selectedDrawing != null) {
-      widget.onDrawingSelected(null);
-    }
-    if (widget.drawTool != DrawingTool.none) {
-      final panes = TradingChartPainter.paneLayout(_size.height, widget.style);
-      if (local.dy < panes.priceTop ||
-          local.dy > panes.priceTop + panes.priceH) {
+    final panes = TradingChartPainter.paneLayout(_size.height, widget.style);
+    final inPricePane =
+        local.dy >= panes.priceTop && local.dy <= panes.priceTop + panes.priceH;
+
+    // A tap can only ever select something. Tools place their own object when
+    // they are picked, so a stray tap never starts a point.
+    if (inPricePane) {
+      final hit = _nearestDrawing(local);
+      if (hit != null) {
+        widget.onDrawingSelected(hit);
+        widget.onDrawingTapped(hit);
         return;
       }
-      final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
-      widget.onDraw(_view.start + ratio * _view.span, _priceFor(local));
-      return;
     }
-    final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
-    final index = _view.indexAt(ratio, widget.candles.length);
-    final time = widget.candles[index].time.toLocal();
-    final price = _priceFor(local);
-    setState(() {
-      _setDraft(widget.active, price);
-      if (widget.active == Marker.entry) _entryTime = time;
-      if (widget.active == Marker.exit) _exitTime = time;
-    });
-    widget.onPin(widget.active, price, time);
+    // Nothing else happens on a tap: levels are set by dragging their handles
+    // or by editing the fields below the chart, never by an accidental touch.
+    if (widget.selectedDrawing != null) widget.onDrawingSelected(null);
   }
 
   void _onScaleStart(ScaleStartDetails details) {
@@ -2882,6 +3790,14 @@ class _ChartCanvasState extends State<_ChartCanvas>
       }
       final left = start == null ? 0.0 : _xForIndex(start, plotW);
       if (local.dx < left - 12) return null;
+      // The box stops at its end time, so a tap beyond its right edge belongs
+      // to the chart and not to the drawing.
+      final endIndex = drawing.endMs > 0
+          ? _indexForTime(drawing.endMs)
+          : widget.candles.length - 1.0;
+      if (endIndex != null && local.dx > _xForIndex(endIndex, plotW) + 12) {
+        return null;
+      }
       var best = double.infinity;
       for (final level in PositionLevel.values) {
         final price = drawing.levelFor(level);
@@ -2945,6 +3861,14 @@ class _ChartCanvasState extends State<_ChartCanvas>
     }
 
     if (original.isPosition) {
+      // The right grip changes how far the calibration runs and leaves the
+      // levels alone.
+      if (_dragEdge) {
+        final endMs = original.endMs > 0
+            ? original.endMs
+            : candles.last.time.millisecondsSinceEpoch;
+        return original.withEnd(shiftTime(endMs));
+      }
       // Grabbing one of the three lines moves only that level; grabbing the box
       // itself moves all of them together, which is how the levels are set.
       final level = _dragLevel;
@@ -2954,6 +3878,12 @@ class _ChartCanvasState extends State<_ChartCanvas>
       return original.shifted(
         priceDelta: priceDelta,
         startMs: shiftTime(original.startMs),
+        // The whole box travels, right edge included.
+        endMs: shiftTime(
+          original.endMs > 0
+              ? original.endMs
+              : candles.last.time.millisecondsSinceEpoch,
+        ),
       );
     }
 
@@ -2986,13 +3916,16 @@ class _ChartCanvasState extends State<_ChartCanvas>
     final drawing = _nearestDrawing(local);
     if (drawing != null) {
       final original = widget.drawings[drawing];
+      final plotW = _size.width - TradingChartPainter.axisWidth;
       setState(() {
         _crosshair = null;
         _drawingIndex = drawing;
         _drawingOriginal = original;
         _dragOrigin = local;
-        _dragLevel =
-            original.isPosition ? _nearestPositionLevel(original, local) : null;
+        _dragEdge = plotW > 0 && _nearRightEdge(original, local, plotW);
+        _dragLevel = original.isPosition && !_dragEdge
+            ? _nearestPositionLevel(original, local)
+            : null;
       });
       widget.onDrawingSelected(drawing);
       return;
@@ -3012,6 +3945,18 @@ class _ChartCanvasState extends State<_ChartCanvas>
   }
 
   PositionLevel? _dragLevel;
+
+  /// True while the finger holds the position box's right grip.
+  bool _dragEdge = false;
+
+  bool _nearRightEdge(ChartDrawing drawing, Offset local, double plotW) {
+    if (!drawing.isPosition) return false;
+    final endIndex = drawing.endMs > 0
+        ? _indexForTime(drawing.endMs)
+        : (widget.candles.isEmpty ? null : widget.candles.length - 1.0);
+    if (endIndex == null) return false;
+    return (local.dx - _xForIndex(endIndex, plotW)).abs() <= 16;
+  }
 
   void _updateDrag(Offset local) {
     final drawing = _drawingOriginal;
@@ -3044,6 +3989,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
         _drawingIndex = null;
         _drawingOriginal = null;
         _dragLevel = null;
+        _dragEdge = false;
       });
       widget.onDrawingMoveEnd();
       return;
@@ -3127,7 +4073,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       chartType: widget.style.chartType,
                       studies: _studies,
                       drawings: widget.drawings,
-                      draftStart: widget.draftStart,
                       selectedDrawing: widget.selectedDrawing,
                       positionOutcomes: widget.positionOutcomes,
                       style: widget.style,
@@ -3566,9 +4511,7 @@ class _LevelRow extends StatelessWidget {
             ),
             Expanded(
               child: Text(
-                price == null
-                    ? 'Tap the chart'
-                    : chartPrice(price!, instrument),
+                price == null ? 'Not set' : chartPrice(price!, instrument),
                 style: tabular.copyWith(
                   color: price == null ? AppColors.faint : color,
                   fontSize: 12,
@@ -3667,7 +4610,6 @@ CustomPainter debugChartPainter({
     chartType: style.chartType,
     studies: const {},
     drawings: const [],
-    draftStart: null,
     style: style,
     symbol: symbol,
     selectedDrawing: null,
@@ -3815,4 +4757,136 @@ class _ColorDot extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Searchable clock picker for the chart.
+///
+/// Starts on the zones a trader is most likely to want, then offers every IANA
+/// zone the bundled database knows. Selecting one returns it; the style sheet
+/// stores the id and the axis follows immediately.
+class _ZoneSheet extends StatefulWidget {
+  const _ZoneSheet({required this.current});
+
+  final ChartZone current;
+
+  @override
+  State<_ZoneSheet> createState() => _ZoneSheetState();
+}
+
+class _ZoneSheetState extends State<_ZoneSheet> {
+  final _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final zones = ChartZone.search(_query);
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.72,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Chart time zone',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _search,
+                autofocus: false,
+                style: TextStyle(color: AppColors.text, fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Search a city or zone',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (value) => setState(() => _query = value),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                itemCount: zones.length,
+                itemBuilder: (context, index) {
+                  final zone = zones[index];
+                  final selected = zone.id == widget.current.id;
+                  return ListTile(
+                    dense: true,
+                    title: Text(
+                      zone.label,
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 13,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      zone.isDevice
+                          ? zone.describe()
+                          : '${zone.id} · ${zone.describe()}',
+                      style: TextStyle(
+                        color: AppColors.faint,
+                        fontSize: 10,
+                      ),
+                    ),
+                    trailing: selected
+                        ? Icon(Icons.check, size: 18, color: AppColors.primary)
+                        : null,
+                    onTap: () => Navigator.of(context).pop(zone),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A page in the chart settings sheet. TradingView groups chart settings the
+/// same way: a short list of names, each opening its own page.
+enum _SettingsPage {
+  home('Chart settings'),
+  appearance('Appearance'),
+  scales('Scales'),
+  grid('Grid'),
+  watermark('Watermark'),
+  events('Events'),
+  indicators('Indicators'),
+  timeZone('Time zone');
+
+  const _SettingsPage(this.title);
+
+  final String title;
 }

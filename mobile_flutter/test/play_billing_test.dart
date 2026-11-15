@@ -23,6 +23,21 @@ void main() {
     );
   });
 
+  test('a Play refusal points at the store install, not the card', () {
+    final message = playFailureMessage('BillingResponse.developerError');
+    expect(message, contains('Install it from the'));
+    expect(message, isNot(contains('developerError')));
+  });
+
+  test('a cancelled purchase says nothing was charged', () {
+    expect(playFailureMessage('BillingResponse.userCanceled'), 'Purchase cancelled. Nothing was charged.');
+  });
+
+  test('an unknown Play failure never shows a raw enum', () {
+    expect(playFailureMessage('something odd'), isNot(contains('BillingResponse')));
+    expect(playFailureMessage(null), isNot(contains('null')));
+  });
+
   test('no sellable product leaves the button dead', () {
     expect(
       canBuyWithPlay(current: false, yearly: false, enabled: true, hasProduct: false),

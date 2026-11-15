@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Download, Key, Server, XCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
-import { MT5_SYNC_ENABLED } from '@/lib/features'
+import { MT5_HOSTED_SYNC_ENABLED, MT5_SYNC_ENABLED } from '@/lib/features'
 import { useToast } from '@/components/toast'
 import BrokerConnect from '@/components/broker-connect'
 import BrokerPicker, { ServerSuggestions } from '@/components/broker-picker'
@@ -104,11 +104,53 @@ export default function SyncPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">MT5 Auto Sync</h1>
         <p className="text-gray-400 mt-1">
-          Connect your MT5 account once and every closed trade lands here — from a phone, no PC needed
+          {MT5_HOSTED_SYNC_ENABLED
+            ? 'Connect your MT5 account once and every closed trade lands here — from a phone, no PC needed'
+            : 'Sync closed trades from your own MT5 terminal, and let the same EA enforce the hard daily stop.'}
         </p>
       </div>
 
-      <BrokerConnect />
+      {MT5_HOSTED_SYNC_ENABLED ? <BrokerConnect /> : null}
+
+      <div className="bg-surface rounded-xl border border-border p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Server className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-white">MT5 Expert Advisor</h2>
+            <p className="text-sm text-gray-400">
+              Syncs closed trades and enforces the hard daily stop. Recommended on desktop.
+            </p>
+          </div>
+        </div>
+        <ol className="space-y-3 text-sm text-gray-400">
+          <li>
+            <span className="font-medium text-white">1. Install</span> — copy{' '}
+            <code className="rounded bg-background px-1.5 py-0.5 text-gray-300">
+              MTLTraderSync.mq5
+            </code>{' '}
+            into <code className="rounded bg-background px-1.5 py-0.5 text-gray-300">
+              MQL5/Experts
+            </code>{' '}
+            and press F7 in MetaEditor.
+          </li>
+          <li>
+            <span className="font-medium text-white">2. Attach</span> — add the EA to any
+            one chart and allow this site under Tools → Options → Expert Advisors →
+            “Allow WebRequest for listed URL”.
+          </li>
+          <li>
+            <span className="font-medium text-white">3. Configure</span> — paste your
+            user id and the token below into the EA inputs, then turn AutoTrading on.
+          </li>
+          <li>
+            <span className="font-medium text-white">4. Enforce</span> — a hard lock
+            deletes pending orders and closes a new fill until the reset. A manual
+            market order still fills before the EA can see it.
+          </li>
+        </ol>
+      </div>
 
       <div className="bg-surface rounded-xl border border-border p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -201,8 +243,10 @@ export default function SyncPage() {
             <Download className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Running the agent yourself</h2>
-            <p className="text-sm text-gray-400">For Windows users who prefer the local agent</p>
+            <h2 className="text-lg font-semibold text-white">Running the Python agent yourself</h2>
+            <p className="text-sm text-gray-400">
+              Syncs trades only — hard-lock enforcement needs the Expert Advisor above.
+            </p>
           </div>
         </div>
         

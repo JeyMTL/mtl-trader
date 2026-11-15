@@ -20,6 +20,98 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Database | Migrated through `20261116` (signup trigger); `/api/health` reports every RPC ready and none missing |
 | Git | `main` pushed to `origin`, tree clean — production verified serving the pushed commit |
 
+## 16 Nov 2026 — the freezer cannot fire until the web app is deployed
+
+The 1.0.8 phone build asks `/api/day-state` on every tick and production answers
+**404**: `src/app/api/day-state/` and `src/lib/daily-stop.ts` are still
+uncommitted, so the deployed commit predates them. Consequences observed on a
+Pixel 7a against production:
+
+- No soft-lock banner ever appears, whatever the loss. `/api/prop-rules` (401
+  without a token) and `/api/import` are live, so only the daily-stop route is
+  missing.
+- Pointed at `next dev` on this machine the same build reads
+  `rules.limit = 50` and `state.breached = true` correctly.
+
+So the recording of the accessibility declaration has to wait for a deploy that
+carries `/api/day-state`. Two app bugs surfaced while filming and are fixed in
+the working tree: the gate wraps the Navigator, so `showDialog` from it threw and
+the banner's Unfreeze/disclosure did nothing (now routed through
+`dayGateNavigatorKey`), and the disclosure's tap target covered the tab bar.
+
+## 15 Nov 2026 — the 1.0.8+9 draft is blocked on permission declarations
+
+Play refuses to save the closed-testing release with **2 Errors**, both reading
+*"This release includes permissions that haven't been declared. Go to Sensitive
+app permissions to update your permission declarations."* The uploaded bundle's
+manifest is fine — it requests `INTERNET`, `RECORD_AUDIO`,
+`SYSTEM_ALERT_WINDOW`, `ACCESS_NETWORK_STATE`, `BIND_JOB_SERVICE`, `DUMP`, plus
+`BIND_ACCESSIBILITY_SERVICE` on the freezer service. Two capabilities are new
+since the 1.0.4+5 bundle that passed review, and they are what the console is
+asking about:
+
+| Capability | Declared in | Where the declaration goes |
+| --- | --- | --- |
+| Accessibility service (`Mt5FreezeService`) | `<service>` in `AndroidManifest.xml` + `res/xml/mt5_freeze_service.xml` | App content → Sensitive app permissions → **Accessibility API** |
+| Display over other apps (`SYSTEM_ALERT_WINDOW`) | `uses-permission` in `AndroidManifest.xml` | The same page, if it lists the permission; users grant it in Settings either way |
+
+Open **App content → Sensitive app permissions** first: it names the flagged
+permissions with an alert, so there is nothing to guess. No manifest edit clears
+this error other than deleting the feature, and the freezer is what makes the
+soft lock real on the phone.
+
+Use this for the accessibility declaration: *"MTL Trader is a trading journal.
+Its optional 'MT5 freezer' lets a trader block their own MetaTrader 5 app for
+the rest of a day after a self-set loss limit is hit. The service only detects
+which package is in the foreground and draws a cover over MT5; it does not
+read screen content (`canRetrieveWindowContent=false`), collect, or transmit
+data. It is switched on by the trader in Android Settings, can be switched off
+there at any time, and the journal works without it."*
+
+Two things the review expects, now in place:
+
+- a prominent in-app disclosure before the permissions are requested —
+  `_FreezerDisclosureDialog` in `lib/screens/day_lock_gate.dart`, shown on the
+  banner's *Freezer is off* tap; Settings opens only after **Agree**;
+- `android:isAccessibilityTool="false"` in `mt5_freeze_service.xml` — the
+  service is an app blocker, not a disability tool, and claiming otherwise is
+  what Play rejects.
+
+### The declaration form, field by field
+
+The form is **App content → Accessibility services** (linked from the release
+error). Answers, on 15 Nov 2026:
+
+| Field | Answer |
+| --- | --- |
+| Usage — why does the app need the AccessibilityServices API | **App functionality** only. Nothing else applies: the service feeds no analytics, sends no communications, serves no ads, and is not fraud prevention, personalisation or account management. Extra ticks are a rejection cause, not a safety margin. |
+| Sensitive data — do you collect and/or share personal or sensitive user data using the API | **No.** The only thing the service reads is the foreground package name, it is compared on-device and kept in `SharedPreferences` for this app's own use; nothing is sent to Supabase or anywhere else. If a future release ever syncs which app was in front, this becomes **Yes** and needs the data type, purpose and a privacy-policy line. |
+| Prominent disclosure — video link | Unlisted YouTube (link sharing on, no sign-in, ≤ 3 min). Shot list below. |
+| Video requirements acknowledgement | Tick it. |
+
+The video has to show, in this order:
+
+1. the app being opened on the phone;
+2. the normal-usage route to the disclosure — the soft-lock banner's *Freezer
+   is off — tap to turn it on*;
+3. the `_FreezerDisclosureDialog` read in full, scrolling slowly if needed;
+4. consent: **Agree** → Android Accessibility settings → enable *MT5 freezer* →
+   back → tap again → **Display over other apps** granted;
+5. the feature working: MT5 open, covered by the freeze sheet, tapping *Open
+   MTL Trader to unfreeze* landing in the journal;
+6. non-consent: tap the link again, press **Not now** (Settings does not open),
+   then tap a second time to show the disclosure comes back.
+
+To get the banner on screen, use a test account with `lock_mode = 'soft'` and a
+small `daily_loss_limit`, then log a losing trade past it. Record it from the
+1.0.8+10 build, not the older one from Play — the disclosure does not exist in
+those bundles. Keep the link current: Play asks for a fresh video with each new
+submission that changes this flow.
+
+Then reopen the draft (no new bundle: the declaration is app-level and applies
+to every later release). Accessibility declarations are reviewed by hand, so
+allow days. Leave the production track alone until it passes.
+
 ## Version codes already burned
 
 `1` (old internal 1.0.0), `2` (1.0.1, had the photo permission), `3` (1.0.2,
@@ -240,10 +332,9 @@ to Gemini, `features.avatars` ready.
 
 ## Open outside the Play Console
 
-- **Hosted sync has no supervisor behind it.** The one queued
-  `broker_connections` row (created 1 Nov, never claimed, `lastSyncAt: null`) was
-  deleted on 4 Nov, so `/api/health` now reports `verdict: "idle"` with 0
-  connections. Nothing is broken — but while `MT5_SYNC_ENABLED = false` (see
-  `src/lib/features.ts`) and no Windows supervisor runs, any customer who
-  connects queues a row nobody will claim. Fund the supervisor before flipping
-  that flag, or the first one to connect watches a spinner known to be dead.
+- **Hosted sync is enabled for the phone → PC test.** `MT5_HOSTED_SYNC_ENABLED
+  = true` (see `src/lib/features.ts`) and `kMt5SyncEnabled = true` on mobile, so
+  the broker-connect card is live. It only works while
+  `supervisor/mt5_supervisor.py` runs on this PC; without it a connection queues
+  as `pending` and never claims. Fund a real supervisor host before public
+  launch. The desktop EA path is independent and does not need it.

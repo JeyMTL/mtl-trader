@@ -184,4 +184,73 @@ void main() {
         '"e":1.2,"sl":1.1,"tp":1.4}]';
     expect(decodeDrawings(raw).single.side, PositionSide.long);
   });
+
+  test('flipping a long to a short keeps the risk and the reward', () {
+    final long = positionAt(
+      side: PositionSide.long,
+      entry: 100,
+      stop: 90,
+      target: 120,
+    );
+    final short = long.withSide(PositionSide.short);
+
+    expect(short.side, PositionSide.short);
+    // Entry held, legs mirrored: the stop moves above, the target below.
+    expect(short.entry, 100);
+    expect(short.stop, 110);
+    expect(short.target, 80);
+    expect(short.rewardRatio, closeTo(2, 1e-9));
+  });
+
+  test('flipping back to the same side changes nothing', () {
+    final long = positionAt(
+      side: PositionSide.long,
+      entry: 100,
+      stop: 90,
+      target: 120,
+    );
+    expect(identical(long.withSide(PositionSide.long), long), isTrue);
+  });
+
+  test('a position box remembers the candle it ends on', () {
+    final drawing = positionAt(
+      side: PositionSide.long,
+      entry: 1.25,
+      stop: 1.248,
+      target: 1.254,
+    ).withEnd(
+      DateTime.utc(2026, 11, 11, 13).millisecondsSinceEpoch,
+    );
+
+    final decoded = decodeDrawings(encodeDrawings([drawing])).single;
+    expect(decoded.endMs, drawing.endMs);
+    expect(decoded.isPosition, isTrue);
+  });
+
+  test('the right edge can never move before the left edge', () {
+    final drawing = positionAt(
+      side: PositionSide.long,
+      entry: 1.25,
+      stop: 1.248,
+      target: 1.254,
+    );
+    expect(drawing.withEnd(1).endMs, drawing.startMs);
+  });
+
+  test('an exit after the box end belongs to a later idea', () {
+    final drawing = positionAt(
+      side: PositionSide.long,
+      entry: 1.25000,
+      stop: 1.24800,
+      target: 1.25400,
+    ).withEnd(
+      DateTime.utc(2026, 11, 11, 12, 2).millisecondsSinceEpoch,
+    );
+    final candles = [
+      bar(0, 1.25000, 1.25100, 1.24950, 1.25050),
+      bar(5, 1.25100, 1.25420, 1.25080, 1.25400),
+    ];
+
+    expect(resolvePositionOutcome(drawing: drawing, candles: candles), isNull);
+  });
 }

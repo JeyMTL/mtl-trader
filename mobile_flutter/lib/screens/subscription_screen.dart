@@ -133,10 +133,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await _verifyPlayPurchase(purchase);
       } else if (purchase.status == PurchaseStatus.error) {
         if (mounted) {
-          setState(
-            () => _error = purchase.error?.message ??
-                'Google Play could not complete the purchase. Nothing was charged.',
-          );
+          setState(() => _error = playFailureMessage(purchase.error?.message));
         }
       }
       // Play re-delivers an unfinished purchase, so it is cleared even when the

@@ -15,10 +15,13 @@ import {
   TrendingDown,
   TrendingUp,
   Plus,
+  ShieldAlert,
   Tag,
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/api'
+import type { DayStateResponse } from '@/lib/daily-stop'
 import { calculatePnL, cn, formatCurrency, formatDuration, getPointValue } from '@/lib/utils'
 import { effectiveMaxTrades, UNLIMITED } from '@/lib/subscription'
 import { mergeTags, suggestTags } from '@/lib/ai/autotag'
@@ -107,6 +110,7 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
   const [error, setError] = useState('')
   const [notFound, setNotFound] = useState(false)
   const [quotaHit, setQuotaHit] = useState<number | null>(null)
+  const [dayStop, setDayStop] = useState<DayStateResponse | null>(null)
   const [tagDraft, setTagDraft] = useState('')
   const [strategyLabels, setStrategyLabels] = useState<string[]>([])
   const [strategyOpen, setStrategyOpen] = useState(false)
@@ -184,6 +188,23 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
       if (!cancelled) setUserId(data.user?.id ?? '')
     })
     return () => { cancelled = true }
+  }, [mode])
+
+  // The day's stop is checked before the form is used, not only on save: an
+  // account at its limit should see the closed day before typing a price, and
+  // the submit path re-checks so a stale tab cannot slip a trade through.
+  useEffect(() => {
+    if (mode !== 'create') return
+    let active = true
+    authedFetch('/api/day-state')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (active && body) setDayStop(body as DayStateResponse)
+      })
+      .catch(() => {
+        // The form still works when the daily-stop route is unavailable.
+      })
+    return () => { active = false }
   }, [mode])
 
   useEffect(() => {
@@ -302,6 +323,13 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
     lots: Number.isNaN(numbers.lots) || numbers.lots <= 0,
   }
   const canSave = !missing.symbol && !missing.entry && !missing.exit && !missing.lots
+  // Soft only freezes MT5; the journal keeps recording. "Journal only" and
+  // hard still refuse a new entry from the app.
+  const dayBlocked =
+    mode === 'create' &&
+    dayStop?.state.breached === true &&
+    !dayStop.overridden &&
+    dayStop.lock.mode !== 'soft'
 
   // A stop or target on the wrong side of entry is what makes a losing sell
   // look like a profitable one: the broker fills the level the trader actually
@@ -339,6 +367,39 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
     setError('')
     setQuotaHit(null)
 
+    // Re-read the stop at submit time. The loaded state can be minutes old, and
+    // a trade may have closed (or an override been recorded) since the form
+    // opened. When the route is unreachable the last known state still applies.
+    let day = dayStop
+    if (mode === 'create') {
+      try {
+        const response = await authedFetch('/api/day-state')
+        if (response.ok) {
+          day = (await response.json()) as DayStateResponse
+          setDayStop(day)
+        }
+      } catch {
+        // Keep the state already loaded.
+      }
+      if (day?.state.breached && !day.overridden && day.lock.mode !== 'soft') {
+        setError(
+          'Your daily stop is reached, so the journal is closed for today. Review the day on the dashboard, or override the stop there with a reason.'
+        )
+        setSaving(false)
+        return
+      }
+    }
+
+    // An entry dated inside a day that already hit its stop is the cohort worth
+    // measuring: this is what the after_stop tag and its analytics row are for.
+    const tagsForSave = [...form.tags]
+    if (mode === 'create' && day?.state.breached) {
+      const closedAt = form.close_time ? new Date(form.close_time) : new Date()
+      const inDay =
+        closedAt >= new Date(day.day.start) && closedAt < new Date(day.day.end)
+      if (inDay && !tagsForSave.includes('after_stop')) tagsForSave.push('after_stop')
+    }
+
     const payload = {
       symbol: form.symbol.trim().toUpperCase(),
       type: form.type,
@@ -352,7 +413,7 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
       swap: Number.isNaN(numbers.swap) ? 0 : numbers.swap,
       strategy: typedStrategy || null,
       notes: form.notes.trim() || null,
-      tags: form.tags.length ? form.tags : null,
+      tags: tagsForSave.length ? tagsForSave : null,
       open_time: form.open_time ? new Date(form.open_time).toISOString() : null,
       close_time: form.close_time ? new Date(form.close_time).toISOString() : null,
     }
@@ -518,6 +579,31 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
           <button onClick={() => setError('')} className="text-xs font-medium text-danger/80 hover:text-danger">
             Dismiss
           </button>
+        </div>
+      )}
+
+      {dayBlocked && (
+        <div className="mt-5 flex items-start gap-3 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+          <div className="flex-1">
+            <p className="font-medium text-danger">
+              Daily stop reached — the journal is closed for today.
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-gray-400">
+              {dayStop?.state.lossLimit
+                ? `${formatCurrency(-(dayStop?.state.lossUsed ?? 0))} of ${formatCurrency(dayStop.state.lossLimit)} spent. `
+                : ''}
+              Your broker is not blocked; the record is. Every trade taken after the stop is
+              tagged and counted, so the habit is measured rather than hidden.
+            </p>
+            <Link
+              href="/dashboard"
+              className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              Review the day and record the debrief
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
       )}
 
@@ -981,7 +1067,7 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
           <div className="mobile-actionbar sticky z-10 flex items-center gap-2 rounded-xl border border-border bg-background/95 p-2 backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || dayBlocked}
               className="btn btn-primary flex-1 lg:flex-none lg:px-6"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

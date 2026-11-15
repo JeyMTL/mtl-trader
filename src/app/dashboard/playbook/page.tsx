@@ -9,9 +9,11 @@ import {
   Loader2,
   Plus,
   Save,
+  ShieldAlert,
   Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import type { LockMode } from '@/lib/daily-stop'
 import { useToast } from '@/components/toast'
 import {
   DAY_LABELS,
@@ -38,6 +40,24 @@ import {
  */
 
 const REMINDER_CHOICES = [15, 30, 45, 60, 90, 120]
+
+const LOCK_CHOICES: { value: LockMode; label: string; blurb: string }[] = [
+  {
+    value: 'off',
+    label: 'Journal only',
+    blurb: 'New entries are refused in the app. Nothing else changes.',
+  },
+  {
+    value: 'soft',
+    label: 'Soft lock',
+    blurb: 'MT5 trading freezes. The journal stays open; unfreezing needs a written reason, recorded on the day.',
+  },
+  {
+    value: 'hard',
+    label: 'Hard lock',
+    blurb: 'MT5 trading freezes and the journal locks completely until the reset.',
+  },
+]
 
 function newSession(index: number): TradingSession {
   return {
@@ -91,6 +111,9 @@ export default function PlaybookPage() {
               reminderMinutes: playbookResult.data.reminder_minutes,
               remindersEnabled: playbookResult.data.reminders_enabled,
               notes: playbookResult.data.notes,
+              dailyLossLimit: playbookResult.data.daily_loss_limit,
+              maxTradesPerDay: playbookResult.data.max_trades_per_day,
+              lockMode: playbookResult.data.lock_mode,
             })
           )
         }
@@ -135,6 +158,9 @@ export default function PlaybookPage() {
         reminder_minutes: cleaned.reminderMinutes,
         reminders_enabled: cleaned.remindersEnabled,
         notes: cleaned.notes,
+        daily_loss_limit: cleaned.dailyLossLimit,
+        max_trades_per_day: cleaned.maxTradesPerDay,
+        lock_mode: cleaned.lockMode,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id' }
@@ -374,6 +400,105 @@ export default function PlaybookPage() {
                 )
               })}
             </div>
+          </section>
+
+          {/* --------------------------------------------------- daily stop */}
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
+              <ShieldAlert className="h-4 w-4 text-gray-500" /> Daily stop
+            </h2>
+            <p className="mb-4 text-xs leading-relaxed text-gray-500">
+              The loss budget and entry cap you commit to before the session. Once either is
+              reached, the chosen lock applies for the rest of the local day. A soft lock closes
+              the app; a hard lock asks the MT5 guard EA to refuse orders. Neither can stop a
+              manual click at the broker — the EA is the closest a desktop app can get.
+              Measured in {timeZone.replace(/_/g, ' ')} time. Leave both at 0 to switch it off.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-xs text-gray-500">Loss budget per day</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="10"
+                  inputMode="decimal"
+                  value={playbook.dailyLossLimit || ''}
+                  onChange={(event) =>
+                    setPlaybook((current) => ({
+                      ...current,
+                      dailyLossLimit: Number(event.target.value) || 0,
+                    }))
+                  }
+                  placeholder="e.g. 250"
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-primary focus:outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-gray-500">Max entries per day</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={playbook.maxTradesPerDay || ''}
+                  onChange={(event) =>
+                    setPlaybook((current) => ({
+                      ...current,
+                      maxTradesPerDay: Number(event.target.value) || 0,
+                    }))
+                  }
+                  placeholder="e.g. 3"
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-primary focus:outline-none"
+                />
+              </label>
+            </div>
+            <div className="mt-4">
+              <span className="text-xs text-gray-500">When the stop is reached</span>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {LOCK_CHOICES.map((choice) => {
+                  const selected = playbook.lockMode === choice.value
+                  return (
+                    <button
+                      key={choice.value}
+                      type="button"
+                      onClick={() =>
+                        setPlaybook((current) => ({ ...current, lockMode: choice.value }))
+                      }
+                      className={`rounded-lg border p-3 text-left transition ${
+                        selected
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-background hover:border-gray-600'
+                      }`}
+                    >
+                      <span
+                        className={`block text-xs font-semibold ${
+                          selected ? 'text-primary' : 'text-gray-300'
+                        }`}
+                      >
+                        {choice.label}
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+                        {choice.blurb}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              {playbook.lockMode === 'hard' ? (
+                <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                  Hard lock needs the MTLTraderSync EA attached to a chart with the same user id
+                  and token as the sync. Pending orders are deleted while locked, and new fills
+                  are closed immediately. A market order fills before any EA can see it, so the
+                  broker — not the app — remains the only true block.
+                </p>
+              ) : null}
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
+              Reaching the stop is a green day, not a failure: the rule did its job. The Day Over
+              card records whether you stopped, and the trades taken afterwards are tagged
+              <span className="mx-1 font-mono text-gray-400">after_stop</span>
+              so their cost is visible in analytics.
+            </p>
           </section>
 
           {/* ---------------------------------------------------- sessions */}

@@ -33,7 +33,6 @@ class TradingChartPainter extends CustomPainter {
     required this.chartType,
     required this.studies,
     required this.drawings,
-    required this.draftStart,
     required this.style,
     required this.symbol,
     required this.selectedDrawing,
@@ -110,7 +109,6 @@ class TradingChartPainter extends CustomPainter {
   final ChartType chartType;
   final Map<OverlayStudy, List<double?>> studies;
   final List<ChartDrawing> drawings;
-  final DrawingDraft? draftStart;
   final ChartStyle style;
   final String symbol;
   final int? selectedDrawing;
@@ -260,6 +258,7 @@ class TradingChartPainter extends CustomPainter {
       for (final index in periodSeparatorIndices(
         visibleTimes,
         style.separatorGrain,
+        wallTime: style.zone.wall,
       )) {
         final gx = ((index + from - start) / span) * plotW;
         if (gx < 0 || gx > plotW) continue;
@@ -593,17 +592,6 @@ class TradingChartPainter extends CustomPainter {
         canvas.drawCircle(p2, handle, Paint()..color = drawingColor);
       }
     }
-    final draft = draftStart;
-    final draftX = draft == null ? null : _xForTime(draft.timeMs, plotW);
-    if (draft != null && draftX != null && crosshair != null) {
-      _dashed(
-        canvas,
-        Offset(draftX, y(draft.price)),
-        crosshair!,
-        drawingColor,
-      );
-    }
-
     final last = candles.last;
     final lastY = y(last.close);
     if (lastY >= topPad && lastY <= topPad + plotH) {
@@ -726,7 +714,9 @@ class TradingChartPainter extends CustomPainter {
       final ratio = (pointer.dx / plotW).clamp(0.0, 1.0).toDouble();
       final index =
           (start + ratio * span).floor().clamp(0, candles.length - 1).toInt();
-      final time = candles[index].time.toLocal();
+      // The tag reads the same clock as the axis under it, so the crosshair
+      // never disagrees with the labels it sits between.
+      final time = style.zone.wall(candles[index].time);
       final text = interval.size < const Duration(days: 1)
           ? DateFormat('HH:mm').format(time)
           : DateFormat('d MMM').format(time);
@@ -736,7 +726,7 @@ class TradingChartPainter extends CustomPainter {
     final picks = <double>[start, start + span / 2, start + span - 1];
     for (final raw in picks) {
       final index = raw.floor().clamp(0, candles.length - 1);
-      final time = candles[index].time.toLocal();
+      final time = style.zone.wall(candles[index].time);
       final text = interval.size < const Duration(days: 1)
           ? DateFormat('HH:mm').format(time)
           : DateFormat('d MMM').format(time);
@@ -839,8 +829,8 @@ class TradingChartPainter extends CustomPainter {
     } else {
       return;
     }
-    final right = plotW;
-    if (right - left < 1) return;
+    // A box dragged onto a single candle still has to be visible and grabable.
+    final right = math.max(_positionRight(drawing, plotW), left + 1.5);
 
     final entryY = y(entry);
     final stopY = y(stop);
@@ -958,7 +948,9 @@ class TradingChartPainter extends CustomPainter {
       (targetY, positionProfitColor),
     ]) {
       if (handle.$1 < priceTop || handle.$1 > priceTop + plotH) continue;
-      final center = Offset(right - 5, handle.$1);
+      // Handles sit on the box's left edge, where the setup was marked, so a
+      // calibration that ends mid-chart keeps its grips on screen.
+      final center = Offset(left + 7, handle.$1);
       canvas.drawCircle(center, 4.5, Paint()..color = handle.$2);
       canvas.drawCircle(
         center,
@@ -969,6 +961,44 @@ class TradingChartPainter extends CustomPainter {
           ..strokeWidth = 1,
       );
     }
+
+    // One grip on the right edge widens or narrows the box. Without it the only
+    // way to change how far the calibration runs is to draw a new one.
+    final gripY = (entryY + stopY + targetY) / 3;
+    if (gripY >= priceTop - 12 && gripY <= priceTop + plotH + 12) {
+      final rect = Rect.fromCenter(
+        center: Offset(right - 3, gripY.clamp(priceTop, priceTop + plotH)),
+        width: 7,
+        height: 22,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+        Paint()..color = positionEntryColor,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+        Paint()
+          ..color = const Color(0xFFFFFFFF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
+  }
+
+  /// Where a position box stops on the right.
+  ///
+  /// A box never runs past its own end time, and never past the newest candle
+  /// either: a calibration is a record of the move it was drawn on, so it must
+  /// not stretch across the future bars that print after it.
+  double _positionRight(ChartDrawing drawing, double plotW) {
+    final lastMs = candles.last.time.millisecondsSinceEpoch;
+    final endMs = drawing.endMs > 0 ? drawing.endMs : lastMs;
+    final endX = _xForTime(endMs, plotW);
+    if (endX != null) return endX.clamp(0.0, plotW);
+    // The end anchor is older than the loaded window: draw to the left edge, so
+    // a box scrolled far into the past still shows as a sliver rather than
+    // vanishing.
+    return endMs < candles.first.time.millisecondsSinceEpoch ? 0 : plotW;
   }
 
   void _bottomTag(Canvas canvas, Size size, double cx, String text) {
@@ -1174,7 +1204,6 @@ class TradingChartPainter extends CustomPainter {
         oldDelegate.style != style ||
         oldDelegate.symbol != symbol ||
         oldDelegate.drawings != drawings ||
-        oldDelegate.draftStart != draftStart ||
         oldDelegate.selectedDrawing != selectedDrawing;
   }
 }

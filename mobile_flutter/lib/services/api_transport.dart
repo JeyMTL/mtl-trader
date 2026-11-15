@@ -48,7 +48,46 @@ class ApiTransport {
 
   static String? _noToken() => null;
 
+  /// How long to wait before the one retry a dropped connection earns.
+  static const Duration _retryDelay = Duration(milliseconds: 300);
+
+  /// A request, retried once when the connection itself failed.
+  ///
+  /// Each call opens its own client, so a phone handed an address it cannot
+  /// reach — carriers here are known to blackhole single Vercel anycast
+  /// addresses — loses the whole call on the first try. A second attempt
+  /// resolves the name again and usually lands on a working address, which
+  /// turns a dead request into a slow one. Timeouts and HTTP errors are
+  /// answers, not drops, so they are not retried.
   Future<ApiResponse> send(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Duration? timeout,
+    String? fallbackError,
+  }) async {
+    try {
+      return await _sendOnce(
+        method,
+        path,
+        body: body,
+        timeout: timeout,
+        fallbackError: fallbackError,
+      );
+    } on ApiTransportException catch (error) {
+      if (error.code != 'network') rethrow;
+      await Future<void>.delayed(_retryDelay);
+      return _sendOnce(
+        method,
+        path,
+        body: body,
+        timeout: timeout,
+        fallbackError: fallbackError,
+      );
+    }
+  }
+
+  Future<ApiResponse> _sendOnce(
     String method,
     String path, {
     Map<String, dynamic>? body,

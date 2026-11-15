@@ -223,6 +223,36 @@ export function zonedDayKey(date: Date, timeZone: string | null = 'UTC'): string
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+/**
+ * The local calendar day containing `date`, with its UTC bounds.
+ *
+ * `end` is the start of the next local day, not `start + 24h`: a day around a
+ * DST change is 23 or 25 hours long, and a daily loss window has to follow the
+ * trader's clock rather than a fixed duration.
+ */
+export function zonedDayBounds(
+  date: Date,
+  timeZone: string | null = 'UTC'
+): { key: string; start: Date; end: Date } {
+  const tz = normalizeTimeZone(timeZone)
+  const { year, month, day } = localParts(date, tz)
+  const start = zonedStartOfDay(year, month, day, tz)
+  // Add one calendar day before resolving its midnight: doing it in UTC first
+  // keeps month-end and year-end rollovers correct.
+  const next = new Date(Date.UTC(year, month - 1, day + 1))
+  const end = zonedStartOfDay(
+    next.getUTCFullYear(),
+    next.getUTCMonth() + 1,
+    next.getUTCDate(),
+    tz
+  )
+  return {
+    key: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+    start,
+    end,
+  }
+}
+
 /** Whether any trade is journaled on the same local day as `date`. */
 export function hasJournaledOn(trades: TradeLike[], date: Date, timeZone: string | null = 'UTC'): boolean {
   const key = zonedDayKey(date, timeZone)

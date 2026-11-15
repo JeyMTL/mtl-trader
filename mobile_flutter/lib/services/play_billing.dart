@@ -43,6 +43,36 @@ bool canBuyWithPlay({
 }) =>
     hasProduct && enabled && (!current || yearly);
 
+/// A sentence a trader can act on for a Play failure.
+///
+/// Play hands back the enum name (`BillingResponse.developerError`) in
+/// `IAPError.message`, which tells a customer nothing and says nothing about
+/// who has to fix it. `developerError` is the one that bites a release: Play
+/// will not sell from a build it did not sign and upload, or to a Play account
+/// that is not on the licence-testing list — so the advice points at the store
+/// install rather than at the customer's card.
+String playFailureMessage(String? raw, {String fallback = 'Google Play could not complete the purchase. Nothing was charged.'}) {
+  final text = (raw ?? '').toLowerCase();
+  if (text.contains('developererror')) {
+    return 'Google Play refused this version of the app. Install it from the '
+        'Play Store and try again — a build installed from a file cannot buy a '
+        'subscription.';
+  }
+  if (text.contains('itemalreadyowned')) {
+    return 'That plan is already on this Google account. Use Restore purchases '
+        'to bring it onto this profile.';
+  }
+  if (text.contains('itemunavailable') || text.contains('itemnotowned')) {
+    return 'Google Play could not find that plan for this account. Try again in '
+        'a moment, or check the plan is on sale in your country.';
+  }
+  if (text.contains('service') || text.contains('network') || text.contains('disconnected')) {
+    return 'Could not reach Google Play. Check your connection and try again.';
+  }
+  if (text.contains('usercanceled')) return 'Purchase cancelled. Nothing was charged.';
+  return fallback;
+}
+
 /// Thin wrapper over Play Billing.
 ///
 /// It deliberately holds no billing state of its own: what the trader owns is

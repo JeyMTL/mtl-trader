@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase'
 import { effectiveMaxTrades, subscriptionState } from '@/lib/subscription'
 import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
+import LockGate from '@/components/lock-gate'
 import { Avatar } from '@/components/avatar'
 import { useBackButton, useHaptics } from '@/hooks/useCapacitor'
 
@@ -447,6 +448,9 @@ export default function DashboardLayout({
           </button>
         </div>
       </nav>
+
+      {/* The soft/hard daily stop sits above every journal route. */}
+      <LockGate />
 
       {/* Mobile More sheet */}
       {sheetOpen && (

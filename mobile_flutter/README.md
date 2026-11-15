@@ -174,7 +174,18 @@ The checked-in Android manifest and iOS `Info.plist` already include the microph
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 ```
+
+Plus the MT5 freezer, which is an accessibility service and needs its two
+companion files regenerated with it (`android/app/src/main/kotlin/com/mtltrader/app/Mt5FreezeService.kt`,
+`android/app/src/main/res/xml/mt5_freeze_service.xml`). Both of those entries
+are Play-sensitive: the release is blocked until the **Accessibility API** and
+**Display over other apps** declarations in App content → Sensitive app
+permissions are submitted, and Play expects the in-app disclosure that
+`day_lock_gate.dart` shows before it sends the trader to Settings (the service
+must not set `isAccessibilityTool="true"` — it is an app blocker, not a
+disability tool).
 
 There is deliberately no `READ_MEDIA_IMAGES`: photos are attached through the Android system picker, which needs no permission, and declaring broad photo access makes Play demand a justification for a permission the app never uses.
 

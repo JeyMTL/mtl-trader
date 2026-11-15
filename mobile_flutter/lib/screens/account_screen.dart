@@ -7,7 +7,9 @@ import '../core/config.dart';
 import '../core/features.dart';
 import '../core/subscription.dart';
 import '../models/models.dart';
+import '../services/daily_stop_bus.dart';
 import '../services/journal_api.dart';
+import '../services/mt5_freezer.dart';
 import '../ui/language_picker.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -91,10 +93,143 @@ class AccountScreen extends StatefulWidget {
 class _AccountScreenState extends State<AccountScreen> {
   late Future<Map<String, dynamic>> _future;
 
+  String _lockMode = 'off';
+  double _lossLimit = 0;
+  bool _lockLoading = true;
+  bool _lockSaving = false;
+
   @override
   void initState() {
     super.initState();
     _future = widget.api.profile();
+    _loadDailyStop();
+  }
+
+  Future<void> _loadDailyStop() async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      final row = await Supabase.instance.client
+          .from('playbooks')
+          .select('lock_mode, daily_loss_limit')
+          .eq('user_id', uid)
+          .maybeSingle();
+      if (!mounted) return;
+      setState(() {
+        _lockMode = (row?['lock_mode'] as String?) ?? 'off';
+        _lossLimit = (row?['daily_loss_limit'] as num?)?.toDouble() ?? 0;
+        _lockLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _lockLoading = false);
+    }
+  }
+
+  Future<void> _setLockMode(String mode) async {
+    if (_lockSaving || mode == _lockMode) return;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+
+    final previous = _lockMode;
+    setState(() {
+      _lockMode = mode;
+      _lockSaving = true;
+    });
+    try {
+      await Supabase.instance.client.from('playbooks').upsert(
+        {'user_id': uid, 'lock_mode': mode},
+        onConflict: 'user_id',
+      );
+      // Off and hard both mean this phone is not the enforcement. Clear the
+      // cover locally straight away: the day-state read can fail on mobile
+      // data, and a failed read must never leave MT5 frozen after the trader
+      // has already turned the lock off.
+      if (mode != 'soft') {
+        await Mt5Freezer.sync(active: false);
+      }
+      DailyStopBus.refresh();
+      if (!mounted) return;
+      setState(() => _lockSaving = false);
+      final message = switch (mode) {
+        'soft' => 'Soft lock on: MT5 will freeze on this phone after the stop.',
+        'hard' => 'Hard lock on: the MT5 EA blocks trading after the stop.',
+        _ => 'Daily stop is now journal-only.',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _lockMode = previous;
+        _lockSaving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not change the lock: $error')),
+      );
+    }
+  }
+
+  Widget _dailyStopCard() {
+    const options = <(String, String, String)>[
+      ('off', 'Off', 'Journal only'),
+      ('soft', 'Soft', 'Freeze phone MT5'),
+      ('hard', 'Hard', 'Block trading'),
+    ];
+    final description = switch (_lockMode) {
+      'soft' =>
+        'After the loss budget, MetaTrader 5 on this phone is covered and the journal stays open. Unfreeze from the banner.',
+      'hard' =>
+        'After the loss budget, the journal locks and the MT5 EA blocks orders until the next reset.',
+      _ =>
+        'After the loss budget, the journal refuses new entries. The loss budget itself is set in Rules on the web.',
+    };
+
+    return FlatCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionTitle(
+            title: 'Daily stop',
+            subtitle:
+                'What happens when the loss budget or entry cap is reached.',
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (var index = 0; index < options.length; index++) ...[
+                Expanded(
+                  child: _LockChoice(
+                    label: options[index].$2,
+                    hint: options[index].$3,
+                    selected: _lockMode == options[index].$1,
+                    enabled: !_lockLoading && !_lockSaving,
+                    onTap: () => _setLockMode(options[index].$1),
+                  ),
+                ),
+                if (index != options.length - 1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+          const SizedBox(height: 9),
+          Text(
+            description,
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 11,
+              height: 1.45,
+            ),
+          ),
+          if (!_lockLoading && _lossLimit <= 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              'No loss budget is set yet — add one in Rules on the web.',
+              style: TextStyle(color: AppColors.faint, fontSize: 10.5),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _refresh() async {
@@ -598,7 +733,9 @@ class _AccountScreenState extends State<AccountScreen> {
                   onPressed: _openPlans,
                   icon: const Icon(Icons.credit_card, size: 16),
                   label: Text(
-                    info.hasAccess ? 'View plans & billing' : 'Buy a subscription',
+                    info.hasAccess
+                        ? 'View plans & billing'
+                        : 'Buy a subscription',
                   ),
                 ),
                 if (widget.onOpenPropFirm != null) ...[
@@ -633,6 +770,8 @@ class _AccountScreenState extends State<AccountScreen> {
                     label: const Text('Connect MT5 account'),
                   ),
                 ],
+                const SizedBox(height: 10),
+                _dailyStopCard(),
                 const SizedBox(height: 10),
                 FlatCard(
                   child: Column(
@@ -877,6 +1016,64 @@ class _ThemeChoice extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LockChoice extends StatelessWidget {
+  const _LockChoice({
+    required this.label,
+    required this.hint,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final String hint;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.10)
+              : AppColors.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? AppColors.primary : AppColors.text,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.faint,
+                fontSize: 8.5,
+                height: 1.2,
+              ),
+            ),
+          ],
         ),
       ),
     );

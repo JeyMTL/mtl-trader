@@ -121,6 +121,23 @@ void main() {
     expect(packs.isInstalling('de'), isFalse);
   });
 
+  test('a dropped first attempt is retried instead of failing', () async {
+    var attempts = 0;
+    final flaky = LanguagePacks(fetch: (uri) async {
+      attempts++;
+      if (attempts == 1) throw StateError('connection dropped');
+      return jsonEncode(<String, Object>{
+        'code': 'fr',
+        'version': 1,
+        'messages': <String, String>{'navDesk': 'Bureau'},
+      });
+    });
+
+    expect(await flaky.install('fr'), isTrue);
+    expect(attempts, 2);
+    expect(flaky.messagesFor('fr')!['navDesk'], 'Bureau');
+  });
+
   test('a pack localises its keys and falls back to English for the rest',
       () async {
     server.pack('fr', <String, String>{

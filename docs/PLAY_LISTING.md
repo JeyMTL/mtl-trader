@@ -28,6 +28,7 @@ WHAT YOU SEE
 • P&L calendar — a month heatmap of profit and loss, so streaks, revenge days and dead weeks are visible at a glance.
 • Analytics — results by hour and session, so you can tell a real edge from a lucky run.
 • AI trade review — your own notes and your own statistics are sent to an AI model, which writes back the mistakes you keep repeating. Optional, and you can ignore it.
+• Daily stop — set a loss limit and the journal refuses new entries once you reach it. On Android you can also let it cover MetaTrader 5 on your phone for the rest of the day; that optional part uses Android's Accessibility service only to notice when MetaTrader 5 is in front (it never reads screen content) and to draw the cover over it, is switched on in Android Settings, and can be turned off there at any time.
 • Journal — chart screenshots and voice notes kept with each trade.
 • Backtester — replay past setups and see how a change to your rules would have played out.
 

@@ -19,6 +19,9 @@ const base: Playbook = {
   reminderMinutes: 60,
   remindersEnabled: true,
   notes: '',
+  dailyLossLimit: 0,
+  maxTradesPerDay: 0,
+  lockMode: 'off',
 }
 
 describe('normalizePlaybook', () => {

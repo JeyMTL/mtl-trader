@@ -10,6 +10,7 @@ import 'core/config.dart';
 import 'core/language_packs.dart';
 import 'core/locale.dart';
 import 'screens/auth_gate.dart';
+import 'screens/day_lock_gate.dart';
 import 'services/telemetry.dart';
 import 'ui/theme.dart';
 
@@ -78,6 +79,9 @@ class MtlTraderApp extends StatelessWidget {
         return MaterialApp(
           title: 'MTL Trader',
           debugShowCheckedModeBanner: false,
+          // The gate sits above the Navigator and still has to open the daily
+          // stop's dialogs, so it addresses the navigator through this key.
+          navigatorKey: dayGateNavigatorKey,
           theme: buildFlatTheme(AppColors.palette),
           // Null locale means "follow the device", resolved against the
           // generated list, which falls back to English for anything else.
@@ -90,6 +94,11 @@ class MtlTraderApp extends StatelessWidget {
           // InheritedWidget, so a switch has to rebuild the tree. The key makes
           // Flutter discard the subtree instead of keeping const widgets that
           // still hold the old colours or the old strings.
+          // The daily stop wraps the Navigator, not the shell. A pushed route
+          // (subscription, trade form) sits above `home`, so a gate inside the
+          // shell would leave that screen usable while the day is over.
+          builder: (context, child) =>
+              DayLockGate(child: child ?? const SizedBox.shrink()),
           home: KeyedSubtree(
             key: ValueKey<String>(
               'theme-${appearance.name}-$language-'

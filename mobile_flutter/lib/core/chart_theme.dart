@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chart_sessions.dart';
+import 'chart_zone.dart';
 import 'indicators.dart';
 
 /// How the price series is drawn.
@@ -83,6 +84,7 @@ class ChartStyle {
     this.macdFast = 12,
     this.macdSlow = 26,
     this.macdSignal = 9,
+    this.zoneId = '',
   });
 
   /// Stable key for the preset, used for selection state.
@@ -149,6 +151,13 @@ class ChartStyle {
   final int macdSlow;
   final int macdSignal;
 
+  /// Clock the time axis and the day separators use. Empty follows the phone;
+  /// otherwise an IANA name from [ChartZone].
+  final String zoneId;
+
+  /// The zone this chart is drawn in.
+  ChartZone get zone => ChartZone.byId(zoneId);
+
   /// The period this study is drawn with.
   int periodFor(OverlayStudy study) => studyPeriods[study.name] ?? study.period;
 
@@ -177,6 +186,7 @@ class ChartStyle {
     int? macdFast,
     int? macdSlow,
     int? macdSignal,
+    String? zoneId,
   }) {
     return ChartStyle(
       id: id,
@@ -207,6 +217,7 @@ class ChartStyle {
       macdFast: macdFast ?? this.macdFast,
       macdSlow: macdSlow ?? this.macdSlow,
       macdSignal: macdSignal ?? this.macdSignal,
+      zoneId: zoneId ?? this.zoneId,
     );
   }
 
@@ -336,6 +347,7 @@ class ChartStyle {
         'macdFast': macdFast,
         'macdSlow': macdSlow,
         'macdSignal': macdSignal,
+        'zone': zoneId,
       };
 
   static String encode(ChartStyle style) => jsonEncode(style.toJson());
@@ -382,6 +394,7 @@ class ChartStyle {
       macdFast: _readInt(decoded['macdFast']),
       macdSlow: _readInt(decoded['macdSlow']),
       macdSignal: _readInt(decoded['macdSignal']),
+      zoneId: decoded['zone'] is String ? decoded['zone'] as String : '',
     );
   }
 

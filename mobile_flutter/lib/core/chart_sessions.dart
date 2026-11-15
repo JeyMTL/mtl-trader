@@ -177,15 +177,21 @@ enum SeparatorGrain {
 
 /// True when [current] begins a new [grain] period that [previous] was not in.
 ///
-/// Compared in UTC and by calendar field, not by subtracting a duration: a day
-/// is not always 24 hours (DST), and a month is never a fixed number of days.
+/// Compared by calendar field, not by subtracting a duration: a day is not
+/// always 24 hours (DST), and a month is never a fixed number of days.
+///
+/// [wallTime] maps an instant onto the clock the chart is drawn in. It defaults
+/// to UTC, but the chart passes the trader's zone so a New York chart breaks at
+/// New York midnight rather than at 19:00 or 20:00 the evening before.
 bool isPeriodBoundary(
   DateTime previous,
   DateTime current,
-  SeparatorGrain grain,
-) {
-  final a = previous.toUtc();
-  final b = current.toUtc();
+  SeparatorGrain grain, {
+  DateTime Function(DateTime)? wallTime,
+}) {
+  final wall = wallTime ?? (time) => time.toUtc();
+  final a = wall(previous);
+  final b = wall(current);
   switch (grain) {
     case SeparatorGrain.day:
       return a.year != b.year || a.month != b.month || a.day != b.day;
@@ -203,13 +209,15 @@ bool isPeriodBoundary(
 /// the start of a period the window only happens to begin inside.
 Iterable<int> periodSeparatorIndices(
   Iterable<DateTime> times,
-  SeparatorGrain grain,
-) sync* {
+  SeparatorGrain grain, {
+  DateTime Function(DateTime)? wallTime,
+}) sync* {
   DateTime? previous;
   var index = -1;
   for (final time in times) {
     index++;
-    if (previous != null && isPeriodBoundary(previous, time, grain)) {
+    if (previous != null &&
+        isPeriodBoundary(previous, time, grain, wallTime: wallTime)) {
       yield index;
     }
     previous = time;

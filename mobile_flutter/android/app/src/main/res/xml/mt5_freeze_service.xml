@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- isAccessibilityTool stays false: this service is a self-imposed app
+     blocker, not a tool for people with disabilities. Declaring it true would
+     exempt the app from Play's prominent-disclosure requirement and is exactly
+     the claim Google rejects. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:isAccessibilityTool="false"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/mt5_freezer_description"
+    android:notificationTimeout="50" />

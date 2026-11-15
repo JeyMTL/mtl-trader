@@ -9,6 +9,7 @@
  * the market they actually sit in front of.
  */
 
+import { normalizeDailyStop, normalizeLockMode, type LockMode } from './daily-stop'
 import { normalizeTimeZone } from './notification-schedule'
 
 export const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
@@ -40,6 +41,12 @@ export interface Playbook {
   reminderMinutes: number
   remindersEnabled: boolean
   notes: string
+  /** Loss budget for one trading day, in account currency. 0 disables it. */
+  dailyLossLimit: number
+  /** Most entries allowed in one trading day. 0 disables the cap. */
+  maxTradesPerDay: number
+  /** How the stop holds: journal only, MT5 freeze, or both. */
+  lockMode: LockMode
 }
 
 export const EMPTY_PLAYBOOK: Playbook = {
@@ -49,6 +56,9 @@ export const EMPTY_PLAYBOOK: Playbook = {
   reminderMinutes: DEFAULT_REMINDER_MINUTES,
   remindersEnabled: true,
   notes: '',
+  dailyLossLimit: 0,
+  maxTradesPerDay: 0,
+  lockMode: 'off',
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/
@@ -132,6 +142,11 @@ export function normalizePlaybook(raw: unknown): Playbook {
     ? Math.min(MAX_REMINDER_MINUTES, Math.max(MIN_REMINDER_MINUTES, Math.round(requestedReminder)))
     : DEFAULT_REMINDER_MINUTES
 
+  const stop = normalizeDailyStop({
+    limit: input.dailyLossLimit,
+    maxTrades: input.maxTradesPerDay,
+  })
+
   return {
     rules,
     days,
@@ -139,6 +154,9 @@ export function normalizePlaybook(raw: unknown): Playbook {
     reminderMinutes,
     remindersEnabled: input.remindersEnabled !== false,
     notes: asString(input.notes).slice(0, 2000),
+    dailyLossLimit: stop.limit,
+    maxTradesPerDay: stop.maxTrades,
+    lockMode: normalizeLockMode(input.lockMode),
   }
 }
 

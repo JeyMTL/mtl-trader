@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mt5_freezer_label">MT5 freezer</string>
+    <string name="mt5_freezer_description">Covers MetaTrader 5 when the MTL Trader daily loss limit is reached, until the day is unfrozen in the journal. It only checks which app is in front; it does not read screen content.</string>
+</resources>

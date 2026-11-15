@@ -4,4 +4,9 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Debug only: the phone talks to the Next dev server on the LAN over
+         plain HTTP. Release builds keep Android's cleartext block, so a real
+         deployment must use HTTPS. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

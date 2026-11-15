@@ -18,9 +18,6 @@ const Color positionProfitColor = Color(0xFF26A69A);
 const Color positionLossColor = Color(0xFFF23645);
 const Color positionEntryColor = Color(0xFF5D6675);
 
-/// What a tap on the chart currently creates.
-enum DrawingTool { none, trend, ray, longPosition, shortPosition }
-
 enum DrawingKind { trend, ray, position }
 
 /// Whether a position tool is marking a long or a short.
@@ -60,28 +57,31 @@ class ChartDrawing {
   /// A long or short position: one entry line, a stop and a target, with the
   /// profit and loss zones filled between them.
   ///
-  /// The tool starts at [startMs] and runs to the right edge of the chart, which
-  /// is how a trader marks a setup they are still watching: levels stay put
-  /// while new candles print under them.
+  /// The box covers [startMs] to [endMs] and stops there. It is deliberately
+  /// not projected past its right edge: a calibration drawn over Friday's move
+  /// is a record of that move, not a level stretched across next week's
+  /// candles. Drag the right handle to widen it; zero means "no end stored yet"
+  /// and the painter falls back to the newest candle.
   const ChartDrawing.position({
     required PositionSide this.side,
     required this.startMs,
     required double this.entry,
     required double this.stop,
     required double this.target,
+    this.endMs = 0,
   })  : kind = DrawingKind.position,
         startPrice = 0,
-        endMs = 0,
         endPrice = 0,
         price = null;
 
   final DrawingKind kind;
 
-  /// First point of a trend line, epoch milliseconds of the candle under it.
+  /// First point of a trend line, or the left edge of a position box, as epoch
+  /// milliseconds of the candle under it.
   final int startMs;
   final double startPrice;
 
-  /// Second point of a trend line.
+  /// Second point of a trend line, or the right edge of a position box.
   final int endMs;
   final double endPrice;
 
@@ -126,19 +126,75 @@ class ChartDrawing {
     return ChartDrawing.position(
       side: side ?? PositionSide.long,
       startMs: startMs,
+      endMs: endMs,
       entry: level == PositionLevel.entry ? price : e,
       stop: level == PositionLevel.stop ? price : s,
       target: level == PositionLevel.target ? price : t,
     );
   }
 
-  ChartDrawing shifted({required double priceDelta, required int startMs}) {
-    final e = entry ?? 0;
-    final s = stop ?? 0;
-    final t = target ?? 0;
+  /// Replaces levels from the edit sheet. A missing value keeps the current one.
+  ChartDrawing withLevels({
+    double? entry,
+    double? stop,
+    double? target,
+  }) {
     return ChartDrawing.position(
       side: side ?? PositionSide.long,
       startMs: startMs,
+      endMs: endMs,
+      entry: entry ?? this.entry ?? 0,
+      stop: stop ?? this.stop ?? 0,
+      target: target ?? this.target ?? 0,
+    );
+  }
+
+  /// The same idea viewed the other way: entry stays, risk and reward swap
+  /// sides but keep their distances. Flipping a long into a short must not
+  /// silently turn a 2R setup into a 0.5R one.
+  ChartDrawing withSide(PositionSide next) {
+    if (!isPosition || (side ?? PositionSide.long) == next) return this;
+    final e = entry ?? 0;
+    final s = stop ?? 0;
+    final t = target ?? 0;
+    final risk = (e - s).abs();
+    final reward = (t - e).abs();
+    return ChartDrawing.position(
+      side: next,
+      startMs: startMs,
+      endMs: endMs,
+      entry: e,
+      stop: next == PositionSide.long ? e - risk : e + risk,
+      target: next == PositionSide.long ? e + reward : e - reward,
+    );
+  }
+
+  /// Moves the box's right edge, never before its left one.
+  ChartDrawing withEnd(int ms) {
+    if (!isPosition) return this;
+    return ChartDrawing.position(
+      side: side ?? PositionSide.long,
+      startMs: startMs,
+      endMs: ms < startMs ? startMs : ms,
+      entry: entry ?? 0,
+      stop: stop ?? 0,
+      target: target ?? 0,
+    );
+  }
+
+  ChartDrawing shifted({
+    required double priceDelta,
+    required int startMs,
+    int endMs = 0,
+  }) {
+    final e = entry ?? 0;
+    final s = stop ?? 0;
+    final t = target ?? 0;
+    final nextEnd = endMs == 0 ? this.endMs : endMs;
+    return ChartDrawing.position(
+      side: side ?? PositionSide.long,
+      startMs: startMs,
+      endMs: nextEnd < startMs ? startMs : nextEnd,
       entry: e + priceDelta,
       stop: s + priceDelta,
       target: t + priceDelta,
@@ -162,6 +218,7 @@ class ChartDrawing {
           'k': kind.name,
           'side': side?.name,
           'st': startMs,
+          'et': endMs,
           'e': entry,
           'sl': stop,
           'tp': target,
@@ -197,12 +254,14 @@ class ChartDrawing {
       final sl = value['sl'];
       final tp = value['tp'];
       final side = value['side'];
+      final et = value['et'];
       if (st is! num || e is! num || sl is! num || tp is! num) return null;
       return ChartDrawing.position(
         side: side == PositionSide.short.name
             ? PositionSide.short
             : PositionSide.long,
         startMs: st.toInt(),
+        endMs: et is num ? et.toInt() : 0,
         entry: e.toDouble(),
         stop: sl.toDouble(),
         target: tp.toDouble(),
@@ -228,6 +287,15 @@ ResolvedExit? resolvePositionOutcome({
   final target = drawing.target;
   if (entry == null || stop == null || target == null) return null;
 
+  // Only the candles the box covers can decide the outcome: an exit after its
+  // right edge belongs to a later idea, not to this calibration.
+  final window = drawing.endMs <= 0
+      ? candles
+      : [
+          for (final candle in candles)
+            if (candle.time.millisecondsSinceEpoch <= drawing.endMs) candle,
+        ];
+
   final outcome = resolveExit(
     type: drawing.side == PositionSide.short ? 'SELL' : 'BUY',
     entry: entry,
@@ -235,7 +303,7 @@ ResolvedExit? resolvePositionOutcome({
     take: target,
     entryTime:
         DateTime.fromMillisecondsSinceEpoch(drawing.startMs, isUtc: true),
-    candles: candles,
+    candles: window,
   );
   // `latestPrice` is the resolver's "neither level was reached" fallback; for a
   // position tool that is not an exit, so nothing is marked.
@@ -258,15 +326,6 @@ double? realisedR({
       ? entry - exit.price
       : exit.price - entry;
   return move / risk;
-}
-
-/// The first point of a trend line that is still being drawn.
-@immutable
-class DrawingDraft {
-  const DrawingDraft({required this.timeMs, required this.price});
-
-  final int timeMs;
-  final double price;
 }
 
 String encodeDrawings(List<ChartDrawing> drawings) =>

@@ -158,6 +158,23 @@ class JournalApi {
     return result.body;
   }
 
+  /// Today's daily stop, computed by the server — including the `lock` object
+  /// that says how the day is closed and how hard.
+  Future<Map<String, dynamic>> dayState() async {
+    final result = await _api('GET', '/api/day-state');
+    return result.body;
+  }
+
+  /// Lifts a soft lock for today. The reason is stored on the trading day, the
+  /// same record the web app writes, so the decision survives a device change.
+  Future<Map<String, dynamic>> overrideDayStop(String reason) async {
+    final result = await _api('POST', '/api/day-state', {
+      'action': 'override',
+      'reason': reason,
+    });
+    return result.body;
+  }
+
   /// Remaining AI reviews this month. A 402 is not thrown: the card renders the
   /// allowance as "not included" rather than an error.
   Future<Map<String, dynamic>> aiReviewQuota() async {
