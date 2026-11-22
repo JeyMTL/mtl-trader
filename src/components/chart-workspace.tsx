@@ -19,6 +19,7 @@ import {
 } from '@/lib/desk-settings'
 import { ChartSettingsDialog } from '@/components/chart-settings-panel'
 import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
+import { alignCompare } from '@/lib/chart-compare'
 import {
   ChartObjectBar,
   ChartObjectSettings,
@@ -124,6 +125,8 @@ const SYMBOLS = ['EUR_USD', 'GBP_USD', 'USD_JPY', 'XAU_USD', 'US30', 'NAS100']
 
 const AXIS = 64
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
+/** Violet: distinct from the bars, the VWAP amber and the session lines. */
+const COMPARE_COLOUR = '#a78bfa'
 
 interface View {
   /** Index of the first visible candle. */
@@ -162,6 +165,13 @@ export function ChartWorkspace({
   const [settingsId, setSettingsId] = useState<string | null>(null)
   const [showVwap, setShowVwap] = useState(false)
   const [showSessions, setShowSessions] = useState(false)
+
+  /** The second instrument drawn on this axis, and its own candle series. */
+  const [compareSymbol, setCompareSymbol] = useState<string | null>(null)
+  const [compareCandles, setCompareCandles] = useState<Candle[]>([])
+  const [compareError, setCompareError] = useState<string | null>(null)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [compareDraft, setCompareDraft] = useState('')
 
   /** What the canvas paints: colours, decimals, crosshair, clock, log axis. */
   const [settings, setSettings] = useState<DeskSettings>(DEFAULT_SETTINGS)
@@ -269,6 +279,14 @@ export function ChartWorkspace({
     return candles.slice(from, to)
   }, [candles, view])
 
+  const compareSeries = useMemo(
+    () =>
+      compareSymbol && compareCandles.length > 0
+        ? alignCompare(candles, compareCandles)
+        : null,
+    [candles, compareCandles, compareSymbol]
+  )
+
   const priceRange = useMemo(() => {
     if (visible.length === 0) return { min: 0, max: 1 }
     let min = Infinity
@@ -277,10 +295,33 @@ export function ChartWorkspace({
       if (candle.l < min) min = candle.l
       if (candle.h > max) max = candle.h
     }
+    // The compare line shares the axis, so its range counts too; a line drawn
+    // off the top of the plot would be a line the trader cannot see.
+    if (compareSeries) {
+      const from = Math.max(0, Math.floor(view.start))
+      const to = Math.min(candles.length, Math.ceil(view.start + view.span) + 1)
+      for (let index = from; index < to; index += 1) {
+        const point = compareSeries.points[index]
+        if (!point) continue
+        if (point.p < min) min = point.p
+        if (point.p > max) max = point.p
+      }
+    }
     // A little air above and below, so a level at the extreme is still grabbable.
     const pad = (max - min) * 0.08 || 0.0004
     return { min: min - pad, max: max + pad }
-  }, [visible])
+  }, [candles.length, compareSeries, view, visible])
+
+  /** Percent move of the compare instrument across what is on screen. */
+  const compareChange = useMemo(() => {
+    if (!compareSeries) return null
+    const from = Math.max(0, Math.floor(view.start))
+    const to = Math.min(candles.length, Math.ceil(view.start + view.span) + 1) - 1
+    const first = compareSeries.points[from]
+    const last = compareSeries.points[to]
+    if (!first || !last || first.p <= 0) return null
+    return last.p / first.p - 1
+  }, [candles.length, compareSeries, view])
 
   const plotW = Math.max(60, size.width - AXIS)
   /** Decimals on every price: the trader's override, else the instrument's. */
@@ -381,6 +422,41 @@ export function ChartWorkspace({
       cancelled = true
     }
   }, [symbol, interval])
+
+  // The compare series is loaded on its own: a second instrument that fails to
+  // answer must never take the main chart down with it.
+  useEffect(() => {
+    const clean = compareSymbol
+    // Nothing to fetch while there is no compare instrument; the candles are
+    // cleared where the overlay is removed, not by running an effect to say so.
+    if (!clean) return
+    let cancelled = false
+    async function load(target: string) {
+      try {
+        const response = await fetch(
+          `/api/market/candles?symbol=${encodeURIComponent(target)}&interval=${interval}`,
+          { cache: 'no-store' }
+        )
+        const body = await response.json()
+        if (!response.ok) {
+          throw new Error(body?.error || `The compare feed answered ${response.status}.`)
+        }
+        if (cancelled) return
+        setCompareCandles(Array.isArray(body.candles) ? body.candles : [])
+        setCompareError(null)
+      } catch (caught) {
+        if (cancelled) return
+        setCompareCandles([])
+        setCompareError(
+          caught instanceof Error ? caught.message : 'Could not load the compare instrument.'
+        )
+      }
+    }
+    void load(clean)
+    return () => {
+      cancelled = true
+    }
+  }, [compareSymbol, interval])
 
   const symbolDrawings = useMemo(
     () => drawings.filter((row) => row.symbol === chartSymbol(symbol)),
@@ -502,6 +578,28 @@ export function ChartWorkspace({
     setTemplates(removeTemplate(templates, name))
   }
 
+  /** Adds a compare instrument; the one already charted would be a flat line. */
+  const addCompare = (raw: string) => {
+    const next = chartSymbol(raw)
+    if (!next) return
+    if (next === chartSymbol(symbol)) {
+      setCompareError('Compare needs a different instrument.')
+      return
+    }
+    setCompareSymbol(next)
+    setCompareDraft(next)
+    setCompareOpen(false)
+    setCompareError(null)
+  }
+
+  const removeCompare = () => {
+    setCompareSymbol(null)
+    setCompareCandles([])
+    setCompareError(null)
+    setCompareDraft('')
+    setCompareOpen(false)
+  }
+
   const newLayout = () => {
     setSettings({ ...DEFAULT_SETTINGS })
     setActiveLayoutId(null)
@@ -595,6 +693,34 @@ export function ChartWorkspace({
       const top = Math.min(open, close)
       const height = Math.max(1, Math.abs(close - open))
       context.fillRect(x - bodyW / 2, top, bodyW, height)
+    }
+
+    // The compare instrument, in the main axis's own units. Broken where the
+    // compare series has no bar, so a holiday does not paint as a flat stretch.
+    if (compareSeries) {
+      context.strokeStyle = COMPARE_COLOUR
+      context.lineWidth = 1.6
+      context.setLineDash([])
+      context.beginPath()
+      let drawing = false
+      const from = Math.max(0, Math.floor(view.start) - 1)
+      const to = Math.min(lastPaintable, Math.ceil(view.start + view.span) + 1)
+      for (let index = from; index <= to; index += 1) {
+        const point = compareSeries.points[index]
+        if (!point || point.stale) {
+          drawing = false
+          continue
+        }
+        const x = xForIndex(index)
+        const y = yForPrice(point.p)
+        if (drawing) context.lineTo(x, y)
+        else {
+          context.moveTo(x, y)
+          drawing = true
+        }
+      }
+      context.stroke()
+      context.lineWidth = 1
     }
 
     // Computed levels sit under the objects: they are reference, not edits.
@@ -894,6 +1020,7 @@ export function ChartWorkspace({
   }, [
     activeAlertsOnly,
     candles,
+    compareSeries,
     decimals,
     hover,
     interval,
@@ -1395,10 +1522,13 @@ export function ChartWorkspace({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <form
-          onSubmit={(event) => {
-            event.preventDefault()
+          onSubmit={(event) => {              event.preventDefault()
             const next = chartSymbol(symbolDraft)
-            if (next) setSymbolInput(next)
+            if (!next) return
+            // The compare overlay is the same instrument now, which is a flat
+            // line at the anchor: drop it rather than draw a lie.
+            if (next === compareSymbol) removeCompare()
+            setSymbolInput(next)
           }}
           className="flex items-center gap-2"
         >
@@ -1559,6 +1689,48 @@ export function ChartWorkspace({
         </span>
         <button
           type="button"
+          title="Overlay a second instrument, scaled to this one"
+          aria-pressed={compareSymbol !== null}
+          aria-expanded={compareOpen}
+          onClick={() => {
+            setCompareOpen((open) => !open)
+            setCompareError(null)
+          }}
+          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+            compareSymbol
+              ? 'border-violet-400/60 bg-violet-400/10 text-violet-300'
+              : 'border-border bg-surface text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          Compare
+        </button>
+        {compareSymbol && (
+          <span className="flex items-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums">
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: COMPARE_COLOUR }}
+            />
+            <span className="text-violet-200">{compareSymbol.replace('_', '/')}</span>
+            {compareChange !== null && (
+              <span className={compareChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                {compareChange >= 0 ? '+' : ''}
+                {(compareChange * 100).toFixed(2)}%
+              </span>
+            )}
+            {compareError && <span className="text-rose-400">no feed</span>}
+            <button
+              type="button"
+              aria-label={`Remove compare ${compareSymbol}`}
+              onClick={removeCompare}
+              className="text-violet-300/70 hover:text-white"
+            >
+              ×
+            </button>
+          </span>
+        )}
+        <button
+          type="button"
           title="Session VWAP, reset each UTC day"
           onClick={() => setShowVwap((value) => !value)}
           className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
@@ -1588,6 +1760,58 @@ export function ChartWorkspace({
         )}
       </div>
 
+      {compareOpen && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            addCompare(compareDraft)
+          }}
+          className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5"
+        >
+          <input
+            value={compareDraft}
+            onChange={(event) => setCompareDraft(event.target.value)}
+            aria-label="Compare symbol"
+            placeholder="XAU_USD"
+            spellCheck={false}
+            className="w-24 rounded-md border border-border bg-surface-light px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            className="rounded-md bg-primary px-2 py-1 text-[11px] font-bold text-black"
+          >
+            Overlay
+          </button>
+          {SYMBOLS.filter((item) => item !== chartSymbol(symbol))
+            .slice(0, 4)
+            .map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => addCompare(item)}
+                className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-gray-400 hover:text-white"
+              >
+                {item.replace('_', '/')}
+              </button>
+            ))}
+          <button
+            type="button"
+            onClick={() => {
+              setCompareOpen(false)
+              setCompareError(null)
+            }}
+            className="ml-auto text-[11px] font-semibold text-gray-500 hover:text-white"
+          >
+            Cancel
+          </button>
+          {compareError && (
+            <span role="alert" className="w-full text-[10px] text-rose-400">
+              {compareError}
+            </span>
+          )}
+        </form>
+      )}
+
       {/* The object strip sits directly above the canvas, where the eye
           already is: selecting something must not push the tools it was drawn
           with out from under the pointer. */}
@@ -1606,6 +1830,11 @@ export function ChartWorkspace({
           ? `${tickLabel(hoverCandle.t, interval, settings)} open ${hoverCandle.o.toFixed(decimals(hoverCandle.o))}, high ${hoverCandle.h.toFixed(decimals(hoverCandle.h))}, low ${hoverCandle.l.toFixed(decimals(hoverCandle.l))}, close ${hoverCandle.c.toFixed(decimals(hoverCandle.c))}`
           : `${symbolDrawings.length} saved object${symbolDrawings.length === 1 ? '' : 's'} on ${symbol}`}
         {replayCut === null ? '' : `. Replay paused at bar ${replayCut + 1} of ${candles.length}`}
+        {compareSymbol && compareChange !== null
+          ? `. ${compareSymbol} is ${compareChange >= 0 ? 'up' : 'down'} ${Math.abs(
+              compareChange * 100
+            ).toFixed(2)} percent across this view, drawn in violet against ${symbol}.`
+          : ''}
       </p>
 
       <div
@@ -1618,7 +1847,7 @@ export function ChartWorkspace({
           tabIndex={0}
           aria-label={`${symbol} ${interval} chart with ${symbolDrawings.length} saved object${
             symbolDrawings.length === 1 ? '' : 's'
-          }. Arrow keys pan, plus and minus zoom.`}
+          }${compareSymbol ? `, compared with ${compareSymbol}` : ''}. Arrow keys pan, plus and minus zoom.`}
           aria-describedby="chart-live"
           style={{ width: size.width, height: size.height, touchAction: 'none', cursor: tool === 'select' ? 'crosshair' : 'copy' }}
           onKeyDown={(event) => {
@@ -1648,6 +1877,7 @@ export function ChartWorkspace({
               setSettingsOpen(false)
               setLayoutsOpen(false)
               setHubOpen(false)
+              setCompareOpen(false)
             }
           }}
           onPointerDown={onPointerDown}
