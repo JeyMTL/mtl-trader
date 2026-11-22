@@ -16,8 +16,7 @@ export default function TermsPage() {
       <p className="mt-2 text-xs text-gray-500">Last updated {UPDATED}</p>
 
       <p className="mt-6">
-        These terms are an agreement between you and <strong>Jeremiah Chipeta</strong>, trading as
-        MTL Ledger (&ldquo;MTL Ledger&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;), of{' '}
+        These terms are an agreement between you and <strong>MTL Ledger</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;), of{' '}
         <strong>Copperbelt, Zambia</strong>. By creating an account or using the service, you accept them.
         If you do not accept them, do not use the service.
       </p>

@@ -16,8 +16,7 @@ export default function RefundPolicyPage() {
       <p className="mt-2 text-xs text-gray-500">Last updated {UPDATED}</p>
 
       <p className="mt-6">
-        This policy applies to subscriptions sold by <strong>Jeremiah Chipeta</strong>, trading as
-        MTL Ledger, through our card subscription, PayPal, bank transfer or Google Play. It does not limit any
+        This policy applies to subscriptions sold by <strong>MTL Ledger</strong> through our card subscription, PayPal, bank transfer or Google Play. It does not limit any
         statutory rights you have as a consumer in your country of residence.
       </p>
 

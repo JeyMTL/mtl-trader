@@ -22,6 +22,7 @@ import {
 import { ChartSettingsDialog } from '@/components/chart-settings-panel'
 import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
 import { alignCompare } from '@/lib/chart-compare'
+import { sessionWindows } from '@/lib/market-sessions'
 import {
   deleteCloudTemplate,
   pushCloudTemplate,
@@ -106,6 +107,12 @@ interface VwapPoint {
 }
 
 const INTERVALS = [
+  { key: '5s', label: '5s' },
+  { key: '10s', label: '10s' },
+  { key: '15s', label: '15s' },
+  { key: '30s', label: '30s' },
+  { key: '45s', label: '45s' },
+  { key: '1m', label: '1m' },
   { key: '5m', label: '5m' },
   { key: '15m', label: '15m' },
   { key: '30m', label: '30m' },
@@ -643,32 +650,27 @@ export function ChartWorkspace({
   }, [candles, showVwap])
 
   /**
-   * Asia / London / New York high and low for the most recent session day.
-   * The windows are UTC and deliberately overlap, because London and New York
-   * do: that overlap is the point of the levels.
+   * Asia / London / New York high and low for the most recent session.
+   *
+   * The windows come from `market-sessions`, which defines them in each city's
+   * own zone, so daylight saving is applied and the levels are identical for a
+   * viewer in Lusaka and one in New York. London and New York deliberately
+   * overlap; that overlap is the point of the levels.
    */
   const sessionLevels = useMemo<SessionLevel[]>(() => {
     if (!showSessions || candles.length === 0) return []
-    const dayStart = Math.floor(candles[candles.length - 1].t / 86_400_000) * 86_400_000
-    const windows = [
-      { label: 'Asia', from: 0, to: 8, colour: '#a78bfa' },
-      { label: 'London', from: 8, to: 16, colour: '#38bdf8' },
-      { label: 'New York', from: 13, to: 21, colour: '#fb923c' },
-    ]
     const levels: SessionLevel[] = []
-    for (const window of windows) {
-      const from = dayStart + window.from * 3_600_000
-      const to = dayStart + window.to * 3_600_000
+    for (const window of sessionWindows(candles[candles.length - 1].t)) {
       let high = -Infinity
       let low = Infinity
       for (const candle of candles) {
-        if (candle.t < from || candle.t >= to) continue
+        if (candle.t < window.from || candle.t >= window.to) continue
         if (candle.h > high) high = candle.h
         if (candle.l < low) low = candle.l
       }
       if (!Number.isFinite(high) || !Number.isFinite(low)) continue
-      levels.push({ label: window.label, side: 'high', price: high, colour: window.colour })
-      levels.push({ label: window.label, side: 'low', price: low, colour: window.colour })
+      levels.push({ label: window.name, side: 'high', price: high, colour: window.colour })
+      levels.push({ label: window.name, side: 'low', price: low, colour: window.colour })
     }
     return levels
   }, [candles, showSessions])
@@ -1800,7 +1802,7 @@ export function ChartWorkspace({
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface p-0.5">
+        <div className="ml-auto flex min-w-0 max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-0.5">
           {INTERVALS.map((item) => (
             <button
               key={item.key}

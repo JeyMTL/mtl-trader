@@ -16,8 +16,7 @@ export default function PrivacyPage() {
       <p className="mt-2 text-xs text-gray-500">Last updated {UPDATED}</p>
 
       <p className="mt-6">
-        This policy explains what personal data <strong>Jeremiah Chipeta</strong>, trading as
-        MTL Ledger (&ldquo;we&rdquo;), collects when you use the journal, why we process it, and the choices you have. It
+        This policy explains what personal data <strong>MTL Ledger</strong> (&ldquo;we&rdquo;) collects when you use the journal, why we process it, and the choices you have. It
         covers the web app and the mobile app, which load the same service.
       </p>
 
