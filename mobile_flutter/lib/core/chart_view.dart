@@ -1,5 +1,17 @@
 import 'dart:math' as math;
 
+/// How far a drag along an axis strip zooms that axis.
+///
+/// The factor is exponential in the distance travelled, so a slow drag creeps
+/// and a fast one arrives: [fraction] is the drag as a share of the strip's
+/// length (width for time, height for price), and 2.5 is how hard it bites at
+/// full length. Negative [fraction] for time (dragging left) packs bars
+/// together; for price, [invert] makes an upward drag magnify.
+const double axisDragGain = 2.5;
+
+double axisDragZoom(double fraction, {bool invert = false}) =>
+    math.exp((invert ? -fraction : fraction) * axisDragGain);
+
 /// The visible window over a candle list: `start` is the index of the first
 /// visible candle (fractional while panning), `span` how many candles fit.
 /// Kept free of Flutter so the pan/zoom maths can be unit tested.

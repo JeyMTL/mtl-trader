@@ -5509,6 +5509,12 @@ class _ChartCanvasState extends State<_ChartCanvas>
   double _priceZoom = 1;
   double _basePriceZoom = 1;
 
+  /// Which axis strip this gesture started on. A drag along the price column
+  /// or the timestamp strip zooms that axis instead of panning the chart, the
+  /// way the same strips behave in a desktop terminal.
+  _AxisDrag _axisDrag = _AxisDrag.none;
+  Offset _axisDragDelta = Offset.zero;
+
   /// Drives the coast after a fling and the short spring onto a whole bar.
   late final AnimationController _settle = AnimationController(
     vsync: this,
@@ -6011,6 +6017,18 @@ class _ChartCanvasState extends State<_ChartCanvas>
     _baseSpan = _view.span;
     _baseStart = _view.start;
     _basePriceZoom = _priceZoom;
+    _axisDragDelta = Offset.zero;
+    _axisDrag = _AxisDrag.none;
+    if (details.pointerCount == 1) {
+      final plotW = _size.width - TradingChartPainter.axisWidth;
+      final point = details.localFocalPoint;
+      if (plotW > 0 && point.dx >= plotW) {
+        _axisDrag = _AxisDrag.price;
+      } else if (point.dy >=
+          _size.height - TradingChartPainter.bottomPad) {
+        _axisDrag = _AxisDrag.time;
+      }
+    }
   }
 
   void _onSettleTick() {
@@ -6070,6 +6088,11 @@ class _ChartCanvasState extends State<_ChartCanvas>
       setState(() => _crosshair = null);
       _reportCrosshair(null);
     }
+    // A zoom drag ends where the finger lifts: there is no throw to hand on.
+    if (_axisDrag != _AxisDrag.none) {
+      _axisDrag = _AxisDrag.none;
+      return;
+    }
     final count = widget.candles.length;
     if (count < 2 || _dragging != null || _drawingIndex != null) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
@@ -6115,6 +6138,37 @@ class _ChartCanvasState extends State<_ChartCanvas>
           _priceZoom = (_basePriceZoom * details.verticalScale)
               .clamp(0.2, 8.0)
               .toDouble();
+        }
+      } else if (_axisDrag != _AxisDrag.none) {
+        _axisDragDelta += details.focalPointDelta;
+        if (_axisDrag == _AxisDrag.time) {
+          // Along the timestamp strip, right widens the bars and left packs
+          // them together, with the newest bar held in place so the live edge
+          // does not walk out from under the trader.
+          _view.zoomAround(
+            scale: axisDragZoom(_axisDragDelta.dx / plotW),
+            anchorRatio: 1,
+            count: widget.candles.length,
+            baseSpan: _baseSpan,
+            baseStart: _baseStart,
+          );
+        } else {
+          final panes = TradingChartPainter.paneLayout(
+            _size.height,
+            widget.style,
+          );
+          if (panes.priceH > 0) {
+            // Up the price column stretches the scale around the middle of the
+            // pane; down compresses it. Same clamp as a two-finger spread so
+            // the two gestures cannot disagree.
+            _priceZoom = (_basePriceZoom *
+                    axisDragZoom(
+                      _axisDragDelta.dy / panes.priceH,
+                      invert: true,
+                    ))
+                .clamp(0.2, 8.0)
+                .toDouble();
+          }
         }
       } else {
         _view.pan(-details.focalPointDelta.dx / plotW * _view.span);
@@ -7127,6 +7181,10 @@ class _Warning extends StatelessWidget {
     );
   }
 }
+
+/// Which axis a drag is zooming, when it started on a strip rather than the
+/// plotting area.
+enum _AxisDrag { none, time, price }
 
 /// Candles, price/time axes, crosshair and the draggable level lines.
 

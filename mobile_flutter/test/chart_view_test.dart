@@ -150,6 +150,19 @@ void main() {
       expect(view.priceAt(0.5, 100, 200), 150);
     });
 
+    test('an axis-strip drag zooms the axis it started on', () {
+      // Right along the timestamp strip widens bars, left packs them.
+      expect(axisDragZoom(0.2), greaterThan(1));
+      expect(axisDragZoom(-0.2), lessThan(1));
+      // Equal distance either way is the same zoom, mirrored.
+      expect(axisDragZoom(0.2) * axisDragZoom(-0.2), closeTo(1, 1e-12));
+      // No movement is no zoom: the axis strip must not creep as it is held.
+      expect(axisDragZoom(0), 1);
+      // Up stretches the price scale, down compresses it.
+      expect(axisDragZoom(0.2, invert: true), lessThan(1));
+      expect(axisDragZoom(-0.2, invert: true), greaterThan(1));
+    });
+
     test('visible returns a non-empty clamped range', () {
       final view = ChartViewport()..fit(300);
       final range = view.visible(300);
