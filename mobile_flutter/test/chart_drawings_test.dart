@@ -72,6 +72,36 @@ void main() {
     ]);
   });
 
+  test('an alert line survives a save with its fired state', () {
+    final line = ChartDrawing.ray(
+      price: 1.0972,
+      look: DrawingLook(alert: true, tint: const Color(0xFF45D29A)),
+    );
+    final decoded = decodeDrawings(encodeDrawings([line])).single;
+
+    expect(decoded.look.alert, isTrue);
+    expect(decoded.look.fired, isFalse);
+    expect(decoded.look.tint, const Color(0xFF45D29A));
+
+    // Once it fires, the flag is part of the object rather than a side table.
+    final fired = line.withLook(line.look.copyWith(fired: true));
+    final reloaded = decodeDrawings(encodeDrawings([fired])).single;
+    expect(reloaded.look.fired, isTrue);
+    expect(lookSignature(reloaded.look), contains('fd'));
+  });
+
+  test('a plain ray is not an alert, and the two differ in signature', () {
+    final plain = ChartDrawing.ray(price: 1.09);
+    expect(plain.look.alert, isFalse);
+    expect(lookSignature(plain.look), isNot(contains('al')));
+
+    final alert = ChartDrawing.ray(
+      price: 1.09,
+      look: const DrawingLook(alert: true),
+    );
+    expect(lookSignature(alert.look), isNot(lookSignature(plain.look)));
+  });
+
   test('the reward ratio comes from the two legs, not the entry alone', () {
     final drawing = _short();
     expect(drawing.rewardRatio, closeTo(2.16, 0.01));
@@ -304,7 +334,8 @@ void main() {
     expect(moved.points.last.ms, 1762900660000);
     expect(moved.points.first.price, closeTo(1.25150, 1e-9));
     expect(moved.points.last.price, closeTo(1.24750, 1e-9));
-    expect(drawing.points.first.ms, 1762900000000, reason: 'the original is untouched');
+    expect(drawing.points.first.ms, 1762900000000,
+        reason: 'the original is untouched');
   });
 
   test('dragging one anchor leaves the other anchors alone', () {

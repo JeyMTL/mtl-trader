@@ -118,6 +118,9 @@ class ChartStyle {
     this.crosshairWidth = 1,
     this.crosshairStyle = CrosshairStyle.dashed,
     this.magnet = MagnetMode.weak,
+    this.alertUp,
+    this.alertDown,
+    this.onlyActiveAlerts = false,
   });
 
   /// Stable key for the preset, used for selection state.
@@ -225,6 +228,16 @@ class ChartStyle {
   final double crosshairWidth;
   final CrosshairStyle crosshairStyle;
 
+  /// Colour of an alert line pointing at a price above the market, and one
+  /// pointing below it. Null falls back to the candle pair, so an untouched
+  /// chart's alert lines still read as up and down.
+  final Color? alertUp;
+  final Color? alertDown;
+
+  /// Hide alert lines that have already fired. The lines are kept, because a
+  /// level that was reached is still the record of a level.
+  final bool onlyActiveAlerts;
+
   /// How a new anchor treats the candle values under the finger. Saved with the
   /// instrument, because a trader who sets a strong magnet sets it for good.
   final MagnetMode magnet;
@@ -286,6 +299,9 @@ class ChartStyle {
     double? crosshairWidth,
     CrosshairStyle? crosshairStyle,
     MagnetMode? magnet,
+    Color? alertUp,
+    Color? alertDown,
+    bool? onlyActiveAlerts,
 
     /// Drop back to a flat background; null cannot mean that in a copyWith.
     bool clearBackgroundTo = false,
@@ -334,6 +350,9 @@ class ChartStyle {
       crosshairWidth: crosshairWidth ?? this.crosshairWidth,
       crosshairStyle: crosshairStyle ?? this.crosshairStyle,
       magnet: magnet ?? this.magnet,
+      alertUp: alertUp ?? this.alertUp,
+      alertDown: alertDown ?? this.alertDown,
+      onlyActiveAlerts: onlyActiveAlerts ?? this.onlyActiveAlerts,
     );
   }
 
@@ -477,6 +496,9 @@ class ChartStyle {
         'crosshairWidth': crosshairWidth,
         'crosshairStyle': crosshairStyle.name,
         'magnet': magnet.name,
+        if (alertUp != null) 'alertUp': alertUp!.toARGB32(),
+        if (alertDown != null) 'alertDown': alertDown!.toARGB32(),
+        'onlyActiveAlerts': onlyActiveAlerts,
       };
 
   static String encode(ChartStyle style) => jsonEncode(style.toJson());
@@ -542,6 +564,9 @@ class ChartStyle {
         (mode) => mode.name == decoded['magnet'],
         orElse: () => preset.magnet,
       ),
+      alertUp: _readColor(decoded['alertUp']),
+      alertDown: _readColor(decoded['alertDown']),
+      onlyActiveAlerts: _readFlag(decoded['onlyActiveAlerts']),
     );
   }
 

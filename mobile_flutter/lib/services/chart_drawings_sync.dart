@@ -393,7 +393,9 @@ class ChartDrawingsSync {
     if (a.length != b.length) return false;
     for (var index = 0; index < a.length; index += 1) {
       if (a[index].id != b[index].id) return false;
-      if (drawingSignature(a[index]) != drawingSignature(b[index])) return false;
+      if (drawingSignature(a[index]) != drawingSignature(b[index])) {
+        return false;
+      }
     }
     return true;
   }
@@ -514,6 +516,8 @@ String lookSignature(DrawingLook look) => <Object?>[
       look.locked ? 'lk' : '',
       look.hidden ? 'hd' : '',
       look.fill ?? '',
+      look.alert ? 'al' : '',
+      look.fired ? 'fd' : '',
     ].join(',');
 
 String _money(double value) => value.toStringAsFixed(7);

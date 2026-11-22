@@ -82,6 +82,22 @@ void main() {
     );
   });
 
+  test('alert line colours and the active-only filter survive a save', () {
+    final edited = ChartStyle.slate.copyWith(
+      alertUp: const Color(0xFFFFB020),
+      alertDown: const Color(0xFF7C4DFF),
+      onlyActiveAlerts: true,
+    );
+    final decoded = ChartStyle.decode(ChartStyle.encode(edited));
+
+    expect(decoded.alertUp, const Color(0xFFFFB020));
+    expect(decoded.alertDown, const Color(0xFF7C4DFF));
+    expect(decoded.onlyActiveAlerts, isTrue);
+    // An untouched chart leaves alert lines on the candle pair.
+    expect(ChartStyle.ink.alertUp, isNull);
+    expect(ChartStyle.ink.onlyActiveAlerts, isFalse);
+  });
+
   test('a flat canvas clears the gradient colour', () {
     final gradient =
         ChartStyle.slate.copyWith(backgroundTo: const Color(0xFF101421));

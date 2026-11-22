@@ -683,8 +683,19 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     add('stop', _stop);
     add('target', _take);
     add('exit', _exit);
-    for (final drawing in _drawings) {
-      if (drawing.kind == DrawingKind.ray) add('level', drawing.price);
+    // Alert lines are told apart from plain levels, because reaching one
+    // changes the object itself rather than only sending a notification.
+    final alertLines = <double, int>{};
+    for (var i = 0; i < _drawings.length; i++) {
+      final drawing = _drawings[i];
+      if (drawing.kind != DrawingKind.ray) continue;
+      if (drawing.look.alert) {
+        add('alert', drawing.price);
+        final price = drawing.price;
+        if (price != null) alertLines[price] = i;
+      } else {
+        add('level', drawing.price);
+      }
     }
     if (levels.isEmpty) return;
 
@@ -701,6 +712,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         continue;
       }
       _touchedAt[key] = now;
+      if (hit.label == 'alert') {
+        final index = alertLines[hit.price];
+        if (index != null) _markAlertFired(index);
+      }
       unawaited(
         Alerts.instance.levelTouched(
           symbol: widget.instrument.symbol,
@@ -712,6 +727,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         ),
       );
     }
+  }
+
+  /// Records that an alert line's price was reached.
+  ///
+  /// The flag lives on the object, so it synchronises with the line and
+  /// survives a restart; a side table would forget on the next launch and the
+  /// alert would fire again for a level the trader already saw.
+  void _markAlertFired(int index) {
+    if (index < 0 || index >= _drawings.length) return;
+    final drawing = _drawings[index];
+    if (drawing.look.fired) return;
+    final next = [..._drawings];
+    next[index] = drawing.withLook(drawing.look.copyWith(fired: true));
+    _commitDrawings(next);
   }
 
   void _retry() {
@@ -1685,6 +1714,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     final label = price.toStringAsFixed(decimals);
     final clock = DateFormat('d MMM HH:mm').format(time);
     final symbol = widget.instrument.symbol;
+    // An alert above the market is waiting for price to rise into it, so it
+    // takes the up colour; one below is waiting for a fall.
+    final last = _lastVisible?.close;
+    final alertColour = last != null && price < last
+        ? (_style.alertDown ?? _style.bear)
+        : (_style.alertUp ?? _style.bull);
 
     final action = await showModalBottomSheet<String>(
       context: context,
@@ -1756,9 +1791,16 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 ),
               ),
               row(
+                icon: Icons.notifications_active_outlined,
+                title: 'Add alert on $symbol at $label',
+                subtitle: 'A line that fires when price reaches this level',
+                value: 'alert',
+                tone: alertColour,
+              ),
+              row(
                 icon: Icons.horizontal_rule,
                 title: 'Pin a level here',
-                subtitle: 'Lives on the chart and alerts when price touches it',
+                subtitle: 'A plain line, no notification',
                 value: 'level',
                 tone: drawingColor,
               ),
@@ -1784,6 +1826,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     if (!mounted || action == null) return;
 
     switch (action) {
+      case 'alert':
+        _addDrawing(
+          ChartDrawing.ray(
+            price: price,
+            look: DrawingLook(alert: true, tint: alertColour),
+          ),
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Alert set at $label.'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        break;
       case 'level':
         _addDrawing(ChartDrawing.ray(price: price));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2672,6 +2728,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   String _drawingTitle(ChartDrawing drawing) {
     switch (drawing.kind) {
       case DrawingKind.ray:
+        if (drawing.look.alert) {
+          return drawing.look.fired ? 'Alert line — fired' : 'Alert line';
+        }
         return 'Horizontal ray';
       case DrawingKind.trend:
         return 'Trend line';
@@ -4031,6 +4090,13 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         ),
         _settingsDivider(),
         _settingsEntry(
+          _SettingsPage.alerts,
+          Icons.notifications_active_outlined,
+          style.onlyActiveAlerts ? 'Active only' : 'All lines',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
           _SettingsPage.events,
           Icons.event_note_outlined,
           _eventsSummary(style),
@@ -4089,6 +4155,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     ValueChanged<ChartStyle> onChanged,
   ) {
     switch (page) {
+      case _SettingsPage.alerts:
+        return _alertsSettings(style, onChanged);
       case _SettingsPage.canvas:
         return _canvasSettings(style, onChanged);
       case _SettingsPage.symbol:
@@ -4110,6 +4178,50 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       case _SettingsPage.home:
         return const SizedBox.shrink();
     }
+  }
+
+  /// Alert lines: what colour they take when they point up or down, and
+  /// whether the ones that have already fired stay in view.
+  Widget _alertsSettings(ChartStyle style, ValueChanged<ChartStyle> onChanged) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Alert lines'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _colorRow(
+            'Above the market',
+            style.alertUp ?? style.bull,
+            (color) => onChanged(style.copyWith(alertUp: color)),
+          ),
+        ),
+        _settingsDivider(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _colorRow(
+            'Below the market',
+            style.alertDown ?? style.bear,
+            (color) => onChanged(style.copyWith(alertDown: color)),
+          ),
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Only active alerts',
+          subtitle: 'Lines that have already fired are kept but taken off the '
+              'chart, so what is left is what is still being watched.',
+          value: style.onlyActiveAlerts,
+          onChanged: (value) =>
+              onChanged(style.copyWith(onlyActiveAlerts: value)),
+        ),
+        _settingsGroupLabel('On the chart'),
+        _settingsRow(
+          title: 'Add an alert',
+          subtitle: 'Long-press the chart, then tap + beside the price and '
+              'choose “Add alert”.',
+          value: 'Crosshair +',
+        ),
+      ],
+    );
   }
 
   /// The canvas itself: what it is painted on, and how the crosshair reads
@@ -7651,6 +7763,7 @@ enum _SettingsPage {
   home('Chart settings'),
   canvas('Canvas'),
   symbol('Symbol'),
+  alerts('Alerts'),
   appearance('Appearance'),
   scales('Scales'),
   grid('Grid'),

@@ -78,6 +78,8 @@ class DrawingLook {
     this.locked = false,
     this.hidden = false,
     this.fill,
+    this.alert = false,
+    this.fired = false,
   });
 
   /// Colour of the stroke and its tags; null follows the chart style.
@@ -104,6 +106,16 @@ class DrawingLook {
   /// Null follows the chart's own restraint, so an untouched object stays quiet.
   final int? fill;
 
+  /// A level that announces itself when price reaches it, rather than one that
+  /// only sits on the chart. The line is the same object either way: the flag
+  /// is what makes it an alert.
+  final bool alert;
+
+  /// Set once the alert has been delivered. A fired line stays where it was
+  /// drawn — it is the record of a level that was reached — but it stops
+  /// counting as active.
+  final bool fired;
+
   bool get isDefault =>
       tint == null &&
       weight == null &&
@@ -111,6 +123,8 @@ class DrawingLook {
       !dotted &&
       !locked &&
       !hidden &&
+      !alert &&
+      !fired &&
       fill == null;
 
   DrawingLook copyWith({
@@ -121,6 +135,8 @@ class DrawingLook {
     bool? locked,
     bool? hidden,
     int? fill,
+    bool? alert,
+    bool? fired,
     bool clearTint = false,
     bool clearWeight = false,
     bool clearFill = false,
@@ -129,7 +145,9 @@ class DrawingLook {
     // round, so the two flags can never both be true and draw something between
     // the two.
     final nextDashed = dotted == true ? false : (dashed ?? this.dashed);
-    final nextDotted = dotted == true ? true : (dashed == true ? false : (dotted ?? this.dotted));
+    final nextDotted = dotted == true
+        ? true
+        : (dashed == true ? false : (dotted ?? this.dotted));
     return DrawingLook(
       tint: clearTint ? null : (tint ?? this.tint),
       weight: clearWeight ? null : (weight ?? this.weight),
@@ -138,18 +156,22 @@ class DrawingLook {
       locked: locked ?? this.locked,
       hidden: hidden ?? this.hidden,
       fill: clearFill ? null : (fill ?? this.fill),
+      alert: alert ?? this.alert,
+      fired: fired ?? this.fired,
     );
   }
 
   Map<String, Object?> toJson() => {
-    if (tint != null) 'c': tint!.toARGB32(),
-    if (weight != null) 'w': weight,
-    if (dashed) 'd': true,
-    if (dotted) 'dt': true,
-    if (locked) 'lk': true,
-    if (hidden) 'hd': true,
-    if (fill != null) 'f': fill,
-  };
+        if (tint != null) 'c': tint!.toARGB32(),
+        if (weight != null) 'w': weight,
+        if (dashed) 'd': true,
+        if (dotted) 'dt': true,
+        if (locked) 'lk': true,
+        if (hidden) 'hd': true,
+        if (fill != null) 'f': fill,
+        if (alert) 'al': true,
+        if (fired) 'fd': true,
+      };
 
   static DrawingLook fromJson(Object? value) {
     if (value is! Map) return const DrawingLook();
@@ -164,6 +186,8 @@ class DrawingLook {
       locked: value['lk'] == true,
       hidden: value['hd'] == true,
       fill: rawFill is num ? rawFill.toInt().clamp(0, 100) : null,
+      alert: value['al'] == true,
+      fired: value['fd'] == true,
     );
   }
 }
@@ -344,7 +368,8 @@ class ChartDrawing {
   }
 
   /// True for the objects drawn from [points] rather than from levels.
-  bool get isAnchored => points.isNotEmpty &&
+  bool get isAnchored =>
+      points.isNotEmpty &&
       kind != DrawingKind.trend &&
       kind != DrawingKind.position;
 

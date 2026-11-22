@@ -893,15 +893,22 @@ class TradingChartPainter extends CustomPainter {
     if (drawing.kind == DrawingKind.ray) {
       final price = drawing.price;
       if (price == null) return;
+      // An alert that has already fired stops counting as active, and a trader
+      // who asked to see only active ones is not asking to see this line.
+      final fired = drawing.look.fired;
+      if (fired && style.onlyActiveAlerts) return;
       final ly = y(price);
       if (ly < priceTop || ly > priceTop + plotH) return;
       final width = drawing.look.weight ?? (selected ? 2.4 : 1.3);
+      // A fired line keeps its colour but loses its weight: still readable as
+      // the level that was reached, no longer competing with the live ones.
+      final colour = fired ? drawing.ink.withAlpha(120) : drawing.ink;
       if (drawing.look.dashed || drawing.look.dotted) {
         _dashSegment(
           canvas,
           Offset(0, ly),
           Offset(plotW, ly),
-          drawing.ink,
+          colour,
           width,
           dotted: drawing.look.dotted,
         );
@@ -910,9 +917,22 @@ class TradingChartPainter extends CustomPainter {
           Offset(0, ly),
           Offset(plotW, ly),
           Paint()
-            ..color = drawing.ink
+            ..color = colour
             ..strokeWidth = width
             ..style = PaintingStyle.stroke,
+        );
+      }
+      if (drawing.look.alert) {
+        // A mark at the left edge, so an alert line is told apart from a plain
+        // level without reading its menu. Hollow while it is waiting, solid
+        // once it has fired.
+        final marker = Rect.fromLTWH(0, ly - 3.5, 4, 7);
+        canvas.drawRect(
+          marker,
+          Paint()
+            ..color = colour
+            ..style = fired ? PaintingStyle.fill : PaintingStyle.stroke
+            ..strokeWidth = 1.2,
         );
       }
       if (selected) {
