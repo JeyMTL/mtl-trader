@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' show Color;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mtl_trader_mobile/core/chart_magnet.dart';
 import 'package:mtl_trader_mobile/core/chart_theme.dart';
 import 'package:mtl_trader_mobile/core/indicators.dart';
 
@@ -44,6 +45,7 @@ void main() {
       showCountdown: true,
       dayOfWeekLabels: true,
       use24Hour: false,
+      magnet: MagnetMode.strong,
     );
 
     final decoded = ChartStyle.decode(ChartStyle.encode(edited));
@@ -57,6 +59,9 @@ void main() {
     expect(decoded.showCountdown, isTrue);
     expect(decoded.dayOfWeekLabels, isTrue);
     expect(decoded.use24Hour, isFalse);
+    // The magnet travels with the instrument: reopening a chart must not put a
+    // trader back on the weak magnet they replaced.
+    expect(decoded.magnet, MagnetMode.strong);
   });
 
   test('the canvas gradient and crosshair survive a save', () {

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'chart_magnet.dart';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -115,6 +117,7 @@ class ChartStyle {
     this.backgroundTo,
     this.crosshairWidth = 1,
     this.crosshairStyle = CrosshairStyle.dashed,
+    this.magnet = MagnetMode.weak,
   });
 
   /// Stable key for the preset, used for selection state.
@@ -222,6 +225,10 @@ class ChartStyle {
   final double crosshairWidth;
   final CrosshairStyle crosshairStyle;
 
+  /// How a new anchor treats the candle values under the finger. Saved with the
+  /// instrument, because a trader who sets a strong magnet sets it for good.
+  final MagnetMode magnet;
+
   /// The zone this chart is drawn in.
   ChartZone get zone => ChartZone.byId(zoneId);
 
@@ -278,6 +285,7 @@ class ChartStyle {
     Color? backgroundTo,
     double? crosshairWidth,
     CrosshairStyle? crosshairStyle,
+    MagnetMode? magnet,
 
     /// Drop back to a flat background; null cannot mean that in a copyWith.
     bool clearBackgroundTo = false,
@@ -325,6 +333,7 @@ class ChartStyle {
           clearBackgroundTo ? null : (backgroundTo ?? this.backgroundTo),
       crosshairWidth: crosshairWidth ?? this.crosshairWidth,
       crosshairStyle: crosshairStyle ?? this.crosshairStyle,
+      magnet: magnet ?? this.magnet,
     );
   }
 
@@ -467,6 +476,7 @@ class ChartStyle {
         if (backgroundTo != null) 'backgroundTo': backgroundTo!.toARGB32(),
         'crosshairWidth': crosshairWidth,
         'crosshairStyle': crosshairStyle.name,
+        'magnet': magnet.name,
       };
 
   static String encode(ChartStyle style) => jsonEncode(style.toJson());
@@ -528,6 +538,10 @@ class ChartStyle {
           ? (decoded['crosshairWidth'] as num).toDouble().clamp(0.5, 4.0)
           : null,
       crosshairStyle: CrosshairStyle.byName(decoded['crosshairStyle']),
+      magnet: MagnetMode.values.firstWhere(
+        (mode) => mode.name == decoded['magnet'],
+        orElse: () => preset.magnet,
+      ),
     );
   }
 

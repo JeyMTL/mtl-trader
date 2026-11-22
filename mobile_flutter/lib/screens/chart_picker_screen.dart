@@ -10,6 +10,7 @@ import '../core/chart_replay.dart';
 import 'time_frame_sheet.dart';
 import '../core/chart_drawings.dart';
 import '../core/chart_layouts.dart';
+import '../core/chart_magnet.dart';
 import '../core/chart_presets.dart';
 import '../core/chart_scale.dart';
 import '../core/chart_sessions.dart';
@@ -132,7 +133,24 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   /// Snap to a wick while dragging. On by default, as on a desk, but a trader
   /// marking a fill that printed between two ticks needs it off.
-  bool _magnet = true;
+  /// The magnet lives in the saved chart style: a trader who picks Strong has
+  /// picked it for this instrument, and reopening the chart must not undo it.
+  MagnetMode get _magnet => _style.magnet;
+
+  /// Off → weak → strong → off, saved immediately so the next open matches the
+  /// icon the trader is looking at.
+  void _cycleMagnet() {
+    setState(() => _style = _style.copyWith(magnet: _style.magnet.next));
+    unawaited(ChartStyle.saveLayout(widget.instrument.symbol, _style));
+  }
+
+  /// The magnet's own icon, so the rail button always says which mode is live
+  /// rather than only whether it is on.
+  IconData get _magnetIcon => switch (_magnet) {
+        MagnetMode.off => Icons.hdr_off,
+        MagnetMode.weak => Icons.hdr_weak,
+        MagnetMode.strong => Icons.hdr_strong,
+      };
 
   /// Candle under the crosshair, so the header can show its O H L C the way a
   /// desktop chart does while the pointer travels.
@@ -1007,10 +1025,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             active: _replay != null,
           ),
           button(
-            icon: Icons.hdr_strong,
-            tooltip: _magnet ? 'Magnet on' : 'Magnet off',
-            onTap: () => setState(() => _magnet = !_magnet),
-            active: _magnet,
+            icon: _magnetIcon,
+            tooltip: 'Magnet: ${_magnet.label}',
+            onTap: _cycleMagnet,
+            active: _magnet != MagnetMode.off,
           ),
           button(
             icon: Icons.tune,
@@ -1065,12 +1083,14 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           // next to fullscreen under the same finger.
           _syncAction(),
           IconButton(
-            tooltip: _magnet ? 'Magnet on' : 'Magnet off',
-            onPressed: () => setState(() => _magnet = !_magnet),
+            tooltip: 'Magnet: ${_magnet.label}',
+            onPressed: _cycleMagnet,
             icon: Icon(
-              Icons.hdr_strong,
+              _magnetIcon,
               size: 20,
-              color: _magnet ? AppColors.primaryLight : AppColors.muted,
+              color: _magnet == MagnetMode.off
+                  ? AppColors.muted
+                  : AppColors.primaryLight,
             ),
           ),
           Container(
@@ -1221,12 +1241,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           // discover after leaving the canvas.
           _syncAction(overlay: true),
           IconButton(
-            tooltip: _magnet ? 'Magnet on' : 'Magnet off',
-            onPressed: () => setState(() => _magnet = !_magnet),
+            tooltip: 'Magnet: ${_magnet.label}',
+            onPressed: _cycleMagnet,
             icon: Icon(
-              Icons.hdr_strong,
+              _magnetIcon,
               size: 19,
-              color: _magnet ? _style.text : _style.muted,
+              color: _magnet == MagnetMode.off ? _style.muted : _style.text,
             ),
           ),
           Container(
@@ -4226,7 +4246,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   selected: preset.id == style.id &&
                       preset.bull == style.bull &&
                       preset.bear == style.bear,
-                  onTap: () => onChanged(preset),
+                  // A theme is colours, not tools: the magnet the trader set
+                  // survives picking a new palette.
+                  onTap: () => onChanged(preset.copyWith(magnet: style.magnet)),
                 ),
             ],
           ),
@@ -5476,7 +5498,7 @@ class _ChartCanvas extends StatefulWidget {
     this.pendingKind,
     this.pendingSide,
     required this.onDrawingCreated,
-    this.magnet = true,
+    this.magnet = MagnetMode.weak,
     this.onCrosshair,
     this.onPlacing,
     this.onQuickAction,
@@ -5524,7 +5546,7 @@ class _ChartCanvas extends StatefulWidget {
   final ValueChanged<ChartDrawing> onDrawingCreated;
 
   /// Snap a placed or dragged point onto a wick, open, high, low or close.
-  final bool magnet;
+  final MagnetMode magnet;
 
   /// The candle under the crosshair, or null when the crosshair is away. The
   /// screen uses it for the O H L C legend in the header.
@@ -5816,32 +5838,31 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// still lands exactly where it was released.
   double _priceAt(Offset local) {
     final raw = _priceFor(local);
-    if (!widget.magnet) return raw;
+    if (widget.magnet == MagnetMode.off) return raw;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     final candles = widget.candles;
     if (plotW <= 0 || candles.isEmpty) return raw;
     final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
     final index = _view.indexAt(ratio, candles.length);
-    var bestDy = 7.0;
-    double? best;
-    for (var i = math.max(0, index - 1);
-        i <= math.min(candles.length - 1, index + 1);
-        i++) {
-      final candle = candles[i];
-      for (final price in [
-        candle.open,
-        candle.high,
-        candle.low,
-        candle.close
-      ]) {
-        final dy = (_yFor(price) - local.dy).abs();
-        if (dy < bestDy) {
-          bestDy = dy;
-          best = price;
-        }
-      }
-    }
-    return best ?? raw;
+    final prices = <double>[
+      for (var i = math.max(0, index - 1);
+          i <= math.min(candles.length - 1, index + 1);
+          i++) ...<double>[
+        candles[i].open,
+        candles[i].high,
+        candles[i].low,
+        candles[i].close,
+      ],
+    ];
+    return magnetPrice(
+      raw: raw,
+      candidates: magnetCandidates(
+        prices: prices,
+        yFor: _yFor,
+        fingerY: local.dy,
+      ),
+      mode: widget.magnet,
+    );
   }
 
   /// A finger position as a chart point. Time is the candle's own stamp, so an
