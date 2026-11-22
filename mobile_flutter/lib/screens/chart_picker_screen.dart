@@ -9,6 +9,8 @@ import 'package:intl/intl.dart' show DateFormat;
 import '../core/chart_replay.dart';
 import 'time_frame_sheet.dart';
 import '../core/chart_drawings.dart';
+import '../core/chart_layouts.dart';
+import '../core/chart_presets.dart';
 import '../core/chart_scale.dart';
 import '../core/chart_sessions.dart';
 import '../core/chart_theme.dart';
@@ -24,7 +26,9 @@ import '../services/chart_drawings_sync.dart';
 import '../services/market_data.dart';
 import '../ui/chart/chart_marker.dart';
 import '../ui/chart/chart_painter.dart';
+import 'alerts_screen.dart';
 import '../ui/chart/drawings_sheet.dart';
+import '../ui/chart/layouts_sheet.dart';
 import '../ui/chart/object_settings.dart';
 import '../ui/chart/sync_badge.dart';
 import '../ui/color_wheel.dart';
@@ -268,6 +272,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     _startRefreshTimer();
     _restoreDrawings();
     _restoreLayout();
+    _restoreLayouts();
   }
 
   /// Every instrument remembers its own studies, panes and scale.
@@ -1005,6 +1010,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             icon: Icons.tune,
             tooltip: 'Chart style',
             onTap: _openStyleSheet,
+          ),
+          button(
+            icon: Icons.more_horiz,
+            tooltip: 'Analysis hub',
+            onTap: _openAnalysisHub,
           ),
           const Spacer(),
           button(
@@ -2253,6 +2263,14 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.more_horiz, size: 20),
+                  title: const Text('Analysis hub'),
+                  subtitle: const Text('Layouts, settings, studies, alerts'),
+                  onTap: () => pick('hub'),
+                ),
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.delete_sweep_outlined, size: 20),
                   title: const Text('Clear all drawings'),
                   enabled: _drawings.isNotEmpty,
@@ -2300,6 +2318,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       await _openObjectTree();
       return;
     }
+    if (action == 'hub') {
+      await _openAnalysisHub();
+      return;
+    }
     if (action == 'clear') {
       _commitDrawings(const []);
       // The account copy goes too, so a level pinned on the web desk cannot
@@ -2324,10 +2346,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     required IconData icon,
     required String label,
     required String subtitle,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     Color? tone,
   }) {
-    final color = tone ?? AppColors.text;
+    // A card with nowhere to go still draws, greyed: a hub that hides its
+    // unavailable tools leaves the trader wondering whether it has them at all.
+    final color = onTap == null ? AppColors.faint : (tone ?? AppColors.text);
     return Material(
       color: AppColors.surfaceAlt,
       borderRadius: BorderRadius.circular(AppRadius.field),
@@ -3147,41 +3171,639 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     );
   }
 
-  Future<void> _openStyleSheet() async {
-    var page = _SettingsPage.home;
-    await showModalBottomSheet<void>(
+  /// The analysis hub: workspace controls above, analytical tools below.
+  ///
+  /// This is the "..." button of a charting app — the place a trader goes to
+  /// change how they are looking rather than what they are looking at. Cards
+  /// rather than rows, because the six workspace actions are the ones people
+  /// hit without reading.
+  Future<void> _openAnalysisHub() async {
+    final action = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        final active = _layouts
+            .where((layout) => layout.id == _activeLayoutId)
+            .cast<ChartLayout?>()
+            .firstWhere((layout) => layout != null, orElse: () => null);
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Chart tools',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      icon: Icon(Icons.close, size: 18, color: AppColors.muted),
+                    ),
+                  ],
+                ),
+                Text(
+                  active == null
+                      ? 'No layout saved yet — Save keeps this chart exactly as it looks.'
+                      : 'Layout: ${active.name}',
+                  style: TextStyle(
+                    color: AppColors.faint,
+                    fontSize: 10.5,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _sheetLabel('WORKSPACE'),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.dashboard_customize_outlined,
+                        label: 'Layouts',
+                        subtitle: '${_layouts.length} saved',
+                        onTap: () => Navigator.of(sheetContext).pop('layouts'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.tune,
+                        label: 'Settings',
+                        subtitle: _style.name,
+                        onTap: () => Navigator.of(sheetContext).pop('settings'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.save_outlined,
+                        label: 'Save',
+                        subtitle: 'This chart',
+                        onTap: () => Navigator.of(sheetContext).pop('save'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.folder_open_outlined,
+                        label: 'Open',
+                        subtitle: 'From library',
+                        onTap: () => Navigator.of(sheetContext).pop('open'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.note_add_outlined,
+                        label: 'New',
+                        subtitle: 'Blank chart',
+                        onTap: () => Navigator.of(sheetContext).pop('new'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.grid_view_outlined,
+                        label: 'Type',
+                        subtitle: _style.chartType.label,
+                        onTap: () => Navigator.of(sheetContext).pop('type'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _sheetLabel('TOOLS'),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.show_chart,
+                        label: 'Indicators',
+                        subtitle: _style.studies.isEmpty
+                            ? 'None'
+                            : '${_style.studies.length} on',
+                        onTap: () => Navigator.of(sheetContext).pop('indicators'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.notifications_active_outlined,
+                        label: 'Alerts',
+                        subtitle: 'Level touches',
+                        onTap: () => Navigator.of(sheetContext).pop('alerts'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.replay,
+                        label: 'Replay',
+                        subtitle: _replay == null ? 'Off' : 'On',
+                        onTap: _candles.length < 12
+                            ? null
+                            : () => Navigator.of(sheetContext).pop('replay'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.account_tree_outlined,
+                        label: 'Object tree',
+                        subtitle: '${_drawings.length} objects',
+                        onTap: _drawings.isEmpty
+                            ? null
+                            : () => Navigator.of(sheetContext).pop('tree'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.schedule,
+                        label: 'Time zone',
+                        subtitle: _style.zone.describe(),
+                        onTap: () => Navigator.of(sheetContext).pop('zone'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _toolCard(
+                        icon: Icons.calendar_month_outlined,
+                        label: 'Events',
+                        subtitle: _eventsSummary(_style),
+                        onTap: () => Navigator.of(sheetContext).pop('events'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'layouts':
+      case 'open':
+        await _openLayouts();
+        break;
+      case 'save':
+        await _saveLayout();
+        break;
+      case 'new':
+        await _newLayout();
+        break;
+      case 'settings':
+        await _openStyleSheet();
+        break;
+      case 'indicators':
+      case 'studies':
+        await _openStyleSheet(start: _SettingsPage.indicators);
+        break;
+      case 'zone':
+        final zone = await _pickZone(_style.zone);
+        if (zone == null || !mounted) return;
+        setState(() => _style = _style.copyWith(zoneId: zone.id));
+        unawaited(ChartStyle.save());
+        unawaited(ChartStyle.saveLayout(widget.instrument.symbol, _style));
+        break;
+      case 'alerts':
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const AlertsScreen()),
+        );
+        break;
+      case 'replay':
+        _toggleReplayMode();
+        break;
+      case 'tree':
+        await _openObjectTree();
+        break;
+      case 'events':
+        await _openStyleSheet(start: _SettingsPage.events);
+        break;
+      case 'type':
+        await _openStyleSheet(start: _SettingsPage.appearance);
+        break;
+    }
+  }
+
+  /// The saved-layout library, loaded once per visit and kept in memory: the
+  /// list is small and the manager edits it locally before a single write.
+  List<ChartLayout> _layouts = const <ChartLayout>[];
+  String? _activeLayoutId;
+
+  Future<void> _restoreLayouts() async {
+    final layouts = await ChartLayoutStore.load();
+    final active = await ChartLayoutStore.activeId();
+    if (!mounted) return;
+    setState(() {
+      _layouts = layouts;
+      _activeLayoutId = active;
+    });
+  }
+
+  /// Saves what is on screen as a layout, under a name the trader picks.
+  ///
+  /// Saving over the active layout is the common case — a chart is tuned a
+  /// little at a time — so the dialog offers that name first and keeps its id,
+  /// which is what makes "Save" an update instead of a growing pile.
+  Future<void> _saveLayout() async {
+    final existing = _layouts
+        .where((layout) => layout.id == _activeLayoutId)
+        .cast<ChartLayout?>()
+        .firstWhere((layout) => layout != null, orElse: () => null);
+    final controller = TextEditingController(
+      text: existing?.name ?? '${widget.instrument.symbol} ${_interval.key}',
+    );
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(existing == null ? 'Save layout' : 'Update layout'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 40,
+          decoration: const InputDecoration(
+            labelText: 'Layout name',
+            hintText: 'JeyMTL',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (value) =>
+              Navigator.of(dialogContext).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: Text(existing == null ? 'Save' : 'Update'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || name == null || name.isEmpty) return;
+
+    final saved = ChartLayout(
+      id: existing?.id ??
+          DateTime.now().millisecondsSinceEpoch.toRadixString(36),
+      name: name,
+      symbol: widget.instrument.symbol,
+      intervalKey: _interval.key,
+      style: _style,
+      savedAt: DateTime.now(),
+      starred: existing?.starred ?? false,
+    );
+    final next = <ChartLayout>[
+      for (final layout in _layouts)
+        if (layout.id != saved.id) layout,
+      saved,
+    ];
+    await ChartLayoutStore.save(next);
+    await ChartLayoutStore.setActive(saved.id);
+    if (!mounted) return;
+    setState(() {
+      _layouts = next;
+      _activeLayoutId = saved.id;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Saved “$name”.'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Opens the library and applies whatever the trader picks.
+  Future<void> _openLayouts() async {
+    if (_layouts.isEmpty) await _restoreLayouts();
+    if (!mounted) return;
+    final result = await showLayoutsManager(
+      context,
+      layouts: _layouts,
+      activeId: _activeLayoutId,
+      currentSymbol: widget.instrument.symbol,
+      currentIntervalKey: _interval.key,
+    );
+    if (!mounted || result == null) return;
+
+    if (result.saveCurrent) {
+      await _saveLayout();
+      return;
+    }
+    final deleting = result.delete;
+    if (deleting != null) {
+      final next = _layouts.where((layout) => layout.id != deleting.id).toList();
+      await ChartLayoutStore.save(next);
+      final active = _activeLayoutId == deleting.id ? null : _activeLayoutId;
+      await ChartLayoutStore.setActive(active);
+      if (!mounted) return;
+      setState(() {
+        _layouts = next;
+        _activeLayoutId = active;
+      });
+      return;
+    }
+
+    final layout = result.layout;
+    if (layout == null) return;
+    final interval = ChartInterval.values.firstWhere(
+      (candidate) => candidate.key == layout.intervalKey,
+      orElse: () => _interval,
+    );
+    final candlesChanged = interval != _interval;
+    setState(() {
+      _style = layout.style;
+      _activeLayoutId = layout.id;
+    });
+    unawaited(ChartStyle.save());
+    unawaited(ChartStyle.saveLayout(widget.instrument.symbol, layout.style));
+    unawaited(ChartLayoutStore.setActive(layout.id));
+    // The candle size is a different series, so it is switched through the one
+    // path that already clears the cache, the replay and the stale stamp.
+    if (candlesChanged) await _setInterval(interval);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          layout.symbol == widget.instrument.symbol
+              ? 'Opened “${layout.name}”.'
+              : 'Opened “${layout.name}” on ${widget.instrument.symbol} — the '
+                  'palette and candle size came with it.',
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  /// A blank chart: the app's own palette, no studies, no active layout.
+  Future<void> _newLayout() async {
+    setState(() {
+      _style = ChartStyle.ink;
+      _activeLayoutId = null;
+    });
+    unawaited(ChartStyle.save());
+    unawaited(ChartStyle.saveLayout(widget.instrument.symbol, ChartStyle.ink));
+    unawaited(ChartLayoutStore.setActive(null));
+  }
+
+  Future<void> _openStyleSheet({_SettingsPage start = _SettingsPage.home}) async {
+    var page = start;
+    // Everything below edits a draft. Nothing reaches the chart until Ok, which
+    // is the whole point of a Cancel button: a trader tries a light canvas, sees
+    // it is wrong and walks away with the dark one still there.
+    var draft = _style;
+    final presets = await ChartPresetStore.load();
+    if (!mounted) return;
+
+    void commit(ChartStyle next) {
+      ChartStyle.current = next;
+      unawaited(ChartStyle.save());
+      unawaited(ChartStyle.saveLayout(widget.instrument.symbol, next));
+      if (!mounted) return;
+      setState(() => _style = next);
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface,
       builder: (sheetContext) {
         return SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * 0.92,
+          height: MediaQuery.sizeOf(sheetContext).height * 0.94,
           child: StatefulBuilder(
             builder: (context, setSheetState) {
               return _styleSheet(
-                _style,
-                (next) {
-                  ChartStyle.current = next;
-                  // Persist in the background; the sheet repaints immediately. The
-                  // per-instrument layout is what reopening this symbol restores.
-                  unawaited(ChartStyle.save());
-                  unawaited(
-                    ChartStyle.saveLayout(widget.instrument.symbol, next),
-                  );
-                  if (!mounted) return;
-                  _style = next;
-                  setSheetState(() {});
-                  setState(() {});
-                },
+                draft,
+                (next) => setSheetState(() => draft = next),
                 page: page,
                 onNavigate: (next) => setSheetState(() => page = next),
-                onClose: () => Navigator.of(context).pop(),
+                onClose: () => Navigator.of(sheetContext).pop(),
+                footer: _settingsFooter(
+                  presets: presets,
+                  onApply: (next) => setSheetState(() => draft = next),
+                  onSaveAs: () async {
+                    final name = await _namePreset();
+                    if (name == null || name.isEmpty || !mounted) return;
+                    presets
+                      ..removeWhere(
+                        (preset) =>
+                            preset.name.toLowerCase() == name.toLowerCase(),
+                      )
+                      ..insert(0, ChartPreset(name: name, style: draft));
+                    await ChartPresetStore.save(presets);
+                    if (!mounted) return;
+                    setSheetState(() {});
+                  },
+                  onDeletePreset: (preset) async {
+                    presets.removeWhere((item) => item.name == preset.name);
+                    await ChartPresetStore.save(presets);
+                    if (!mounted) return;
+                    setSheetState(() {});
+                  },
+                  onCancel: () => Navigator.of(sheetContext).pop(),
+                  onOk: () {
+                    commit(draft);
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
               );
             },
           ),
         );
       },
     );
+  }
+
+  /// The bottom bar of every settings page: templates, Cancel, Ok.
+  Widget _settingsFooter({
+    required List<ChartPreset> presets,
+    required ValueChanged<ChartStyle> onApply,
+    required Future<void> Function() onSaveAs,
+    required Future<void> Function(ChartPreset preset) onDeletePreset,
+    required VoidCallback onCancel,
+    required VoidCallback onOk,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(6, 8, 12, 8),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Templates',
+            onPressed: () => _openTemplates(
+              presets: presets,
+              onApply: onApply,
+              onSaveAs: onSaveAs,
+              onDeletePreset: onDeletePreset,
+            ),
+            icon: Icon(Icons.more_horiz, size: 20, color: AppColors.muted),
+          ),
+          const Spacer(),
+          // Both buttons give way at large system text instead of forcing the
+          // bar wider than the phone: a Cancel nobody can reach is not a choice.
+          Flexible(
+            child: TextButton(
+              onPressed: onCancel,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.muted,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: const Text('Cancel', maxLines: 1),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: FilledButton(
+              onPressed: onOk,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(48, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: const Text('Ok', maxLines: 1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openTemplates({
+    required List<ChartPreset> presets,
+    required ValueChanged<ChartStyle> onApply,
+    required Future<void> Function() onSaveAs,
+    required Future<void> Function(ChartPreset preset) onDeletePreset,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: StatefulBuilder(
+          builder: (context, setLocal) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.restart_alt, size: 20),
+                title: const Text('Apply defaults'),
+                subtitle: const Text('Back to the app’s own palette and studies'),
+                onTap: () {
+                  onApply(ChartStyle.ink);
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.save_as_outlined, size: 20),
+                title: const Text('Save as…'),
+                subtitle: const Text('Keep these settings as a template'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await onSaveAs();
+                },
+              ),
+              if (presets.isNotEmpty) ...[
+                const Divider(height: 8),
+                for (final preset in presets)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.dashboard_outlined, size: 20),
+                    title: Text(preset.name),
+                    trailing: IconButton(
+                      tooltip: 'Delete ${preset.name}',
+                      onPressed: () async {
+                        await onDeletePreset(preset);
+                        if (context.mounted) setLocal(() {});
+                      },
+                      icon: Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: AppColors.danger,
+                      ),
+                    ),
+                    onTap: () {
+                      onApply(preset.style);
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+              ],
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _namePreset() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Save template'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 30,
+          decoration: const InputDecoration(
+            labelText: 'Template name',
+            hintText: 'MTL',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (value) =>
+              Navigator.of(dialogContext).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return name;
   }
 
   /// The chart settings sheet, laid out the way TradingView does it: a short
@@ -3195,6 +3817,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     required _SettingsPage page,
     required ValueChanged<_SettingsPage> onNavigate,
     required VoidCallback onClose,
+    required Widget footer,
   }) {
     return SafeArea(
       top: false,
@@ -3207,6 +3830,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 ? _settingsHome(style, onChanged, onNavigate)
                 : _settingsBody(page, style, onChanged),
           ),
+          footer,
         ],
       ),
     );
@@ -3236,17 +3860,21 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             padding: const EdgeInsets.fromLTRB(4, 2, 8, 2),
             child: Row(
               children: [
-                IconButton(
-                  tooltip: page == _SettingsPage.home ? 'Close' : 'Back',
-                  onPressed: page == _SettingsPage.home
-                      ? onClose
-                      : () => onNavigate(_SettingsPage.home),
-                  icon: Icon(
-                    page == _SettingsPage.home ? Icons.close : Icons.arrow_back,
-                    size: 20,
-                    color: AppColors.text,
-                  ),
-                ),
+                // A subpage gets the back chevron the spec asks for; the close
+                // X on the right is the way out from anywhere, so the two are
+                // never the same button wearing two icons.
+                if (page != _SettingsPage.home)
+                  IconButton(
+                    tooltip: 'Back',
+                    onPressed: () => onNavigate(_SettingsPage.home),
+                    icon: Icon(
+                      Icons.arrow_back,
+                      size: 20,
+                      color: AppColors.text,
+                    ),
+                  )
+                else
+                  const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     page.title,
@@ -3258,17 +3886,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                     ),
                   ),
                 ),
-                TextButton(
+                IconButton(
+                  tooltip: 'Close',
                   onPressed: onClose,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primaryLight,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    textStyle: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  child: const Text('Done'),
+                  icon: Icon(Icons.close, size: 20, color: AppColors.muted),
                 ),
               ],
             ),
