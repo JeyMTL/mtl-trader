@@ -126,7 +126,7 @@ export default function HomePage() {
           {authError && (
             <p className="mt-3 text-sm text-danger">{authError}</p>
           )}
-          <p className="fade-up-3 text-gray-500 mt-5 text-sm">No credit card required • Unlimited access for 14 days</p>
+          <p className="fade-up-3 text-gray-500 mt-5 text-sm">No credit card required • Unlimited access for 7 days</p>
         </div>
       </section>
 

@@ -36,7 +36,7 @@ Read at a glance between sessions: dark interface, gold accents, monospaced numb
 
 PLANS
 
-A 14-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar and analytics, time edge, the chart desk with levels shared between phone and web, MT5 sync, prop-firm rules, photos and voice notes, and 30 AI reviews a month; Pro raises the review allowance and adds the backtester, market replay, API access and priority support. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
+A 7-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar and analytics, time edge, the chart desk with levels shared between phone and web, MT5 sync, prop-firm rules, photos and voice notes, and 30 AI reviews a month; Pro raises the review allowance and adds the backtester, market replay, API access and priority support. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
 
 Subscriptions bought in this app are sold and billed by Google Play, and you can manage or cancel them any time from your Play account.
 

@@ -132,6 +132,8 @@ const TOOLS: { id: ToolId; label: string; hint: string }[] = [
 const SYMBOLS = ['EUR_USD', 'GBP_USD', 'USD_JPY', 'XAU_USD', 'US30', 'NAS100']
 
 const AXIS = 64
+/** The time gutter under the plot. Reserved, so labels no longer sit on bars. */
+const TIME_AXIS = 24
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 /** Violet: distinct from the bars, the VWAP amber and the session lines. */
 const COMPARE_COLOUR = '#a78bfa'
@@ -287,6 +289,12 @@ export function ChartWorkspace({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 900, height: 520 })
+  /**
+   * Vertical stretch of the price scale, the same idea as the phone's
+   * `_priceZoom`: 1 fits the visible candles, smaller zooms in on the range.
+   * Dragging the price gutter changes it.
+   */
+  const [priceZoom, setPriceZoom] = useState(1)
 
   useEffect(() => {
     if (!replayPlaying) return
@@ -311,6 +319,16 @@ export function ChartWorkspace({
     originY: number
     start: View
     points?: Point[]
+  } | null>(null)
+
+  /** A drag that started on one of the axis gutters: it zooms that axis. */
+  const axisDrag = useRef<{
+    axis: 'price' | 'time'
+    startX: number
+    startY: number
+    baseZoom: number
+    baseSpan: number
+    baseStart: number
   } | null>(null)
 
   const visible = useMemo(() => {
@@ -350,8 +368,19 @@ export function ChartWorkspace({
     }
     // A little air above and below, so a level at the extreme is still grabbable.
     const pad = (max - min) * 0.08 || 0.0004
-    return { min: min - pad, max: max + pad }
-  }, [candles.length, compareSeries, view, visible])
+    min -= pad
+    max += pad
+    // The trader's vertical stretch, around the middle of the range: the candles
+    // keep their centre while the axis stretches, which is what makes a drag on
+    // the price gutter feel like the chart rather than the page is moving.
+    if (priceZoom !== 1) {
+      const mid = (min + max) / 2
+      const half = ((max - min) / 2) * priceZoom
+      min = mid - half
+      max = mid + half
+    }
+    return { min, max }
+  }, [candles.length, compareSeries, priceZoom, view, visible])
 
   /** Percent move of the compare instrument across what is on screen. */
   const compareChange = useMemo(() => {
@@ -370,7 +399,7 @@ export function ChartWorkspace({
     (price: number) => settings.precision ?? pricePrecision(price),
     [settings.precision]
   )
-  const plotH = Math.max(60, size.height)
+  const plotH = Math.max(60, size.height - TIME_AXIS)
 
   const xForIndex = useCallback(
     (index: number) => ((index + 0.5 - view.start) / view.span) * plotW,
@@ -510,6 +539,9 @@ export function ChartWorkspace({
         const span = Math.min(160, Math.max(40, Math.floor(next.length * 0.45)))
         setView({ start: Math.max(0, next.length - span), span })
         setPending(null)
+        // A new instrument or candle size has its own range; keeping a stretch
+        // from the last chart would open it somewhere nobody asked for.
+        setPriceZoom(1)
       } catch (caught) {
         if (!cancelled) {
           setCandles([])
@@ -754,13 +786,26 @@ export function ChartWorkspace({
       context.fillRect(0, 0, size.width, size.height)
     }
 
-    // Grid and axes. There is only one background now that the trader can pick
-    // it, so the chrome that lives in the canvas flips with it: grey-on-dark
-    // disappears on a light canvas.
+    // The two axis gutters first: a panel each, so the labels have somewhere to
+    // live that is not on top of the candles. `axisInk` is deliberately brighter
+    // than the old #6b7280, which was under 4.5:1 on this canvas.
     const lightCanvas = isLightCanvas(settings)
-    const axisInk = lightCanvas ? '#475569' : '#6b7280'
+    const axisInk = lightCanvas ? '#334155' : '#9aa4b2'
     const gridInk = lightCanvas ? 'rgba(15, 23, 42, 0.12)' : 'rgba(148, 163, 184, 0.12)'
     const crosshairInk = lightCanvas ? 'rgba(15, 23, 42, 0.5)' : 'rgba(226, 232, 240, 0.45)'
+    const axisPanel = lightCanvas ? 'rgba(15, 23, 42, 0.05)' : 'rgba(148, 163, 184, 0.07)'
+    context.fillStyle = axisPanel
+    context.fillRect(plotW, 0, AXIS, plotH)
+    context.fillRect(0, plotH, size.width, TIME_AXIS)
+    context.strokeStyle = gridInk
+    context.beginPath()
+    context.moveTo(plotW + 0.5, 0)
+    context.lineTo(plotW + 0.5, size.height)
+    context.moveTo(0, plotH + 0.5)
+    context.lineTo(size.width, plotH + 0.5)
+    context.stroke()
+
+    // Grid and axes.
     context.font = '10px ui-sans-serif, system-ui, sans-serif'
     context.fillStyle = axisInk
     context.strokeStyle = gridInk
@@ -773,10 +818,15 @@ export function ChartWorkspace({
       context.stroke()
       // The bottom gridline shares its corner with the first time label, so the
       // price there is left to the axis below rather than painted twice.
-      if (step < 4) {
-        const price = priceForY(y)
-        context.fillText(price.toFixed(decimals(price)), 4, Math.min(plotH - 4, y + 3))
-      }
+      const price = priceForY(y)
+      context.fillStyle = axisInk
+      context.fillText(
+        price.toFixed(decimals(price)),
+        plotW + 6,
+        // 12, not 3: 10px digits drawn at the top gridline would be cut in half
+        // by the gutter's own edge.
+        Math.min(plotH - 4, Math.max(12, y + 3))
+      )
     }
     const ticks = Math.max(3, Math.min(8, Math.floor(plotW / 110)))
     for (let step = 0; step <= ticks; step += 1) {
@@ -789,7 +839,11 @@ export function ChartWorkspace({
       context.stroke()
       context.fillStyle = axisInk
       const label = tickLabel(timeForIndex(index), interval, settings)
-      context.fillText(label, Math.min(x + 4, plotW - 52), plotH - 6)
+      const labelWidth = context.measureText(label).width
+      // Centred under its own tick and kept inside the plot, so the first and
+      // last labels do not hang off the gutter.
+      const labelX = Math.max(2, Math.min(x - labelWidth / 2, plotW - labelWidth - 2))
+      context.fillText(label, labelX, plotH + 15)
     }
 
     // Candles.
@@ -1137,6 +1191,16 @@ export function ChartWorkspace({
           Math.max(14, hover.y - 13)
         )
       }
+
+      // The price under the pointer, printed in its own gutter the way the phone
+      // prints it: the floating tag can land on a candle, this cannot.
+      const hoverPrice = priceForY(hover.y)
+      const priceBadge = hoverPrice.toFixed(decimals(hoverPrice))
+      const badgeWidth = Math.min(AXIS - 4, context.measureText(priceBadge).width + 10)
+      context.fillStyle = lightCanvas ? 'rgba(15, 23, 42, 0.9)' : 'rgba(148, 163, 184, 0.9)'
+      context.fillRect(plotW + 2, hover.y - 8, badgeWidth, 16)
+      context.fillStyle = lightCanvas ? '#f8fafc' : '#0b1220'
+      context.fillText(priceBadge, plotW + 6, hover.y + 4)
     }
   }, [
     activeAlertsOnly,
@@ -1475,7 +1539,21 @@ export function ChartWorkspace({
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const { x, y } = localPoint(event)
-    if (x > plotW) return
+    // The gutters are controls, not dead margins: a vertical drag stretches the
+    // price scale and a horizontal drag stretches the time axis, exactly as the
+    // same strips behave on the phone and in a desktop terminal.
+    if (x > plotW || y > plotH) {
+      event.currentTarget.setPointerCapture(event.pointerId)
+      axisDrag.current = {
+        axis: x > plotW ? 'price' : 'time',
+        startX: x,
+        startY: y,
+        baseZoom: priceZoom,
+        baseSpan: view.span,
+        baseStart: view.start,
+      }
+      return
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
 
     if (tool === 'select') {
@@ -1541,9 +1619,34 @@ export function ChartWorkspace({
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const { x, y } = localPoint(event)
-    setHover(x <= plotW ? { x, y } : null)
+    setHover(x <= plotW ? { x: Math.min(x, plotW), y: Math.min(y, plotH) } : null)
+
+    const zoomDrag = axisDrag.current
+    if (zoomDrag) {
+      if (zoomDrag.axis === 'price') {
+        // Up stretches the range around its middle (bars look bigger), down
+        // compresses it. Clamped like the phone, so a fling cannot invert it.
+        const factor = Math.exp(((y - zoomDrag.startY) / plotH) * 2.5)
+        setPriceZoom(Math.min(8, Math.max(0.2, zoomDrag.baseZoom * factor)))
+      } else {
+        // Right widens the bars, left packs them, with the newest bar held in
+        // place so the live edge does not walk out from under the trader.
+        const factor = Math.exp((-1 * (x - zoomDrag.startX) / plotW) * 2.5)
+        const span = Math.max(12, Math.min(candles.length, zoomDrag.baseSpan * factor))
+        const rightEdge = zoomDrag.baseStart + zoomDrag.baseSpan
+        const start = Math.max(0, Math.min(candles.length - span, rightEdge - span))
+        setView({ start, span })
+      }
+      return
+    }
+
     const active = drag.current
-    if (!active) return
+    if (!active) {
+      // A pointer over a gutter says what it can do before it is pressed.
+      event.currentTarget.style.cursor =
+        x > plotW ? 'ns-resize' : y > plotH ? 'ew-resize' : tool === 'select' ? 'crosshair' : 'copy'
+      return
+    }
 
     if (active.mode === 'pan') {
       const barsMoved = ((x - active.originX) / plotW) * active.start.span
@@ -1571,6 +1674,7 @@ export function ChartWorkspace({
   }
 
   const onPointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    axisDrag.current = null
     const active = drag.current
     drag.current = null
     if (active?.mode === 'object' && active.id) {

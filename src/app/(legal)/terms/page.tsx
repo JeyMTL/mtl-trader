@@ -56,7 +56,7 @@ export default function TermsPage() {
 
       <h2>4. Subscriptions, trials and billing</h2>
       <ul>
-        <li>New accounts receive a 14-day free trial. No payment is taken during the trial.</li>
+        <li>New accounts receive a 7-day free trial. No payment is taken during the trial.</li>
         <li>Paid plans are billed monthly or annually in advance, at the prices shown in the app or on the{' '}
           <Link href="/pricing">pricing page</Link>.</li>
         <li>On the website, payment is taken through PayPal, card or bank transfer. In the Android app,

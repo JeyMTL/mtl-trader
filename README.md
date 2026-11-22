@@ -12,7 +12,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Analytics** - Win rate, profit factor, equity curve, strategy analysis, and the time-of-day edge report
 - **Trading Calendar** - Daily P&L heatmap
 - **MT5 Auto Sync** - Python agent that syncs closed trades every 60s with proper entry/exit pairing; its token can be rotated or revoked from Settings
-- **Subscription System** - 14-day unlimited free trial, then paid 30-day periods (PayPal + bank transfer). Each payment buys a period; access lapses unless it is renewed
+- **Subscription System** - 7-day unlimited free trial, then paid 30-day periods (PayPal + bank transfer). Each payment buys a period; access lapses unless it is renewed
 - **PayPal Webhook** - Signature-verified webhook applies upgrades server-side, so a closed tab no longer loses a payment; refunds, reversals and disputes revoke access
 - **Paddle Card Subscriptions** - Auto-renewing monthly card payments through Paddle, the merchant of record. Paddle handles sales tax and receipts; every renewal is applied by the signed webhook, and cancelling stops the card at the gateway while keeping the paid period
 - **Email Verification** - Users must verify a real email address before using the journal
@@ -140,7 +140,7 @@ node --env-file=.env.local scripts/check-payments.mjs --reconcile
 
 | Plan | Monthly | Yearly | Trades/Month |
 |------|---------|--------|--------------|
-| Free | $0 | — | Unlimited for 14 days, read-only afterwards |
+| Free | $0 | — | Unlimited for 7 days, read-only afterwards |
 | Basic | $12.00 | $120.00 | 50 |
 | Pro | $29.00 | $290.00 | Unlimited |
 

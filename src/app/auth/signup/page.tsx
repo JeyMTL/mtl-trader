@@ -109,7 +109,7 @@ export default function SignupPage() {
             <Logo size="md" />
           </Link>
           <h1 className="text-2xl font-bold text-white">Create your account</h1>
-          <p className="text-gray-400 mt-2">Enjoy unlimited access free for 14 days</p>
+          <p className="text-gray-400 mt-2">Enjoy unlimited access free for 7 days</p>
         </div>
 
         <form onSubmit={handleSignup} className="bg-surface border border-border rounded-2xl p-8 space-y-6 shadow-2xl shadow-primary/5">

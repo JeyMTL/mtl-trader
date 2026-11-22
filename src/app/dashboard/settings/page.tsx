@@ -735,7 +735,7 @@ export default function SettingsPage() {
                     </h3>
                     <p className="text-sm text-gray-400">
                       {userPlan.liveState === 'trial'
-                        ? 'Unlimited trades for 14 days, then choose a paid plan'
+                        ? 'Unlimited trades for 7 days, then choose a paid plan'
                         : userPlan.liveState === 'active'
                           ? 'Unlimited trades'
                           : 'The journal is read-only until you buy a subscription'}

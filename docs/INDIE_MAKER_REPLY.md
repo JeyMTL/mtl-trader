@@ -16,7 +16,7 @@ The product is live right now at https://mtlledger.com (returns HTTP 200 — thi
 -Database + auth:** Supabase Postgres. Schema, row-level security, and the monthly-quota trigger all live in versioned migrations under `supabase/migrations/`
 - Mobile: Capacitor wrapper pointed at the same URL (Android project included, iOS config present)
 
-You can create an account and get a 14-day trial yourself — no credit card required.
+You can create an account and get a 7-day trial yourself — no credit card required.
 
 On "no revenue"
 
