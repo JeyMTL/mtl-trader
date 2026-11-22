@@ -15,23 +15,32 @@ import '../theme.dart';
 /// the object *and* the action, rather than overloading null.
 @immutable
 class ObjectSettingsResult {
-  const ObjectSettingsResult.change(this.drawing)
+  const ObjectSettingsResult.change(this.drawing, {this.order})
       : clone = false,
         remove = false;
 
   const ObjectSettingsResult.clone(this.drawing)
       : clone = true,
-        remove = false;
+        remove = false,
+        order = null;
 
   const ObjectSettingsResult.remove()
       : drawing = null,
         clone = false,
-        remove = true;
+        remove = true,
+        order = null;
 
   final ChartDrawing? drawing;
   final bool clone;
   final bool remove;
+
+  /// Where the object lands in the drawing order, when the trader asked for it.
+  /// Last drawn is painted last, so "front" means the end of the list.
+  final ObjectOrder? order;
 }
+
+/// Bring to front or send to back.
+enum ObjectOrder { front, back }
 
 /// The object's settings, the way a charting app is expected to offer them.
 ///
@@ -203,7 +212,9 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
                 price: _read(_priceFields[i], _points[i].price),
               ),
           ],
-          text: drawing.carriesText ? _textField.text.trim() : drawing.text,
+          text: drawing.supportsLabel
+              ? (_textField.text.trim().isEmpty ? null : _textField.text.trim())
+              : drawing.text,
         );
     }
   }
@@ -291,7 +302,7 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
     final tabs = <String>[
       'Style',
       'Coordinates',
-      if (_drawing.carriesText) 'Text',
+      if (_drawing.supportsLabel) 'Text',
     ];
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -494,13 +505,42 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
             children: [
               _Chip(
                 label: 'Solid',
-                active: !_look.dashed,
-                onTap: () => setState(() => _look = _look.copyWith(dashed: false)),
+                active: !_look.dashed && !_look.dotted,
+                onTap: () => setState(
+                  () => _look = _look.copyWith(dashed: false, dotted: false),
+                ),
               ),
               _Chip(
                 label: 'Dashed',
                 active: _look.dashed,
                 onTap: () => setState(() => _look = _look.copyWith(dashed: true)),
+              ),
+              _Chip(
+                label: 'Dotted',
+                active: _look.dotted,
+                onTap: () => setState(() => _look = _look.copyWith(dotted: true)),
+              ),
+            ],
+          ),
+        ),
+        _row(
+          'Order',
+          Wrap(
+            spacing: 6,
+            children: [
+              _Chip(
+                label: 'Front',
+                active: false,
+                onTap: () => Navigator.of(context).pop(
+                  ObjectSettingsResult.change(_build(), order: ObjectOrder.front),
+                ),
+              ),
+              _Chip(
+                label: 'Back',
+                active: false,
+                onTap: () => Navigator.of(context).pop(
+                  ObjectSettingsResult.change(_build(), order: ObjectOrder.back),
+                ),
               ),
             ],
           ),
@@ -829,6 +869,10 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
   }
 
   Widget _textTab() {
+    final placement = _drawing.carriesText
+        ? 'The label sits above its anchor point.'
+        : 'The label sits just above the object, so the note stays with the thing '
+            'it is about.';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -846,8 +890,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
           ),
         ),
         Text(
-          'A short note beats a paragraph: the chart is read at a glance, and '
-          'a label that needs reading twice is in the way.',
+          '$placement A short note beats a paragraph: the chart is read at a '
+          'glance, and a label that needs reading twice is in the way.',
           style: TextStyle(color: AppColors.faint, fontSize: 10.5, height: 1.45),
         ),
       ],

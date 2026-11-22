@@ -418,6 +418,45 @@ void _lookTests() {
     expect(DrawingLook.fromJson({'f': 'wide'}).fill, isNull);
   });
 
+  test('a dotted stroke survives storage and never doubles up with dashes', () {
+    const look = DrawingLook(dotted: true);
+    expect(look.toJson()['dt'], isTrue);
+    expect(DrawingLook.fromJson(look.toJson()).dotted, isTrue);
+
+    // One line style at a time: asking for dashes drops the dots.
+    final dashed = look.copyWith(dashed: true);
+    expect(dashed.dashed, isTrue);
+    expect(dashed.dotted, isFalse);
+
+    // And a stored row that somehow has both reads as dashed, not as both.
+    final both = DrawingLook.fromJson({'d': true, 'dt': true});
+    expect(both.dashed, isTrue);
+    expect(both.dotted, isFalse);
+  });
+
+  test('a shape can carry a label, the level tools cannot', () {
+    const zone = ChartDrawing.points(
+      kind: DrawingKind.rectangle,
+      points: [
+        ChartPoint(ms: 1, price: 1.1),
+        ChartPoint(ms: 2, price: 1.2),
+      ],
+      text: 'Supply',
+    );
+    expect(zone.supportsLabel, isTrue);
+    expect(zone.carriesText, isFalse);
+    expect(ChartDrawing.ray(price: 1.1).supportsLabel, isFalse);
+    expect(
+      ChartDrawing.trend(
+        startMs: 1,
+        startPrice: 1.1,
+        endMs: 2,
+        endPrice: 1.2,
+      ).supportsLabel,
+      isFalse,
+    );
+  });
+
   test('a restyle makes the cloud signature differ', () {
     const plain = ChartDrawing.ray(price: 1.10);
     final tinted = plain.withLook(const DrawingLook(tint: Color(0xFF45D29A)));

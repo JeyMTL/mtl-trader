@@ -63,7 +63,9 @@ describe('ChartObjectBar', () => {
     expect(onStyle).toHaveBeenCalledWith({ w: 3 })
 
     fireEvent.click(screen.getByRole('button', { name: /Dashed/i }))
-    expect(onStyle).toHaveBeenCalledWith({ d: true })
+    expect(onStyle).toHaveBeenCalledWith({ d: true, dt: false })
+    fireEvent.click(screen.getByRole('button', { name: /Dotted/i }))
+    expect(onStyle).toHaveBeenCalledWith({ dt: true, d: false })
 
     fireEvent.click(screen.getByTitle('Clone'))
     expect(onClone).toHaveBeenCalled()

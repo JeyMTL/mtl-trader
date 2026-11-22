@@ -74,6 +74,7 @@ class DrawingLook {
     this.tint,
     this.weight,
     this.dashed = false,
+    this.dotted = false,
     this.locked = false,
     this.hidden = false,
     this.fill,
@@ -86,6 +87,11 @@ class DrawingLook {
   final double? weight;
 
   final bool dashed;
+
+  /// Dots instead of dashes: the quietest stroke a chart offers, and the one
+  /// that reads best under a dense zone. Dashed and dotted are exclusive — the
+  /// sheet treats them as one choice with three answers.
+  final bool dotted;
 
   /// Locked objects stay exactly where they were drawn: no drag, no handle.
   final bool locked;
@@ -102,6 +108,7 @@ class DrawingLook {
       tint == null &&
       weight == null &&
       !dashed &&
+      !dotted &&
       !locked &&
       !hidden &&
       fill == null;
@@ -110,6 +117,7 @@ class DrawingLook {
     Color? tint,
     double? weight,
     bool? dashed,
+    bool? dotted,
     bool? locked,
     bool? hidden,
     int? fill,
@@ -117,10 +125,16 @@ class DrawingLook {
     bool clearWeight = false,
     bool clearFill = false,
   }) {
+    // One line style at a time: asking for dots clears dashes and the other way
+    // round, so the two flags can never both be true and draw something between
+    // the two.
+    final nextDashed = dotted == true ? false : (dashed ?? this.dashed);
+    final nextDotted = dotted == true ? true : (dashed == true ? false : (dotted ?? this.dotted));
     return DrawingLook(
       tint: clearTint ? null : (tint ?? this.tint),
       weight: clearWeight ? null : (weight ?? this.weight),
-      dashed: dashed ?? this.dashed,
+      dashed: nextDashed,
+      dotted: nextDotted,
       locked: locked ?? this.locked,
       hidden: hidden ?? this.hidden,
       fill: clearFill ? null : (fill ?? this.fill),
@@ -131,6 +145,7 @@ class DrawingLook {
     if (tint != null) 'c': tint!.toARGB32(),
     if (weight != null) 'w': weight,
     if (dashed) 'd': true,
+    if (dotted) 'dt': true,
     if (locked) 'lk': true,
     if (hidden) 'hd': true,
     if (fill != null) 'f': fill,
@@ -145,6 +160,7 @@ class DrawingLook {
       tint: rawTint is num ? Color(rawTint.toInt()) : null,
       weight: rawWeight is num ? rawWeight.toDouble() : null,
       dashed: value['d'] == true,
+      dotted: value['dt'] == true && value['d'] != true,
       locked: value['lk'] == true,
       hidden: value['hd'] == true,
       fill: rawFill is num ? rawFill.toInt().clamp(0, 100) : null,
@@ -343,8 +359,16 @@ class ChartDrawing {
       kind == DrawingKind.fibExtension ||
       kind == DrawingKind.position;
 
-  /// Kinds that show words a trader can retype — the text tool's whole object.
+  /// Kinds whose whole object is its words — the text tool alone.
   bool get carriesText => kind == DrawingKind.text;
+
+  /// Kinds that can carry a label *and* geometry: every shape and line drawn
+  /// from anchors. The three level-based kinds rebuild from `entry`/`price` and
+  /// have nowhere to keep words, so they answer false rather than pretending.
+  bool get supportsLabel =>
+      kind != DrawingKind.trend &&
+      kind != DrawingKind.ray &&
+      kind != DrawingKind.position;
 
   /// The level a long loses money towards, and a short profits towards.
   double? levelFor(PositionLevel level) {

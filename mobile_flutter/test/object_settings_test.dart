@@ -44,8 +44,8 @@ void main() {
 
     expect(find.text('Style'), findsOneWidget);
     expect(find.text('Coordinates'), findsOneWidget);
-    // A rectangle carries no words, so it gets no text tab.
-    expect(find.text('Text'), findsNothing);
+    // A shape can carry a label, the way TradingView puts words on a zone.
+    expect(find.text('Text'), findsOneWidget);
 
     // The controls that were missing entirely.
     expect(find.text('Width'), findsOneWidget);
@@ -225,6 +225,83 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('#2'), findsOneWidget);
+  });
+
+  testWidgets('a label typed on a rectangle comes back with it', (tester) async {
+    ObjectSettingsResult? answer;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  answer = await showObjectSettings(
+                    context,
+                    drawing: _rect,
+                    title: 'Rectangle',
+                    decimals: 5,
+                  );
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(InkWell, 'Text'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Supply, hold above');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ok'));
+    await tester.pumpAndSettle();
+
+    expect(answer!.drawing!.text, 'Supply, hold above');
+    // The geometry is still the rectangle it was.
+    expect(answer!.drawing!.points.length, 2);
+  });
+
+  testWidgets('a dotted line is one line style, not two', (tester) async {
+    ObjectSettingsResult? answer;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  answer = await showObjectSettings(
+                    context,
+                    drawing: _rect,
+                    title: 'Rectangle',
+                    decimals: 5,
+                  );
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Dashed'));
+    await tester.tap(find.text('Dashed'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Dotted'));
+    await tester.tap(find.text('Dotted'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ok'));
+    await tester.pumpAndSettle();
+
+    expect(answer!.drawing!.look.dotted, isTrue);
+    expect(answer!.drawing!.look.dashed, isFalse);
   });
 
   testWidgets('a text object gets its words back', (tester) async {

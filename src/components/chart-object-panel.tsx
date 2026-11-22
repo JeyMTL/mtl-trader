@@ -15,6 +15,8 @@ export interface DrawingStyle {
   c?: number
   w?: number
   d?: boolean
+  /** Dotted stroke. Exclusive with `d`, the way the sheet treats one choice. */
+  dt?: boolean
   f?: number
   lk?: boolean
   hd?: boolean
@@ -171,7 +173,7 @@ export function ChartObjectBar({
 
       <button
         type="button"
-        onClick={() => onStyle({ d: !style.d })}
+        onClick={() => onStyle({ d: !style.d, ...(style.d ? {} : { dt: false }) })}
         title="Dashed line"
         aria-pressed={Boolean(style.d)}
         className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
@@ -181,6 +183,20 @@ export function ChartObjectBar({
         }`}
       >
         Dashed
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onStyle({ dt: !style.dt, ...(style.dt ? {} : { d: false }) })}
+        title="Dotted line"
+        aria-pressed={Boolean(style.dt)}
+        className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
+          style.dt
+            ? 'border-primary/60 bg-primary/10 text-primary'
+            : 'border-border text-gray-400 hover:text-white'
+        }`}
+      >
+        Dotted
       </button>
 
       {fillable && (
@@ -319,9 +335,9 @@ export function ChartObjectSettings({
     onSave({
       points: points.filter((point) => Number.isFinite(point.t) && Number.isFinite(point.p)),
       style,
-      text: row.kind === 'text' || row.kind === 'arrowUp' || row.kind === 'arrowDown'
-        ? text.trim() || null
-        : row.text,
+      // Any object can carry a label: a zone reads better with "supply" on it
+      // than with a colour nobody remembers choosing.
+      text: text.trim() || null,
     })
 
   return (
@@ -335,7 +351,7 @@ export function ChartObjectSettings({
         </div>
 
         <div className="flex items-center gap-1 border-b border-border px-2">
-          {(['style', 'coordinates', ...(row.kind === 'text' ? ['text'] : [])] as const).map((value) => (
+          {(['style', 'coordinates', 'text'] as const).map((value) => (
             <button
               key={value}
               type="button"
@@ -392,21 +408,30 @@ export function ChartObjectSettings({
                   <span className="ml-2 text-[11px] text-gray-400">Style</span>
                   <button
                     type="button"
-                    onClick={() => patchStyle({ d: false })}
+                    onClick={() => patchStyle({ d: false, dt: false })}
                     className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
-                      !style.d ? 'border-primary bg-primary/15 text-primary' : 'border-border text-gray-400'
+                      !style.d && !style.dt ? 'border-primary bg-primary/15 text-primary' : 'border-border text-gray-400'
                     }`}
                   >
                     Solid
                   </button>
                   <button
                     type="button"
-                    onClick={() => patchStyle({ d: true })}
+                    onClick={() => patchStyle({ d: true, dt: false })}
                     className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
                       style.d ? 'border-primary bg-primary/15 text-primary' : 'border-border text-gray-400'
                     }`}
                   >
                     Dashed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => patchStyle({ dt: true, d: false })}
+                    className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
+                      style.dt ? 'border-primary bg-primary/15 text-primary' : 'border-border text-gray-400'
+                    }`}
+                  >
+                    Dotted
                   </button>
                 </div>
               </section>

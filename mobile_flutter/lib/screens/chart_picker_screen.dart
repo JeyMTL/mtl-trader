@@ -1374,6 +1374,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         setState(() => _placing = down);
       },
       onDrawingCreated: (drawing) => unawaited(_placeDrawing(drawing)),
+      onQuickAction: _openQuickActions,
     );
 
     final armed = _armingKind != null || _armingSide != null;
@@ -1591,6 +1592,145 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         ],
       ),
     );
+  }
+
+  /// What a trader does with a price they have just pointed at.
+  ///
+  /// A crosshair is only useful if it leads somewhere: the four things here are
+  /// the ones that leave a mark on this chart — a level they can see later, an
+  /// entry they can trade from, and the number itself. Anything that needs a
+  /// broker order stays out until the app can actually place one.
+  Future<void> _openQuickActions(double price, DateTime time) async {
+    final decimals = widget.instrument.decimals;
+    final label = price.toStringAsFixed(decimals);
+    final clock = DateFormat('d MMM HH:mm').format(time);
+    final symbol = widget.instrument.symbol;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        Widget row({
+          required IconData icon,
+          required String title,
+          required String subtitle,
+          required String value,
+          Color? tone,
+        }) {
+          return ListTile(
+            dense: true,
+            leading: Icon(icon, size: 20, color: tone ?? AppColors.muted),
+            title: Text(
+              title,
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: TextStyle(color: AppColors.faint, fontSize: 10.5),
+            ),
+            trailing: Icon(Icons.chevron_right, size: 16, color: AppColors.faint),
+            onTap: () => Navigator.of(sheetContext).pop(value),
+          );
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                child: Row(
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: const [
+                          FontFeature.tabularFigures(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$symbol · $clock',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.faint,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              row(
+                icon: Icons.horizontal_rule,
+                title: 'Pin a level here',
+                subtitle: 'Lives on the chart and alerts when price touches it',
+                value: 'level',
+                tone: drawingColor,
+              ),
+              row(
+                icon: Icons.login,
+                title: 'Use as entry',
+                subtitle: 'Fills the entry price and this candle’s time',
+                value: 'entry',
+                tone: AppColors.primary,
+              ),
+              row(
+                icon: Icons.copy_all_outlined,
+                title: 'Copy price',
+                subtitle: label,
+                value: 'copy',
+              ),
+              const SizedBox(height: 6),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case 'level':
+        _addDrawing(ChartDrawing.ray(price: price));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Level pinned at $label.'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        break;
+      case 'entry':
+        // The canvas takes the markers from these fields, so setting them is
+        // enough: it re-reads its levels on the next build.
+        setState(() {
+          _entry = price;
+          _entryTime = time;
+        });
+        break;
+      case 'copy':
+        await Clipboard.setData(ClipboardData(text: label));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$label copied.'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        break;
+    }
   }
 
   Future<void> _jumpToDate() async {
@@ -2822,10 +2962,23 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     }
 
     final next = [..._drawings];
-    next[index] = stamped;
+    // Visual order is the list's own order — last painted sits on top — so
+    // bringing to front is a move to the end, not a z-index the painter has to
+    // learn about.
+    if (result.order == null) {
+      next[index] = stamped;
+    } else {
+      next.removeAt(index);
+      if (result.order == ObjectOrder.front) {
+        next.add(stamped);
+      } else {
+        next.insert(0, stamped);
+      }
+    }
+    final moved = next.indexOf(stamped);
     setState(() {
       _drawings = next;
-      _selectedDrawing = index;
+      _selectedDrawing = moved >= 0 ? moved : null;
     });
     _persistDrawings(next);
   }
@@ -4485,6 +4638,7 @@ class _ChartCanvas extends StatefulWidget {
     this.magnet = true,
     this.onCrosshair,
     this.onPlacing,
+    this.onQuickAction,
   });
 
   final List<Candle> candles;
@@ -4539,6 +4693,10 @@ class _ChartCanvas extends StatefulWidget {
   /// placed, so the banner can count.
   final ValueChanged<bool>? onPlacing;
 
+  /// The price and candle time under a crosshair the trader is acting on. The
+  /// screen owns what the actions do, because they reach past the canvas.
+  final void Function(double price, DateTime time)? onQuickAction;
+
   @override
   State<_ChartCanvas> createState() => _ChartCanvasState();
 }
@@ -4556,6 +4714,10 @@ class _ChartCanvasState extends State<_ChartCanvas>
 
   Size _size = Size.zero;
   Offset? _crosshair;
+
+  /// True when the crosshair was left behind by a long press, so the trader can
+  /// lift their finger and still act on the price it is showing.
+  bool _crosshairPinned = false;
 
   /// Study series aligned with the candles, rebuilt when either changes.
   Map<OverlayStudy, List<double?>> _studies = const {};
@@ -4875,6 +5037,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
     _settle.stop();
     widget.onPlacing?.call(true);
     setState(() {
+      _crosshairPinned = false;
       _placeFrom = local;
       _brush = [_pointAt(local)];
       _crosshair = local;
@@ -4903,6 +5066,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
       _placeFrom = null;
       _brush = const [];
       _crosshair = null;
+      _crosshairPinned = false;
     });
     widget.onPlacing?.call(false);
     widget.onCrosshair?.call(null);
@@ -4998,6 +5162,15 @@ class _ChartCanvasState extends State<_ChartCanvas>
       _commitPlace();
       return;
     }
+    // A tap anywhere is a decision about something else, so a crosshair left
+    // behind by a long press goes away with it.
+    if (_crosshairPinned) {
+      setState(() {
+        _crosshairPinned = false;
+        _crosshair = null;
+      });
+      _reportCrosshair(null);
+    }
     final panes = TradingChartPainter.paneLayout(_size.height, widget.style);
     final inPricePane =
         local.dy >= panes.priceTop && local.dy <= panes.priceTop + panes.priceH;
@@ -5018,8 +5191,16 @@ class _ChartCanvasState extends State<_ChartCanvas>
   }
 
   void _onScaleStart(ScaleStartDetails details) {
-    // A new touch owns the chart: stop the coast where it is.
+    // A new touch owns the chart: stop the coast where it is, and put a pinned
+    // crosshair away — the trader has moved on to something else.
     _settle.stop();
+    if (_crosshairPinned) {
+      setState(() {
+        _crosshairPinned = false;
+        _crosshair = null;
+      });
+      _reportCrosshair(null);
+    }
     _lastTouch = details.localFocalPoint;
     if (widget.pendingKind != null) {
       _beginPlace(details.localFocalPoint);
@@ -5087,8 +5268,12 @@ class _ChartCanvasState extends State<_ChartCanvas>
       _reportCrosshair(null);
       return;
     }
-    setState(() => _crosshair = null);
-    _reportCrosshair(null);
+    // A pinned crosshair survives the lift-off that follows its long press; a
+    // pan or pinch (above) has already put it away.
+    if (!_crosshairPinned) {
+      setState(() => _crosshair = null);
+      _reportCrosshair(null);
+    }
     final count = widget.candles.length;
     if (count < 2 || _dragging != null || _drawingIndex != null) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
@@ -5509,9 +5694,19 @@ class _ChartCanvasState extends State<_ChartCanvas>
       return;
     }
     final marker = _dragging;
+    // A long press that did not grab anything leaves the crosshair where the
+    // trader put it. TradingView keeps it too: the price it is on is the thing
+    // the next tap acts on, and clearing it on lift-off would make the quick
+    // actions beside it unreachable.
+    if (marker == null && _crosshair != null) {
+      setState(() => _crosshairPinned = true);
+      _reportCrosshair(_crosshair);
+      return;
+    }
     setState(() {
       _dragging = null;
       _crosshair = null;
+      _crosshairPinned = false;
     });
     if (marker == null) return;
     final price = switch (marker) {
@@ -5601,6 +5796,39 @@ class _ChartCanvasState extends State<_ChartCanvas>
                   right: TradingChartPainter.axisWidth + 6,
                   child: IgnorePointer(child: _readout()),
                 ),
+                // The quick-action button sits on the price the crosshair is
+                // showing, exactly where the eye already is. It only exists
+                // while there is a crosshair to act on.
+                if (_crosshair != null)
+                  Positioned(
+                    right: TradingChartPainter.axisWidth + 2,
+                    top: (_crosshair!.dy - 12).clamp(0.0, _size.height - 24),
+                    child: Semantics(
+                      button: true,
+                      label: 'Quick actions at this price',
+                      child: GestureDetector(
+                        onTap: () {
+                          final price = _priceFor(_crosshair!);
+                          final time = _timeFor(_crosshair!) ?? DateTime.now();
+                          widget.onQuickAction?.call(price, time);
+                        },
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: widget.style.background.withAlpha(235),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: widget.style.axis),
+                          ),
+                          child: Icon(
+                            Icons.add,
+                            size: 16,
+                            color: widget.style.text,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 // A shifted price axis: the same affordance as LIVE, so the
                 // trader is never stuck with a scale they cannot undo.
                 if (_pricePan != 0)

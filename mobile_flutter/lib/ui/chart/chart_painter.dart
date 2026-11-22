@@ -713,9 +713,12 @@ class TradingChartPainter extends CustomPainter {
       // The tag reads the same clock as the axis under it, so the crosshair
       // never disagrees with the labels it sits between.
       final time = style.zone.wall(candles[index].time);
+      // The badge names the day as well as the minute on an intraday chart: a
+      // crosshair is used to say "here, on this bar", and "23:50" alone leaves
+      // the trader guessing which session they are looking at.
       final text = interval.size < const Duration(days: 1)
-          ? DateFormat('HH:mm').format(time)
-          : DateFormat('d MMM').format(time);
+          ? DateFormat("EEE d MMM ''yy HH:mm").format(time)
+          : DateFormat('d MMM yyyy').format(time);
       _bottomTag(canvas, size, pointer.dx, text);
     }
 
@@ -822,13 +825,14 @@ class TradingChartPainter extends CustomPainter {
       final ly = y(price);
       if (ly < priceTop || ly > priceTop + plotH) return;
       final width = drawing.look.weight ?? (selected ? 2.4 : 1.3);
-      if (drawing.look.dashed) {
+      if (drawing.look.dashed || drawing.look.dotted) {
         _dashSegment(
           canvas,
           Offset(0, ly),
           Offset(plotW, ly),
           drawing.ink,
           width,
+          dotted: drawing.look.dotted,
         );
       } else {
         canvas.drawLine(
@@ -870,8 +874,15 @@ class TradingChartPainter extends CustomPainter {
       final p1 = Offset(x1, y(drawing.startPrice));
       final p2 = Offset(x2, y(drawing.endPrice));
       final width = drawing.look.weight ?? (selected ? 2.4 : 1.3);
-      if (drawing.look.dashed) {
-        _dashSegment(canvas, p1, p2, drawing.ink, width);
+      if (drawing.look.dashed || drawing.look.dotted) {
+        _dashSegment(
+          canvas,
+          p1,
+          p2,
+          drawing.ink,
+          width,
+          dotted: drawing.look.dotted,
+        );
       } else {
         canvas.drawLine(
           p1,
@@ -1090,6 +1101,26 @@ class TradingChartPainter extends CustomPainter {
         break;
       default:
         break;
+    }
+
+    // A label on a shape or a line, not just on the text tool. TradingView puts
+    // the words on the object itself, above its highest anchor, so the note is
+    // attached to the thing it is about instead of floating in a corner.
+    final note = drawing.text;
+    if (note != null &&
+        note.trim().isNotEmpty &&
+        drawing.kind != DrawingKind.text) {
+      final top = anchors.reduce((a, b) => a.dy <= b.dy ? a : b);
+      final label = _painter(
+        note,
+        color: ink,
+        size: 10.5,
+        weight: FontWeight.w700,
+      );
+      label.paint(
+        canvas,
+        Offset(top.dx + (drawing.kind == DrawingKind.measure ? 0 : 3), top.dy - 16),
+      );
     }
 
     if (selected) {
@@ -1391,14 +1422,17 @@ class TradingChartPainter extends CustomPainter {
     Offset from,
     Offset to,
     Color color,
-    double width,
-  ) {
+    double width, {
+    bool dotted = false,
+  }) {
     final paint = Paint()
       ..color = color
       ..strokeWidth = width
       ..strokeCap = StrokeCap.round;
-    const dash = 5.0;
-    const gap = 4.0;
+    // Dotted is the same walk with a shorter step: one stroke length, a longer
+    // gap, so the line reads as points rather than as a broken rule.
+    final dash = dotted ? 1.6 : 5.0;
+    final gap = dotted ? 3.6 : 4.0;
     final delta = to - from;
     final length = delta.distance;
     if (length < 0.5) return;

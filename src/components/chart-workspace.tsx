@@ -450,7 +450,9 @@ export function ChartWorkspace({
       context.strokeStyle = colour
       context.fillStyle = styleFill(row.style, colour, selected)
       context.lineWidth = row.style?.w ?? (selected ? 2 : 1.2)
-      context.setLineDash(row.style?.d ? [5, 4] : [])
+      context.setLineDash(
+        row.style?.dt ? [1.5, 3.5] : row.style?.d ? [5, 4] : []
+      )
 
       if (row.kind === 'text') {
         // A label pinned on the phone has to read here too: the words are the
@@ -555,6 +557,17 @@ export function ChartWorkspace({
         context.moveTo(a.x, a.y)
         context.lineTo(b.x, b.y)
         context.stroke()
+      }
+
+      // A label on the shape or line itself, above its highest anchor: the
+      // note belongs to the object, not to a corner of the chart.
+      if (row.text && row.kind !== 'text') {
+        const top = a.y <= b.y ? a : b
+        context.setLineDash([])
+        context.fillStyle = colour
+        context.font = '600 10.5px ui-sans-serif, system-ui, sans-serif'
+        context.fillText(row.text, top.x + 4, top.y - 6)
+        context.font = '11px ui-sans-serif, system-ui, sans-serif'
       }
 
       if (selected) {
