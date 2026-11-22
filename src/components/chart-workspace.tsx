@@ -178,6 +178,12 @@ export function ChartWorkspace({
   const [compareError, setCompareError] = useState<string | null>(null)
   const [compareOpen, setCompareOpen] = useState(false)
   const [compareDraft, setCompareDraft] = useState('')
+  /**
+   * The chart on the whole viewport, the way the phone's immersive toggle
+   * leaves it. The desk inside the dashboard shell is a 62vh block with a
+   * sidebar and two headers around it; analysis on a laptop wants the candles.
+   */
+  const [expanded, setExpanded] = useState(false)
 
   /** What the canvas paints: colours, decimals, crosshair, clock, log axis. */
   const [settings, setSettings] = useState<DeskSettings>(DEFAULT_SETTINGS)
@@ -404,6 +410,23 @@ export function ChartWorkspace({
     },
     [candles]
   )
+
+  // Full screen is a mode, so it owns the page while it is on: the dashboard
+  // behind it must not scroll under the canvas, and Escape has to give the
+  // screen back even when the canvas is not the focused element.
+  useEffect(() => {
+    if (!expanded) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [expanded])
 
   // ---------------------------------------------------------------- loading
   useEffect(() => {
@@ -1546,7 +1569,13 @@ export function ChartWorkspace({
   const activeTool = TOOLS.find((item) => item.id === tool)
 
   return (
-    <div className="space-y-3">
+    <div
+      className={
+        expanded
+          ? 'fixed inset-0 z-[45] flex flex-col gap-2 overflow-y-auto bg-background p-3'
+          : 'space-y-3'
+      }
+    >
       <div className="flex flex-wrap items-center gap-2">
         <form
           onSubmit={(event) => {              event.preventDefault()
@@ -1636,6 +1665,19 @@ export function ChartWorkspace({
             }`}
           >
             Active alerts
+          </button>
+          <button
+            type="button"
+            title={expanded ? 'Back to the dashboard' : 'Give the chart the whole screen'}
+            aria-pressed={expanded}
+            onClick={() => setExpanded((value) => !value)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+              expanded
+                ? 'border-primary bg-primary/15 text-primary'
+                : 'border-border bg-surface text-gray-400 hover:text-white'
+            }`}
+          >
+            {expanded ? 'Exit full screen' : 'Full screen'}
           </button>
           <button
             type="button"
@@ -1866,7 +1908,11 @@ export function ChartWorkspace({
 
       <div
         ref={boxRef}
-        className="relative h-[62vh] min-h-[380px] w-full overflow-hidden rounded-xl border border-border bg-[#0b1220]"
+        className={`relative w-full overflow-hidden rounded-xl border border-border bg-[#0b1220] ${
+          expanded
+            ? 'h-[calc(100vh-14rem)] min-h-[320px]'
+            : 'h-[62vh] min-h-[380px]'
+        }`}
       >
         <canvas
           ref={canvasRef}
