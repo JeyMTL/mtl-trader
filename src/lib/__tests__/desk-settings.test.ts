@@ -13,7 +13,9 @@ import {
   loadTemplates,
   removeLayout,
   removeTemplate,
+  mergeTemplates,
   saveSettings,
+  templateFromCloud,
   upsertLayout,
   upsertTemplate,
   type ChartLayout,
@@ -158,6 +160,100 @@ describe('chart layouts', () => {
     const long = `  ${'x'.repeat(MAX_TEMPLATE_NAME + 10)}  `
     const [saved] = upsertTemplate([], { name: long, settings: DEFAULT_SETTINGS })
     expect(saved.name).toHaveLength(MAX_TEMPLATE_NAME)
+  })
+
+  it('reads a phone template through the shared keys', () => {
+    const [fromPhone] = mergeTemplates(
+      [],
+      [
+        templateFromCloud({
+          name: 'MTL',
+          style: {
+            bull: 0xff26a69a,
+            bear: 0xfff23645,
+            precision: 3,
+            crosshairStyle: 'dotted',
+            crosshairWidth: 2,
+            backgroundTo: 0xff101820,
+            hour24: false,
+            dayOfWeek: true,
+            logScale: true,
+            countdown: true,
+            // A phone-only setting the desk has no control for.
+            studies: ['ema', 'rsi'],
+          },
+          edited_at: '2026-11-22T18:00:00.000Z',
+        })!
+      ]
+    )
+    expect(fromPhone.settings.bull).toBe('#26a69a')
+    expect(fromPhone.settings.bear).toBe('#f23645')
+    expect(fromPhone.settings.precision).toBe(3)
+    expect(fromPhone.settings.crosshairStyle).toBe('dotted')
+    expect(fromPhone.settings.crosshairWidth).toBe(2)
+    expect(fromPhone.settings.gradient).toBe(true)
+    expect(fromPhone.settings.gradientTo).toBe('#101820')
+    expect(fromPhone.settings.clock24).toBe(false)
+    expect(fromPhone.settings.weekday).toBe(true)
+    expect(fromPhone.editedAt).toBe(Date.parse('2026-11-22T18:00:00.000Z'))
+    // The desk keeps what it cannot draw, so a save here cannot erase it.
+    expect(fromPhone.style.studies).toEqual(['ema', 'rsi'])
+  })
+
+  it('writes a desk template in the phone’s vocabulary without losing other keys', () => {
+    upsertTemplate(
+      upsertTemplate([], {
+        name: 'MTL',
+        settings: { ...DEFAULT_SETTINGS, countdown: true },
+        style: { studies: ['ema'], preset: 'ink' },
+      }),
+      // Saving the same name from the desk keeps the phone-only keys.
+      {
+        name: 'mtl',
+        settings: { ...DEFAULT_SETTINGS, bull: '#4c9aff', gradient: true, gradientTo: '#0b1220' },
+      }
+    )
+    const [saved] = loadTemplates()
+    expect(saved.name).toBe('mtl')
+    expect(saved.style.studies).toEqual(['ema'])
+    expect(saved.style.preset).toBe('ink')
+    expect(saved.style.bull).toBe(0xff4c9aff)
+    expect(saved.style.backgroundTo).toBe(0xff0b1220)
+    expect(saved.settings.bull).toBe('#4c9aff')
+  })
+
+  it('merges the account and the browser by name, later edit winning', () => {
+    const cloud = [
+      templateFromCloud({ name: 'MTL', style: { countdown: true }, edited_at: 2_000 })!,
+      templateFromCloud({ name: 'Night', style: { logScale: true }, edited_at: 1_000 })!,
+    ]
+    const local = [
+      // Same name, edited later here: the local look stands.
+      { ...templateFromCloud({ name: 'mtl', style: { countdown: false }, edited_at: 3_000 })! },
+      // Present only here, so it joins the list.
+      { ...templateFromCloud({ name: 'Dawn', style: { weekday: true }, edited_at: 500 })! },
+    ]
+    const merged = mergeTemplates(local, cloud)
+    expect(merged.map((entry) => entry.name)).toEqual(['mtl', 'Night', 'Dawn'])
+    expect(merged[0].settings.countdown).toBe(false)
+    expect(merged[1].settings.logScale).toBe(true)
+    expect(loadTemplates()).toHaveLength(3)
+
+    // The account's copy is newer for that name, so it wins.
+    const newerCloud = [templateFromCloud({ name: 'MTL', style: { countdown: true }, edited_at: 9_000 })!]
+    const afterPull = mergeTemplates(local, newerCloud)
+    expect(afterPull[0].settings.countdown).toBe(true)
+  })
+
+  it('reads a template saved by the first version of the feature', () => {
+    window.localStorage.setItem(
+      CHART_TEMPLATES_KEY,
+      JSON.stringify([{ name: 'Old', settings: { ...DEFAULT_SETTINGS, weekday: true } }])
+    )
+    const [legacy] = loadTemplates()
+    expect(legacy.name).toBe('Old')
+    expect(legacy.settings.weekday).toBe(true)
+    expect(legacy.style.dayOfWeek).toBe(true)
   })
 
   it('drops template entries that are not templates', () => {

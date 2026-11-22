@@ -165,7 +165,10 @@ export function ChartSettingsDialog({
             <div className="py-1">
               <button
                 type="button"
-                onClick={() => applyTemplate({ name: 'Defaults', settings: DEFAULT_SETTINGS })}
+                onClick={() => {
+                  onChange({ ...DEFAULT_SETTINGS })
+                  setTemplatesOpen(false)
+                }}
                 className="flex w-full items-center justify-between rounded-lg px-2 py-2.5 text-left hover:bg-surface-light"
               >
                 <span>

@@ -205,7 +205,19 @@ export function removeLayout(layouts: ChartLayout[], id: string): ChartLayout[] 
  */
 export interface ChartTemplate {
   name: string
+  /** What this desk can paint, derived from `style`. */
   settings: DeskSettings
+  /**
+   * The phone's `ChartStyle.toJson()` object, carried whole.
+   *
+   * The phone is the older client and the one with the longer settings list, so
+   * its keys are the shared vocabulary. Keeping the untouched object means a
+   * save made in a browser cannot erase a phone-only setting — a study period,
+   * the watermark — that the browser has no control for.
+   */
+  style: Record<string, unknown>
+  /** When the look was last changed, epoch ms. Settles which copy wins. */
+  editedAt: number
 }
 
 export const CHART_TEMPLATES_KEY = 'mtl.desk.templates.v1'
@@ -222,6 +234,119 @@ function cleanName(value: unknown): string | null {
   return name.length > 0 ? name : null
 }
 
+/** The case-insensitive identity of a template, matching the server's `slug`. */
+export function templateSlug(name: string): string {
+  return name.trim().toLowerCase()
+}
+
+/**
+ * A phone colour — `Color.toARGB32()`, an unsigned 32-bit int — as `#rrggbb`.
+ *
+ * Alpha is dropped: a template colour is a fill or a stroke, and every painter
+ * on both desks expects an opaque value. Anything that is not a number is
+ * ignored rather than guessed at.
+ */
+function hexFromArgb(value: unknown): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  const argb = Math.trunc(value) >>> 0
+  const rgb = (argb & 0xffffff).toString(16).padStart(6, '0')
+  return `#${rgb}`
+}
+
+function argbFromHex(hex: string): number {
+  return (0xff000000 | parseInt(hex.slice(1), 16)) >>> 0
+}
+
+function booleanFrom(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+/**
+ * The part of a phone style this desk can paint.
+ *
+ * Deliberately partial and silent about what it does not know: a template made
+ * on the phone carries studies, a chart type and a watermark, none of which have
+ * a desk control yet. Mapping only what exists keeps the two sides honest
+ * instead of pretending a setting travelled when it did not.
+ */
+export function settingsFromPhoneStyle(
+  style: Record<string, unknown>
+): Partial<DeskSettings> {
+  const settings: Partial<DeskSettings> = {}
+  const bull = hexFromArgb(style.bull)
+  if (bull) settings.bull = bull
+  const bear = hexFromArgb(style.bear)
+  if (bear) settings.bear = bear
+  if (
+    typeof style.precision === 'number' &&
+    Number.isInteger(style.precision) &&
+    style.precision >= 0 &&
+    style.precision <= 8
+  ) {
+    settings.precision = style.precision
+  }
+  if (CROSSHAIR_STYLES.includes(style.crosshairStyle as CrosshairStyle)) {
+    settings.crosshairStyle = style.crosshairStyle as CrosshairStyle
+  }
+  if (
+    typeof style.crosshairWidth === 'number' &&
+    style.crosshairWidth >= 1 &&
+    style.crosshairWidth <= 4
+  ) {
+    settings.crosshairWidth = style.crosshairWidth
+  }
+  // The phone signals "no gradient" by leaving `backgroundTo` out altogether.
+  const gradientTo = hexFromArgb(style.backgroundTo)
+  settings.gradient = gradientTo !== null
+  if (gradientTo) settings.gradientTo = gradientTo
+  const clock24 = booleanFrom(style.hour24)
+  if (clock24 !== undefined) settings.clock24 = clock24
+  const weekday = booleanFrom(style.dayOfWeek)
+  if (weekday !== undefined) settings.weekday = weekday
+  const logScale = booleanFrom(style.logScale)
+  if (logScale !== undefined) settings.logScale = logScale
+  const countdown = booleanFrom(style.countdown)
+  if (countdown !== undefined) settings.countdown = countdown
+  return settings
+}
+
+/**
+ * This desk's settings as a phone style object, laid over `base` so the keys the
+ * desk does not own survive a save.
+ */
+export function phoneStyleFromSettings(
+  settings: DeskSettings,
+  base: Record<string, unknown> = {}
+): Record<string, unknown> {
+  const style: Record<string, unknown> = { ...base }
+  style.bull = argbFromHex(settings.bull)
+  style.bear = argbFromHex(settings.bear)
+  if (settings.precision === null) delete style.precision
+  else style.precision = settings.precision
+  style.crosshairStyle = settings.crosshairStyle
+  style.crosshairWidth = settings.crosshairWidth
+  style.hour24 = settings.clock24
+  style.dayOfWeek = settings.weekday
+  style.logScale = settings.logScale
+  style.countdown = settings.countdown
+  if (settings.gradient) style.backgroundTo = argbFromHex(settings.gradientTo)
+  else delete style.backgroundTo
+  return style
+}
+
+function templateFromStyle(
+  name: string,
+  style: Record<string, unknown>,
+  editedAt: number
+): ChartTemplate {
+  return {
+    name,
+    style,
+    editedAt,
+    settings: { ...DEFAULT_SETTINGS, ...settingsFromPhoneStyle(style) },
+  }
+}
+
 export function loadTemplates(): ChartTemplate[] {
   if (typeof window === 'undefined') return []
   try {
@@ -235,7 +360,29 @@ export function loadTemplates(): ChartTemplate[] {
       const value = entry as Record<string, unknown>
       const name = cleanName(value.name)
       if (!name) continue
-      templates.push({ name, settings: normaliseSettings(value.settings) })
+      const editedAt = typeof value.editedAt === 'number' ? value.editedAt : 0
+      if (value.style && typeof value.style === 'object') {
+        templates.push(
+          templateFromStyle(name, value.style as Record<string, unknown>, editedAt)
+        )
+      } else if (value.settings && typeof value.settings === 'object') {
+        // A template saved by the first version of this feature, before the
+        // phone's vocabulary existed: read it, then store it the shared way.
+        templates.push(
+          templateFromStyle(
+            name,
+            phoneStyleFromSettings(normaliseSettings(value.settings)),
+            editedAt
+          )
+        )
+      } else {
+        // A named entry whose payload is unreadable still has a name the trader
+        // typed: keep it as a defaults template rather than silently dropping
+        // it.
+        templates.push(
+          templateFromStyle(name, phoneStyleFromSettings(DEFAULT_SETTINGS), editedAt)
+        )
+      }
       if (templates.length >= MAX_TEMPLATES) break
     }
     return templates
@@ -244,38 +391,108 @@ export function loadTemplates(): ChartTemplate[] {
   }
 }
 
+/** Only the shared parts are written: `settings` is derived, never stored. */
 export function saveTemplates(templates: ChartTemplate[]): void {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(
       CHART_TEMPLATES_KEY,
-      JSON.stringify(templates.slice(0, MAX_TEMPLATES))
+      JSON.stringify(
+        templates.slice(0, MAX_TEMPLATES).map((template) => ({
+          name: template.name,
+          style: template.style,
+          editedAt: template.editedAt,
+        }))
+      )
     )
   } catch {
     // A template that can't be stored is still applied to the open chart.
   }
 }
 
-/** Saves under a name, replacing one that reads the same instead of duplicating. */
+/**
+ * Saves under a name, replacing one that reads the same instead of duplicating.
+ *
+ * `style` may be supplied by the caller (a template downloaded from the
+ * account); otherwise it is rebuilt from the settings laid over whatever the
+ * replaced template already carried, so phone-only keys are not lost.
+ */
 export function upsertTemplate(
   templates: ChartTemplate[],
-  template: ChartTemplate
+  template: { name: string; settings: DeskSettings; style?: Record<string, unknown> }
 ): ChartTemplate[] {
   // Cleaned here rather than only on load, so the list the dialog shows is the
   // list that will come back on the next visit.
   const name = cleanName(template.name)
   if (!name) return templates
-  const saved: ChartTemplate = { name, settings: template.settings }
-  const without = templates.filter(
-    (entry) => entry.name.toLowerCase() !== name.toLowerCase()
-  )
+  const slug = templateSlug(name)
+  const existing = templates.find((entry) => templateSlug(entry.name) === slug)
+  const style =
+    template.style ?? phoneStyleFromSettings(template.settings, existing?.style ?? {})
+  const saved = templateFromStyle(name, style, Date.now())
+  const without = templates.filter((entry) => templateSlug(entry.name) !== slug)
   const next = [saved, ...without].slice(0, MAX_TEMPLATES)
   saveTemplates(next)
   return next
 }
 
+/** A template straight from the account, keeping its edit time for the merge. */
+export function templateFromCloud(row: {
+  name?: unknown
+  style?: unknown
+  edited_at?: unknown
+  editedAt?: unknown
+}): ChartTemplate | null {
+  const name = cleanName(row.name)
+  if (!name) return null
+  const style =
+    row.style && typeof row.style === 'object'
+      ? (row.style as Record<string, unknown>)
+      : {}
+  const raw = row.editedAt ?? row.edited_at
+  const editedAt =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string'
+        ? Date.parse(raw) || 0
+        : 0
+  return templateFromStyle(name, style, editedAt)
+}
+
+/**
+ * Local and account templates as one list: same name, later edit wins.
+ *
+ * Union rather than replace, because a template lives on whichever desk it was
+ * made on until the account has it, and losing the local list to a slow or empty
+ * fetch would look like the trader's looks were deleted.
+ */
+export function mergeTemplates(
+  local: ChartTemplate[],
+  cloud: ChartTemplate[]
+): ChartTemplate[] {
+  const merged = new Map<string, ChartTemplate>()
+  for (const template of [...cloud, ...local]) {
+    const key = templateSlug(template.name)
+    const existing = merged.get(key)
+    if (!existing) {
+      merged.set(key, template)
+      continue
+    }
+    // Local is folded in after the cloud copy, and a tie keeps the local one:
+    // a save made here with an unstamped time must not be replaced by an older
+    // row that happens to share the stamp.
+    if (template.editedAt >= existing.editedAt) merged.set(key, template)
+  }
+  const next = [...merged.values()]
+    .sort((a, b) => b.editedAt - a.editedAt)
+    .slice(0, MAX_TEMPLATES)
+  saveTemplates(next)
+  return next
+}
+
 export function removeTemplate(templates: ChartTemplate[], name: string): ChartTemplate[] {
-  const next = templates.filter((entry) => entry.name !== name)
+  const slug = templateSlug(name)
+  const next = templates.filter((entry) => templateSlug(entry.name) !== slug)
   saveTemplates(next)
   return next
 }

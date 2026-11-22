@@ -13,28 +13,47 @@ import 'chart_theme.dart';
 /// onto whichever chart is open.
 @immutable
 class ChartPreset {
-  const ChartPreset({required this.name, required this.style});
+  const ChartPreset({
+    required this.name,
+    required this.style,
+    this.editedAtMs,
+  });
 
   final String name;
   final ChartStyle style;
 
-  ChartPreset copyWith({String? name, ChartStyle? style}) =>
-      ChartPreset(name: name ?? this.name, style: style ?? this.style);
+  /// When the look was last changed, epoch milliseconds.
+  ///
+  /// The same claim `chart_drawings.edited_at` carries, and for the same
+  /// reason: a phone that was offline all afternoon must not overwrite a
+  /// template saved on the web desk after it. Null on presets written before
+  /// templates were shared.
+  final int? editedAtMs;
+
+  ChartPreset copyWith({String? name, ChartStyle? style, int? editedAtMs}) =>
+      ChartPreset(
+        name: name ?? this.name,
+        style: style ?? this.style,
+        editedAtMs: editedAtMs ?? this.editedAtMs,
+      );
 
   Map<String, Object?> toJson() => <String, Object?>{
         'name': name,
         'style': style.toJson(),
+        if (editedAtMs != null) 'editedAt': editedAtMs,
       };
 
   static ChartPreset? fromJson(Object? value) {
     if (value is! Map) return null;
     final name = value['name'];
     if (name is! String || name.trim().isEmpty) return null;
+    final edited = value['editedAt'];
     return ChartPreset(
       name: name.trim(),
       style: value['style'] is Map
           ? ChartStyle.fromJson(Map<Object?, Object?>.from(value['style'] as Map))
           : ChartStyle.ink,
+      editedAtMs: edited is num ? edited.toInt() : null,
     );
   }
 }

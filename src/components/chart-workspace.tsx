@@ -10,6 +10,7 @@ import {
   loadTemplates,
   removeLayout,
   removeTemplate,
+  templateSlug,
   saveSettings,
   upsertLayout,
   upsertTemplate,
@@ -20,6 +21,11 @@ import {
 import { ChartSettingsDialog } from '@/components/chart-settings-panel'
 import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
 import { alignCompare } from '@/lib/chart-compare'
+import {
+  deleteCloudTemplate,
+  pushCloudTemplate,
+  syncTemplates,
+} from '@/lib/chart-templates-cloud'
 import {
   ChartObjectBar,
   ChartObjectSettings,
@@ -191,6 +197,7 @@ export function ChartWorkspace({
   // server renders this component too, and reading localStorage while rendering
   // would hand React two different first frames.
   useEffect(() => {
+    let cancelled = false
     // Deferred by a tick: the server rendered this frame with the default
     // instrument, and applying storage during the same paint would hand React a
     // different tree than the HTML it just hydrated.
@@ -210,9 +217,20 @@ export function ChartWorkspace({
       setLayouts(loadLayouts())
       setTemplates(loadTemplates())
     }, 0)
+    // Templates are shared with the phone, so the account's copy is pulled once
+    // and merged; whatever the account has not seen is pushed back up there.
+    const pullTemplates = window.setTimeout(() => {
+      void syncTemplates(loadTemplates()).then((result) => {
+        if (cancelled) return
+        setTemplates(result.templates)
+        if (result.error) setNotice(result.error)
+      })
+    }, 0)
     return () => {
+      cancelled = true
       window.clearTimeout(restore)
       window.clearTimeout(restoreSettings)
+      window.clearTimeout(pullTemplates)
     }
   }, [])
 
@@ -571,11 +589,20 @@ export function ChartWorkspace({
 
   /** Templates carry the paint only, so saving one never touches instrument or interval. */
   const saveTemplate = (name: string) => {
-    setTemplates(upsertTemplate(templates, { name, settings }))
+    const next = upsertTemplate(templates, { name, settings })
+    setTemplates(next)
+    const saved = next.find((entry) => templateSlug(entry.name) === templateSlug(name))
+    if (!saved) return
+    void pushCloudTemplate(saved).then((failure) => {
+      if (failure) setNotice(failure)
+    })
   }
 
   const deleteTemplate = (name: string) => {
     setTemplates(removeTemplate(templates, name))
+    void deleteCloudTemplate(name).then((failure) => {
+      if (failure) setNotice(failure)
+    })
   }
 
   /** Adds a compare instrument; the one already charted would be a flat line. */

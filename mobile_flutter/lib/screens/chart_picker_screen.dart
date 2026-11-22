@@ -24,6 +24,7 @@ import '../core/instruments.dart';
 import '../services/journal_api.dart';
 import '../services/alerts.dart';
 import '../services/chart_drawings_sync.dart';
+import '../services/chart_templates_sync.dart';
 import '../services/market_data.dart';
 import '../ui/chart/chart_marker.dart';
 import '../ui/chart/chart_painter.dart';
@@ -3719,7 +3720,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     // is the whole point of a Cancel button: a trader tries a light canvas, sees
     // it is wrong and walks away with the dark one still there.
     var draft = _style;
-    final presets = await ChartPresetStore.load();
+    // The account's copy first, then the device's: a look saved on the web desk
+    // should be in this list before the trader scrolls it.
+    final synced = await ChartTemplatesSync().sync(await ChartPresetStore.load());
+    final presets = synced.presets;
+    if (synced.changed) unawaited(ChartPresetStore.save(presets));
     if (!mounted) return;
 
     void commit(ChartStyle next) {
@@ -3752,19 +3757,28 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   onSaveAs: () async {
                     final name = await _namePreset();
                     if (name == null || name.isEmpty || !mounted) return;
+                    final saved = ChartPreset(
+                      name: name,
+                      style: draft,
+                      editedAtMs: DateTime.now().millisecondsSinceEpoch,
+                    );
                     presets
                       ..removeWhere(
                         (preset) =>
                             preset.name.toLowerCase() == name.toLowerCase(),
                       )
-                      ..insert(0, ChartPreset(name: name, style: draft));
+                      ..insert(0, saved);
                     await ChartPresetStore.save(presets);
+                    // The account copy is best-effort: the template is already
+                    // safe on this device.
+                    unawaited(ChartTemplatesSync().push(saved));
                     if (!mounted) return;
                     setSheetState(() {});
                   },
                   onDeletePreset: (preset) async {
                     presets.removeWhere((item) => item.name == preset.name);
                     await ChartPresetStore.save(presets);
+                    unawaited(ChartTemplatesSync().remove(preset));
                     if (!mounted) return;
                     setSheetState(() {});
                   },
