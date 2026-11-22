@@ -2,7 +2,7 @@ import { SubscriptionPlan } from '@/types'
 
 /**
  * The plan catalogue: the single source every surface reads — the pricing page,
- * Settings, the PayPal checkout, the Paddle checkout, `apply_paid_order`
+ * Settings, the Paddle checkout, `apply_paid_order`
  * and the Flutter app (`mobile_flutter/lib/core/plans.dart`).
  *
  * What a plan covers is now genuinely split: Basic adds the desk (calendar, time

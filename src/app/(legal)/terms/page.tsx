@@ -58,7 +58,7 @@ export default function TermsPage() {
         <li>New accounts receive a 7-day free trial. No payment is taken during the trial.</li>
         <li>Paid plans are billed monthly or annually in advance, at the prices shown in the app or on the{' '}
           <Link href="/pricing">pricing page</Link>.</li>
-        <li>On the website, payment is taken through PayPal, card or bank transfer. In the Android app,
+        <li>On the website, payment is taken by card or bank transfer. In the Android app,
           subscriptions are sold and billed by Google Play.</li>
         <li>Subscriptions renew automatically until cancelled. Website subscriptions can be cancelled from
           Settings; Google Play subscriptions must be cancelled in Google Play &rarr; Subscriptions. Cancelling

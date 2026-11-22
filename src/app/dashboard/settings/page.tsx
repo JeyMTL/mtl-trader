@@ -362,24 +362,25 @@ export default function SettingsPage() {
 
   const totalBalance = deposits.reduce((acc, d) => acc + d.amount, 0)
 
+  /** Card renewal through Paddle: the checkout is hosted, so no card data here. */
   const handleCheckout = async (planId: string) => {
     setCheckoutLoading(planId)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await fetch('/api/paddle/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, userId: user.id, email: user.email }),
+        body: JSON.stringify({ planId, userId: user.id, interval: 'month' }),
       })
       const data = await res.json()
       if (data.url) {
         window.location.assign(data.url)
       } else {
-        toast(data.error || 'Could not start checkout.', { tone: 'error' })
+        toast(data.error || 'Could not start the card checkout.', { tone: 'error' })
       }
     } catch {
-      toast('Could not start checkout. Check your connection and try again.', { tone: 'error' })
+      toast('Could not start the card checkout. Check your connection and try again.', { tone: 'error' })
     }
     setCheckoutLoading(null)
   }
@@ -806,7 +807,7 @@ export default function SettingsPage() {
                     >
                       {checkoutLoading === 'basic' ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> :
                        userPlan.tier === 'basic' && !userPlan.cancelAtPeriodEnd ? 'Current Plan' :
-                       userPlan.tier === 'basic' ? 'Resume with PayPal' : 'Pay with PayPal'}
+                       userPlan.tier === 'basic' ? 'Resume with card' : 'Subscribe with card'}
                     </button>
                     <button
                       onClick={() => window.location.href = '/dashboard/payment?plan=basic'}
@@ -832,7 +833,7 @@ export default function SettingsPage() {
                     >
                       {checkoutLoading === 'pro' ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> :
                        userPlan.tier === 'pro' && !userPlan.cancelAtPeriodEnd ? 'Current Plan' :
-                       userPlan.tier === 'pro' ? 'Resume with PayPal' : 'Pay with PayPal'}
+                       userPlan.tier === 'pro' ? 'Resume with card' : 'Subscribe with card'}
                     </button>
                     <button
                       onClick={() => window.location.href = '/dashboard/payment?plan=pro'}

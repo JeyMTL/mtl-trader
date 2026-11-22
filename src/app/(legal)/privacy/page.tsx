@@ -34,7 +34,7 @@ export default function PrivacyPage() {
           <strong>Cash records</strong> — deposits and withdrawals you record yourself, with descriptions.
         </li>
         <li>
-          <strong>Subscription data</strong> — plan, trial dates, period end, payment status, PayPal order and
+          <strong>Subscription data</strong> — plan, trial dates, period end, payment status, order and
           capture identifiers, and the reference of any bank transfer. We never see or store your card or bank
           credentials.
         </li>
@@ -67,7 +67,8 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>Supabase</strong> — database, authentication and file storage.</li>
         <li><strong>Vercel</strong> — application hosting and scheduled jobs.</li>
-        <li><strong>PayPal</strong> — subscription checkout and payment capture.</li>
+        <li><strong>Paddle</strong> — card subscription checkout, billing and payment capture.</li>
+        <li><strong>PayPal</strong> — renewal of subscriptions started before card checkout.</li>
         <li><strong>Resend</strong> — transactional and summary email delivery.</li>
         <li><strong>An AI provider</strong> (Google Gemini, or Anthropic where configured) — receives the trade summary you submit for a review. Reviews are not used by us to train models.</li>
       </ul>

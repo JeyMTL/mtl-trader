@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, CreditCard, Loader2, RefreshCw } from 'lucide-react'
+import { Check, Loader2, RefreshCw } from 'lucide-react'
 import { PLANS } from '@/lib/plans'
 import { formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -27,15 +27,9 @@ interface CardStatus {
 export default function PricingPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [loading, setLoading] = useState<string | null>(null)
   const [cardLoading, setCardLoading] = useState<string | null>(null)
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
   const [cardStatus, setCardStatus] = useState<CardStatus>({ enabled: false, plans: [], annual: [] })
   const [billing, setBilling] = useState<BillingInterval>('month')
-
-  useEffect(() => {
-    if (redirectUrl) window.location.href = redirectUrl
-  }, [redirectUrl])
 
   // Ask the server which paid plans are actually purchasable. A missing key or
   // price id hides the card option rather than promising a checkout that fails.
@@ -52,7 +46,7 @@ export default function PricingPage() {
           annual: Array.isArray(data.annual) ? data.annual : [],
         })
       } catch {
-        // Leave the card option hidden; PayPal and bank transfer still work.
+        // Leave the card option hidden; bank transfer still works.
       }
     })()
     return () => {
@@ -65,32 +59,6 @@ export default function PricingPage() {
   const cardAvailable = (planId: string, interval: BillingInterval) =>
     cardStatus.enabled &&
     (interval === 'year' ? cardStatus.annual : cardStatus.plans).includes(planId)
-
-  const handleCheckout = async (planId: string) => {
-    setLoading(planId)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/auth/signup')
-      return
-    }
-
-    try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, userId: user.id, email: user.email }),
-      })
-      const data = await res.json()
-      if (data.url) {
-        setRedirectUrl(data.url)
-      } else {
-        toast(data.error || 'Could not start checkout.', { tone: 'error' })
-      }
-    } catch {
-      toast('Could not start checkout. Check your connection and try again.', { tone: 'error' })
-    }
-    setLoading(null)
-  }
 
   /**
    * Card subscription: Paddle creates the transaction and hosts the checkout, so
@@ -246,28 +214,15 @@ export default function PricingPage() {
                     </p>
                     )}
                     {billing === 'month' ? (
-                      <>
-                        <button
-                          onClick={() => handleCheckout(plan.id)}
-                          disabled={loading === plan.id}
-                          className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white disabled:opacity-50"
-                        >
-                          {loading === plan.id ? (
-                            <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
-                          ) : (
-                            <><CreditCard className="w-4 h-4" /> Pay with PayPal</>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleBankTransfer(plan.id)}
-                          className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white"
-                        >
-                          Bank Transfer
-                        </button>
-                      </>
+                      <button
+                        onClick={() => handleBankTransfer(plan.id)}
+                        className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white"
+                      >
+                        Bank Transfer
+                      </button>
                     ) : (
                       <p className="text-xs text-gray-500 text-center">
-                        Annual plans are card only. PayPal and bank transfer buy one 30-day period.
+                        Annual plans are card only.
                       </p>
                     )}
                   </div>
@@ -277,8 +232,8 @@ export default function PricingPage() {
           </div>
 
           <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-gray-500">
-            A yearly payment buys 365 days; PayPal is a one-time 30-day payment, and bank
-            transfers are approved manually.
+            A yearly payment buys 365 days; a bank transfer buys one 30-day period and is
+            approved manually.
             {cardStatus.enabled
               ? ' Card payments are processed by Paddle, renew automatically, and can be stopped from Settings at any time; access continues until the paid period ends.'
               : ''}
