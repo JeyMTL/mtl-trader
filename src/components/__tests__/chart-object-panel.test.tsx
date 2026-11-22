@@ -7,6 +7,7 @@ import {
   ChartObjectSettings,
   isAlertLine,
   objectName,
+  visibleOnInterval,
   styleColour,
   styleFill,
   type ObjectRow,
@@ -36,6 +37,19 @@ describe('alert lines', () => {
     expect(isAlertLine('ray', { al: true })).toBe(true)
     expect(isAlertLine('ray', {})).toBe(false)
     expect(isAlertLine('rectangle', { al: true })).toBe(false)
+  })
+})
+
+describe('object visibility by interval', () => {
+  it('an object with no list is drawn on every candle size', () => {
+    expect(visibleOnInterval(undefined, '5m')).toBe(true)
+    expect(visibleOnInterval({}, '1d')).toBe(true)
+    expect(visibleOnInterval({ iv: [] }, '1h')).toBe(true)
+  })
+
+  it('a list limits the object to the intervals it names', () => {
+    expect(visibleOnInterval({ iv: ['1h', '4h'] }, '1h')).toBe(true)
+    expect(visibleOnInterval({ iv: ['1h', '4h'] }, '5m')).toBe(false)
   })
 })
 

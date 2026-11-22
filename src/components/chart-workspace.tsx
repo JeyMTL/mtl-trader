@@ -4,10 +4,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { loadDeskPrefs, saveDeskPrefs } from '@/lib/desk-prefs'
 import {
+  DEFAULT_SETTINGS,
+  loadLayouts,
+  loadSettings,
+  removeLayout,
+  saveSettings,
+  upsertLayout,
+  type ChartLayout,
+  type DeskSettings,
+} from '@/lib/desk-settings'
+import { ChartSettingsDialog } from '@/components/chart-settings-panel'
+import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
+import {
   ChartObjectBar,
   ChartObjectSettings,
   styleColour,
   styleFill,
+  visibleOnInterval,
   type DrawingStyle,
 } from '@/components/chart-object-panel'
 
@@ -105,8 +118,6 @@ const TOOLS: { id: ToolId; label: string; hint: string }[] = [
 
 const SYMBOLS = ['EUR_USD', 'GBP_USD', 'USD_JPY', 'XAU_USD', 'US30', 'NAS100']
 
-const UP = '#22c55e'
-const DOWN = '#ef4444'
 const AXIS = 64
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
 
@@ -148,6 +159,19 @@ export function ChartWorkspace({
   const [showVwap, setShowVwap] = useState(false)
   const [showSessions, setShowSessions] = useState(false)
 
+  /** What the canvas paints: colours, decimals, crosshair, clock, log axis. */
+  const [settings, setSettings] = useState<DeskSettings>(DEFAULT_SETTINGS)
+  const [layouts, setLayouts] = useState<ChartLayout[]>([])
+  const [activeLayoutId, setActiveLayoutId] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [layoutsOpen, setLayoutsOpen] = useState(false)
+  const [hubOpen, setHubOpen] = useState(false)
+  /** Index of the newest candle replay may paint; null is the live chart. */
+  const [replayCut, setReplayCut] = useState<number | null>(null)
+  const [replayPlaying, setReplayPlaying] = useState(false)
+  /** A clock for the bar-close countdown; null when the countdown is off. */
+  const [now, setNow] = useState<number | null>(null)
+
   // Restoring the workspace happens after mount, not in the initial state: the
   // server renders this component too, and reading localStorage while rendering
   // would hand React two different first frames.
@@ -166,8 +190,30 @@ export function ChartWorkspace({
       if (typeof prefs.vwap === 'boolean') setShowVwap(prefs.vwap)
       if (typeof prefs.sessions === 'boolean') setShowSessions(prefs.sessions)
     }, 0)
-    return () => window.clearTimeout(restore)
+    const restoreSettings = window.setTimeout(() => {
+      setSettings(loadSettings())
+      setLayouts(loadLayouts())
+    }, 0)
+    return () => {
+      window.clearTimeout(restore)
+      window.clearTimeout(restoreSettings)
+    }
   }, [])
+
+  // Settings are the trader's own; they are written the moment they change.
+  useEffect(() => {
+    saveSettings(settings)
+  }, [settings])
+
+  // The countdown is the only thing on this chart that needs a clock, so it is
+  // the only thing that asks for a timer.
+  useEffect(() => {
+    if (!settings.countdown) return
+    // The first tick lands one interval later, which keeps this an effect that
+    // subscribes to a clock rather than one that sets state while running.
+    const tick = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(tick)
+  }, [settings.countdown])
 
   // One effect for the lot: every one of these is a workspace choice, and each
   // change is merged into what is already stored.
@@ -184,6 +230,17 @@ export function ChartWorkspace({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 900, height: 520 })
+
+  useEffect(() => {
+    if (!replayPlaying) return
+    const id = window.setInterval(() => {
+      setReplayCut((cut) => {
+        if (cut === null) return null
+        return cut >= candles.length - 1 ? cut : cut + 1
+      })
+    }, 900)
+    return () => window.clearInterval(id)
+  }, [replayPlaying, candles.length])
 
   /** Pointer state for a pan or an object drag that is in progress. */
   /** Writes in flight. The poll stands aside while one is running, so a read
@@ -220,22 +277,42 @@ export function ChartWorkspace({
   }, [visible])
 
   const plotW = Math.max(60, size.width - AXIS)
+  /** Decimals on every price: the trader's override, else the instrument's. */
+  const decimals = useCallback(
+    (price: number) => settings.precision ?? pricePrecision(price),
+    [settings.precision]
+  )
   const plotH = Math.max(60, size.height)
 
   const xForIndex = useCallback(
     (index: number) => ((index + 0.5 - view.start) / view.span) * plotW,
     [plotW, view]
   )
+  // A log axis is only defined for positive prices; a range that touches zero
+  // falls back to linear rather than painting NaN.
+  const logAxis = settings.logScale && priceRange.min > 0
   const yForPrice = useCallback(
-    (price: number) =>
-      plotH - ((price - priceRange.min) / (priceRange.max - priceRange.min)) * plotH,
-    [plotH, priceRange]
+    (price: number) => {
+      if (!logAxis) {
+        return plotH - ((price - priceRange.min) / (priceRange.max - priceRange.min)) * plotH
+      }
+      const low = Math.log(priceRange.min)
+      const high = Math.log(priceRange.max)
+      const value = Math.log(Math.max(price, Number.MIN_VALUE))
+      return plotH - ((value - low) / (high - low)) * plotH
+    },
+    [logAxis, plotH, priceRange]
   )
   const priceForY = useCallback(
-    (y: number) =>
-      priceRange.min +
-      ((plotH - y) / plotH) * (priceRange.max - priceRange.min),
-    [plotH, priceRange]
+    (y: number) => {
+      if (!logAxis) {
+        return priceRange.min + ((plotH - y) / plotH) * (priceRange.max - priceRange.min)
+      }
+      const low = Math.log(priceRange.min)
+      const high = Math.log(priceRange.max)
+      return Math.exp(low + ((plotH - y) / plotH) * (high - low))
+    },
+    [logAxis, plotH, priceRange]
   )
   const indexForTime = useCallback(
     (ms: number) => {
@@ -380,6 +457,60 @@ export function ChartWorkspace({
     return levels
   }, [candles, showSessions])
 
+  // ------------------------------------------------------- layouts and replay
+  /** Opens a saved layout: its instrument, interval and paint settings. */
+  const openLayout = (layout: ChartLayout) => {
+    setSettings(layout.settings)
+    setSymbolInput(layout.symbol)
+    setSymbolDraft(layout.symbol)
+    setIntervalKey(layout.interval)
+    setActiveLayoutId(layout.id)
+    setLayoutsOpen(false)
+    setHubOpen(false)
+  }
+
+  const saveCurrentLayout = (name: string) => {
+    const layout: ChartLayout = {
+      id: `layout-${Date.now()}`,
+      name,
+      symbol: chartSymbol(symbol),
+      interval,
+      settings,
+      savedAt: Date.now(),
+    }
+    setLayouts(upsertLayout(layouts, layout))
+    setActiveLayoutId(layout.id)
+  }
+
+  const deleteLayout = (id: string) => {
+    setLayouts(removeLayout(layouts, id))
+    if (activeLayoutId === id) setActiveLayoutId(null)
+  }
+
+  const newLayout = () => {
+    setSettings({ ...DEFAULT_SETTINGS })
+    setActiveLayoutId(null)
+    setHubOpen(false)
+  }
+
+  const startReplay = () => {
+    if (candles.length < 20) return
+    // Sixty bars back is enough to see the setup that led to now without
+    // making the trader walk through a session by hand.
+    setReplayCut(Math.max(1, candles.length - 60))
+    setReplayPlaying(false)
+  }
+
+  const stopReplay = () => {
+    setReplayCut(null)
+    setReplayPlaying(false)
+  }
+
+  const stepReplay = () =>
+    setReplayCut((cut) => Math.min(candles.length - 1, (cut ?? candles.length - 1) + 1))
+
+  const activeAlertCount = symbolDrawings.filter((row) => row.style?.al && !row.style?.fd).length
+
   // ------------------------------------------------------------------ paint
   useEffect(() => {
     const canvas = canvasRef.current
@@ -391,6 +522,13 @@ export function ChartWorkspace({
     if (!context) return
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     context.clearRect(0, 0, size.width, size.height)
+    if (settings.gradient) {
+      const gradient = context.createLinearGradient(0, 0, 0, size.height)
+      gradient.addColorStop(0, '#0b1220')
+      gradient.addColorStop(1, settings.gradientTo)
+      context.fillStyle = gradient
+      context.fillRect(0, 0, size.width, size.height)
+    }
 
     // Grid and axes.
     context.font = '10px ui-sans-serif, system-ui, sans-serif'
@@ -404,7 +542,7 @@ export function ChartWorkspace({
       context.lineTo(plotW, y)
       context.stroke()
       const price = priceForY(y)
-      context.fillText(price.toFixed(pricePrecision(price)), 4, Math.min(plotH - 4, y + 3))
+      context.fillText(price.toFixed(decimals(price)), 4, Math.min(plotH - 4, y + 3))
     }
     const ticks = Math.max(3, Math.min(8, Math.floor(plotW / 110)))
     for (let step = 0; step <= ticks; step += 1) {
@@ -416,18 +554,21 @@ export function ChartWorkspace({
       context.lineTo(x, plotH)
       context.stroke()
       context.fillStyle = '#6b7280'
-      const label = tickLabel(timeForIndex(index), interval)
+      const label = tickLabel(timeForIndex(index), interval, settings)
       context.fillText(label, Math.min(x + 4, plotW - 52), plotH - 6)
     }
 
     // Candles.
     const bodyW = Math.max(1.5, (plotW / view.span) * 0.65)
-    for (let index = Math.floor(view.start); index <= view.start + view.span; index += 1) {
+    // Replay paints up to the bar the trader has walked to, and no further: the
+    // candles after it exist but are not history yet.
+    const lastPaintable = replayCut === null ? candles.length - 1 : Math.min(replayCut, candles.length - 1)
+    for (let index = Math.floor(view.start); index <= Math.min(view.start + view.span, lastPaintable); index += 1) {
       const candle = candles[index]
       if (!candle) continue
       const x = xForIndex(index)
       if (x < -bodyW || x > plotW + bodyW) continue
-      const colour = candle.c >= candle.o ? UP : DOWN
+      const colour = candle.c >= candle.o ? settings.bull : settings.bear
       context.strokeStyle = colour
       context.fillStyle = colour
       context.beginPath()
@@ -456,7 +597,7 @@ export function ChartWorkspace({
         context.setLineDash([])
         context.fillStyle = level.colour
         context.fillText(
-          `${level.label} ${level.side === 'high' ? 'H' : 'L'} ${level.price.toFixed(pricePrecision(level.price))}`,
+          `${level.label} ${level.side === 'high' ? 'H' : 'L'} ${level.price.toFixed(decimals(level.price))}`,
           6,
           y - 3
         )
@@ -484,13 +625,19 @@ export function ChartWorkspace({
       context.stroke()
     }
 
-    // Objects.
-    for (const row of symbolDrawings) {
+    // Objects. Paint order is the trader's: a higher `z` sits on top, and the
+    // list order decides when nobody has moved one.
+    const orderedObjects = [...symbolDrawings].sort(
+      (a, b) => (a.style?.z ?? 0) - (b.style?.z ?? 0)
+    )
+    for (const row of orderedObjects) {
       const points = row.points ?? []
       if (points.length === 0) continue
       // A hidden object keeps its row and stops being painted, which is how a
       // trader clears the chart without throwing the idea away.
       if (row.style?.hd) continue
+      // An object the trader only wants on other candle sizes is not drawn here.
+      if (!visibleOnInterval(row.style, interval)) continue
       // A fired alert is kept as the record of a level that was reached; the
       // filter is about what the trader still wants to see.
       const firedAlert = Boolean(row.style?.al && row.style?.fd)
@@ -551,7 +698,7 @@ export function ChartWorkspace({
         }
         context.setLineDash([])
         context.fillStyle = colour
-        const tag = points[0].p.toFixed(pricePrecision(points[0].p))
+        const tag = points[0].p.toFixed(decimals(points[0].p))
         const width = context.measureText(tag).width + 8
         context.fillRect(plotW + 2, y - 8, width, 16)
         context.fillStyle = '#0b1220'
@@ -588,7 +735,7 @@ export function ChartWorkspace({
         context.lineTo(b.x, b.y)
         context.stroke()
         const label =
-          `${delta >= 0 ? '+' : ''}${delta.toFixed(pricePrecision(delta || points[0].p))}` +
+          `${delta >= 0 ? '+' : ''}${delta.toFixed(decimals(delta || points[0].p))}` +
           `  ${change >= 0 ? '+' : ''}${change.toFixed(2)}%  ${bars} bars`
         context.fillStyle = '#0b1220'
         const width = context.measureText(label).width + 10
@@ -657,10 +804,48 @@ export function ChartWorkspace({
       context.setLineDash([])
     }
 
+    // The last price, with the countdown under it when the trader asked for
+    // one: how long the forming bar still has to run.
+    const lastShown = candles[lastPaintable]
+    if (lastShown) {
+      const y = yForPrice(lastShown.c)
+      if (y >= 0 && y <= plotH) {
+        const colour = lastShown.c >= lastShown.o ? settings.bull : settings.bear
+        context.strokeStyle = colour
+        context.lineWidth = 1
+        context.setLineDash([4, 3])
+        context.beginPath()
+        context.moveTo(0, y)
+        context.lineTo(plotW, y)
+        context.stroke()
+        context.setLineDash([])
+        context.fillStyle = colour
+        const tag = lastShown.c.toFixed(decimals(lastShown.c))
+        const tagWidth = context.measureText(tag).width + 10
+        context.fillRect(plotW + 2, y - 8, tagWidth, 16)
+        context.fillStyle = '#0b1220'
+        context.fillText(tag, plotW + 6, y + 4)
+        if (settings.countdown && now !== null) {
+          const closeAt = lastShown.t + intervalMs(interval)
+          const left = Math.max(0, Math.round((closeAt - now) / 1000))
+          const clock = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`
+          context.fillStyle = '#94a3b8'
+          context.fillText(clock, plotW + 4, y + 20)
+        }
+      }
+    }
+
     // Crosshair.
     if (hover) {
-      context.strokeStyle = 'rgba(226, 232, 240, 0.35)'
-      context.setLineDash([3, 3])
+      context.strokeStyle = 'rgba(226, 232, 240, 0.45)'
+      context.lineWidth = settings.crosshairWidth
+      context.setLineDash(
+        settings.crosshairStyle === 'solid'
+          ? []
+          : settings.crosshairStyle === 'dotted'
+            ? [1, 3]
+            : [5, 4]
+      )
       context.beginPath()
       context.moveTo(hover.x, 0)
       context.lineTo(hover.x, plotH)
@@ -668,11 +853,13 @@ export function ChartWorkspace({
       context.lineTo(plotW, hover.y)
       context.stroke()
       context.setLineDash([])
+      context.lineWidth = 1
 
       const index = Math.round(view.start + (hover.x / plotW) * view.span)
       const candle = candles[Math.min(candles.length - 1, Math.max(0, index))]
       if (candle) {
-        const tag = tickLabel(candle.t, interval) + '  ·  ' + candle.c.toFixed(pricePrecision(candle.c))
+        const tag =
+          tickLabel(candle.t, interval, settings) + '  ·  ' + candle.c.toFixed(decimals(candle.c))
         context.fillStyle = 'rgba(15, 23, 42, 0.92)'
         const width = context.measureText(tag).width + 12
         context.fillRect(
@@ -692,9 +879,13 @@ export function ChartWorkspace({
   }, [
     activeAlertsOnly,
     candles,
+    decimals,
     hover,
     interval,
+    now,
     pending,
+    replayCut,
+    settings,
     plotH,
     plotW,
     priceForY,
@@ -1172,6 +1363,17 @@ export function ChartWorkspace({
   }, [removeDrawing, selectedId])
 
   const lastPrice = candles.length > 0 ? candles[candles.length - 1].c : null
+
+  /** The candle under the pointer, for the screen-reader line. */
+  const hoverCandle =
+    hover && candles.length > 0
+      ? candles[
+          Math.min(
+            candles.length - 1,
+            Math.max(0, Math.round(view.start + (hover.x / plotW) * view.span))
+          )
+        ]
+      : null
   const activeTool = TOOLS.find((item) => item.id === tool)
 
   return (
@@ -1265,6 +1467,60 @@ export function ChartWorkspace({
           </button>
           <button
             type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white"
+          >
+            Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => setHubOpen(true)}
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white"
+          >
+            Hub
+          </button>
+          {replayCut !== null ? (
+            <span className="flex items-center gap-1 rounded-lg border border-primary/50 bg-primary/10 px-1.5 py-0.5">
+              <button
+                type="button"
+                onClick={() => setReplayPlaying((playing) => !playing)}
+                className="rounded px-1.5 py-1 text-[11px] font-bold text-primary"
+                aria-label={replayPlaying ? 'Pause replay' : 'Play replay'}
+              >
+                {replayPlaying ? 'Pause' : 'Play'}
+              </button>
+              <button
+                type="button"
+                onClick={stepReplay}
+                className="rounded px-1.5 py-1 text-[11px] font-bold text-primary"
+                aria-label="Next bar"
+              >
+                Step
+              </button>
+              <button
+                type="button"
+                onClick={stopReplay}
+                className="rounded px-1.5 py-1 text-[11px] font-bold text-primary"
+                aria-label="Stop replay"
+              >
+                Stop
+              </button>
+              <span className="pr-1 text-[10px] text-primary/80">
+                {replayCut + 1}/{candles.length}
+              </span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={startReplay}
+              disabled={candles.length < 20}
+              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white disabled:opacity-40"
+            >
+              Replay
+            </button>
+          )}
+          <button
+            type="button"
             onClick={undo}
             disabled={symbolDrawings.length === 0}
             className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white disabled:opacity-40"
@@ -1330,6 +1586,13 @@ export function ChartWorkspace({
         />
       )}
 
+      <p id="chart-live" aria-live="polite" className="sr-only">
+        {hoverCandle
+          ? `${tickLabel(hoverCandle.t, interval, settings)} open ${hoverCandle.o.toFixed(decimals(hoverCandle.o))}, high ${hoverCandle.h.toFixed(decimals(hoverCandle.h))}, low ${hoverCandle.l.toFixed(decimals(hoverCandle.l))}, close ${hoverCandle.c.toFixed(decimals(hoverCandle.c))}`
+          : `${symbolDrawings.length} saved object${symbolDrawings.length === 1 ? '' : 's'} on ${symbol}`}
+        {replayCut === null ? '' : `. Replay paused at bar ${replayCut + 1} of ${candles.length}`}
+      </p>
+
       <div
         ref={boxRef}
         className="relative h-[62vh] min-h-[380px] w-full overflow-hidden rounded-xl border border-border bg-[#0b1220]"
@@ -1337,8 +1600,41 @@ export function ChartWorkspace({
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label={`${symbol} ${interval} chart with saved drawings`}
+          tabIndex={0}
+          aria-label={`${symbol} ${interval} chart with ${symbolDrawings.length} saved object${
+            symbolDrawings.length === 1 ? '' : 's'
+          }. Arrow keys pan, plus and minus zoom.`}
+          aria-describedby="chart-live"
           style={{ width: size.width, height: size.height, touchAction: 'none', cursor: tool === 'select' ? 'crosshair' : 'copy' }}
+          onKeyDown={(event) => {
+            // A canvas has no focusable parts, so the keyboard model lives on
+            // the canvas itself: the same keys a trader reaches for in any
+            // charting app, without a mouse.
+            const step = event.shiftKey ? 0.25 : 0.1
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+              event.preventDefault()
+              setView((current) => ({
+                ...current,
+                start: Math.max(0, current.start + (event.key === 'ArrowLeft' ? -current.span : current.span) * step),
+              }))
+              return
+            }
+            if (event.key === '+' || event.key === '=' || event.key === '-') {
+              event.preventDefault()
+              setView((current) => {
+                const zoomed = event.key === '-' ? current.span * 1.15 : current.span / 1.15
+                const span = Math.max(12, Math.min(candles.length, zoomed))
+                return { start: Math.min(current.start, Math.max(0, candles.length - span)), span }
+              })
+              return
+            }
+            if (event.key === 'Escape') {
+              setSelectedId(null)
+              setSettingsOpen(false)
+              setLayoutsOpen(false)
+              setHubOpen(false)
+            }
+          }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -1410,6 +1706,59 @@ export function ChartWorkspace({
           </button>
         </div>
       )}
+
+      {settingsOpen && (
+        <ChartSettingsDialog
+          settings={settings}
+          onChange={setSettings}
+          onClose={() => setSettingsOpen(false)}
+          activeAlertsOnly={activeAlertsOnly}
+          onActiveAlertsOnly={setActiveAlertsOnly}
+        />
+      )}
+
+      {layoutsOpen && (
+        <ChartLayoutsDialog
+          layouts={layouts}
+          currentSymbol={chartSymbol(symbol)}
+          currentInterval={interval}
+          onOpen={openLayout}
+          onSave={(name) => {
+            saveCurrentLayout(name)
+            setLayoutsOpen(false)
+          }}
+          onDelete={deleteLayout}
+          onClose={() => setLayoutsOpen(false)}
+        />
+      )}
+
+      {hubOpen && (
+        <AnalysisHubDialog
+          activeLayoutName={layouts.find((layout) => layout.id === activeLayoutId)?.name ?? null}
+          onOpenLayouts={() => {
+            setHubOpen(false)
+            setLayoutsOpen(true)
+          }}
+          onOpenSettings={() => {
+            setHubOpen(false)
+            setSettingsOpen(true)
+          }}
+          onSaveLayout={() => {
+            setHubOpen(false)
+            setLayoutsOpen(true)
+          }}
+          onNewLayout={newLayout}
+          onToggleReplay={() => {
+            if (replayCut === null) startReplay()
+            else stopReplay()
+            setHubOpen(false)
+          }}
+          replaying={replayCut !== null}
+          objectCount={symbolDrawings.length}
+          alertCount={activeAlertCount}
+          onClose={() => setHubOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -1464,6 +1813,19 @@ export function chartSymbol(raw: string): string {
 }
 
 /** Price decimals that suit the magnitude: 5 for EUR/USD, 2 for gold, 1 for indices. */
+/** Milliseconds in one candle of this interval, for the bar-close countdown. */
+function intervalMs(interval: string): number {
+  const table: Record<string, number> = {
+    '5m': 5 * 60_000,
+    '15m': 15 * 60_000,
+    '30m': 30 * 60_000,
+    '1h': 60 * 60_000,
+    '4h': 4 * 60 * 60_000,
+    '1d': 24 * 60 * 60_000,
+  }
+  return table[interval] ?? 60 * 60_000
+}
+
 function pricePrecision(price: number): number {
   const magnitude = Math.abs(price)
   if (magnitude >= 1000) return 1
@@ -1472,13 +1834,23 @@ function pricePrecision(price: number): number {
   return 5
 }
 
-function tickLabel(ms: number, interval: string): string {
+function tickLabel(
+  ms: number,
+  interval: string,
+  settings?: { clock24: boolean; weekday: boolean }
+): string {
   const date = new Date(ms)
+  const weekday = settings?.weekday
+    ? `${date.toLocaleString('en-GB', { weekday: 'short', timeZone: 'UTC' })} `
+    : ''
   const daily = interval === '1d'
   if (daily) {
-    return `${date.getUTCDate()} ${date.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`
+    return `${weekday}${date.getUTCDate()} ${date.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`
   }
-  const hours = String(date.getUTCHours()).padStart(2, '0')
+  const hours = settings?.clock24 === false
+    ? String(date.getUTCHours() % 12 === 0 ? 12 : date.getUTCHours() % 12)
+    : String(date.getUTCHours()).padStart(2, '0')
   const minutes = String(date.getUTCMinutes()).padStart(2, '0')
-  return `${date.getUTCDate()}/${date.getUTCMonth() + 1} ${hours}:${minutes}`
+  const suffix = settings?.clock24 === false ? (date.getUTCHours() >= 12 ? ' PM' : ' AM') : ''
+  return `${weekday}${date.getUTCDate()}/${date.getUTCMonth() + 1} ${hours}:${minutes}${suffix}`
 }

@@ -24,6 +24,21 @@ export interface DrawingStyle {
   al?: boolean
   /** Set once that alert has been delivered. Kept so the level is not lost. */
   fd?: boolean
+  /**
+   * Intervals this object is drawn on, e.g. ['15m','1h']. Absent means every
+   * interval, which is what an object drawn before this key existed means.
+   */
+  iv?: string[]
+  /** Paint order: higher sits on top. The phone uses list order instead. */
+  z?: number
+}
+
+export const INTERVAL_OPTIONS = ['5m', '15m', '30m', '1h', '4h', '1d'] as const
+
+/** True when an object belongs on this interval. */
+export function visibleOnInterval(style: DrawingStyle | undefined, interval: string): boolean {
+  if (!style?.iv || style.iv.length === 0) return true
+  return style.iv.includes(interval)
 }
 
 export interface ObjectRow {
@@ -328,7 +343,7 @@ export function ChartObjectSettings({
   onClone: () => void
   onDelete: () => void
 }) {
-  const [tab, setTab] = useState<'style' | 'coordinates' | 'text'>('style')
+  const [tab, setTab] = useState<'style' | 'coordinates' | 'visibility' | 'text'>('style')
   const [style, setStyle] = useState<DrawingStyle>({ ...(row.style ?? {}) })
   const [points, setPoints] = useState(row.points.map((point) => ({ ...point })))
   const [text, setText] = useState(row.text ?? '')
@@ -368,11 +383,11 @@ export function ChartObjectSettings({
         </div>
 
         <div className="flex items-center gap-1 border-b border-border px-2">
-          {(['style', 'coordinates', 'text'] as const).map((value) => (
+          {(['style', 'coordinates', 'visibility', 'text'] as const).map((value) => (
             <button
               key={value}
               type="button"
-              onClick={() => setTab(value as 'style' | 'coordinates' | 'text')}
+              onClick={() => setTab(value as 'style' | 'coordinates' | 'visibility' | 'text')}
               className={`border-b-2 px-3 py-2 text-xs font-semibold capitalize ${
                 tab === value ? 'border-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-300'
               }`}
@@ -493,6 +508,23 @@ export function ChartObjectSettings({
                     className="h-4 w-4 accent-sky-400"
                   />
                 </label>
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="flex-1 text-[11px] text-gray-400">Order</span>
+                  <button
+                    type="button"
+                    onClick={() => patchStyle({ z: (style.z ?? 0) + 1 })}
+                    className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-gray-300 hover:text-white"
+                  >
+                    Bring forward
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => patchStyle({ z: (style.z ?? 0) - 1 })}
+                    className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-gray-300 hover:text-white"
+                  >
+                    Send back
+                  </button>
+                </div>
               </section>
 
               <div className="flex items-center gap-2 border-t border-border pt-3">
@@ -512,6 +544,43 @@ export function ChartObjectSettings({
                 </button>
               </div>
             </>
+          )}
+
+          {tab === 'visibility' && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold text-gray-400">Show on intervals</p>
+              <div className="flex flex-wrap gap-1.5">
+                {INTERVAL_OPTIONS.map((option) => {
+                  const list = style.iv ?? []
+                  const on = list.length === 0 || list.includes(option)
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        const next = list.length === 0
+                          ? INTERVAL_OPTIONS.filter((entry) => entry !== option)
+                          : list.includes(option)
+                            ? list.filter((entry) => entry !== option)
+                            : [...list, option]
+                        // Every interval ticked is the same as no list at all.
+                        patchStyle({ iv: next.length === INTERVAL_OPTIONS.length ? undefined : next })
+                      }}
+                      className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${
+                        on ? 'border-primary bg-primary/15 text-primary' : 'border-border text-gray-400'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[11px] leading-relaxed text-gray-500">
+                An object hidden here is kept and still syncs; it simply is not
+                drawn on that candle size. With nothing ticked it shows everywhere.
+              </p>
+            </div>
           )}
 
           {tab === 'coordinates' && (
