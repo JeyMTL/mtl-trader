@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  CandlestickChart,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -19,6 +20,7 @@ import {
   Tag,
   X,
 } from 'lucide-react'
+import { LevelPicker, type PickedLevels } from '@/components/level-picker'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
 import type { DayStateResponse } from '@/lib/daily-stop'
@@ -114,6 +116,7 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
   const [tagDraft, setTagDraft] = useState('')
   const [strategyLabels, setStrategyLabels] = useState<string[]>([])
   const [strategyOpen, setStrategyOpen] = useState(false)
+  const [pinOpen, setPinOpen] = useState(false)
   const [userId, setUserId] = useState('')
   const [attachments, setAttachments] = useState<JournalAttachment[]>([])
   const [pendingMedia, setPendingMedia] = useState<PendingJournalAttachment[]>([])
@@ -535,6 +538,21 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
   const fieldClass = (invalid: boolean) =>
     cn('input num', invalid && showErrors && 'border-danger focus:border-danger')
 
+  /**
+   * Levels pinned on the chart, written into the fields this form already uses.
+   * A marker the trader left empty keeps whatever was typed there — pinning one
+   * level must never wipe another.
+   */
+  const applyPickedLevels = (levels: PickedLevels) => {
+    setForm((current) => ({
+      ...current,
+      entry_price: levels.entry === null ? current.entry_price : formatPrice(levels.entry),
+      stop_loss: levels.stop === null ? current.stop_loss : formatPrice(levels.stop),
+      take_profit: levels.take === null ? current.take_profit : formatPrice(levels.take),
+    }))
+    setPinOpen(false)
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl space-y-4">
@@ -726,7 +744,17 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
                 <h2 className="text-sm font-semibold text-white">Execution</h2>
                 <p className="text-xs text-gray-500">Entry, exit and size</p>
               </div>
-              <span className="eyebrow">02</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPinOpen(true)}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-gray-300 transition-colors hover:border-primary/50 hover:text-white"
+                >
+                  <CandlestickChart className="h-3.5 w-3.5" />
+                  Pin levels from chart
+                </button>
+                <span className="eyebrow">02</span>
+              </div>
             </div>
             <div className="grid gap-4 p-4 sm:grid-cols-3">
               <div>
@@ -1159,6 +1187,20 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
           </div>
         </aside>
       </div>
+
+      {pinOpen && (
+        <LevelPicker
+          symbol={form.symbol}
+          side={form.type}
+          initial={{
+            entry: Number.parseFloat(form.entry_price) || null,
+            stop: Number.parseFloat(form.stop_loss) || null,
+            take: Number.parseFloat(form.take_profit) || null,
+          }}
+          onApply={applyPickedLevels}
+          onClose={() => setPinOpen(false)}
+        />
+      )}
     </div>
   )
 }

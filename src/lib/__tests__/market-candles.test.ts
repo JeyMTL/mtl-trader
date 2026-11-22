@@ -156,6 +156,19 @@ describe('oandaInstrument', () => {
     expect(oandaInstrument('EURRUB')).toBe('EUR_RUB')
   })
 
+  it('sees through a broker suffix on the symbol', () => {
+    // MT5 accounts name the same feed instrument with a suffix; the level
+    // picker has to chart what the journal actually holds.
+    expect(oandaInstrument('XAUUSDM')).toBe('XAU_USD')
+    expect(oandaInstrument('EURUSDM')).toBe('EUR_USD')
+    expect(oandaInstrument('NAS100CASH')).toBe('NAS100_USD')
+    expect(oandaInstrument('US30MINI')).toBe('US30_USD')
+  })
+
+  it('still refuses a symbol that only looks like a pair', () => {
+    expect(oandaInstrument('ABCXYZQ')).toBeNull()
+  })
+
   it('declines symbols OANDA cannot be asked for', () => {
     expect(oandaInstrument('GOLD')).toBeNull()
     expect(oandaInstrument('DOGEUSD')).toBeNull()

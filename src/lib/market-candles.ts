@@ -254,7 +254,16 @@ export function normalizeSymbol(value: string): string {
 export function oandaInstrument(symbol: string): string | null {
   const mapped = OANDA_INSTRUMENTS[symbol]
   if (mapped) return mapped
-  return /^[A-Z]{6}$/.test(symbol) ? `${symbol.slice(0, 3)}_${symbol.slice(3)}` : null
+  if (/^[A-Z]{6}$/.test(symbol)) return `${symbol.slice(0, 3)}_${symbol.slice(3)}`
+  // A broker's own symbol usually carries a suffix: XAUUSDM, NAS100CASH,
+  // EURUSDA. Peel characters off the end and take the first name the catalogue
+  // knows. Nothing is guessed out of a near match, so a symbol that genuinely
+  // cannot be charted still answers null and the route says so.
+  for (let end = symbol.length - 1; end >= 3; end -= 1) {
+    const known = OANDA_INSTRUMENTS[symbol.slice(0, end)]
+    if (known) return known
+  }
+  return null
 }
 
 /** OANDA `price=M` candles, strings included, sorted oldest → newest. */

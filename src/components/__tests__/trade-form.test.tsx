@@ -89,6 +89,14 @@ vi.mock('@/lib/subscription', async (importOriginal) => {
 
 import { TradeForm } from '@/components/trade-form'
 
+// jsdom has no ResizeObserver and no canvas; the picker only needs the
+// observer to exist, and it skips drawing when there is nothing to measure.
+class StubResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 function fill(name: string, value: string) {
   fireEvent.change(screen.getByLabelText(name), { target: { value } })
 }
@@ -108,6 +116,18 @@ describe('TradeForm', () => {
     db.tradeCount = 0
     db.limit = -1
     db.push.mockClear()
+    vi.stubGlobal('ResizeObserver', StubResizeObserver)
+    // Candles answer so the picker can open; every other call fails the way a
+    // test environment with no backend already did.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: unknown) => {
+        if (String(input).includes('/api/market/candles')) {
+          return { ok: true, json: async () => ({ candles: [] }) }
+        }
+        throw new Error('no backend in this test')
+      })
+    )
   })
 
   afterEach(() => {
@@ -124,6 +144,22 @@ describe('TradeForm', () => {
 
     expect(screen.getByText('+$500.00')).toBeTruthy()
     expect(screen.getByText(/\+50\.0 pips/)).toBeTruthy()
+  })
+
+  it('opens the chart picker for the trade\'s own symbol', async () => {
+    render(<TradeForm mode="create" />)
+    fill('Symbol', 'XAUUSDM')
+
+    fireEvent.click(screen.getByRole('button', { name: /Pin levels from chart/i }))
+
+    await waitFor(() =>
+      expect(screen.getByText(/Pin levels · XAUUSDM/)).toBeTruthy()
+    )
+    // The broker suffix is the route's problem to resolve, not the form's.
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/market/candles?symbol=XAUUSDM&interval=M15'),
+      expect.anything()
+    )
   })
 
   it('refuses to save without the required prices and size', () => {
