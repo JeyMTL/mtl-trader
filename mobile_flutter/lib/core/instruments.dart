@@ -183,5 +183,8 @@ Instrument? inferInstrument(String value) {
 }
 
 /// A price with the instrument's decimals, ready for a form field.
-String chartPrice(double value, Instrument instrument) =>
-    value.toStringAsFixed(instrument.decimals);
+///
+/// [decimals] overrides the instrument when the chart's own precision setting
+/// pins a different number, so the header and the axis never disagree.
+String chartPrice(double value, Instrument instrument, {int? decimals}) =>
+    value.toStringAsFixed(decimals ?? instrument.decimals);

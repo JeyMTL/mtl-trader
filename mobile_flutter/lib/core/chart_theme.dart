@@ -85,6 +85,15 @@ class ChartStyle {
     this.macdSlow = 26,
     this.macdSignal = 9,
     this.zoneId = '',
+    this.colorBarsByPrevClose = false,
+    this.showCandleBody = true,
+    this.showCandleBorder = true,
+    this.showCandleWick = true,
+    this.precision,
+    this.showAxisPlus = true,
+    this.showCountdown = false,
+    this.dayOfWeekLabels = false,
+    this.use24Hour = true,
   });
 
   /// Stable key for the preset, used for selection state.
@@ -155,6 +164,34 @@ class ChartStyle {
   /// otherwise an IANA name from [ChartZone].
   final String zoneId;
 
+  /// Colour a bar against the previous close instead of the previous open.
+  /// Flat bars then read as neutral rather than green, which is how a trader
+  /// reading a bar chart thinks about a doji.
+  final bool colorBarsByPrevClose;
+
+  /// Candle anatomy. All three on is a normal candle; body off draws bars,
+  /// wick off draws flat boxes.
+  final bool showCandleBody;
+  final bool showCandleBorder;
+  final bool showCandleWick;
+
+  /// Decimals on every price the chart prints. Null follows the instrument:
+  /// JPY pairs get three, FX majors five.
+  final int? precision;
+
+  /// The circular '+' beside the crosshair price badge. Off leaves the
+  /// crosshair analytical and nothing else.
+  final bool showAxisPlus;
+
+  /// Countdown to the close of the forming bar under the last price.
+  final bool showCountdown;
+
+  /// Weekday in the time-axis labels — `Fri 20 Nov` rather than `20 Nov`.
+  final bool dayOfWeekLabels;
+
+  /// 24-hour clock on the axis and the crosshair badge, or 12-hour with AM/PM.
+  final bool use24Hour;
+
   /// The zone this chart is drawn in.
   ChartZone get zone => ChartZone.byId(zoneId);
 
@@ -187,6 +224,19 @@ class ChartStyle {
     int? macdSlow,
     int? macdSignal,
     String? zoneId,
+    bool? colorBarsByPrevClose,
+    bool? showCandleBody,
+    bool? showCandleBorder,
+    bool? showCandleWick,
+    int? precision,
+
+    /// Explicitly drop back to the instrument's own decimals; a plain null
+    /// cannot mean "clear" in a copyWith whose nulls mean "unchanged".
+    bool clearPrecision = false,
+    bool? showAxisPlus,
+    bool? showCountdown,
+    bool? dayOfWeekLabels,
+    bool? use24Hour,
   }) {
     return ChartStyle(
       id: id,
@@ -218,6 +268,15 @@ class ChartStyle {
       macdSlow: macdSlow ?? this.macdSlow,
       macdSignal: macdSignal ?? this.macdSignal,
       zoneId: zoneId ?? this.zoneId,
+      colorBarsByPrevClose: colorBarsByPrevClose ?? this.colorBarsByPrevClose,
+      showCandleBody: showCandleBody ?? this.showCandleBody,
+      showCandleBorder: showCandleBorder ?? this.showCandleBorder,
+      showCandleWick: showCandleWick ?? this.showCandleWick,
+      precision: clearPrecision ? null : (precision ?? this.precision),
+      showAxisPlus: showAxisPlus ?? this.showAxisPlus,
+      showCountdown: showCountdown ?? this.showCountdown,
+      dayOfWeekLabels: dayOfWeekLabels ?? this.dayOfWeekLabels,
+      use24Hour: use24Hour ?? this.use24Hour,
     );
   }
 
@@ -348,6 +407,15 @@ class ChartStyle {
         'macdSlow': macdSlow,
         'macdSignal': macdSignal,
         'zone': zoneId,
+        'prevCloseColors': colorBarsByPrevClose,
+        'candleBody': showCandleBody,
+        'candleBorder': showCandleBorder,
+        'candleWick': showCandleWick,
+        if (precision != null) 'precision': precision,
+        'axisPlus': showAxisPlus,
+        'countdown': showCountdown,
+        'dayOfWeek': dayOfWeekLabels,
+        'hour24': use24Hour,
       };
 
   static String encode(ChartStyle style) => jsonEncode(style.toJson());
@@ -395,6 +463,15 @@ class ChartStyle {
       macdSlow: _readInt(decoded['macdSlow']),
       macdSignal: _readInt(decoded['macdSignal']),
       zoneId: decoded['zone'] is String ? decoded['zone'] as String : '',
+      colorBarsByPrevClose: _readFlag(decoded['prevCloseColors']),
+      showCandleBody: _readFlag(decoded['candleBody']),
+      showCandleBorder: _readFlag(decoded['candleBorder']),
+      showCandleWick: _readFlag(decoded['candleWick']),
+      precision: _readInt(decoded['precision']),
+      showAxisPlus: _readFlag(decoded['axisPlus']),
+      showCountdown: _readFlag(decoded['countdown']),
+      dayOfWeekLabels: _readFlag(decoded['dayOfWeek']),
+      use24Hour: _readFlag(decoded['hour24']),
     );
   }
 

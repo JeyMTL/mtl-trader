@@ -38,7 +38,22 @@ class TradingChartPainter extends CustomPainter {
     required this.selectedDrawing,
     required this.positionOutcomes,
     this.preview,
+    this.now,
   });
+
+  /// The clock the bar-close countdown counts against. Null reads the device
+  /// clock, which is right on the phone but untestable, so tests pass it in.
+  final DateTime? now;
+
+  /// A candle's colour, honouring the previous-close rule when it is on.
+  Color _candleColor(int index) {
+    if (!style.colorBarsByPrevClose || index <= 0) {
+      return candles[index].isUp ? style.bull : style.bear;
+    }
+    return candles[index].close >= candles[index - 1].close
+        ? style.bull
+        : style.bear;
+  }
 
   static const double height = 380;
   static const double axisWidth = 58;
@@ -284,14 +299,17 @@ class TradingChartPainter extends CustomPainter {
         final candle = candles[i];
         final cx = x(i.toDouble());
         if (cx < -slot || cx > plotW + slot) continue;
-        final color = candle.isUp ? style.bull : style.bear;
-        canvas.drawLine(
-          Offset(cx, y(candle.high)),
-          Offset(cx, y(candle.low)),
-          Paint()
-            ..color = color
-            ..strokeWidth = 1,
-        );
+        final color = _candleColor(i);
+        if (style.showCandleWick) {
+          canvas.drawLine(
+            Offset(cx, y(candle.high)),
+            Offset(cx, y(candle.low)),
+            Paint()
+              ..color = color
+              ..strokeWidth = 1,
+          );
+        }
+        if (!style.showCandleBody) continue;
         final openY = y(candle.open);
         final closeY = y(candle.close);
         final body = Rect.fromLTRB(
@@ -303,6 +321,15 @@ class TradingChartPainter extends CustomPainter {
         // Opaque, like a TradingView body: the black/green scheme reads as
         // solid black rather than a grey that lets the session tint through.
         canvas.drawRect(body, Paint()..color = color);
+        if (style.showCandleBorder) {
+          canvas.drawRect(
+            body.deflate(0.5),
+            Paint()
+              ..color = color.withAlpha(255)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1,
+          );
+        }
       }
     } else {
       final line = Path();
@@ -606,6 +633,29 @@ class TradingChartPainter extends CustomPainter {
         last.close.toStringAsFixed(decimals),
         color,
       );
+      // How long this candle still has to run. Under the badge rather than in
+      // the header, because it is a property of the bar being formed and that
+      // is what the badge is attached to.
+      if (style.showCountdown) {
+        final seconds = last.time
+            .add(interval.size)
+            .difference(now ?? DateTime.now())
+            .inSeconds
+            .clamp(0, 86400)
+            .toInt();
+        final clock = '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
+            '${(seconds % 60).toString().padLeft(2, '0')}';
+        final label = _painter(
+          clock,
+          color: style.muted,
+          size: 8.5,
+          weight: FontWeight.w600,
+        );
+        label.paint(
+          canvas,
+          Offset(plotW + 2 + (axisWidth - 4 - label.width) / 2, lastY + 8),
+        );
+      }
     }
 
     for (final time in [entryTime, exitTime]) {
@@ -717,7 +767,11 @@ class TradingChartPainter extends CustomPainter {
       // crosshair is used to say "here, on this bar", and "23:50" alone leaves
       // the trader guessing which session they are looking at.
       final text = interval.size < const Duration(days: 1)
-          ? DateFormat("EEE d MMM ''yy HH:mm").format(time)
+          ? DateFormat(
+              style.use24Hour
+                  ? "EEE d MMM ''yy HH:mm"
+                  : "EEE d MMM ''yy h:mm a",
+            ).format(time)
           : DateFormat('d MMM yyyy').format(time);
       _bottomTag(canvas, size, pointer.dx, text);
     }
@@ -726,9 +780,12 @@ class TradingChartPainter extends CustomPainter {
     for (final raw in picks) {
       final index = raw.floor().clamp(0, candles.length - 1);
       final time = style.zone.wall(candles[index].time);
+      final clock = style.use24Hour ? 'HH:mm' : 'h:mm a';
+      final day = style.dayOfWeekLabels ? 'EEE d MMM' : 'd MMM';
       final text = interval.size < const Duration(days: 1)
-          ? DateFormat('HH:mm').format(time)
-          : DateFormat('d MMM').format(time);
+          ? DateFormat(style.dayOfWeekLabels ? 'EEE $clock' : clock)
+              .format(time)
+          : DateFormat(day).format(time);
       final painter = _painter(text, color: style.muted, size: 8.5);
       final cx = x(index.toDouble())
           .clamp(0.0, math.max(0.0, plotW - painter.width))
@@ -1022,9 +1079,7 @@ class TradingChartPainter extends CustomPainter {
             ..strokeWidth = selected ? 2.0 : 1.1;
           canvas.drawLine(Offset(left, ly), Offset(right, ly), linePaint);
           final label = _painter(
-            extension
-                ? ratio.toStringAsFixed(3)
-                : '${(ratio * 100).round()}%',
+            extension ? ratio.toStringAsFixed(3) : '${(ratio * 100).round()}%',
             color: ink,
             size: 9,
             weight: FontWeight.w600,
@@ -1119,7 +1174,8 @@ class TradingChartPainter extends CustomPainter {
       );
       label.paint(
         canvas,
-        Offset(top.dx + (drawing.kind == DrawingKind.measure ? 0 : 3), top.dy - 16),
+        Offset(top.dx + (drawing.kind == DrawingKind.measure ? 0 : 3),
+            top.dy - 16),
       );
     }
 
@@ -1248,9 +1304,7 @@ class TradingChartPainter extends CustomPainter {
     final reward = (target - entry).abs();
     final percent = entry == 0 ? 0.0 : risk / entry.abs() * 100;
     final ratio = risk < 1e-9 ? null : reward / risk;
-    final labelX = (left + 6)
-        .clamp(0.0, math.max(0.0, plotW - 90))
-        .toDouble();
+    final labelX = (left + 6).clamp(0.0, math.max(0.0, plotW - 90)).toDouble();
     void reading(double priceY, String text, Color color, {double dy = -8}) {
       if (priceY < priceTop || priceY > priceTop + plotH) return;
       _chip(canvas, text, Offset(labelX, priceY + dy), color);
@@ -1264,7 +1318,7 @@ class TradingChartPainter extends CustomPainter {
     reading(
       stopY,
       'Stop: ${risk.toStringAsFixed(decimals)} '
-          '(${percent.toStringAsFixed(percent < 0.1 ? 3 : 2)}%)',
+      '(${percent.toStringAsFixed(percent < 0.1 ? 3 : 2)}%)',
       positionLossColor,
       dy: 4,
     );
@@ -1609,6 +1663,7 @@ class TradingChartPainter extends CustomPainter {
         oldDelegate.symbol != symbol ||
         oldDelegate.drawings != drawings ||
         oldDelegate.selectedDrawing != selectedDrawing ||
+        oldDelegate.now != now ||
         !identical(oldDelegate.preview, preview);
   }
 }

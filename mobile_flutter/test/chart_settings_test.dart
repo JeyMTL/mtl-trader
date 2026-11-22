@@ -101,6 +101,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
+    // The Symbol entry pushed Grid below the fold on a 320pt phone at 2x
+    // text, so the list has to be scrolled to it first.
+    await tester.ensureVisible(find.text('Grid'));
+    await tester.pump();
     await tester.tap(find.text('Grid'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

@@ -166,6 +166,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   Timer? _refreshTimer;
 
   ChartStyle _style = ChartStyle.current;
+
+  /// Decimals every price on this chart prints with. The style's precision
+  /// wins over the instrument's own, because "1/100 on a 5-decimal pair" is a
+  /// trader deciding how much noise to read, not a correction.
+  int get _decimals => _style.precision ?? widget.instrument.decimals;
+
   bool _fullscreen = false;
 
   /// In fullscreen the canvas owns the screen, so the buy/sell bar is collapsed
@@ -677,7 +683,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           price: hit.price,
           crossedFrom: previousClose,
           crossedTo: close,
-          decimals: widget.instrument.decimals,
+          decimals: _decimals,
         ),
       );
     }
@@ -909,7 +915,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           if (last != null) ...[
             const SizedBox(width: 6),
             Text(
-              chartPrice(last, instrument),
+              chartPrice(last, instrument, decimals: _decimals),
               style: tabular.copyWith(
                 color: _style.text,
                 fontSize: 11.5,
@@ -1157,7 +1163,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     final last = _lastVisible?.close;
     final change = _changePercent;
     final parts = <String>[
-      if (last != null) chartPrice(last, instrument),
+      if (last != null) chartPrice(last, instrument, decimals: _decimals),
       if (change != null)
         '${change >= 0 ? '+' : ''}${change.toStringAsFixed(2)}%',
     ];
@@ -1306,7 +1312,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(open ? Icons.close : Icons.swap_vert, size: 15, color: ink),
+                Icon(open ? Icons.close : Icons.swap_vert,
+                    size: 15, color: ink),
                 const SizedBox(width: 5),
                 Text(
                   open ? 'Hide' : 'Buy / sell',
@@ -1339,7 +1346,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     final canvas = _ChartCanvas(
       candles: _visibleCandles,
       interval: _interval,
-      decimals: instrument.decimals,
+      decimals: _decimals,
       symbol: instrument.symbol,
       style: _style,
       // Null height means "fill whatever the parent gives me", which is how
@@ -1611,7 +1618,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   /// entry they can trade from, and the number itself. Anything that needs a
   /// broker order stays out until the app can actually place one.
   Future<void> _openQuickActions(double price, DateTime time) async {
-    final decimals = widget.instrument.decimals;
+    final decimals = _decimals;
     final label = price.toStringAsFixed(decimals);
     final clock = DateFormat('d MMM HH:mm').format(time);
     final symbol = widget.instrument.symbol;
@@ -1645,7 +1652,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               subtitle,
               style: TextStyle(color: AppColors.faint, fontSize: 10.5),
             ),
-            trailing: Icon(Icons.chevron_right, size: 16, color: AppColors.faint),
+            trailing:
+                Icon(Icons.chevron_right, size: 16, color: AppColors.faint),
             onTap: () => Navigator.of(sheetContext).pop(value),
           );
         }
@@ -2491,7 +2499,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
             child: const Text('Add'),
           ),
         ],
@@ -2624,7 +2633,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   }
 
   String _positionSummary(ChartDrawing drawing) {
-    final decimals = widget.instrument.decimals;
+    final decimals = _decimals;
     final entry = drawing.entry;
     final stop = drawing.stop;
     final target = drawing.target;
@@ -2788,7 +2797,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               if (!mounted) return;
               final restore = [..._drawings];
               final at = restore.indexWhere(
-                (item) => item.id == drawing.id &&
+                (item) =>
+                    item.id == drawing.id &&
                     item.kind == drawing.kind &&
                     item.look.hidden,
               );
@@ -2851,8 +2861,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                           ),
                           IconButton(
                             tooltip: 'Close',
-                            onPressed: () =>
-                                Navigator.of(sheetContext).pop(),
+                            onPressed: () => Navigator.of(sheetContext).pop(),
                             icon: Icon(
                               Icons.close,
                               size: 18,
@@ -2875,9 +2884,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined,
                               size: 19,
-                              color: item.look.hidden
-                                  ? AppColors.faint
-                                  : item.ink,
+                              color:
+                                  item.look.hidden ? AppColors.faint : item.ink,
                             ),
                             title: Text(
                               _drawingTitle(item),
@@ -2906,9 +2914,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  tooltip: item.look.locked
-                                      ? 'Unlock'
-                                      : 'Lock',
+                                  tooltip: item.look.locked ? 'Unlock' : 'Lock',
                                   onPressed: () => update(
                                     index,
                                     (look) =>
@@ -2965,7 +2971,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       context,
       drawing: drawing,
       title: _drawingTitle(drawing),
-      decimals: widget.instrument.decimals,
+      decimals: _decimals,
     );
     if (!mounted || result == null) return;
 
@@ -3006,6 +3012,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     });
     _persistDrawings(next);
   }
+
   /// The position tool the BUY/SELL buttons act on: the selected box, or the
   /// most recent one when nothing is selected.
   ({int index, ChartDrawing drawing})? _activePosition() {
@@ -3099,7 +3106,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     required VoidCallback onTap,
     bool compact = false,
   }) {
-    final decimals = widget.instrument.decimals;
+    final decimals = _decimals;
     return Opacity(
       opacity: enabled ? 1 : 0.4,
       child: Material(
@@ -3301,7 +3308,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                         subtitle: _style.studies.isEmpty
                             ? 'None'
                             : '${_style.studies.length} on',
-                        onTap: () => Navigator.of(sheetContext).pop('indicators'),
+                        onTap: () =>
+                            Navigator.of(sheetContext).pop('indicators'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -3453,8 +3461,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             hintText: 'JeyMTL',
             border: OutlineInputBorder(),
           ),
-          onSubmitted: (value) =>
-              Navigator.of(dialogContext).pop(value.trim()),
+          onSubmitted: (value) => Navigator.of(dialogContext).pop(value.trim()),
         ),
         actions: [
           TextButton(
@@ -3521,7 +3528,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     }
     final deleting = result.delete;
     if (deleting != null) {
-      final next = _layouts.where((layout) => layout.id != deleting.id).toList();
+      final next =
+          _layouts.where((layout) => layout.id != deleting.id).toList();
       await ChartLayoutStore.save(next);
       final active = _activeLayoutId == deleting.id ? null : _activeLayoutId;
       await ChartLayoutStore.setActive(active);
@@ -3575,7 +3583,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     unawaited(ChartLayoutStore.setActive(null));
   }
 
-  Future<void> _openStyleSheet({_SettingsPage start = _SettingsPage.home}) async {
+  Future<void> _openStyleSheet(
+      {_SettingsPage start = _SettingsPage.home}) async {
     var page = start;
     // Everything below edits a draft. Nothing reaches the chart until Ok, which
     // is the whole point of a Cancel button: a trader tries a light canvas, sees
@@ -3722,7 +3731,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 dense: true,
                 leading: const Icon(Icons.restart_alt, size: 20),
                 title: const Text('Apply defaults'),
-                subtitle: const Text('Back to the app’s own palette and studies'),
+                subtitle:
+                    const Text('Back to the app’s own palette and studies'),
                 onTap: () {
                   onApply(ChartStyle.ink);
                   Navigator.of(sheetContext).pop();
@@ -3786,8 +3796,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             hintText: 'MTL',
             border: OutlineInputBorder(),
           ),
-          onSubmitted: (value) =>
-              Navigator.of(dialogContext).pop(value.trim()),
+          onSubmitted: (value) => Navigator.of(dialogContext).pop(value.trim()),
         ),
         actions: [
           TextButton(
@@ -3909,6 +3918,13 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       padding: const EdgeInsets.only(top: 4, bottom: 26),
       children: [
         _settingsEntry(
+          _SettingsPage.symbol,
+          Icons.style_outlined,
+          '$_decimals decimals · ${style.zone.describe()}',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
           _SettingsPage.appearance,
           Icons.palette_outlined,
           '${style.chartType.label} · ${style.name}',
@@ -3995,6 +4011,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     ValueChanged<ChartStyle> onChanged,
   ) {
     switch (page) {
+      case _SettingsPage.symbol:
+        return _symbolSettings(style, onChanged);
       case _SettingsPage.appearance:
         return _appearanceSettings(style, onChanged);
       case _SettingsPage.scales:
@@ -4012,6 +4030,94 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       case _SettingsPage.home:
         return const SizedBox.shrink();
     }
+  }
+
+  /// What the bars are made of, and how many decimals every price on the chart
+  /// prints. The two belong together: both decide how much of the market is
+  /// visible at a glance rather than how it is painted.
+  Widget _symbolSettings(ChartStyle style, ValueChanged<ChartStyle> onChanged) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Bars'),
+        _settingsSwitch(
+          'Colour bars by previous close',
+          subtitle: 'A bar that closes where the last one did stays neutral '
+              'instead of flipping colour.',
+          value: style.colorBarsByPrevClose,
+          onChanged: (value) =>
+              onChanged(style.copyWith(colorBarsByPrevClose: value)),
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Body',
+          subtitle: 'Off leaves just the wick, which is how a bar chart is '
+              'read.',
+          value: style.showCandleBody,
+          onChanged: (value) =>
+              onChanged(style.copyWith(showCandleBody: value)),
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Border',
+          subtitle: 'A one-pixel edge around each body.',
+          value: style.showCandleBorder,
+          onChanged: (value) =>
+              onChanged(style.copyWith(showCandleBorder: value)),
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Wick',
+          subtitle: 'The high–low line through the body.',
+          value: style.showCandleWick,
+          onChanged: (value) =>
+              onChanged(style.copyWith(showCandleWick: value)),
+        ),
+        _settingsGroupLabel('Candle colours'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _colorRow('Up', style.bull, (color) {
+            onChanged(style.copyWith(bull: color));
+          }),
+        ),
+        _settingsDivider(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _colorRow('Down', style.bear, (color) {
+            onChanged(style.copyWith(bear: color));
+          }),
+        ),
+        _settingsGroupLabel('Precision'),
+        _settingsRow(
+          title: 'Decimal places',
+          subtitle: 'Every price on this chart prints with this many decimals. '
+              'The instrument decides when left on default.',
+          value: style.precision == null
+              ? 'Default (${widget.instrument.decimals})'
+              : '${style.precision}',
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _StylePill(
+                label: 'Default',
+                selected: style.precision == null,
+                onTap: () => onChanged(style.copyWith(clearPrecision: true)),
+              ),
+              for (var places = 0; places <= 8; places++)
+                _StylePill(
+                  label: '$places',
+                  selected: style.precision == places,
+                  onTap: () => onChanged(style.copyWith(precision: places)),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _appearanceSettings(
@@ -4058,19 +4164,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           value: style.showVolume,
           onChanged: (value) => onChanged(style.copyWith(showVolume: value)),
         ),
-        _settingsGroupLabel('Candle colours'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _colorRow('Up', style.bull, (color) {
-            onChanged(style.copyWith(bull: color));
-          }),
-        ),
-        _settingsDivider(),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _colorRow('Down', style.bear, (color) {
-            onChanged(style.copyWith(bear: color));
-          }),
+        _settingsRow(
+          title: 'Candle colours and precision',
+          subtitle: 'Per-bar colours, body/wick switches and decimals live '
+              'under Symbol.',
+          value: 'Symbol',
         ),
       ],
     );
@@ -4093,6 +4191,38 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           title: 'Scale position',
           subtitle: 'The price axis sits on the right, as on TradingView.',
           value: 'Right',
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Countdown to bar close',
+          subtitle: 'Under the last price: how long this candle still has to '
+              'run.',
+          value: style.showCountdown,
+          onChanged: (value) => onChanged(style.copyWith(showCountdown: value)),
+        ),
+        _settingsGroupLabel('Time axis'),
+        _settingsSwitch(
+          'Day of week on labels',
+          subtitle: '“Fri 20 Nov” rather than “20 Nov”.',
+          value: style.dayOfWeekLabels,
+          onChanged: (value) =>
+              onChanged(style.copyWith(dayOfWeekLabels: value)),
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          '24-hour clock',
+          subtitle: 'Off prints 11:50 PM instead of 23:50, on the axis and in '
+              'the crosshair badge.',
+          value: style.use24Hour,
+          onChanged: (value) => onChanged(style.copyWith(use24Hour: value)),
+        ),
+        _settingsDivider(),
+        _settingsSwitch(
+          'Axis “+” button',
+          subtitle: 'The circular button beside the crosshair price, for '
+              'alerts and horizontal lines on that price.',
+          value: style.showAxisPlus,
+          onChanged: (value) => onChanged(style.copyWith(showAxisPlus: value)),
         ),
       ],
     );
@@ -4714,7 +4844,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    last == null ? '—' : chartPrice(last, instrument),
+                    last == null
+                        ? '—'
+                        : chartPrice(last, instrument, decimals: _decimals),
                     style: tabular.copyWith(
                       color: AppColors.text,
                       fontSize: 20,
@@ -4769,10 +4901,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                             ),
                           ))
                     : Text(
-                        'O ${_hover!.open.toStringAsFixed(widget.instrument.decimals)}'
-                        '  H ${_hover!.high.toStringAsFixed(widget.instrument.decimals)}'
-                        '  L ${_hover!.low.toStringAsFixed(widget.instrument.decimals)}'
-                        '  C ${_hover!.close.toStringAsFixed(widget.instrument.decimals)}',
+                        'O ${_hover!.open.toStringAsFixed(_decimals)}'
+                        '  H ${_hover!.high.toStringAsFixed(_decimals)}'
+                        '  L ${_hover!.low.toStringAsFixed(_decimals)}'
+                        '  C ${_hover!.close.toStringAsFixed(_decimals)}',
                         textAlign: TextAlign.right,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -5206,7 +5338,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             ),
           ),
           Text(
-            price == null ? '—' : chartPrice(price, instrument),
+            price == null
+                ? '—'
+                : chartPrice(price, instrument, decimals: _decimals),
             style: tabular.copyWith(
               color: price == null ? AppColors.faint : AppColors.text,
               fontSize: 13,
@@ -5369,6 +5503,12 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// desktop terminal does.
   double _pricePan = 0;
 
+  /// Vertical magnification of the price window. 1 is auto-fit; a two-finger
+  /// vertical spread stretches the range, and a pinch compresses it, which is
+  /// how a 30-pip move is read on a phone screen.
+  double _priceZoom = 1;
+  double _basePriceZoom = 1;
+
   /// Drives the coast after a fling and the short spring onto a whole bar.
   late final AnimationController _settle = AnimationController(
     vsync: this,
@@ -5380,16 +5520,36 @@ class _ChartCanvasState extends State<_ChartCanvas>
   double _settleTo = 0;
   bool _thenSnap = false;
 
+  /// Counts the clock down under the last price. Ticks only while the trader
+  /// has the countdown switched on, so a chart without it never wakes the
+  /// device once a second for a number nobody is reading.
+  Timer? _countdown;
+  DateTime _now = DateTime.now();
+
+  void _syncCountdown() {
+    final wanted = widget.style.showCountdown && widget.candles.isNotEmpty;
+    if (wanted && _countdown == null) {
+      _countdown = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _now = DateTime.now());
+      });
+    } else if (!wanted) {
+      _countdown?.cancel();
+      _countdown = null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _syncLevels();
     _view.fit(widget.candles.length);
     _rebuildStudies();
+    _syncCountdown();
   }
 
   @override
   void dispose() {
+    _countdown?.cancel();
     _settle.dispose();
     super.dispose();
   }
@@ -5397,6 +5557,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
   @override
   void didUpdateWidget(covariant _ChartCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncCountdown();
     if (oldWidget.pendingKind != null && widget.pendingKind == null) {
       _cancelPlace();
     }
@@ -5407,6 +5568,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
         // First data, or a different candle size: show the newest bars, and drop
         // any manual price offset since the range has changed underneath it.
         _pricePan = 0;
+        _priceZoom = 1;
         _view.fit(widget.candles.length);
       } else if (_view.isAtEdge(oldLength)) {
         // Watching the live edge, so keep following it as bars arrive.
@@ -5497,6 +5659,15 @@ class _ChartCanvasState extends State<_ChartCanvas>
     var low = min - pad;
     var high = max + pad;
 
+    // The vertical stretch happens around the middle of the pane, so pinching
+    // magnifies what the trader is looking at instead of sliding it away.
+    if (_priceZoom != 1) {
+      final mid = (low + high) / 2;
+      final half = (high - low) / 2 / _priceZoom;
+      low = mid - half;
+      high = mid + half;
+    }
+
     // A manual vertical drag shifts the window by a share of its own range, so
     // the zoom is untouched and the axis labels travel with the candles.
     if (_pricePan != 0) {
@@ -5561,13 +5732,16 @@ class _ChartCanvasState extends State<_ChartCanvas>
     final index = _view.indexAt(ratio, candles.length);
     var bestDy = 7.0;
     double? best;
-    for (
-      var i = math.max(0, index - 1);
-      i <= math.min(candles.length - 1, index + 1);
-      i++
-    ) {
+    for (var i = math.max(0, index - 1);
+        i <= math.min(candles.length - 1, index + 1);
+        i++) {
       final candle = candles[i];
-      for (final price in [candle.open, candle.high, candle.low, candle.close]) {
+      for (final price in [
+        candle.open,
+        candle.high,
+        candle.low,
+        candle.close
+      ]) {
         final dy = (_yFor(price) - local.dy).abs();
         if (dy < bestDy) {
           bestDy = dy;
@@ -5638,9 +5812,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
           endPrice: endPoint.price,
         );
       case DrawingKind.vline ||
-          DrawingKind.text ||
-          DrawingKind.arrowUp ||
-          DrawingKind.arrowDown:
+            DrawingKind.text ||
+            DrawingKind.arrowUp ||
+            DrawingKind.arrowDown:
         return ChartDrawing.points(kind: kind, points: [start]);
       case DrawingKind.brush:
         return ChartDrawing.points(
@@ -5836,6 +6010,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
     }
     _baseSpan = _view.span;
     _baseStart = _view.start;
+    _basePriceZoom = _priceZoom;
   }
 
   void _onSettleTick() {
@@ -5934,6 +6109,13 @@ class _ChartCanvasState extends State<_ChartCanvas>
           baseSpan: _baseSpan,
           baseStart: _baseStart,
         );
+        // A diagonal pinch scales both axes at once: the finger decides, and
+        // there is no modifier to reach for on a phone.
+        if ((details.verticalScale - 1).abs() > 0.005) {
+          _priceZoom = (_basePriceZoom * details.verticalScale)
+              .clamp(0.2, 8.0)
+              .toDouble();
+        }
       } else {
         _view.pan(-details.focalPointDelta.dx / plotW * _view.span);
         _view.clampTo(widget.candles.length);
@@ -6135,7 +6317,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
   ChartDrawing _movedDrawing(ChartDrawing original, Offset local) {
     // A drag on a dot moves that dot. Anything else slides the whole object.
     final handle = _dragHandle;
-    if (handle != null) {  
+    if (handle != null) {
       return original.withPoint(handle, _pointAt(local));
     }
     // Down the screen is down the price axis. This used to be written the other
@@ -6373,6 +6555,12 @@ class _ChartCanvasState extends State<_ChartCanvas>
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (details) => _tap(details.localPosition),
+            // Double-tap anywhere restores auto-fit, which is the gesture a
+            // trader reaches for after stretching the axis by mistake.
+            onDoubleTap: () => setState(() {
+              _pricePan = 0;
+              _priceZoom = 1;
+            }),
             onScaleStart: _onScaleStart,
             onScaleUpdate: _onScaleUpdate,
             onScaleEnd: _onScaleEnd,
@@ -6399,6 +6587,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       crosshair: _crosshair,
                       dragging: _dragging,
                       decimals: widget.decimals,
+                      now: _now,
                       interval: widget.interval,
                       chartType: widget.style.chartType,
                       studies: _studies,
@@ -6419,8 +6608,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
                 ),
                 // The quick-action button sits on the price the crosshair is
                 // showing, exactly where the eye already is. It only exists
-                // while there is a crosshair to act on.
-                if (_crosshair != null)
+                // while there is a crosshair to act on, and only when the
+                // trader has not switched it off under Settings → Scales.
+                if (_crosshair != null && widget.style.showAxisPlus)
                   Positioned(
                     right: TradingChartPainter.axisWidth + 2,
                     top: (_crosshair!.dy - 12).clamp(0.0, _size.height - 24),
@@ -6452,7 +6642,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                   ),
                 // A shifted price axis: the same affordance as LIVE, so the
                 // trader is never stuck with a scale they cannot undo.
-                if (_pricePan != 0)
+                if (_pricePan != 0 || _priceZoom != 1)
                   Positioned(
                     right: TradingChartPainter.axisWidth + 6,
                     bottom: 34,
@@ -6460,7 +6650,10 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       button: true,
                       label: 'Fit the price scale',
                       child: GestureDetector(
-                        onTap: () => setState(() => _pricePan = 0),
+                        onTap: () => setState(() {
+                          _pricePan = 0;
+                          _priceZoom = 1;
+                        }),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -7242,6 +7435,7 @@ class _ZoneSheetState extends State<_ZoneSheet> {
 /// same way: a short list of names, each opening its own page.
 enum _SettingsPage {
   home('Chart settings'),
+  symbol('Symbol'),
   appearance('Appearance'),
   scales('Scales'),
   grid('Grid'),

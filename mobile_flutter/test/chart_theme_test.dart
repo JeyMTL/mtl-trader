@@ -33,6 +33,39 @@ void main() {
     expect(decoded.logScale, isTrue);
   });
 
+  test('the symbol and scale switches survive a save', () {
+    final edited = ChartStyle.slate.copyWith(
+      colorBarsByPrevClose: true,
+      showCandleBody: false,
+      showCandleBorder: false,
+      showCandleWick: false,
+      precision: 3,
+      showAxisPlus: false,
+      showCountdown: true,
+      dayOfWeekLabels: true,
+      use24Hour: false,
+    );
+
+    final decoded = ChartStyle.decode(ChartStyle.encode(edited));
+
+    expect(decoded.colorBarsByPrevClose, isTrue);
+    expect(decoded.showCandleBody, isFalse);
+    expect(decoded.showCandleBorder, isFalse);
+    expect(decoded.showCandleWick, isFalse);
+    expect(decoded.precision, 3);
+    expect(decoded.showAxisPlus, isFalse);
+    expect(decoded.showCountdown, isTrue);
+    expect(decoded.dayOfWeekLabels, isTrue);
+    expect(decoded.use24Hour, isFalse);
+  });
+
+  test('precision goes back to the instrument when told to clear', () {
+    final pinned = ChartStyle.ink.copyWith(precision: 2);
+    expect(pinned.copyWith(clearPrecision: true).precision, isNull);
+    // A copyWith that does not mention precision leaves it alone.
+    expect(pinned.copyWith(logScale: true).precision, 2);
+  });
+
   test('falls back for missing or corrupt layouts', () {
     expect(ChartStyle.decode(null, fallback: ChartStyle.paper).id, 'paper');
     expect(ChartStyle.decode('nope', fallback: ChartStyle.paper).id, 'paper');
