@@ -15,15 +15,18 @@ const CONTENT_SECURITY_POLICY = [
   // Google Identity Services loads its client from accounts.google.com; it is
   // how the "Continue with Google" button gets an ID token without leaving this
   // origin. Its button stylesheet pulls Roboto from fonts.googleapis.com.
-  `script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://accounts.google.com${isDev ? " 'unsafe-eval'" : ''}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  // Paddle.js injects its own stylesheet from the same CDN and a Paddle-owned
+  // ProfitWell script for checkout analytics; blocking either produced console
+  // CSP errors and an unstyled checkout.
+  `script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://public.profitwell.com https://accounts.google.com${isDev ? " 'unsafe-eval'" : ''}`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.paddle.com",
   // /api/avatar redirects to Gravatar, so its picture origins have to be
   // allowed or every customer without an uploaded avatar gets a broken image
   // and falls straight to initials.
   "img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://*.gstatic.com https://www.gravatar.com https://secure.gravatar.com",
   "media-src 'self' blob: https://*.supabase.co",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://accounts.google.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.profitwell.com https://accounts.google.com",
   "frame-src https://*.paddle.com https://accounts.google.com",
   "form-action 'self' https://www.paypal.com https://*.paddle.com",
   // Blocks inline onclick=/onerror= attributes even though the bootstrap

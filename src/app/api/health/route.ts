@@ -146,10 +146,13 @@ function aiProvider(): { configured: boolean; provider: string | null } {
 /**
  * Paddle config, read the way the payment routes read it.
  *
- * `keyEnvironment` comes from the key's own prefix, `api` from
- * PADDLE_ENVIRONMENT: a `pdl_sdbx_` key with `api: production` is a live
- * deployment that cannot take a single payment, and this is where that shows up
- * instead of in a customer's failed checkout.
+ * `keyEnvironment` and `clientTokenEnvironment` come from each value's own
+ * prefix, `api` from PADDLE_ENVIRONMENT: a `pdl_sdbx_` key with
+ * `api: production` is a live deployment that cannot take a single payment.
+ * So is a live client token paired with a sandbox key: Paddle's checkout then
+ * answers "Transaction not found" for a transaction the server just created,
+ * which looks like a broken page rather than a configuration mistake. This is
+ * where both show up instead of in a customer's failed checkout.
  */
 function paddleStatus() {
   const key = (process.env.PADDLE_API_KEY || '').trim()
@@ -159,15 +162,30 @@ function paddleStatus() {
     ''
   ).trim()
 
+  const keyEnvironment = key.startsWith('pdl_live_')
+    ? 'live'
+    : key.startsWith('pdl_sdbx_')
+      ? 'sandbox'
+      : key
+        ? 'unknown'
+        : null
+  const clientTokenEnvironment = clientToken.startsWith('live_')
+    ? 'live'
+    : clientToken.startsWith('test_')
+      ? 'sandbox'
+      : clientToken
+        ? 'unknown'
+        : null
+
   return {
     configured: Boolean(key),
-    keyEnvironment: key.startsWith('pdl_live_')
-      ? 'live'
-      : key.startsWith('pdl_sdbx_')
-        ? 'sandbox'
-        : key
-          ? 'unknown'
-          : null,
+    keyEnvironment,
+    clientTokenEnvironment,
+    environmentMismatch:
+      Boolean(keyEnvironment && clientTokenEnvironment) &&
+      keyEnvironment !== 'unknown' &&
+      clientTokenEnvironment !== 'unknown' &&
+      keyEnvironment !== clientTokenEnvironment,
     api: paddleEnvironment(),
     webhookSecret: Boolean((process.env.PADDLE_WEBHOOK_SECRET || '').trim()),
     clientToken: Boolean(clientToken),

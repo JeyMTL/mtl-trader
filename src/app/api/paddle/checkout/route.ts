@@ -7,6 +7,7 @@ import { PAID_PLAN_PRICES } from '@/lib/payments'
 import {
   createCheckoutTransaction,
   paddleConfigured,
+  paddleEnvironment,
   priceIdFor,
   sellablePlanIds,
 } from '@/lib/paddle'
@@ -35,6 +36,10 @@ export async function GET() {
   return NextResponse.json(
     {
       enabled: paddleConfigured(),
+      // The server's Paddle environment, so the page can refuse to open a live
+      // token against a sandbox transaction (or the reverse) with an
+      // explanation instead of Paddle's "Transaction not found" dialog.
+      environment: paddleEnvironment(),
       plans: sellablePlanIds(PAID_PLANS, 'month'),
       // Selling a yearly price is a separate catalogue entry in Paddle, so a
       // deployment can legitimately have one cadence and not the other.

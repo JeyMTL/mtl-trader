@@ -30,9 +30,18 @@ interface PaddleCheckout {
   open: (options: { transactionId: string }) => void
 }
 
+interface PaddleEvent {
+  name?: string
+  detail?: string
+  code?: string
+}
+
 interface PaddleGlobal {
   Environment?: { set: (environment: 'sandbox' | 'production') => void }
-  Initialize: (options: { token: string }) => void
+  Initialize: (options: {
+    token: string
+    eventCallback?: (event: PaddleEvent) => void
+  }) => void
   Checkout: PaddleCheckout
 }
 
@@ -79,12 +88,12 @@ function loadPaddle(): Promise<PaddleGlobal> {
  * A missing token and an unreachable route are the same problem to a customer:
  * card payments are not wired up yet.
  */
-async function fetchClientToken(): Promise<string> {
+async function fetchClientToken(): Promise<{ token: string; environment: string | null }> {
   try {
     const response = await fetch('/api/paddle/client-token', { cache: 'no-store' })
-    const body = (await response.json()) as { token?: string | null }
+    const body = (await response.json()) as { token?: string | null; environment?: string | null }
     const token = (body.token || '').trim()
-    if (token) return token
+    if (token) return { token, environment: body.environment ?? null }
   } catch {
     // Fall through: an unreachable route means the same thing as no token.
   }
@@ -94,6 +103,18 @@ async function fetchClientToken(): Promise<string> {
   )
 }
 
+/** The environment the server creates transactions in, or null if unknown. */
+async function fetchServerEnvironment(): Promise<string | null> {
+  try {
+    const response = await fetch('/api/paddle/checkout', { cache: 'no-store' })
+    if (!response.ok) return null
+    const body = (await response.json()) as { environment?: string }
+    return body.environment ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Opens the transaction Paddle named in the URL.
  *
@@ -101,18 +122,38 @@ async function fetchClientToken(): Promise<string> {
  * talks to React from a promise callback — state set synchronously inside an
  * effect would render twice before anything has happened.
  */
-async function openCheckout(): Promise<void> {
+async function openCheckout(onCheckoutError: (message: string) => void): Promise<void> {
   const transactionId = new URLSearchParams(window.location.search).get('_ptxn') || ''
   if (!transactionId) {
     throw new CheckoutProblem('missing', 'This page needs a transaction id.')
   }
 
-  const token = await fetchClientToken()
+  const { token, environment } = await fetchClientToken()
+  const serverEnvironment = await fetchServerEnvironment()
+  // A live token cannot see a sandbox transaction, and Paddle answers that
+  // mismatch with "Transaction not found" inside its own dialog, which reads
+  // like a broken product. Refuse it here with something actionable instead.
+  if (environment && serverEnvironment && environment !== serverEnvironment) {
+    throw new CheckoutProblem(
+      'unconfigured',
+      'Card payments are not configured correctly on this deployment. Please contact support so we can fix it — nothing has been charged.'
+    )
+  }
+
   const paddle = await loadPaddle()
-  // A sandbox token against the live checkout (or the reverse) fails with an
-  // opaque error, so the environment is chosen from the token itself.
+  // The environment is chosen from the token itself, so a sandbox token cannot
+  // open a production checkout.
   if (token.startsWith('test_')) paddle.Environment?.set('sandbox')
-  paddle.Initialize({ token })
+  paddle.Initialize({
+    token,
+    eventCallback: (event) => {
+      if (event?.name === 'checkout.error') {
+        onCheckoutError(
+          'The payment session could not be opened. Start the upgrade again from the pricing page, or contact support if it keeps happening — nothing has been charged.'
+        )
+      }
+    },
+  })
   paddle.Checkout.open({ transactionId })
 }
 
@@ -122,15 +163,26 @@ export default function PayPage() {
   // React 18 runs effects twice in development; opening the same transaction
   // twice would show two overlays over each other.
   const started = useRef(false)
+  const alive = useRef(true)
 
   useEffect(() => {
+    alive.current = true
     if (started.current) return
     started.current = true
 
-    void openCheckout().catch((error: unknown) => {
+    void openCheckout((message) => {
+      if (!alive.current) return
+      setProblem('failed')
+      setDetail(message)
+    }).catch((error: unknown) => {
+      if (!alive.current) return
       setProblem(error instanceof CheckoutProblem ? error.problem : 'failed')
       setDetail(publicErrorMessage(error, 'Could not open the checkout. Please try again.'))
     })
+
+    return () => {
+      alive.current = false
+    }
   }, [])
 
   if (!problem) {
