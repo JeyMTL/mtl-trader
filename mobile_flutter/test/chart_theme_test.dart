@@ -34,6 +34,17 @@ void main() {
     expect(decoded.logScale, isTrue);
   });
 
+  test('a canvas colour of its own survives a save', () {
+    final edited = ChartStyle.ink.copyWith(background: const Color(0xFF0E1016));
+    final decoded = ChartStyle.decode(ChartStyle.encode(edited));
+
+    // Shared through the same JSON the web desk writes, so a template made
+    // there lands on a canvas the phone can paint.
+    expect(decoded.background, const Color(0xFF0E1016));
+    expect(ChartStyle.decode(ChartStyle.encode(edited)).toJson()['background'],
+        0xFF0E1016);
+  });
+
   test('the symbol and scale switches survive a save', () {
     final edited = ChartStyle.slate.copyWith(
       colorBarsByPrevClose: true,

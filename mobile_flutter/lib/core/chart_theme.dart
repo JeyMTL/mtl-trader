@@ -261,6 +261,9 @@ class ChartStyle {
   }
 
   ChartStyle copyWith({
+    /// The canvas itself. A preset picks one, but a trader (or the web desk)
+    /// can put the candles on a canvas of their own.
+    Color? background,
     Color? bull,
     Color? bear,
     bool? showGrid,
@@ -309,7 +312,7 @@ class ChartStyle {
     return ChartStyle(
       id: id,
       name: name,
-      background: background,
+      background: background ?? this.background,
       grid: grid,
       axis: axis,
       text: text,
@@ -462,6 +465,7 @@ class ChartStyle {
   /// JSON for this style; shared by the global theme and per-instrument layouts.
   Map<String, Object?> toJson() => <String, Object?>{
         'preset': id,
+        'background': background.toARGB32(),
         'bull': bull.toARGB32(),
         'bear': bear.toARGB32(),
         'grid': showGrid,
@@ -525,6 +529,7 @@ class ChartStyle {
       orElse: () => fallback,
     );
     return preset.copyWith(
+      background: _readColor(decoded['background']) ?? preset.background,
       bull: _readColor(decoded['bull']) ?? preset.bull,
       bear: _readColor(decoded['bear']) ?? preset.bear,
       showGrid: _readFlag(decoded['grid']),

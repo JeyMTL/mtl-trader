@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { loadDeskPrefs, saveDeskPrefs } from '@/lib/desk-prefs'
 import {
   DEFAULT_SETTINGS,
+  isLightCanvas,
   loadLayouts,
   loadSettings,
   loadTemplates,
@@ -185,6 +186,14 @@ export function ChartWorkspace({
    * sidebar and two headers around it; analysis on a laptop wants the candles.
    */
   const [expanded, setExpanded] = useState(false)
+  /**
+   * Whether the stored settings have been read yet.
+   *
+   * The save effect below runs on mount, before the deferred restore lands. Left
+   * unguarded it wrote the defaults over the trader's saved look, so every
+   * reload quietly reset the desk.
+   */
+  const settingsRestored = useRef(false)
   /** The desk's own frame, which is the element handed to the browser when the
    * address bar is asked to go away. */
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -226,6 +235,7 @@ export function ChartWorkspace({
       setSettings(loadSettings())
       setLayouts(loadLayouts())
       setTemplates(loadTemplates())
+      settingsRestored.current = true
     }, 0)
     // Templates are shared with the phone, so the account's copy is pulled once
     // and merged; whatever the account has not seen is pushed back up there.
@@ -244,8 +254,11 @@ export function ChartWorkspace({
     }
   }, [])
 
-  // Settings are the trader's own; they are written the moment they change.
+  // Settings are the trader's own; they are written the moment they change —
+  // but only once the stored ones are in, or the first frame would save the
+  // defaults over them.
   useEffect(() => {
+    if (!settingsRestored.current) return
     saveSettings(settings)
   }, [settings])
 
@@ -735,16 +748,22 @@ export function ChartWorkspace({
     context.clearRect(0, 0, size.width, size.height)
     if (settings.gradient) {
       const gradient = context.createLinearGradient(0, 0, 0, size.height)
-      gradient.addColorStop(0, '#0b1220')
+      gradient.addColorStop(0, settings.background)
       gradient.addColorStop(1, settings.gradientTo)
       context.fillStyle = gradient
       context.fillRect(0, 0, size.width, size.height)
     }
 
-    // Grid and axes.
+    // Grid and axes. There is only one background now that the trader can pick
+    // it, so the chrome that lives in the canvas flips with it: grey-on-dark
+    // disappears on a light canvas.
+    const lightCanvas = isLightCanvas(settings)
+    const axisInk = lightCanvas ? '#475569' : '#6b7280'
+    const gridInk = lightCanvas ? 'rgba(15, 23, 42, 0.12)' : 'rgba(148, 163, 184, 0.12)'
+    const crosshairInk = lightCanvas ? 'rgba(15, 23, 42, 0.5)' : 'rgba(226, 232, 240, 0.45)'
     context.font = '10px ui-sans-serif, system-ui, sans-serif'
-    context.fillStyle = '#6b7280'
-    context.strokeStyle = 'rgba(148, 163, 184, 0.12)'
+    context.fillStyle = axisInk
+    context.strokeStyle = gridInk
     context.lineWidth = 1
     for (let step = 0; step <= 4; step += 1) {
       const y = (plotH / 4) * step
@@ -752,8 +771,12 @@ export function ChartWorkspace({
       context.moveTo(0, y)
       context.lineTo(plotW, y)
       context.stroke()
-      const price = priceForY(y)
-      context.fillText(price.toFixed(decimals(price)), 4, Math.min(plotH - 4, y + 3))
+      // The bottom gridline shares its corner with the first time label, so the
+      // price there is left to the axis below rather than painted twice.
+      if (step < 4) {
+        const price = priceForY(y)
+        context.fillText(price.toFixed(decimals(price)), 4, Math.min(plotH - 4, y + 3))
+      }
     }
     const ticks = Math.max(3, Math.min(8, Math.floor(plotW / 110)))
     for (let step = 0; step <= ticks; step += 1) {
@@ -764,7 +787,7 @@ export function ChartWorkspace({
       context.moveTo(x, 0)
       context.lineTo(x, plotH)
       context.stroke()
-      context.fillStyle = '#6b7280'
+      context.fillStyle = axisInk
       const label = tickLabel(timeForIndex(index), interval, settings)
       context.fillText(label, Math.min(x + 4, plotW - 52), plotH - 6)
     }
@@ -1076,7 +1099,7 @@ export function ChartWorkspace({
 
     // Crosshair.
     if (hover) {
-      context.strokeStyle = 'rgba(226, 232, 240, 0.45)'
+      context.strokeStyle = crosshairInk
       context.lineWidth = settings.crosshairWidth
       context.setLineDash(
         settings.crosshairStyle === 'solid'
@@ -1099,7 +1122,7 @@ export function ChartWorkspace({
       if (candle) {
         const tag =
           tickLabel(candle.t, interval, settings) + '  ·  ' + candle.c.toFixed(decimals(candle.c))
-        context.fillStyle = 'rgba(15, 23, 42, 0.92)'
+        context.fillStyle = lightCanvas ? 'rgba(248, 250, 252, 0.95)' : 'rgba(15, 23, 42, 0.92)'
         const width = context.measureText(tag).width + 12
         context.fillRect(
           Math.min(hover.x + 8, plotW - width - 2),
@@ -1107,7 +1130,7 @@ export function ChartWorkspace({
           width,
           18
         )
-        context.fillStyle = '#e2e8f0'
+        context.fillStyle = lightCanvas ? '#0f172a' : '#e2e8f0'
         context.fillText(
           tag,
           Math.min(hover.x + 14, plotW - width + 4),
@@ -1710,7 +1733,7 @@ export function ChartWorkspace({
             {item.label}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
           <button
             type="button"
             title="Hide alert lines that have already fired"
@@ -1977,23 +2000,27 @@ export function ChartWorkspace({
 
       <div
         ref={boxRef}
-        className={`relative w-full overflow-hidden rounded-xl border border-border bg-[#0b1220] ${
+        className={`relative w-full overflow-hidden rounded-xl border border-border ${
           expanded
-            ? 'h-[calc(100vh-20rem)] min-h-[320px]'
+            ? 'h-[calc(100vh-20rem)] min-h-[320px] shrink-0'
             : 'h-[62vh] min-h-[380px]'
         }`}
+        style={{ background: settings.background }}
       >
         <canvas
           ref={canvasRef}
           id="chart-canvas"
           role="img"
           tabIndex={0}
-          className="outline-none focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary"
+          // The canvas fills its box instead of pinning the measured size: an
+          // inline 900px width is a min-content width, and on a phone it made
+          // the whole desk 934px wide rather than letting it shrink.
+          className="block h-full w-full outline-none focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary"
           aria-label={`${symbol} ${interval} chart with ${symbolDrawings.length} saved object${
             symbolDrawings.length === 1 ? '' : 's'
           }${compareSymbol ? `, compared with ${compareSymbol}` : ''}. Arrow keys pan, plus and minus zoom.`}
           aria-describedby="chart-live"
-          style={{ width: size.width, height: size.height, touchAction: 'none', cursor: tool === 'select' ? 'crosshair' : 'copy' }}
+          style={{ touchAction: 'none', cursor: tool === 'select' ? 'crosshair' : 'copy' }}
           onKeyDown={(event) => {
             // A canvas has no focusable parts, so the keyboard model lives on
             // the canvas itself: the same keys a trader reaches for in any

@@ -10,6 +10,8 @@
 export type CrosshairStyle = 'solid' | 'dashed' | 'dotted'
 
 export interface DeskSettings {
+  /** The canvas behind the candles; also the top stop of the gradient. */
+  background: string
   /** Candle colours. The desk used to hardcode a green and a red. */
   bull: string
   bear: string
@@ -32,6 +34,7 @@ export interface DeskSettings {
 export const DESK_SETTINGS_KEY = 'mtl.desk.settings.v1'
 
 export const DEFAULT_SETTINGS: DeskSettings = {
+  background: '#0b1220',
   bull: '#22c55e',
   bear: '#ef4444',
   precision: null,
@@ -47,6 +50,31 @@ export const DEFAULT_SETTINGS: DeskSettings = {
 
 const CROSSHAIR_STYLES: CrosshairStyle[] = ['solid', 'dashed', 'dotted']
 
+/** Relative luminance of `#rrggbb`, 0 (black) to 1 (white). */
+function luminance(hex: string): number {
+  const value = Number.parseInt(hex.slice(1), 16)
+  const channels = [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff].map((channel) => {
+    const ratio = channel / 255
+    return ratio <= 0.04045 ? ratio / 12.92 : ((ratio + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+}
+
+/**
+ * Whether the canvas is light enough that the desk's dark chrome would vanish.
+ *
+ * Grid, axis labels and crosshair are drawn in the canvas itself, so they cannot
+ * be styled by CSS: this is the one place the painter has to know about the
+ * background a trader picked. A gradient is judged by both stops, the same way
+ * the phone decides its chip palette.
+ */
+export function isLightCanvas(settings: DeskSettings): boolean {
+  const stops = settings.gradient
+    ? [settings.background, settings.gradientTo]
+    : [settings.background]
+  return stops.reduce((sum, stop) => sum + luminance(stop), 0) / stops.length > 0.5
+}
+
 function colour(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback
 }
@@ -61,6 +89,7 @@ export function loadSettings(): DeskSettings {
     if (!parsed || typeof parsed !== 'object') return DEFAULT_SETTINGS
     const value = parsed as Record<string, unknown>
     return {
+      background: colour(value.background, DEFAULT_SETTINGS.background),
       bull: colour(value.bull, DEFAULT_SETTINGS.bull),
       bear: colour(value.bear, DEFAULT_SETTINGS.bear),
       precision:
@@ -150,6 +179,9 @@ function loadSettingsFromRecord(
   value: Record<string, unknown>
 ): Partial<DeskSettings> {
   const settings: Partial<DeskSettings> = {}
+  if (typeof value.background === 'string' && /^#[0-9a-f]{6}$/i.test(value.background)) {
+    settings.background = value.background
+  }
   if (typeof value.bull === 'string' && /^#[0-9a-f]{6}$/i.test(value.bull)) settings.bull = value.bull
   if (typeof value.bear === 'string' && /^#[0-9a-f]{6}$/i.test(value.bear)) settings.bear = value.bear
   if (typeof value.precision === 'number' && value.precision >= 0 && value.precision <= 8) {
@@ -273,6 +305,8 @@ export function settingsFromPhoneStyle(
   style: Record<string, unknown>
 ): Partial<DeskSettings> {
   const settings: Partial<DeskSettings> = {}
+  const background = hexFromArgb(style.background)
+  if (background) settings.background = background
   const bull = hexFromArgb(style.bull)
   if (bull) settings.bull = bull
   const bear = hexFromArgb(style.bear)
@@ -319,6 +353,7 @@ export function phoneStyleFromSettings(
   base: Record<string, unknown> = {}
 ): Record<string, unknown> {
   const style: Record<string, unknown> = { ...base }
+  style.background = argbFromHex(settings.background)
   style.bull = argbFromHex(settings.bull)
   style.bear = argbFromHex(settings.bear)
   if (settings.precision === null) delete style.precision

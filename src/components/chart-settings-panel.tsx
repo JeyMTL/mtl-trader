@@ -403,6 +403,38 @@ export function ChartSettingsDialog({
 
           {section === 'canvas' && (
             <div className="py-1">
+              <Row
+                label="Background"
+                hint="Behind the candles, and the top of the gradient when it is on."
+              >
+                <input
+                  type="color"
+                  aria-label="Chart background colour"
+                  value={settings.background}
+                  onChange={(event) => patch({ background: event.target.value })}
+                  className="h-11 w-14 cursor-pointer rounded border border-border bg-transparent"
+                />
+              </Row>
+              <div className="flex flex-wrap gap-1 py-2">
+                {SWATCHES.map((colour) => (
+                  <button
+                    key={`bg-${colour}`}
+                    type="button"
+                    aria-label={`Set background to ${colour}`}
+                    aria-pressed={settings.background.toLowerCase() === colour}
+                    onClick={() => patch({ background: colour })}
+                    className={`grid h-11 w-11 place-items-center rounded-full border ${
+                      settings.background.toLowerCase() === colour ? 'border-white' : 'border-white/20'
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className="h-6 w-6 rounded-full"
+                      style={{ background: colour }}
+                    />
+                  </button>
+                ))}
+              </div>
               <Row label="Gradient background">
                 <Toggle
                   label="Gradient background"
@@ -411,7 +443,7 @@ export function ChartSettingsDialog({
                 />
               </Row>
               {settings.gradient && (
-                <Row label="Bottom colour">
+                <Row label="Bottom colour" hint="The gradient runs from the background to this.">
                   <input
                     type="color"
                     aria-label="Gradient bottom colour"

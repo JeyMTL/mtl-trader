@@ -6,6 +6,7 @@ import {
   CHART_TEMPLATES_KEY,
   DEFAULT_SETTINGS,
   DESK_SETTINGS_KEY,
+  isLightCanvas,
   MAX_TEMPLATES,
   MAX_TEMPLATE_NAME,
   loadLayouts,
@@ -42,6 +43,7 @@ describe('desk settings', () => {
 
     saveSettings({
       ...DEFAULT_SETTINGS,
+      background: '#101820',
       bear: '#f23645',
       precision: 3,
       crosshairStyle: 'dotted',
@@ -53,6 +55,7 @@ describe('desk settings', () => {
       countdown: true,
     })
     const loaded = loadSettings()
+    expect(loaded.background).toBe('#101820')
     expect(loaded.bear).toBe('#f23645')
     expect(loaded.precision).toBe(3)
     expect(loaded.crosshairStyle).toBe('dotted')
@@ -62,6 +65,19 @@ describe('desk settings', () => {
     expect(loaded.weekday).toBe(true)
     expect(loaded.logScale).toBe(true)
     expect(loaded.countdown).toBe(true)
+  })
+
+  it('knows when the canvas is light enough to flip its chrome', () => {
+    expect(isLightCanvas(DEFAULT_SETTINGS)).toBe(false)
+    expect(isLightCanvas({ ...DEFAULT_SETTINGS, background: '#e2e8f0' })).toBe(true)
+    // A gradient is judged by both stops, so a light top over a dark bottom
+    // still counts as light only when the average is.
+    expect(
+      isLightCanvas({ ...DEFAULT_SETTINGS, background: '#ffffff', gradient: true, gradientTo: '#000000' })
+    ).toBe(false)
+    expect(
+      isLightCanvas({ ...DEFAULT_SETTINGS, background: '#ffffff', gradient: true, gradientTo: '#e2e8f0' })
+    ).toBe(true)
   })
 
   it('refuses values that would paint something unreadable', () => {
@@ -169,6 +185,7 @@ describe('chart layouts', () => {
         templateFromCloud({
           name: 'MTL',
           style: {
+            background: 0xff0e1016,
             bull: 0xff26a69a,
             bear: 0xfff23645,
             precision: 3,
@@ -186,6 +203,7 @@ describe('chart layouts', () => {
         })!
       ]
     )
+    expect(fromPhone.settings.background).toBe('#0e1016')
     expect(fromPhone.settings.bull).toBe('#26a69a')
     expect(fromPhone.settings.bear).toBe('#f23645')
     expect(fromPhone.settings.precision).toBe(3)
