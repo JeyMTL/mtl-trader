@@ -40,7 +40,9 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Sync configuration</strong> — the broker name, server and account login you enter for MetaTrader
-          sync, plus a hashed sync token. The token is what the desktop agent uses to authenticate.
+          sync, the encrypted investor (read-only) password when you use hosted sync, plus a hashed sync token.
+          Hosted sync never asks for your trading password, and disconnecting deletes the stored password. The token
+          is what the desktop agent uses to authenticate.
         </li>
         <li>
           <strong>AI reviews</strong> — the summaries and trade details you submit for review, and the generated

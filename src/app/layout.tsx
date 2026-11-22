@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     default: 'MTL Ledger - Professional Trading Journal',
     template: '%s — MTL Ledger',
   },
-  description: "Track, analyze, and improve your trading performance with MTL Ledger. The professional trading journal for serious traders.",
+  description: "A professional trading journal with a full chart desk, MT5 auto sync, prop-firm discipline and AI reviews. In the browser and on Android, with 30+ languages in the app.",
   applicationName: 'MTL Ledger',
   alternates: { canonical: '/' },
   openGraph: {

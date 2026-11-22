@@ -37,6 +37,30 @@ const FAQ = [
     a: 'Both are set in Rules with your daily loss limit. A soft lock freezes MT5 and keeps the journal open, and can be lifted only by writing down a reason that is stored with the day. A hard lock freezes MT5 and locks the journal completely until the next trading day, with no release. The MT5 guard that syncs your trades enforces it in the terminal: it refuses programmatic orders and deletes pending ones, though a manual market order can still fill before it is seen.',
   },
   {
+    q: 'What is in the chart desk?',
+    a: 'Candles from seconds to daily, session VWAP and Asia, London and New York high/low levels, and drawing tools for levels, trends, fibs, zones, vertical lines and measurements. You can pin entry, stop and target straight off the chart, compare a second instrument, save layouts and templates, and open the whole desk full screen. Settings cover precision, a log scale, the 24-hour clock, countdown to bar close and the canvas background.',
+  },
+  {
+    q: 'Where do price alerts arrive?',
+    a: 'On the web an alert is a line on the chart: it fires visibly and can be hidden once fired, but it does not message you while the tab is closed. On Android the same price levels become local push notifications — allow notifications, then use Send test alert in Alerts to check that the phone receives one.',
+  },
+  {
+    q: 'What does the backtester do, and what is market replay?',
+    a: 'Both are Pro. The backtester runs saved tests and can suggest rules from your own trades. The compiler turns a plain-English description, a voice note or a screenshot into runnable rules that you read and correct before anything runs. Market replay steps the chart candle by candle so you can rehearse a session with the levels you would have had.',
+  },
+  {
+    q: 'How does the prop-firm tracker work?',
+    a: 'Enter the evaluation size, profit target, maximum drawdown and consistency limit. The prop screen shows how much of each limit is left and warns when a setup would break one. It tracks and simulates the evaluation; it never places or manages an order.',
+  },
+  {
+    q: 'What are the two ways to sync MT5?',
+    a: 'Hosted sync asks for your broker, server, account number and the investor (read-only) password once, then our supervisor connects for you. The other way is your own terminal: install the guard EA and paste the sync token from the sync page into its inputs. Hosted sync stores the investor password encrypted so it can reconnect; your trading password is never asked for, and Disconnect deletes the stored password. The guard also enforces the daily stop.',
+  },
+  {
+    q: 'Which languages does the app support, and does it work offline?',
+    a: 'The Android app has a language picker backed by downloadable packs, with more than thirty languages. The web app is in English. The phone also keeps the chart candles it has already loaded, so if the feed drops it shows that saved copy and the time it was fetched instead of an empty chart.',
+  },
+  {
     q: 'A chart or a page will not load. What do you need from me?',
     a: 'The time it happened, the email on the account, and the browser or phone you were on. A screenshot of the console is ideal but not required.',
   },

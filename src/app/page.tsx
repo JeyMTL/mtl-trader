@@ -2,7 +2,18 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { BarChart3, TrendingUp, Shield, Zap, ArrowRight, Check } from 'lucide-react'
+import {
+  BarChart3,
+  TrendingUp,
+  Shield,
+  Zap,
+  ArrowRight,
+  Check,
+  CandlestickChart,
+  RefreshCw,
+  FlaskConical,
+  Smartphone,
+} from 'lucide-react'
 import { PLANS } from '@/lib/plans'
 import { formatCurrency } from '@/lib/utils'
 import { Logo } from '@/components/logo'
@@ -10,28 +21,60 @@ import { GoogleSignInButton } from '@/components/google-signin-button'
 
 const features = [
   {
-    icon: BarChart3,
-    title: 'Advanced Analytics',
-    description: 'Deep insights into your trading performance with win rate, profit factor, and risk/reward analysis.',
+    icon: CandlestickChart,
+    title: 'A real chart desk',
+    description:
+      'Seconds to daily candles, VWAP and Asia, London and New York levels, drawing tools, saved layouts and templates, and two instruments compared on one screen.',
     tile: 'icon-tile-blue',
   },
   {
-    icon: TrendingUp,
-    title: 'Equity Curve',
-    description: 'Visualize your account growth over time with beautiful interactive charts.',
+    icon: RefreshCw,
+    title: 'MT5 auto sync',
+    description:
+      'Connect your account once and closed trades land here, or import an MT5 report, CSV or XLSX when you would rather do it by hand.',
     tile: 'icon-tile-green',
   },
   {
     icon: Shield,
-    title: 'Risk Management',
-    description: 'Track drawdowns, position sizes, and risk per trade to protect your capital.',
+    title: 'Discipline that holds',
+    description:
+      'Write your playbook, track prop-firm limits, and set a daily stop whose soft or hard lock the MT5 guard enforces in your terminal.',
     tile: 'icon-tile-amber',
   },
   {
+    icon: BarChart3,
+    title: 'Analytics that name the leak',
+    description:
+      'Win rate, profit factor, expectancy and max drawdown, split by session, symbol, tag and setup, with your best hours and days.',
+    tile: 'icon-tile-blue',
+  },
+  {
     icon: Zap,
-    title: 'AI Journal Review',
-    description: 'A read of your own fills: what worked, what repeated, and what to stop doing.',
+    title: 'AI journal review',
+    description:
+      'A read of your own fills: what worked, what repeated, and what to stop doing. Fifteen reviews a month on Basic, forty on Pro.',
     tile: 'icon-tile-violet',
+  },
+  {
+    icon: FlaskConical,
+    title: 'Backtest and replay',
+    description:
+      'Pro steps a session candle by candle, keeps saved backtests, and compiles a strategy from plain English, a voice note or a screenshot.',
+    tile: 'icon-tile-amber',
+  },
+  {
+    icon: Smartphone,
+    title: 'Phone and web, one account',
+    description:
+      'The same journal and chart drawings in the browser and the Android app, in 30+ languages, with price alerts pushed to your phone.',
+    tile: 'icon-tile-violet',
+  },
+  {
+    icon: TrendingUp,
+    title: 'The bigger picture',
+    description:
+      'Equity curve, P&L calendar, monthly reports and a full account export, so a bad week is visible before it becomes a habit.',
+    tile: 'icon-tile-green',
   },
 ]
 
@@ -126,7 +169,9 @@ export default function HomePage() {
           {authError && (
             <p className="mt-3 text-sm text-danger">{authError}</p>
           )}
-          <p className="fade-up-3 text-gray-500 mt-5 text-sm">No credit card required • Unlimited access for 7 days</p>
+          <p className="fade-up-3 text-gray-500 mt-5 text-sm">
+            No credit card required • Unlimited access for 7 days • Web and Android
+          </p>
         </div>
       </section>
 
@@ -137,7 +182,9 @@ export default function HomePage() {
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
               Everything You Need to <span className="text-gradient">Trade Better</span>
             </h2>
-            <p className="text-gray-400 max-w-xl mx-auto">One place for your trades, analytics, and growth.</p>
+            <p className="text-gray-400 max-w-xl mx-auto">
+              One place for your trades, your charts, your rules, and the review that ties them together.
+            </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature) => (
@@ -238,6 +285,15 @@ export default function HomePage() {
             <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
             <Link href="/refunds" className="hover:text-white transition-colors">Refunds</Link>
+            <Link href="/support" className="hover:text-white transition-colors">Support</Link>
+            <a
+              href="https://play.google.com/store/apps/details?id=com.mtltrader.app"
+              className="hover:text-white transition-colors"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Android app
+            </a>
           </nav>
         </div>
       </footer>

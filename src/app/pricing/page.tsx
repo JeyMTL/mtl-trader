@@ -233,7 +233,8 @@ export default function PricingPage() {
 
           <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-gray-500">
             A yearly payment buys 365 days; a bank transfer buys one 30-day period and is
-            approved manually.
+            approved manually. The same account opens in the browser and in the Android app,
+            which adds 30+ downloadable languages and push price alerts.
             {cardStatus.enabled
               ? ' Card payments are processed by Paddle, renew automatically, and can be stopped from Settings at any time; access continues until the paid period ends.'
               : ''}
