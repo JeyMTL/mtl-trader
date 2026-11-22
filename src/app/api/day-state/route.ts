@@ -3,6 +3,7 @@ import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { apiError, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
 import {
+  computeDayLock,
   computeDayState,
   DEFAULT_DAILY_STOP,
   normalizeDailyStop,
@@ -12,8 +13,10 @@ import {
   type DayState,
   type DayStateResponse,
   type LockMode,
+  type TradeForDay,
 } from '@/lib/daily-stop'
 import { zonedDayBounds } from '@/lib/notification-schedule'
+import { loadDayTrades } from '@/lib/day-trades'
 
 /**
  * Today's daily-stop state, and the trader's answer to it.
@@ -42,6 +45,9 @@ interface Loaded {
   debrief: DailyStopDebrief | null
   override: DailyStopOverride | null
   missing: boolean
+  /** Every trade that belongs to today, by any of its three clocks. */
+  trades: TradeForDay[]
+  now: Date
 }
 
 /** A column or table the migration has not created yet is not a server error. */
@@ -68,13 +74,8 @@ async function load(userId: string, now: Date): Promise<Loaded> {
   // The rows are keyed on the local day, which is only known after the profile
   // timezone is read — a UTC-keyed first attempt would look correct for most
   // traders and silently use the wrong day for everyone else.
-  const [tradesResult, dayResult] = await Promise.all([
-    admin
-      .from('trades')
-      .select(TRADE_COLUMNS)
-      .eq('user_id', userId)
-      .gte('close_time', bounds.start.toISOString())
-      .lt('close_time', bounds.end.toISOString()),
+  const [trades, dayResult] = await Promise.all([
+    loadDayTrades(userId, bounds, TRADE_COLUMNS),
     admin
       .from('trading_days')
       .select('debrief_followed, debrief_valid, debrief_note, override_reason, override_at')
@@ -83,13 +84,9 @@ async function load(userId: string, now: Date): Promise<Loaded> {
       .maybeSingle(),
   ])
 
-  if (tradesResult.error) {
-    throw new Error(`Could not read today's trades: ${tradesResult.error.message}`)
-  }
-
   const missing = isMissingSchema(playbookResult.error) || isMissingSchema(dayResult.error)
   const dayRow = dayResult.data
-  const state = computeDayState({ rules, trades: tradesResult.data ?? [], now })
+  const state = computeDayState({ rules, trades, now })
 
   const debrief: DailyStopDebrief | null = dayRow
     ? {
@@ -114,10 +111,27 @@ async function load(userId: string, now: Date): Promise<Loaded> {
     debrief,
     override,
     missing,
+    trades,
+    now,
   }
 }
 
+/** The instant a written override was recorded, or null when there is none. */
+function overrideInstant(override: DailyStopOverride | null): Date | null {
+  if (!override) return null
+  const at = new Date(override.at)
+  return Number.isNaN(at.getTime()) ? null : at
+}
+
 function toResponse(loaded: Loaded): DayStateResponse {
+  const { active } = computeDayLock({
+    rules: loaded.rules,
+    mode: loaded.lockMode,
+    state: loaded.state,
+    trades: loaded.trades,
+    overrideAt: overrideInstant(loaded.override),
+    now: loaded.now,
+  })
   return {
     configured: loaded.state.configured,
     missing: loaded.missing || undefined,
@@ -128,12 +142,10 @@ function toResponse(loaded: Loaded): DayStateResponse {
     },
     rules: loaded.rules,
     state: loaded.state,
-    // A breach only locks a day that has not been overridden, and only when a
-    // mode was chosen. `off` keeps the journal's existing behaviour exactly.
-    lock: {
-      mode: loaded.lockMode,
-      active: loaded.state.breached && !loaded.override && loaded.lockMode !== 'off',
-    },
+    // `off` keeps the journal's existing behaviour exactly. Otherwise the lock
+    // follows the rule, not just the day: before a lift that means the day's
+    // breach, after one it means the fresh budget taken since the lift.
+    lock: { mode: loaded.lockMode, active },
     overridden: Boolean(loaded.override),
     debrief: loaded.debrief,
     override: loaded.override,
@@ -219,20 +231,46 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true })
     }
 
-    // A hard lock is the trader's commitment to the EA, not a banner. Letting the
-    // journal override it would release the EA on the next poll, so the override
-    // endpoint is the one place where hard has to mean hard. Support stays
-    // reachable for a false breach, and the lock clears at the local reset.
+    // Hard is the one promise the app cannot walk back. The EA is refusing
+    // orders and the journal is shut, so a server that accepted an override
+    // would leave the browser and the terminal disagreeing about the same day.
+    // It clears when the trading day rolls over, not when the trader asks.
     if (loaded.lockMode === 'hard') {
       return NextResponse.json(
         {
           error:
-            'A hard lock cannot be overridden from the journal. It releases at the next reset; contact support if the day was recorded incorrectly.',
+            'This is a hard daily stop — it cannot be lifted today. It clears at the start of your next trading day.',
         },
         { status: 403 }
       )
     }
 
+    // One lift per day, and only one. Once the grace run has itself been lost,
+    // asking again would make the stop a switch the trader can keep resetting;
+    // the answer there is a clear message, not another frozen minute.
+    if (loaded.override) {
+      const resumed = computeDayLock({
+        rules: loaded.rules,
+        mode: loaded.lockMode,
+        state: loaded.state,
+        trades: loaded.trades,
+        overrideAt: overrideInstant(loaded.override),
+        now,
+      })
+      if (resumed.active) {
+        return NextResponse.json(
+          {
+            error:
+              'You already lifted this stop once today, and the fresh budget went too. Today is closed.',
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    // A soft stop is a speed bump: it freezes MT5 while the journal stays
+    // usable, and the written reason is what turns an override into a decision
+    // on the record rather than a silent undo.
     const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) : ''
     if (reason.length < 10) {
       return NextResponse.json(

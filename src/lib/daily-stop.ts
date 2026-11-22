@@ -235,6 +235,41 @@ export function computeDayState(options: {
 }
 
 /**
+ * Whether the day is locked right now, and how much of a fresh budget an
+ * override has left.
+ *
+ * A lift is a grace run, not a switch that disables the stop until midnight. The
+ * trades that closed before the trader's written reason are history; the stop
+ * re-arms on the trades that closed after it, with the same budget. That is the
+ * difference between a speed bump and a button that turns the rule off: without
+ * it, one reset means `nothing happens` for the rest of the day, which is
+ * exactly what a stop is supposed to prevent.
+ */
+export function computeDayLock(options: {
+  rules: DailyStopRules
+  mode: LockMode
+  state: DayState
+  trades: TradeForDay[]
+  overrideAt?: Date | null
+  now?: Date
+}): { active: boolean; resumed: DayState | null } {
+  if (options.mode === 'off') return { active: false, resumed: null }
+  const overrideAt = options.overrideAt ?? null
+  if (!overrideAt || Number.isNaN(overrideAt.getTime())) {
+    return { active: options.state.breached, resumed: null }
+  }
+  const resumed = computeDayState({
+    rules: options.rules,
+    trades: options.trades.filter((trade) => {
+      const at = tradeInstant(trade)
+      return at !== null && at >= overrideAt
+    }),
+    now: options.now,
+  })
+  return { active: resumed.breached, resumed }
+}
+
+/**
  * Whether an entry would be taken after today's stop, which is what earns the
  * `after_stop` tag. A trade dated on another day is not part of this day's
  * story, so it is left alone.

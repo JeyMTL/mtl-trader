@@ -4,12 +4,14 @@ import { getAdminClient } from '@/lib/server-auth'
 import { apiError } from '@/lib/log'
 import { clientKey, rateLimit } from '@/lib/rate-limit'
 import {
+  computeDayLock,
   computeDayState,
   normalizeDailyStop,
   normalizeLockMode,
   type DayState,
 } from '@/lib/daily-stop'
 import { zonedDayBounds } from '@/lib/notification-schedule'
+import { loadDayTrades } from '@/lib/day-trades'
 
 /**
  * The daily stop, as the MT5 guard EA sees it.
@@ -123,38 +125,59 @@ export async function GET(req: Request) {
 
     const now = new Date()
     const bounds = zonedDayBounds(now, rules.timeZone)
-    const [tradesResult, dayResult] = await Promise.all([
-      admin
-        .from('trades')
-        .select(TRADE_COLUMNS)
-        .eq('user_id', userId)
-        .gte('close_time', bounds.start.toISOString())
-        .lt('close_time', bounds.end.toISOString()),
-      admin
-        .from('trading_days')
-        .select('override_at')
-        .eq('user_id', userId)
-        .eq('day_key', bounds.key)
-        .maybeSingle(),
-    ])
-
-    if (tradesResult.error || dayResult.error) {
+    let trades
+    let dayResult
+    try {
+      ;[trades, dayResult] = await Promise.all([
+        loadDayTrades(userId, bounds, TRADE_COLUMNS),
+        admin
+          .from('trading_days')
+          .select('override_at')
+          .eq('user_id', userId)
+          .eq('day_key', bounds.key)
+          .maybeSingle(),
+      ])
+    } catch {
       // Fail open, loudly in the log. A lock that survives a server outage is
       // worse than a day that ends a minute late.
       return NextResponse.json(
         {
           locked: false,
           mode,
-          missing: isMissingSchema(tradesResult.error) || isMissingSchema(dayResult.error),
+          missing: isMissingSchema(dayResult?.error),
           error: 'Could not read the day; the lock is released for this poll.',
         },
         { headers: { 'Cache-Control': 'no-store' } }
       )
     }
 
-    const state = computeDayState({ rules, trades: tradesResult.data ?? [], now })
-    const overridden = Boolean(dayResult.data?.override_at)
-    const locked = state.breached && !overridden
+    if (dayResult.error) {
+      return NextResponse.json(
+        {
+          locked: false,
+          mode,
+          missing: isMissingSchema(dayResult.error),
+          error: 'Could not read the day; the lock is released for this poll.',
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      )
+    }
+
+    const state = computeDayState({ rules, trades, now })
+    const overrideAt = dayResult.data?.override_at
+      ? new Date(dayResult.data.override_at as string)
+      : null
+    // Same rule as the app: a lift is one grace run, and the stop re-arms on the
+    // trades taken after it. The desk the trader sees and the wall the EA
+    // enforces must not disagree about whether today is still open.
+    const { active: locked } = computeDayLock({
+      rules,
+      mode,
+      state,
+      trades,
+      overrideAt,
+      now,
+    })
 
     return NextResponse.json(
       {
@@ -167,7 +190,11 @@ export async function GET(req: Request) {
         since: state.stopAt,
         until: state.dayEnd,
         serverTime: now.toISOString(),
-        reason: locked ? reasonFor(state) : overridden ? 'Day overridden.' : 'Inside the limits.',
+        reason: locked
+          ? reasonFor(state)
+          : overrideAt
+            ? 'Stop lifted today.'
+            : 'Inside the limits.',
         state: {
           realizedPnl: state.realizedPnl,
           lossLimit: state.lossLimit,

@@ -30,12 +30,12 @@
 //| leave a trader unable to close a position.                         |
 //+------------------------------------------------------------------+
 #property strict
-#property description "Syncs closed MT5 positions and enforces MTL Trader's hard daily stop."
+#property description "Syncs closed MT5 positions and enforces MTL Ledger's hard daily stop."
 #property version   "2.00"
 
 #include <Trade\Trade.mqh>
 
-input string InpAppUrl           = "https://mtl-trader.vercel.app"; // App URL
+input string InpAppUrl           = "https://mtlledger.com"; // App URL
 input string InpUserId           = "";        // User id (from MT5 Sync page)
 input string InpSyncToken        = "";        // Sync token (from MT5 Sync page)
 input int    InpReconcileMinutes = 30;        // Full reconciliation interval
@@ -409,12 +409,12 @@ bool FetchLock()
          // between the breach and the poll is still an after-stop fill.
          g_lockedSince = since > 0 ? since : TimeCurrent();
          PrintFormat("HARD LOCK ACTIVE: %s", reason);
-         Alert("MTL Trader: daily stop reached. New orders are blocked until the reset.");
+         Alert("MTL Ledger: daily stop reached. New orders are blocked until the reset.");
         }
       else
         {
          g_lockedSince = 0;
-         Print("MTL Trader: hard lock released.");
+         Print("MTL Ledger: hard lock released.");
         }
      }
 
