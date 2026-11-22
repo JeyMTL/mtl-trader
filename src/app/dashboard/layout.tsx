@@ -26,7 +26,12 @@ import { cn } from '@/lib/utils'
 import { CandlestickChart, HelpCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { resolveSession } from '@/lib/session'
-import { effectiveMaxTrades, subscriptionState } from '@/lib/subscription'
+import {
+  effectiveMaxTrades,
+  formatTrialRemaining,
+  subscriptionState,
+  trialRemaining,
+} from '@/lib/subscription'
 import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
 import LockGate from '@/components/lock-gate'
@@ -84,7 +89,11 @@ export default function DashboardLayout({
     email: string | null
     avatarUrl: string | null
   } | null>(null)
-  const [trialDaysLeft, setTrialDaysLeft] = useState(0)
+  // The trial ends at a fixed instant, so its countdown is derived from the
+  // clock rather than stored when the profile loads. Ticking once a minute is
+  // enough for a label that shows days and hours, and it keeps moving while the
+  // trader is reading another tab.
+  const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
     async function loadUser() {
@@ -147,13 +156,16 @@ export default function DashboardLayout({
           (authUser.user_metadata?.picture as string | undefined) ??
           null,
       })
-      if (data.trial_ends_at) {
-        setTrialDaysLeft(Math.max(0, Math.ceil((new Date(data.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))))
-      }
       setAuthChecked(true)
     }
     loadUser()
   }, [router])
+
+  useEffect(() => {
+    if (user?.status !== 'trial' || !user.trialEndsAt) return
+    const timer = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(timer)
+  }, [user?.status, user?.trialEndsAt])
 
   // The dashboard routes render on the server, so a trade that arrives from the
   // supervisor only appeared after a navigation. This keeps the open screen
@@ -259,12 +271,19 @@ export default function DashboardLayout({
   // guessing from the stored status label, which may still say `pro`.
   const readOnly = user ? user.maxTrades === 0 : false
 
+  const trial = user?.status === 'trial' ? trialRemaining(user.trialEndsAt, now) : null
+  const trialLabel = user?.status === 'trial' ? formatTrialRemaining(user.trialEndsAt, now) : ''
+
   const planLabel = !user
     ? ''
     : user.status === 'active'
       ? (isPro ? 'Pro' : isBasic ? 'Basic' : 'Paid')
       : user.status === 'trial'
-        ? `${trialDaysLeft}d trial`
+        ? trial?.expired
+          ? 'Free'
+          : trial && trial.days > 0
+            ? `${trial.days}d trial`
+            : '<1d trial'
         : 'Free'
 
   const isActive = (href: string) => {
@@ -356,7 +375,11 @@ export default function DashboardLayout({
               </div>
               <div className="text-sm text-white font-medium">
                 {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
-                 user.status === 'trial' ? `${trialDaysLeft} days remaining, unlimited trades` :
+                 user.status === 'trial'
+                   ? trial?.expired
+                     ? 'Trial ended — your journal stays readable'
+                     : `${trialLabel}, unlimited trades`
+                   :
                  'Read-only — journal safe'}
               </div>
               {!proTools && (
@@ -522,7 +545,7 @@ export default function DashboardLayout({
                 </p>
                 <p className="text-xs text-gray-500">
                   {isPro ? 'Pro plan' : isBasic ? 'Basic plan' : user?.status === 'trial' ? 'Free trial' : 'Free plan'}
-                  {user?.status === 'trial' && trialDaysLeft > 0 ? ` · ${trialDaysLeft} days left` : ''}
+                  {user?.status === 'trial' && trialLabel && !trial?.expired ? ` · ${trialLabel}` : ''}
                 </p>
               </div>
               <button

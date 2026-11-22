@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/subscription.dart';
@@ -16,7 +18,7 @@ import 'theme.dart';
 /// plan runs, "Trial · 12d" while the trial does, and "Upgrade" only when there
 /// is nothing to manage. A pill that says Upgrade to someone who already paid is
 /// an advert aimed at a customer.
-class UpgradePill extends StatelessWidget {
+class UpgradePill extends StatefulWidget {
   const UpgradePill({super.key, required this.onTap, this.plan});
 
   final VoidCallback onTap;
@@ -44,6 +46,32 @@ class UpgradePill extends StatelessWidget {
     }
   }
 
+  @override
+  State<UpgradePill> createState() => _UpgradePillState();
+}
+
+class _UpgradePillState extends State<UpgradePill> {
+  /// The trial ends at a fixed instant, so the label is recomputed from the
+  /// clock even while nobody touches the app. A timer is what makes a pill
+  /// that said "Trial · 7d" yesterday say "Trial · 6d" today without a reload.
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && widget.plan?.state == SubscriptionState.trial) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
   /// The far end of the rim. The near end is the theme's own primary, so the
   /// gradient still belongs to the palette in every appearance.
   static const Color _rimEnd = Color(0xFF9D5BFF);
@@ -52,14 +80,14 @@ class UpgradePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final radius = BorderRadius.circular(999);
-    final label = this.label(l10n);
+    final label = widget.label(l10n);
     return Semantics(
       button: true,
       label: '$label — ${l10n.accountViewPlans}',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: widget.onTap,
           borderRadius: radius,
           child: Container(
             padding: const EdgeInsets.all(1.2),

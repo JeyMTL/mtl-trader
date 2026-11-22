@@ -83,6 +83,51 @@ export function trialEndsAtFrom(now: Date = new Date()): string {
   return new Date(now.getTime() + TRIAL_DAYS * MS_PER_DAY).toISOString()
 }
 
+export interface TrialRemaining {
+  expired: boolean
+  days: number
+  hours: number
+  minutes: number
+}
+
+/**
+ * How much of the trial is left, measured against the clock.
+ *
+ * The trial ends at a fixed instant, so the answer depends on `now` and not on
+ * whether the app is open. Callers re-read it on a timer; nothing here pauses
+ * the countdown for inactivity.
+ */
+export function trialRemaining(
+  endsAt: string | null | undefined,
+  now: Date = new Date()
+): TrialRemaining | null {
+  if (!endsAt) return null
+  const end = new Date(endsAt).getTime()
+  if (!Number.isFinite(end)) return null
+  const ms = end - now.getTime()
+  if (ms <= 0) return { expired: true, days: 0, hours: 0, minutes: 0 }
+  const totalMinutes = Math.floor(ms / 60_000)
+  return {
+    expired: false,
+    days: Math.floor(totalMinutes / 1440),
+    hours: Math.floor((totalMinutes % 1440) / 60),
+    minutes: totalMinutes % 60,
+  }
+}
+
+/** The countdown as a short label: `6d 23h left`, `23h 40m left`, `7m left`. */
+export function formatTrialRemaining(
+  endsAt: string | null | undefined,
+  now: Date = new Date()
+): string {
+  const remaining = trialRemaining(endsAt, now)
+  if (!remaining) return ''
+  if (remaining.expired) return 'Trial ended'
+  if (remaining.days > 0) return `${remaining.days}d ${remaining.hours}h left`
+  if (remaining.hours > 0) return `${remaining.hours}h ${remaining.minutes}m left`
+  return `${Math.max(1, remaining.minutes)}m left`
+}
+
 /** ISO timestamp for the first paid period ending `PERIOD_DAYS` from `now`. */
 export function periodEndFrom(now: Date = new Date()): string {
   return new Date(now.getTime() + PERIOD_DAYS * MS_PER_DAY).toISOString()

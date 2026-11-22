@@ -15,6 +15,8 @@ import {
   periodEndFrom,
   nextPeriodEnd,
   daysLeftInPeriod,
+  formatTrialRemaining,
+  trialRemaining,
   subscriptionState,
   TRIAL_DAYS,
   PERIOD_DAYS,
@@ -235,5 +237,48 @@ describe('subscriptionState', () => {
     }, NOW)).toBe('expired')
     expect(subscriptionState({ subscription_status: 'cancelled' }, NOW)).toBe('cancelled')
     expect(subscriptionState({ subscription_status: 'expired' }, NOW)).toBe('expired')
+  })
+})
+
+describe('trial countdown', () => {
+  const start = new Date('2026-11-22T12:00:00Z')
+  const inSevenDays = new Date(start.getTime() + 7 * 86_400_000).toISOString()
+
+  it('counts from the trial end and not from app usage', () => {
+    expect(trialRemaining(inSevenDays, start)).toEqual({
+      expired: false,
+      days: 7,
+      hours: 0,
+      minutes: 0,
+    })
+
+    // One day later, with the same end instant, there is a day less left.
+    const tomorrow = new Date(start.getTime() + 86_400_000)
+    expect(trialRemaining(inSevenDays, tomorrow)).toMatchObject({ days: 6, hours: 0 })
+  })
+
+  it('shows days and hours, then hours and minutes, then minutes', () => {
+    expect(formatTrialRemaining(inSevenDays, start)).toBe('7d 0h left')
+
+    const sixDaysElevenHours = new Date(start.getTime() + 6 * 86_400_000 + 11 * 3_600_000)
+    expect(formatTrialRemaining(inSevenDays, sixDaysElevenHours)).toBe('13h 0m left')
+
+    const elevenHoursForty = new Date(new Date(inSevenDays).getTime() - 23 * 3_600_000 - 40 * 60_000)
+    expect(formatTrialRemaining(inSevenDays, elevenHoursForty)).toBe('23h 40m left')
+
+    const sevenMinutes = new Date(new Date(inSevenDays).getTime() - 7 * 60_000)
+    expect(formatTrialRemaining(inSevenDays, sevenMinutes)).toBe('7m left')
+  })
+
+  it('says the trial ended instead of counting past zero', () => {
+    const after = new Date(new Date(inSevenDays).getTime() + 60_000)
+    expect(trialRemaining(inSevenDays, after)?.expired).toBe(true)
+    expect(formatTrialRemaining(inSevenDays, after)).toBe('Trial ended')
+  })
+
+  it('returns nothing when there is no trial date to count', () => {
+    expect(trialRemaining(null, start)).toBeNull()
+    expect(trialRemaining('not a date', start)).toBeNull()
+    expect(formatTrialRemaining(null, start)).toBe('')
   })
 })
