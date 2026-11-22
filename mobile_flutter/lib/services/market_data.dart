@@ -82,6 +82,26 @@ int? candleCountFor(Duration span, ChartInterval interval) {
   return bars > maxCandlesPerRequest ? null : bars;
 }
 
+/// Narrows a requested window to what the feed will actually serve.
+///
+/// The route refuses a request that needs more than [maxCandlesPerRequest]
+/// bars, and a one-day window at five seconds needs 17,280 of them. Pulling the
+/// start forward keeps the end the trader asked for and turns an empty seconds
+/// chart into the newest bars that fit.
+({DateTime from, DateTime to}) clampWindowToFeed(
+  DateTime from,
+  DateTime to,
+  ChartInterval interval,
+) {
+  if (candleCountFor(to.difference(from), interval) != null) {
+    return (from: from, to: to);
+  }
+  return (
+    from: to.subtract(interval.size * maxCandlesPerRequest),
+    to: to,
+  );
+}
+
 /// A sensible starting size for a window this long.
 ChartInterval defaultIntervalFor(Duration span) {
   if (span <= const Duration(hours: 3)) return ChartInterval.oneMinute;
@@ -210,7 +230,8 @@ class MarketDataService {
 
   /// Candles for [interval]. With [from] and [to] the server serves that
   /// historical window instead of the newest candles, which is what the
-  /// time-frame picker, replay's jump-to-date and load-earlier use.
+  /// time-frame picker, replay's jump-to-date and load-earlier use. A window
+  /// too long for the feed is narrowed to the newest bars that fit it.
   Future<List<Candle>> candles(
     Instrument instrument,
     ChartInterval interval, {
@@ -218,8 +239,13 @@ class MarketDataService {
     DateTime? from,
     DateTime? to,
   }) async {
-    final fromMs = from?.toUtc().millisecondsSinceEpoch;
-    final toMs = to?.toUtc().millisecondsSinceEpoch;
+    // Clamp before the cache key is built, so a cached series and the request
+    // that produced it describe the same window.
+    final bounded = from != null && to != null
+        ? clampWindowToFeed(from, to, interval)
+        : null;
+    final fromMs = bounded?.from.toUtc().millisecondsSinceEpoch;
+    final toMs = bounded?.to.toUtc().millisecondsSinceEpoch;
     final hasWindow = fromMs != null && toMs != null;
 
     final key = _cacheKey(instrument, interval, fromMs: fromMs, toMs: toMs);
