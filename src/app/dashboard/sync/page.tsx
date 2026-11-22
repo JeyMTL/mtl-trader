@@ -112,6 +112,15 @@ export default function SyncPage() {
 
       {MT5_HOSTED_SYNC_ENABLED ? <BrokerConnect /> : null}
 
+      {/* The manual route stays available for traders who run their own
+          terminal, but it is folded away: the hosted connection above needs no
+          downloads, and the four-step setup was the first thing a new account
+          saw. */}
+      <details className="rounded-xl border border-border bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-medium text-gray-400">
+          Run your own MT5 terminal instead
+        </summary>
+        <div className="mt-4 space-y-6">
       <div className="bg-surface rounded-xl border border-border p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -327,6 +336,8 @@ export default function SyncPage() {
           </div>
         </div>
       </div>
+        </div>
+      </details>
     </div>
   )
 }
