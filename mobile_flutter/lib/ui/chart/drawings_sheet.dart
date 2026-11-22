@@ -6,7 +6,8 @@ import '../theme.dart';
 /// back onto a creation method, so the sheet owns the labels and the screen owns
 /// the geometry.
 class _Tool {
-  const _Tool(this.id, this.label, this.icon, this.category, {this.aliases = const []});
+  const _Tool(this.id, this.label, this.icon, this.category,
+      {this.aliases = const []});
 
   final String id;
   final String label;
@@ -41,7 +42,8 @@ const List<_Tool> _tools = <_Tool>[
       aliases: ['time', 'session', 'event']),
   _Tool('rectangle', 'Rectangle', Icons.crop_square, 'Shapes',
       aliases: ['box', 'zone', 'supply', 'demand']),
-  _Tool('ellipse', 'Ellipse', Icons.circle_outlined, 'Shapes', aliases: ['circle']),
+  _Tool('ellipse', 'Ellipse', Icons.circle_outlined, 'Shapes',
+      aliases: ['circle']),
   _Tool('fib', 'Fib retracement', Icons.format_line_spacing, 'Fibonacci',
       aliases: ['fibonacci', 'golden', 'levels', 'retrace']),
   _Tool('fibExtension', 'Fib extension', Icons.stacked_line_chart, 'Fibonacci',
@@ -73,9 +75,21 @@ const List<String> _categories = <String>[
 /// not have to clear the filter they set two sessions ago. Picking one pops the
 /// sheet with the tool id.
 class DrawingsPanel extends StatefulWidget {
-  const DrawingsPanel({super.key, required this.onPick});
+  const DrawingsPanel({
+    super.key,
+    required this.onPick,
+    this.keepDrawing = false,
+    this.onKeepDrawingChanged,
+  });
 
   final void Function(String id) onPick;
+
+  /// Whether the tool stays armed after it places an object.
+  final bool keepDrawing;
+
+  /// Null hides the switch: a panel with nobody listening must not show a
+  /// control that does nothing.
+  final ValueChanged<bool>? onKeepDrawingChanged;
 
   @override
   State<DrawingsPanel> createState() => _DrawingsPanelState();
@@ -84,6 +98,15 @@ class DrawingsPanel extends StatefulWidget {
 class _DrawingsPanelState extends State<DrawingsPanel> {
   final TextEditingController _search = TextEditingController();
   String _category = 'All';
+  late bool _keepDrawing = widget.keepDrawing;
+
+  @override
+  void didUpdateWidget(covariant DrawingsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.keepDrawing != widget.keepDrawing) {
+      _keepDrawing = widget.keepDrawing;
+    }
+  }
 
   @override
   void dispose() {
@@ -132,6 +155,55 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
               ],
             ),
           ),
+        if (widget.onKeepDrawingChanged != null) ...[
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: () {
+              setState(() => _keepDrawing = !_keepDrawing);
+              widget.onKeepDrawingChanged?.call(_keepDrawing);
+            },
+            child: Row(
+              children: [
+                Icon(
+                  _keepDrawing ? Icons.lock_outline : Icons.lock_open,
+                  size: 16,
+                  color:
+                      _keepDrawing ? AppColors.primaryLight : AppColors.faint,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Keep drawing',
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'The tool stays armed after each object',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _keepDrawing,
+                  onChanged: (value) {
+                    setState(() => _keepDrawing = value);
+                    widget.onKeepDrawingChanged?.call(value);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         if (visible.isEmpty)
           Padding(
@@ -179,7 +251,8 @@ class _CategoryChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withAlpha(28) : AppColors.surfaceAlt,
+          color:
+              selected ? AppColors.primary.withAlpha(28) : AppColors.surfaceAlt,
           borderRadius: BorderRadius.circular(AppRadius.chip),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,

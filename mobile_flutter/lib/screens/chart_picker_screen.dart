@@ -169,6 +169,13 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   /// set the chart places instead of panning, and the hint strip says what it
   /// wants; clearing it hands the chart back.
   DrawingKind? _armingKind;
+
+  /// Keep the armed tool armed after it places an object.
+  ///
+  /// Six levels should cost one trip to the tools sheet, not six. Off by
+  /// default, because a stray second tap after finishing a shape would
+  /// otherwise leave a duplicate on the chart.
+  bool _keepDrawing = false;
   PositionSide? _armingSide;
 
   /// Window the trader entered. Both null means the live tail.
@@ -1506,6 +1513,18 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             const SizedBox(width: 6),
           ],
           IconButton(
+            tooltip: _keepDrawing ? 'Keep drawing on' : 'Keep drawing off',
+            onPressed: () => setState(() => _keepDrawing = !_keepDrawing),
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              _keepDrawing ? Icons.lock_outline : Icons.lock_open,
+              size: 17,
+              color: _keepDrawing
+                  ? drawingColor
+                  : const Color(0xFFF2F4F7).withAlpha(150),
+            ),
+          ),
+          IconButton(
             tooltip: 'Put the tool away',
             onPressed: _disarmTool,
             visualDensity: VisualDensity.compact,
@@ -2249,7 +2268,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                DrawingsPanel(onPick: pick),
+                DrawingsPanel(
+                  onPick: pick,
+                  keepDrawing: _keepDrawing,
+                  onKeepDrawingChanged: (value) =>
+                      setState(() => _keepDrawing = value),
+                ),
                 if (hasSelection) ...[
                   const SizedBox(height: 14),
                   _sheetLabel('SELECTED OBJECT'),
@@ -2504,7 +2528,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   /// label lands where they pointed rather than in the middle of the chart, and
   /// it is not created at all if they back out of the dialog.
   Future<void> _placeDrawing(ChartDrawing drawing) async {
-    _disarmTool();
+    // The lock is the whole point: with it on, the tool stays armed so the next
+    // press starts the next object of the same kind.
+    if (!_keepDrawing) _disarmTool();
     if (drawing.kind == DrawingKind.text) {
       final words = await _askWords();
       if (!mounted || words == null || words.isEmpty) return;
