@@ -10,6 +10,7 @@ import '../core/import_parser.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 /// Refuse absurd uploads before reading the whole file into memory.
 const int _maxImportBytes = 20 * 1024 * 1024;
@@ -132,7 +133,7 @@ class _ImportScreenState extends State<ImportScreen> {
   /// Parser exceptions read like stack traces; everything else here is a
   /// message written for the trader.
   String _friendly(Object error) {
-    final text = error.toString().replaceFirst('Exception: ', '');
+    final text = friendlyError(error);
     return text.startsWith('FormatException') ||
             text.startsWith('RangeError') ||
             text.startsWith('UnsupportedError')
@@ -173,7 +174,7 @@ class _ImportScreenState extends State<ImportScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = friendlyError(error);
       });
     }
   }
@@ -219,7 +220,7 @@ class _ImportScreenState extends State<ImportScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(
-        () => _error = error.toString().replaceFirst('Exception: ', ''),
+        () => _error = friendlyError(error),
       );
     }
   }

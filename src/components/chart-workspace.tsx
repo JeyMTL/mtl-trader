@@ -23,6 +23,7 @@ import { ChartSettingsDialog } from '@/components/chart-settings-panel'
 import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
 import { alignCompare } from '@/lib/chart-compare'
 import { sessionWindows } from '@/lib/market-sessions'
+import { publicErrorMessage } from '@/lib/errors'
 import {
   deleteCloudTemplate,
   pushCloudTemplate,
@@ -552,7 +553,7 @@ export function ChartWorkspace({
       } catch (caught) {
         if (!cancelled) {
           setCandles([])
-          setError(caught instanceof Error ? caught.message : 'Could not load candles.')
+          setError(publicErrorMessage(caught, 'Could not load candles. Please try again.'))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -589,7 +590,7 @@ export function ChartWorkspace({
         if (cancelled) return
         setCompareCandles([])
         setCompareError(
-          caught instanceof Error ? caught.message : 'Could not load the compare instrument.'
+          publicErrorMessage(caught, 'Could not load the compare instrument. Please try again.')
         )
       }
     }

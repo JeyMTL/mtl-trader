@@ -6,22 +6,7 @@ import { Lock, Mail, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 import { GoogleSignInButton } from '@/components/google-signin-button'
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message && error.message !== '{}') return error.message
-  if (typeof error === 'string' && error.trim() && error.trim() !== '{}') return error
-  if (error && typeof error === 'object') {
-    const message = 'message' in error && typeof error.message === 'string' ? error.message : ''
-    if (message && message !== '{}') return message
-    try {
-      const details = JSON.stringify(error)
-      if (details && details !== '{}') return details
-    } catch {
-      // Use the fallback when the error cannot be serialized.
-    }
-  }
-  return fallback
-}
+import { publicErrorMessage } from '@/lib/errors'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -47,7 +32,12 @@ export default function SignupPage() {
       })
 
       if (authError) {
-        setError(getErrorMessage(authError, 'Supabase rejected the signup request. Check your email and password, then try again.'))
+        setError(
+          publicErrorMessage(
+            authError,
+            'Could not create your account. Check your email and password, then try again.'
+          )
+        )
         setLoading(false)
         return
       }
@@ -74,7 +64,7 @@ export default function SignupPage() {
         })
       } catch {
         setError(
-          'Your account was created, but the server could not be reached to finish setting up your profile. Try logging in — if the journal reads as expired, the server is missing SUPABASE_SERVICE_ROLE_KEY.'
+          'Your account was created, but we could not finish setting it up. Try signing in — if the journal shows as expired, contact support@mtlledger.com.'
         )
         setLoading(false)
         return
@@ -95,7 +85,7 @@ export default function SignupPage() {
       if (data.session) await supabase.auth.signOut()
       setSuccess('Account created. Check your email and click the verification link before logging in.')
     } catch (signupError) {
-      setError(getErrorMessage(signupError, 'Unable to create your account. Please try again.'))
+      setError(publicErrorMessage(signupError, 'Unable to create your account. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -200,7 +190,7 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full btn-gradient text-white py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating account...' : 'Start 14-Day Free Trial'}
+            {loading ? 'Creating account...' : 'Start 7-Day Free Trial'}
           </button>
 
           <p className="text-center text-xs leading-relaxed text-gray-500">

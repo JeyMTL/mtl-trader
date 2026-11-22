@@ -49,7 +49,7 @@ describe('LevelPicker', () => {
   it('shows the feed’s own refusal instead of an empty chart', async () => {
     fetchMock.mockImplementationOnce(async () => ({
       ok: false,
-      json: async () => ({ error: 'OANDA cannot quote XAU_USD right now.' }),
+      json: async () => ({ error: 'No chart data for XAU_USD right now.' }),
     }))
 
     render(
@@ -63,7 +63,7 @@ describe('LevelPicker', () => {
     )
 
     await waitFor(() =>
-      expect(screen.getByText('OANDA cannot quote XAU_USD right now.')).toBeTruthy()
+      expect(screen.getByText('No chart data for XAU_USD right now.')).toBeTruthy()
     )
   })
 

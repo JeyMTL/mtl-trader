@@ -17,6 +17,7 @@ import 'alerts_screen.dart';
 import 'rules_screen.dart';
 import 'subscription_screen.dart';
 import 'sync_screen.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 /// IANA names that Postgres can resolve with `AT TIME ZONE`.
 const List<String> _timezoneOptions = [
@@ -799,7 +800,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          snapshot.error.toString(),
+                          friendlyError(snapshot.error),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(

@@ -10,6 +10,7 @@ import { Avatar } from '@/components/avatar'
 import { deleteAvatarByUrl, uploadAvatar, validateAvatarFile } from '@/lib/avatar-upload'
 import { PLANS } from '@/lib/plans'
 import { subscriptionState, type SubscriptionState } from '@/lib/subscription'
+import { publicErrorMessage } from '@/lib/errors'
 
 const BASIC_PRICE = PLANS.find(p => p.id === 'basic')?.price ?? 0
 const PRO_PRICE = PLANS.find(p => p.id === 'pro')?.price ?? 0
@@ -164,7 +165,7 @@ export default function SettingsPage() {
       .eq('id', userId)
     setSavingProfile(false)
     if (error) {
-      toast('Could not save your profile: ' + error.message, { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not save your profile. Please try again.'), { tone: 'error' })
       return
     }
     setSaved('profile')
@@ -179,7 +180,7 @@ export default function SettingsPage() {
     })
     setSavingAvatar(false)
     if (error) {
-      toast('Could not save the picture: ' + error.message, { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not save that picture. Please try again.'), { tone: 'error' })
       return
     }
     toast(value ? 'Profile picture updated' : 'Profile picture removed')
@@ -213,8 +214,9 @@ export default function SettingsPage() {
       await deleteAvatarByUrl(previous, userId)
       toast('Profile picture updated')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      toast('Could not upload the picture: ' + message, { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not upload that picture. Try a JPG or PNG under 2 MB.'), {
+        tone: 'error',
+      })
     } finally {
       setUploadingAvatar(false)
     }
@@ -237,7 +239,9 @@ export default function SettingsPage() {
       .eq('id', userId)
     setSavingNotifications(false)
     if (error) {
-      toast('Could not save your notification settings: ' + error.message, { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not save your notification settings. Please try again.'), {
+        tone: 'error',
+      })
       return
     }
     setSaved('notifications')
@@ -282,7 +286,7 @@ export default function SettingsPage() {
 
     const { error } = await supabase.auth.updateUser({ password: passwords.new })
     if (error) {
-      setPasswordError(error.message)
+      setPasswordError(publicErrorMessage(error, 'Could not change your password. Please try again.'))
     } else {
       setPasswordSuccess(true)
       setPasswords({ current: '', new: '', confirm: '' })
@@ -326,7 +330,7 @@ export default function SettingsPage() {
       await supabase.auth.signOut()
       window.location.href = '/'
     } catch (error: unknown) {
-      toast(error instanceof Error ? error.message : 'Could not delete your account.', { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not delete your account. Please try again.'), { tone: 'error' })
     } finally {
       setDeleteLoading(false)
     }
@@ -344,7 +348,7 @@ export default function SettingsPage() {
       description: depDesc || null,
     })
     if (error) {
-      toast('Could not add that entry: ' + error.message, { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not add that entry. Please try again.'), { tone: 'error' })
       setDepLoading(false)
       return
     }
@@ -727,7 +731,7 @@ export default function SettingsPage() {
                   <div>
                     <h3 className="font-semibold text-white">
                       {userPlan.liveState === 'trial'
-                        ? '14-Day Free Trial'
+                        ? '7-Day Free Trial'
                         : userPlan.tier === 'pro'
                           ? 'Pro Plan'
                           : userPlan.tier === 'basic'

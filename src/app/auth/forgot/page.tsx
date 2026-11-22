@@ -6,6 +6,7 @@ import { ArrowLeft, Mail, Send } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 import { useToast } from '@/components/toast'
+import { publicErrorMessage } from '@/lib/errors'
 
 export default function ForgotPasswordPage() {
   const { toast } = useToast()
@@ -25,7 +26,9 @@ export default function ForgotPasswordPage() {
     setLoading(false)
 
     if (error) {
-      toast(error.message, { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not send the reset email. Please try again.'), {
+        tone: 'error',
+      })
       return
     }
 

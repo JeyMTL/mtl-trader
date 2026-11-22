@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { LockMode } from '@/lib/daily-stop'
 import { useToast } from '@/components/toast'
+import { publicErrorMessage } from '@/lib/errors'
 import {
   DAY_LABELS,
   DAY_SHORT,
@@ -99,9 +100,10 @@ export default function PlaybookPage() {
         setTimeZone(stored)
 
         if (playbookResult.error) {
-          toast('Could not load your playbook: ' + playbookResult.error.message, {
-            tone: 'error',
-          })
+          toast(
+            publicErrorMessage(playbookResult.error, 'Could not load your playbook. Please try again.'),
+            { tone: 'error' }
+          )
         } else if (playbookResult.data) {
           setPlaybook(
             normalizePlaybook({
@@ -167,7 +169,7 @@ export default function PlaybookPage() {
     )
     setSaving(false)
     if (error) {
-      toast('Could not save your playbook: ' + error.message, { tone: 'error' })
+      toast(publicErrorMessage(error, 'Could not save your playbook. Please try again.'), { tone: 'error' })
       return
     }
     setPlaybook(cleaned)

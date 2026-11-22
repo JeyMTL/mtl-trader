@@ -13,6 +13,7 @@ import '../services/play_billing.dart';
 import '../services/telemetry.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 /// Plan cards and the purchase path the phone app uses.
 ///
@@ -176,7 +177,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(
-        () => _error = error.toString().replaceFirst('Exception: ', ''),
+        () => _error = friendlyError(error),
       );
     }
   }
@@ -197,7 +198,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = friendlyError(error);
         _busy = null;
       });
     }
@@ -214,7 +215,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(
-        () => _error = error.toString().replaceFirst('Exception: ', ''),
+        () => _error = friendlyError(error),
       );
     } finally {
       if (mounted) setState(() => _restoring = false);

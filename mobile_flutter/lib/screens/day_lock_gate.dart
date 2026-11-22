@@ -10,6 +10,7 @@ import '../services/journal_api.dart';
 import '../services/mt5_freezer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 /// The gate wraps the Navigator (see `MaterialApp.builder`), so its own context
 /// has no Navigator above it and `showDialog` would throw there. The app hands
@@ -383,7 +384,7 @@ class _DayLockScreenState extends State<DayLockScreen> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+            content: Text(friendlyError(error))),
       );
     }
   }
@@ -645,7 +646,7 @@ class _SoftLockBannerState extends State<_SoftLockBanner>
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+            content: Text(friendlyError(error))),
       );
     }
   }

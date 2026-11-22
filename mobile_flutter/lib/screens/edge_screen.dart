@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 class EdgeScreen extends StatefulWidget {
   const EdgeScreen({super.key, required this.api});
@@ -83,7 +84,7 @@ class _EdgeScreenState extends State<EdgeScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      snapshot.error.toString(),
+                      friendlyError(snapshot.error),
                       textAlign: TextAlign.center,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,

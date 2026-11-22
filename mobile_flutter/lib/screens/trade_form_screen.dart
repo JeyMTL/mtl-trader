@@ -19,6 +19,7 @@ import '../ui/widgets.dart';
 import 'chart_picker_screen.dart';
 import 'media_viewer_screen.dart';
 import 'symbol_picker_screen.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 class TradeFormScreen extends StatefulWidget {
   const TradeFormScreen({super.key, this.tradeId, this.api});
@@ -488,7 +489,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     } catch (error) {
       if (mounted) {
         setState(
-          () => _error = error.toString().replaceFirst('Exception: ', ''),
+          () => _error = friendlyError(error),
         );
       }
     } finally {
@@ -531,7 +532,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     } catch (error) {
       if (mounted) {
         setState(
-          () => _error = error.toString().replaceFirst('Exception: ', ''),
+          () => _error = friendlyError(error),
         );
       }
     } finally {
@@ -574,7 +575,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     } catch (error) {
       if (mounted) {
         setState(
-          () => _error = error.toString().replaceFirst('Exception: ', ''),
+          () => _error = friendlyError(error),
         );
       }
     } finally {
@@ -613,7 +614,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       if (!mounted) return;
       setState(() {
         _recording = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = friendlyError(error);
       });
       await _media.cancelRecording();
     }
@@ -655,7 +656,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     } catch (error) {
       if (mounted) {
         setState(
-          () => _error = error.toString().replaceFirst('Exception: ', ''),
+          () => _error = friendlyError(error),
         );
       }
     } finally {
@@ -984,7 +985,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
           : '';
       final message = error is TimeoutException
           ? 'The save request timed out. Check your connection and press Save again.'
-          : error.toString().replaceFirst('Exception: ', '');
+          : friendlyError(error);
       setState(() => _error = 'Could not save: $message$savedNote');
     } finally {
       // Never leave the Save button spinning: every exit path lands here.

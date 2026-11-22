@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 /// MT5 connection, for customers whose only device is a phone.
 ///
@@ -87,7 +88,7 @@ class _SyncScreenState extends State<SyncScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = friendlyError(error);
       });
     }
   }
@@ -136,7 +137,7 @@ class _SyncScreenState extends State<SyncScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = friendlyError(error));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -174,7 +175,7 @@ class _SyncScreenState extends State<SyncScreen> {
       _poll?.cancel();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = friendlyError(error));
     }
   }
 

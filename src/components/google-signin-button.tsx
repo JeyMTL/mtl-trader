@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { completeGoogleSignIn } from '@/lib/google-signin'
+import { publicErrorMessage } from '@/lib/errors'
 
 /**
  * Google's own rendered button, wired to Google Identity Services.
@@ -154,7 +155,7 @@ export function GoogleSignInButton({
       .catch((error: unknown) => {
         if (cancelled) return
         handlers.current.onError(
-          error instanceof Error ? error.message : 'Could not load Google sign-in.'
+          publicErrorMessage(error, 'Could not load Google sign-in. Check your connection and try again.')
         )
       })
 
@@ -180,7 +181,11 @@ export function GoogleSignInButton({
             },
           })
           // On success the browser leaves for Google, so nothing below runs.
-          if (error) handlers.current.onError(error.message)
+          if (error) {
+            handlers.current.onError(
+              publicErrorMessage(error, 'Google sign-in could not start. Please try again.')
+            )
+          }
         }}
         className={BUTTON_CLASS}
       >

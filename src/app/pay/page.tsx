@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { Logo } from '@/components/logo'
+import { publicErrorMessage } from '@/lib/errors'
 
 /**
  * Where Paddle's checkout link lands.
@@ -128,9 +129,7 @@ export default function PayPage() {
 
     void openCheckout().catch((error: unknown) => {
       setProblem(error instanceof CheckoutProblem ? error.problem : 'failed')
-      setDetail(
-        error instanceof Error ? error.message : 'Could not open the checkout. Please try again.'
-      )
+      setDetail(publicErrorMessage(error, 'Could not open the checkout. Please try again.'))
     })
   }, [])
 

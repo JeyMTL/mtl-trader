@@ -36,6 +36,7 @@ import '../ui/chart/sync_badge.dart';
 import '../ui/color_wheel.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 /// Levels pinned on the chart. Any field may be null when the trader only
 /// wanted to set some of them.
@@ -657,7 +658,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       }
       setState(() {
         _loading = false;
-        _error = error.toString();
+        _error = friendlyError(error);
       });
     }
   }
@@ -1967,7 +1968,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       }
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
+        SnackBar(content: Text(friendlyError(error))),
       );
       return null;
     }
@@ -2039,7 +2040,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         }
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
+        SnackBar(content: Text(friendlyError(error))),
       );
     }
   }

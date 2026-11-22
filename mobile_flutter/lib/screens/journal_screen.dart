@@ -10,6 +10,7 @@ import '../ui/a11y.dart';
 import '../ui/shimmer.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 class JournalScreen extends StatefulWidget {
   const JournalScreen({
@@ -126,7 +127,7 @@ class _JournalScreenState extends State<JournalScreen> {
       }
     } catch (error) {
       if (!mounted || requestId != _requestId) return;
-      final message = error.toString().replaceFirst('Exception: ', '');
+      final message = friendlyError(error);
       if (_items.isNotEmpty) {
         // A refresh that failed is not an empty journal: keep every trade on
         // screen and say the refresh failed, instead of replacing the list with

@@ -5,6 +5,7 @@ import { CandlestickChart, Loader2, X } from 'lucide-react'
 import { chartSymbol } from '@/components/chart-workspace'
 import { useChartPalette } from '@/lib/chart-theme'
 import { cn, formatPrice } from '@/lib/utils'
+import { publicErrorMessage } from '@/lib/errors'
 
 /**
  * Pin entry, stop and target straight off a live chart.
@@ -99,7 +100,7 @@ export function LevelPicker({ symbol, side, initial, onApply, onClose }: LevelPi
       } catch (cause) {
         if (cancelled) return
         setCandles([])
-        setError(cause instanceof Error ? cause.message : 'The chart feed did not answer.')
+        setError(publicErrorMessage(cause, 'The chart feed did not answer. Please try again.'))
         setLoading(false)
       }
     }

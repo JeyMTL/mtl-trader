@@ -351,7 +351,7 @@ export default function DashboardLayout({
                   : isBasic
                     ? 'Basic Plan'
                     : user.status === 'trial'
-                      ? '14-Day Free Trial'
+                      ? '7-Day Free Trial'
                       : 'Free plan'}
               </div>
               <div className="text-sm text-white font-medium">

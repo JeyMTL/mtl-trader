@@ -8,6 +8,7 @@ import '../services/backtest_api.dart';
 import '../services/voice_clip_recorder.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 /// Timeframes the compiler and the engine both understand.
 const List<String> _timeframes = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1'];
@@ -222,7 +223,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
       if (!mounted) return;
       setState(() {
         _recording = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = friendlyError(error);
       });
       await _voice.cancel();
     }

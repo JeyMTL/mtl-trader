@@ -17,6 +17,7 @@ import '../ui/upgrade_pill.dart';
 import '../ui/widgets.dart';
 import 'rules_screen.dart';
 import 'subscription_screen.dart';
+import 'package:mtl_trader_mobile/core/friendly_error.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -125,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
           if (snapshot.hasError) {
             return _LoadError(
-              message: snapshot.error.toString(),
+              message: friendlyError(snapshot.error),
               onRetry: _refresh,
             );
           }
