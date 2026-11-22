@@ -65,6 +65,38 @@ class ChartDrawingsSync {
     'NZD',
   ];
 
+  /// The rows for one symbol, with or without the look column.
+  static Future<List<Map<String, dynamic>>> _readRows(
+    SupabaseClient db,
+    String cloudSymbol, {
+    required bool withStyle,
+  }) async {
+    final data = await db
+        .from('chart_drawings')
+        .select(withStyle
+            ? 'id, kind, points, text, style, edited_at'
+            : 'id, kind, points, text, edited_at')
+        .eq('symbol', cloudSymbol);
+    return [
+      for (final row in data as List)
+        if (row is Map) Map<String, dynamic>.from(row),
+    ];
+  }
+
+  /// True when the database says the `style` column is not there.
+  ///
+  /// Postgres reports 42703 and PostgREST words it as "column ... does not
+  /// exist" or "in the schema cache". Matching on both names keeps this honest
+  /// on a renamed table rather than swallowing every read error as one.
+  static bool isMissingStyleColumn(Object error) {
+    final text = error.toString().toLowerCase();
+    final mentionsStyle = text.contains('style');
+    return mentionsStyle &&
+        (text.contains('does not exist') ||
+            text.contains('42703') ||
+            text.contains('schema cache'));
+  }
+
   /// True when a Supabase client exists, i.e. there is somewhere to sync to.
   /// A widget test or an unconfigured build answers false, and the chart then
   /// stays purely local rather than scheduling work it cannot do.
@@ -93,24 +125,33 @@ class ChartDrawingsSync {
     }
 
     final cloudSymbol = symbolForCloud(symbol);
-    final List<Map<String, dynamic>> rows;
+    // A project that has not run the style migration still has to share its
+    // geometry: without this the select itself fails and *nothing* crosses over,
+    // which reads on the web desk as "the phone's chart is empty".
+    var styleColumn = true;
+    List<Map<String, dynamic>> rows;
     try {
-      final data = await db
-          .from('chart_drawings')
-          .select('id, kind, points, text, style, edited_at')
-          .eq('symbol', cloudSymbol);
-      rows = [
-        for (final row in data as List)
-          if (row is Map) Map<String, dynamic>.from(row),
-      ];
+      rows = await _readRows(db, cloudSymbol, withStyle: true);
     } catch (error) {
-      // The table may not exist yet on this project; the chart keeps working
-      // from the device copy and the caller can show why.
-      return ChartDrawingsSyncOutcome(
-        drawings: local,
-        changed: false,
-        error: _friendly(error),
-      );
+      if (!isMissingStyleColumn(error)) {
+        // The table may not exist yet on this project; the chart keeps working
+        // from the device copy and the caller can show why.
+        return ChartDrawingsSyncOutcome(
+          drawings: local,
+          changed: false,
+          error: _friendly(error),
+        );
+      }
+      styleColumn = false;
+      try {
+        rows = await _readRows(db, cloudSymbol, withStyle: false);
+      } catch (fallbackError) {
+        return ChartDrawingsSyncOutcome(
+          drawings: local,
+          changed: false,
+          error: _friendly(fallbackError),
+        );
+      }
     }
 
     final seen = await _seen(symbol);
@@ -195,8 +236,9 @@ class ChartDrawingsSync {
           'points': drawingToPoints(drawing),
           'text': drawing.text,
           // The look travels with the geometry: a zone made red and half-solid
-          // on the phone must be the same zone on the web desk.
-          'style': drawing.look.toJson(),
+          // on the phone must be the same zone on the web desk. Omitted only on
+          // a project whose table has no `style` column yet.
+          if (styleColumn) 'style': drawing.look.toJson(),
           // The edit time, not the arrival time: this is what the other device
           // compares against when it comes back.
           'edited_at': _isoTime(
@@ -221,7 +263,7 @@ class ChartDrawingsSync {
               'kind': drawing.kind.name,
               'points': drawingToPoints(drawing),
               'text': drawing.text,
-              'style': drawing.look.toJson(),
+              if (styleColumn) 'style': drawing.look.toJson(),
               'edited_at': _isoTime(
                 drawing.editedAtMs ?? DateTime.now().millisecondsSinceEpoch,
               ),
@@ -265,6 +307,23 @@ class ChartDrawingsSync {
     }
 
     await _rememberSeen(symbol, seen);
+
+    if (!styleColumn) {
+      // The table cannot carry a look, so a downloaded row arrives plain. Keep
+      // the colours this device already had instead of repainting the trader's
+      // objects in the default scheme on every sync.
+      final localLook = {
+        for (final drawing in local)
+          if (drawing.id != null) drawing.id!: drawing.look,
+      };
+      for (var index = 0; index < resolved.length; index += 1) {
+        final id = resolved[index].id;
+        final look = id == null ? null : localLook[id];
+        if (look != null && !look.isDefault) {
+          resolved[index] = resolved[index].withLook(look);
+        }
+      }
+    }
 
     return ChartDrawingsSyncOutcome(
       drawings: resolved,

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mtl_trader_mobile/core/chart_drawings.dart';
 import 'package:mtl_trader_mobile/services/chart_drawings_sync.dart';
@@ -44,6 +45,36 @@ void main() {
     expect(back!.kind, DrawingKind.ray);
     expect(back.price, closeTo(1.08432, 1e-9));
     expect(drawingSignature(back), drawingSignature(drawing));
+  });
+
+  test('a project without the style column is named, not guessed at', () {
+    // The shapes PostgREST and Postgres actually produce for a missing column.
+    expect(
+      ChartDrawingsSync.isMissingStyleColumn(
+        PostgrestException(
+          message: 'column chart_drawings.style does not exist',
+          code: '42703',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      ChartDrawingsSync.isMissingStyleColumn(
+        "Could not find the 'style' column of 'chart_drawings' in the schema cache",
+      ),
+      isTrue,
+    );
+    // Anything else is a real failure and must not be swallowed as one.
+    expect(
+      ChartDrawingsSync.isMissingStyleColumn('JWT expired'),
+      isFalse,
+    );
+    expect(
+      ChartDrawingsSync.isMissingStyleColumn(
+        PostgrestException(message: 'relation does not exist', code: '42P01'),
+      ),
+      isFalse,
+    );
   });
 
   test('a trend line travels as its two anchors', () {
@@ -119,7 +150,8 @@ void main() {
     );
 
     expect(reloaded.id, 'row-7');
-    expect(moved.id, 'row-7', reason: 'the drag must update that row, not create one');
+    expect(moved.id, 'row-7',
+        reason: 'the drag must update that row, not create one');
     expect(drawingSignature(moved), isNot(drawingSignature(reloaded)));
   });
 
@@ -163,7 +195,9 @@ void main() {
     );
   });
 
-  test('two versions with the same timestamp pick the same winner on both sides', () {
+  test(
+      'two versions with the same timestamp pick the same winner on both sides',
+      () {
     final first = localEditWins(
       localMs: 5,
       localSignature: 'ray|1.2500000',
