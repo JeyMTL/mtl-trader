@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react'
 import { BarChart3, TrendingUp, Shield, Zap, ArrowRight, Check } from 'lucide-react'
 import { PLANS } from '@/lib/plans'
 import { formatCurrency } from '@/lib/utils'
-import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
+import { GoogleSignInButton } from '@/components/google-signin-button'
 
 const features = [
   {
@@ -57,24 +57,6 @@ export default function HomePage() {
     window.location.replace(`/auth/callback?${forward.toString()}`)
   }, [])
 
-  const signInWithGoogle = async () => {
-    setGoogleLoading(true)
-    setAuthError('')
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: 'select_account' },
-      },
-    })
-
-    // On success the browser leaves for Google, so nothing below runs.
-    if (error) {
-      setAuthError(error.message)
-      setGoogleLoading(false)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -128,15 +110,18 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="fade-up-3 mt-4 flex justify-center">
-            <button
-              type="button"
-              onClick={signInWithGoogle}
+            <GoogleSignInButton
+              text="signin_with"
               disabled={googleLoading}
-              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-sm font-semibold text-gray-200 transition-colors hover:border-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="text-[15px] font-extrabold leading-none">G</span>
-              {googleLoading ? 'Opening Google…' : 'Sign in with Google'}
-            </button>
+              onStart={() => {
+                setGoogleLoading(true)
+                setAuthError('')
+              }}
+              onError={(message) => {
+                setAuthError(message)
+                setGoogleLoading(false)
+              }}
+            />
           </div>
           {authError && (
             <p className="mt-3 text-sm text-danger">{authError}</p>
@@ -248,7 +233,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
         <div className="max-w-7xl mx-auto flex flex-col items-center justify-between gap-3 text-gray-500 text-sm sm:flex-row">
-          <p>&copy; 2026 MTL Trader. All rights reserved.</p>
+          <p>&copy; 2026 MTL Ledger. All rights reserved.</p>
           <nav className="flex flex-wrap items-center justify-center gap-4 text-xs">
             <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>

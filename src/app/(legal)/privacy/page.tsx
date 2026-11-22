@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'What data MTL Trader collects, why it is processed, who processes it, and how to access or delete it.',
+  description: 'What data MTL Ledger collects, why it is processed, who processes it, and how to access or delete it.',
 }
 
 const UPDATED = '25 October 2026'
@@ -17,7 +17,7 @@ export default function PrivacyPage() {
 
       <p className="mt-6">
         This policy explains what personal data <strong>Jeremiah Chipeta</strong>, trading as
-        MTL Trader (&ldquo;we&rdquo;), collects when you use the journal, why we process it, and the choices you have. It
+        MTL Ledger (&ldquo;we&rdquo;), collects when you use the journal, why we process it, and the choices you have. It
         covers the web app and the mobile app, which load the same service.
       </p>
 
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
         <li><strong>Deletion</strong> — Settings → Data → Delete account removes the data described above after email confirmation.</li>
       </ul>
       <p>
-        For anything else, write to <strong>jfx064@gmail.com</strong>. We answer within 30 days and may ask you to
+        For anything else, write to <strong>support@mtlledger.com</strong>. We answer within 30 days and may ask you to
         verify your identity. You also have the right to complain to your local data protection authority.
       </p>
 
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
       <h2>10. Contact</h2>
       <p>
         Data controller: <strong>[legal entity]</strong>, <strong>[registered address]</strong>.
-        Email: <strong>jfx064@gmail.com</strong>. See also our <Link href="/terms">Terms of Service</Link> and{' '}
+        Email: <strong>support@mtlledger.com</strong>. See also our <Link href="/terms">Terms of Service</Link> and{' '}
         <Link href="/refunds">Refund Policy</Link>.
       </p>
     </article>

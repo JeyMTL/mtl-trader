@@ -77,7 +77,7 @@ class MtlTraderApp extends StatelessWidget {
         final appearance = ThemeController.instance.theme;
         final language = LocaleController.instance.code ?? 'system';
         return MaterialApp(
-          title: 'MTL Trader',
+          title: 'MTL Ledger',
           debugShowCheckedModeBanner: false,
           // The gate sits above the Navigator and still has to open the daily
           // stop's dialogs, so it addresses the navigator through this key.
@@ -126,7 +126,7 @@ class _ConfigMissingApp extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             children: [
               Text(
-                'MTL Trader',
+                'MTL Ledger',
                 style: TextStyle(
                   color: AppColors.text,
                   fontSize: 24,

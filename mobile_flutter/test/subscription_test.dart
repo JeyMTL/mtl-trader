@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtl_trader_mobile/core/subscription.dart';
+import 'package:mtl_trader_mobile/l10n/gen/app_localizations_en.dart';
+import 'package:mtl_trader_mobile/ui/upgrade_pill.dart';
 
 void main() {
   final now = DateTime(2026, 11, 11, 12);
@@ -115,5 +117,69 @@ void main() {
     expect(info.state, SubscriptionState.active);
     expect(info.hasAccess, isTrue);
     expect(info.cancelAtPeriodEnd, isTrue);
+  });
+
+  test('trial days round up, so a trial with hours left still reads 1d', () {
+    final info = SubscriptionInfo.fromProfile(
+      profile(status: 'trial', trialEnds: now.add(const Duration(hours: 11))),
+      now: now,
+    );
+    expect(info.state, SubscriptionState.trial);
+    expect(info.daysLeftInTrial(now: now), 1);
+  });
+
+  test('a paid plan has no trial days left to show', () {
+    final info = SubscriptionInfo.fromProfile(
+      profile(
+        status: 'active',
+        tier: 'pro',
+        periodEnds: now.add(const Duration(days: 9)),
+      ),
+      now: now,
+    );
+    expect(info.daysLeftInTrial(now: now), 0);
+  });
+
+  group('the desk pill names the plan the account is on', () {
+    final l10n = AppLocalizationsEn();
+
+    test('a paid plan shows the tier and not an offer', () {
+      final info = SubscriptionInfo.fromProfile(
+        profile(
+          status: 'active',
+          tier: 'pro',
+          periodEnds: now.add(const Duration(days: 9)),
+        ),
+        now: now,
+      );
+      expect(UpgradePill(onTap: () {}, plan: info).label(l10n), 'Pro');
+    });
+
+    test('a running trial shows the days left', () {
+      final info = SubscriptionInfo.fromProfile(
+        profile(status: 'trial', trialEnds: now.add(const Duration(days: 12))),
+        now: now,
+      );
+      expect(
+        UpgradePill(onTap: () {}, plan: info).label(l10n, now: now),
+        'Trial · 12d',
+      );
+    });
+
+    test('an ended plan offers the upgrade again', () {
+      final info = SubscriptionInfo.fromProfile(
+        profile(
+          status: 'active',
+          tier: 'pro',
+          periodEnds: now.subtract(const Duration(days: 1)),
+        ),
+        now: now,
+      );
+      expect(UpgradePill(onTap: () {}, plan: info).label(l10n), 'Upgrade');
+    });
+
+    test('before the profile loads it keeps the neutral word', () {
+      expect(UpgradePill(onTap: () {}).label(l10n), 'Upgrade');
+    });
   });
 }

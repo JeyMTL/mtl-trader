@@ -12,16 +12,19 @@ const CONTENT_SECURITY_POLICY = [
   // Paddle iframe that talks back to Paddle, so the script, frame and connect
   // directives all have to reach *.paddle.com. The header is global, so these
   // origins are allowed site-wide even though only that page uses them.
-  `script-src 'self' 'unsafe-inline' https://cdn.paddle.com${isDev ? " 'unsafe-eval'" : ''}`,
-  "style-src 'self' 'unsafe-inline'",
+  // Google Identity Services loads its client from accounts.google.com; it is
+  // how the "Continue with Google" button gets an ID token without leaving this
+  // origin. Its button stylesheet pulls Roboto from fonts.googleapis.com.
+  `script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://accounts.google.com${isDev ? " 'unsafe-eval'" : ''}`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // /api/avatar redirects to Gravatar, so its picture origins have to be
   // allowed or every customer without an uploaded avatar gets a broken image
   // and falls straight to initials.
-  "img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://www.gravatar.com https://secure.gravatar.com",
+  "img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://*.gstatic.com https://www.gravatar.com https://secure.gravatar.com",
   "media-src 'self' blob: https://*.supabase.co",
-  "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com",
-  "frame-src https://*.paddle.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://accounts.google.com",
+  "frame-src https://*.paddle.com https://accounts.google.com",
   "form-action 'self' https://www.paypal.com https://*.paddle.com",
   // Blocks inline onclick=/onerror= attributes even though the bootstrap
   // scripts still need 'unsafe-inline'. React attaches listeners, so the app
@@ -54,7 +57,10 @@ const nextConfig: NextConfig = {
           // Keep our documents out of other browsing contexts and cross-origin
           // resource loads; frame-ancestors above covers embedding, these cover
           // opener access and no-cors reads.
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          // allow-popups, not same-origin: Google Identity Services returns the
+          // credential from a popup through window.opener, and same-origin severs
+          // that relationship. Nothing else here opens cross-origin windows.
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
           { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
           { key: 'Origin-Agent-Cluster', value: '?1' },
           { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },

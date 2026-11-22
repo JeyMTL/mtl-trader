@@ -39,7 +39,7 @@ function line(label, ok, detail) {
   console.log(`${ok ? '✔' : '✖'} ${label}: ${detail}`)
 }
 
-console.log('MTL Trader — notification check\n')
+console.log('MTL Ledger — notification check\n')
 
 let problems = 0
 
@@ -78,11 +78,11 @@ async function sendSampleEmail() {
     process.exit(1)
   }
 
-  const from = emailFrom || 'MTL Trader <onboarding@resend.dev>'
+  const from = emailFrom || 'MTL Ledger <onboarding@resend.dev>'
   const html = `<!doctype html>
 <html><body style="margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c9d1d9">
   <div style="max-width:520px;margin:0 auto;padding:24px">
-    <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Trader</h1>
+    <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Ledger</h1>
     <p style="color:#8b949e;margin:0 0 20px">Test notification</p>
     <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px">
       <p style="margin:0 0 12px">This is a test from scripts/check-notifications.mjs.</p>
@@ -96,7 +96,7 @@ async function sendSampleEmail() {
     res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [sendTo], subject: 'MTL Trader test notification', html }),
+      body: JSON.stringify({ from, to: [sendTo], subject: 'MTL Ledger test notification', html }),
     })
   } catch (error) {
     console.error('✖ Could not reach api.resend.com')

@@ -96,7 +96,7 @@ export function renderSummaryEmail({
   title,
   summary,
   currency = 'USD',
-  appUrl = 'https://mtl-trader.vercel.app',
+  appUrl = 'https://mtlledger.com',
 }: SummaryEmailOptions): { subject: string; html: string } {
   const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   const sign = summary.pnl >= 0 ? '+' : ''
@@ -110,7 +110,7 @@ export function renderSummaryEmail({
 <html>
   <body style="margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c9d1d9">
     <div style="max-width:520px;margin:0 auto;padding:24px">
-      <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Trader</h1>
+      <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Ledger</h1>
       <p style="color:#8b949e;margin:0 0 20px">${escapeHtml(title)}</p>
       <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px">
         <p style="margin:0 0 12px">${greeting}</p>
@@ -125,7 +125,7 @@ export function renderSummaryEmail({
         <a href="${escapeHtml(appUrl)}/dashboard" style="color:#58a6ff">Open your journal</a>
       </p>
       <p style="color:#6e7681;font-size:12px;margin-top:24px">
-        You are receiving this because email notifications are on in your MTL Trader settings.
+        You are receiving this because email notifications are on in your MTL Ledger settings.
       </p>
     </div>
   </body>
@@ -153,7 +153,7 @@ export function renderTrialReminderEmail({
   name,
   kind,
   daysLeft = 0,
-  appUrl = 'https://mtl-trader.vercel.app',
+  appUrl = 'https://mtlledger.com',
 }: TrialReminderEmailOptions): { subject: string; html: string } {
   const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   const basic = PLANS.find((plan) => plan.id === 'basic')
@@ -176,7 +176,7 @@ export function renderTrialReminderEmail({
 <html>
   <body style="margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c9d1d9">
     <div style="max-width:520px;margin:0 auto;padding:24px">
-      <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Trader</h1>
+      <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Ledger</h1>
       <p style="color:#8b949e;margin:0 0 20px">${escapeHtml(subject)}</p>
       <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px">
         <p style="margin:0 0 12px">${greeting}</p>
@@ -192,7 +192,7 @@ export function renderTrialReminderEmail({
         <a href="${escapeHtml(appUrl)}/dashboard" style="color:#58a6ff">Open your journal</a>
       </p>
       <p style="color:#6e7681;font-size:12px;margin-top:24px">
-        You are receiving this because you started a trial on MTL Trader. It is a one-off account notice, not a digest.
+        You are receiving this because you started a trial on MTL Ledger. It is a one-off account notice, not a digest.
       </p>
     </div>
   </body>
@@ -212,7 +212,7 @@ export interface JournalReminderOptions {
  */
 export function renderJournalReminderEmail({
   name,
-  appUrl = 'https://mtl-trader.vercel.app',
+  appUrl = 'https://mtlledger.com',
 }: JournalReminderOptions = {}): { subject: string; html: string } {
   const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,'
   const subject = 'Reminder: journal today\u2019s trades'
@@ -221,7 +221,7 @@ export function renderJournalReminderEmail({
 <html>
   <body style="margin:0;background:#0d1117;font-family:Arial,Helvetica,sans-serif;color:#c9d1d9">
     <div style="max-width:520px;margin:0 auto;padding:24px">
-      <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Trader</h1>
+      <h1 style="font-size:18px;color:#f0f6fc;margin:0 0 4px">MTL Ledger</h1>
       <p style="color:#8b949e;margin:0 0 20px">Keep today\u2019s journal current</p>
       <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px">
         <p style="margin:0 0 12px">${greeting}</p>
@@ -232,7 +232,7 @@ export function renderJournalReminderEmail({
         <a href="${escapeHtml(appUrl)}/dashboard" style="color:#58a6ff">Open your journal</a>
       </p>
       <p style="color:#6e7681;font-size:12px;margin-top:24px">
-        You are receiving this because working-day journal reminders are on in your MTL Trader settings.
+        You are receiving this because working-day journal reminders are on in your MTL Ledger settings.
       </p>
     </div>
   </body>

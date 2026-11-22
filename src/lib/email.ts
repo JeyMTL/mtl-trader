@@ -36,10 +36,14 @@ export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<
     return { sent: false, reason: 'not_configured' }
   }
 
-  const from = process.env.EMAIL_FROM || 'MTL Trader <onboarding@resend.dev>'
+  const from = process.env.EMAIL_FROM || 'MTL Ledger <onboarding@resend.dev>'
+  // Reports and notifications go out from the sending address, which is not a
+  // mailbox anyone reads. A customer who answers one should reach a person, so
+  // replies are routed to the support inbox unless an override is configured.
+  const replyTo = process.env.EMAIL_REPLY_TO || 'support@mtlledger.com'
 
   try {
-    const { data, error } = await getClient().emails.send({ from, to, subject, html })
+    const { data, error } = await getClient().emails.send({ from, to, subject, html, replyTo })
     if (error) return { sent: false, reason: error.message }
     return { sent: true, id: data?.id }
   } catch (error) {

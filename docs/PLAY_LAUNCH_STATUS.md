@@ -13,7 +13,7 @@ machine on 4 Nov 2026. Pick this file up first; nothing else needs re-deriving.
 | Track | Closed testing – Alpha (Active, 178 countries) |
 | Published | 4 Nov 2026 (Console: "Last published on November 4, 2026") |
 | Testers | Google Group `mtl-trader-testers@googlegroups.com` |
-| Feedback email | `jfx064@gmail.com` |
+| Feedback email | `support@mtlledger.com` |
 | Play Billing products | 4 subscriptions **Active** (4 Nov 2026), each with one activated, priced base plan |
 | Play API access | Service account `play-billing@mtl-trader.iam.gserviceaccount.com` **Active**; its JSON key is in Vercel (Production) |
 | Production track | Inactive — awaiting the 14-day rule |
@@ -60,7 +60,7 @@ permissions with an alert, so there is nothing to guess. No manifest edit clears
 this error other than deleting the feature, and the freezer is what makes the
 soft lock real on the phone.
 
-Use this for the accessibility declaration: *"MTL Trader is a trading journal.
+Use this for the accessibility declaration: *"MTL Ledger is a trading journal.
 Its optional 'MT5 freezer' lets a trader block their own MetaTrader 5 app for
 the rest of a day after a self-set loss limit is hit. The service only detects
 which package is in the foreground and draws a cover over MT5; it does not
@@ -98,7 +98,7 @@ The video has to show, in this order:
 4. consent: **Agree** → Android Accessibility settings → enable *MT5 freezer* →
    back → tap again → **Display over other apps** granted;
 5. the feature working: MT5 open, covered by the freeze sheet, tapping *Open
-   MTL Trader to unfreeze* landing in the journal;
+   MTL Ledger to unfreeze* landing in the journal;
 6. non-consent: tap the link again, press **Not now** (Settings does not open),
    then tap a second time to show the disclosure comes back.
 
@@ -159,7 +159,7 @@ unzip -p build/app/outputs/bundle/release/app-release.aab base/manifest/AndroidM
 
 **The 1.0.4+5 bundle passed all three on 4 Nov 2026:** `versionCode="5"`,
 `versionName="1.0.4"`, `READ_MEDIA` count `0`, and `keytool -printcert -jarfile`
-reports `CN=MTL Trader, O=MTL Trader, L=Nairobi, C=KE`, SHA384withRSA — the
+reports `CN=MTL Ledger, O=MTL Ledger, L=Nairobi, C=KE`, SHA384withRSA — the
 release key, not the debug fallback. The app now sells every subscription through
 Google Play in all builds, so `--dart-define=PLAY_BUILD=true` is optional: it is
 harmless if your build line already passes it, but nothing reads it any more.

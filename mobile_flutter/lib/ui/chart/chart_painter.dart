@@ -37,6 +37,7 @@ class TradingChartPainter extends CustomPainter {
     required this.symbol,
     required this.selectedDrawing,
     required this.positionOutcomes,
+    this.preview,
   });
 
   static const double height = 380;
@@ -112,6 +113,11 @@ class TradingChartPainter extends CustomPainter {
   final ChartStyle style;
   final String symbol;
   final int? selectedDrawing;
+
+  /// The object being placed right now, before the finger has lifted. Drawn
+  /// through the same paths as a committed object, so what the trader sizes up
+  /// is exactly what they get.
+  final ChartDrawing? preview;
 
   /// Where each position tool was taken out of its zones, aligned with
   /// [drawings]; null for every other kind of drawing and for an open idea.
@@ -547,50 +553,40 @@ class TradingChartPainter extends CustomPainter {
       }
     }
 
-    // Trader drawings, then the half-finished trend line if one is in progress.
+    // Trader drawings, then the object being placed under the finger.
     for (var d = 0; d < drawings.length; d++) {
-      final drawing = drawings[d];
-      final selected = d == selectedDrawing;
-      final paint = Paint()
-        ..color = drawingColor
-        ..strokeWidth = selected ? 2.4 : 1.3
-        ..style = PaintingStyle.stroke;
-      if (drawing.kind == DrawingKind.ray) {
-        final price = drawing.price;
-        if (price == null) continue;
-        final ly = y(price);
-        if (ly < panes.priceTop || ly > panes.priceTop + plotH) continue;
-        canvas.drawLine(Offset(0, ly), Offset(plotW, ly), paint);
-        if (selected) {
-          canvas.drawCircle(
-            Offset(plotW / 2, ly),
-            4,
-            Paint()..color = drawingColor,
-          );
-        }
-      } else if (drawing.kind == DrawingKind.position) {
-        _paintPosition(
-          canvas,
-          drawing,
-          selected: selected,
-          outcome: d < positionOutcomes.length ? positionOutcomes[d] : null,
-          size: size,
-          plotW: plotW,
-          priceTop: panes.priceTop,
-          plotH: plotH,
-          y: y,
-        );
-      } else {
-        final x1 = _xForTime(drawing.startMs, plotW);
-        final x2 = _xForTime(drawing.endMs, plotW);
-        if (x1 == null || x2 == null) continue;
-        final p1 = Offset(x1, y(drawing.startPrice));
-        final p2 = Offset(x2, y(drawing.endPrice));
-        canvas.drawLine(p1, p2, paint);
-        final handle = selected ? 4.0 : 2.5;
-        canvas.drawCircle(p1, handle, Paint()..color = drawingColor);
-        canvas.drawCircle(p2, handle, Paint()..color = drawingColor);
-      }
+      // A hidden object keeps its place in the list but is not painted; that is
+      // how a busy idea is cleared off the chart without being deleted.
+      if (drawings[d].look.hidden) continue;
+      _paintOne(
+        canvas,
+        drawings[d],
+        selected: d == selectedDrawing,
+        outcome: d < positionOutcomes.length ? positionOutcomes[d] : null,
+        size: size,
+        plotW: plotW,
+        priceTop: panes.priceTop,
+        plotH: plotH,
+        y: y,
+      );
+    }
+    final placing = preview;
+    if (placing != null) {
+      // Painted exactly like a finished object rather than as a dashed
+      // placeholder, because that is what it becomes the moment the finger
+      // lifts: judging the size of a fib or a box has to happen against the
+      // real thing.
+      _paintOne(
+        canvas,
+        placing,
+        selected: true,
+        outcome: null,
+        size: size,
+        plotW: plotW,
+        priceTop: panes.priceTop,
+        plotH: plotH,
+        y: y,
+      );
     }
     final last = candles.last;
     final lastY = y(last.close);
@@ -801,6 +797,307 @@ class TradingChartPainter extends CustomPainter {
   /// TradingView's long/short position: a profit zone between entry and target,
   /// the mirrored loss zone between entry and stop, three level lines and one
   /// price badge per level on the axis.
+  /// Draws an anchor-based object: box, ellipse, vertical line, fib ladder,
+  /// text, arrow or brush stroke.
+  ///
+  /// Every one of them shares the same thin stroke, so a chart with a dozen
+  /// objects still reads as a chart; only the selected object thickens.
+  /// One drawing, whatever shape it takes. Shared by the committed list and by
+  /// the object currently being placed, so a preview can never drift from what
+  /// the tool actually produces.
+  void _paintOne(
+    Canvas canvas,
+    ChartDrawing drawing, {
+    required bool selected,
+    required ResolvedExit? outcome,
+    required Size size,
+    required double plotW,
+    required double priceTop,
+    required double plotH,
+    required double Function(double) y,
+  }) {
+    if (drawing.kind == DrawingKind.ray) {
+      final price = drawing.price;
+      if (price == null) return;
+      final ly = y(price);
+      if (ly < priceTop || ly > priceTop + plotH) return;
+      final width = drawing.look.weight ?? (selected ? 2.4 : 1.3);
+      if (drawing.look.dashed) {
+        _dashSegment(
+          canvas,
+          Offset(0, ly),
+          Offset(plotW, ly),
+          drawing.ink,
+          width,
+        );
+      } else {
+        canvas.drawLine(
+          Offset(0, ly),
+          Offset(plotW, ly),
+          Paint()
+            ..color = drawing.ink
+            ..strokeWidth = width
+            ..style = PaintingStyle.stroke,
+        );
+      }
+      if (selected) {
+        canvas.drawCircle(
+          Offset(plotW / 2, ly),
+          4,
+          Paint()..color = drawing.ink,
+        );
+      }
+      return;
+    }
+    if (drawing.kind == DrawingKind.position) {
+      _paintPosition(
+        canvas,
+        drawing,
+        selected: selected,
+        outcome: outcome,
+        size: size,
+        plotW: plotW,
+        priceTop: priceTop,
+        plotH: plotH,
+        y: y,
+      );
+      return;
+    }
+    if (drawing.kind == DrawingKind.trend || drawing.points.isEmpty) {
+      final x1 = _xForTime(drawing.startMs, plotW);
+      final x2 = _xForTime(drawing.endMs, plotW);
+      if (x1 == null || x2 == null) return;
+      final p1 = Offset(x1, y(drawing.startPrice));
+      final p2 = Offset(x2, y(drawing.endPrice));
+      final width = drawing.look.weight ?? (selected ? 2.4 : 1.3);
+      if (drawing.look.dashed) {
+        _dashSegment(canvas, p1, p2, drawing.ink, width);
+      } else {
+        canvas.drawLine(
+          p1,
+          p2,
+          Paint()
+            ..color = drawing.ink
+            ..strokeWidth = width
+            ..style = PaintingStyle.stroke,
+        );
+      }
+      // Endpoints are the line's handles: filled when it is selected, so it is
+      // obvious which end a drag will take hold of.
+      final handle = selected ? 4.0 : 2.5;
+      canvas.drawCircle(p1, handle, Paint()..color = drawing.ink);
+      canvas.drawCircle(p2, handle, Paint()..color = drawing.ink);
+      return;
+    }
+    _paintObject(
+      canvas,
+      drawing,
+      selected: selected,
+      plotW: plotW,
+      priceTop: priceTop,
+      plotH: plotH,
+      y: y,
+    );
+  }
+
+  void _paintObject(
+    Canvas canvas,
+    ChartDrawing drawing, {
+    required bool selected,
+    required double plotW,
+    required double priceTop,
+    required double plotH,
+    required double Function(double) y,
+  }) {
+    if (candles.isEmpty) return;
+    final firstMs = candles.first.time.millisecondsSinceEpoch;
+
+    // Anchors outside the loaded window are clamped to the edge instead of
+    // dropped: an object that starts a week before the visible bars still has
+    // a left end, and losing it would delete half the shape.
+    double? xFor(int ms) {
+      final exact = _xForTime(ms, plotW);
+      if (exact != null) return exact;
+      return ms < firstMs ? 0 : plotW;
+    }
+
+    final anchors = <Offset>[];
+    for (final point in drawing.points) {
+      final x = xFor(point.ms);
+      if (x == null) continue;
+      anchors.add(Offset(x, y(point.price)));
+    }
+    if (anchors.isEmpty) return;
+
+    final stroke = Paint()
+      ..color = drawing.ink
+      ..strokeWidth = drawing.look.weight ?? (selected ? 2.0 : 1.1)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final fill = Paint()
+      ..color = drawing.ink.withAlpha(16)
+      ..style = PaintingStyle.fill;
+    final ink = drawing.ink.withAlpha(235);
+
+    switch (drawing.kind) {
+      case DrawingKind.vline:
+        final x = anchors.first.dx;
+        _dashed(
+          canvas,
+          Offset(x, priceTop),
+          Offset(x, priceTop + plotH),
+          drawing.ink,
+        );
+        break;
+      case DrawingKind.rectangle:
+        if (anchors.length < 2) break;
+        final rect = Rect.fromPoints(anchors.first, anchors.last);
+        canvas.drawRect(rect, fill);
+        canvas.drawRect(rect, stroke);
+        break;
+      case DrawingKind.ellipse:
+        if (anchors.length < 2) break;
+        final rect = Rect.fromPoints(anchors.first, anchors.last);
+        canvas.drawOval(rect, fill);
+        canvas.drawOval(rect, stroke);
+        break;
+      case DrawingKind.fib:
+      case DrawingKind.fibExtension:
+        if (anchors.length < 2) break;
+        final a = drawing.points.first;
+        final b = drawing.points[1];
+        final left = math.min(anchors.first.dx, anchors.last.dx);
+        final right = math.max(anchors.first.dx, anchors.last.dx);
+        final extension = drawing.kind == DrawingKind.fibExtension;
+        final ratios = extension
+            ? const [1.272, 1.618, 2.0, 2.618]
+            : const [0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+        double priceFor(double ratio) => extension
+            ? a.price + (b.price - a.price) * ratio
+            : b.price + (a.price - b.price) * ratio;
+        // Alternating bands between the levels. Without them a retracement is
+        // a stack of lines and the trader has to count which zone price is in;
+        // with them the 38.2–61.8% pocket is a thing you can see at a glance,
+        // which is the whole reason the tool exists.
+        final bandPaint = Paint()
+          ..color = drawing.ink.withAlpha(selected ? 30 : 18)
+          ..style = PaintingStyle.fill;
+        for (var i = 0; i + 1 < ratios.length; i++) {
+          if (i.isOdd) continue;
+          final top = y(math.max(priceFor(ratios[i]), priceFor(ratios[i + 1])));
+          final bottom = y(
+            math.min(priceFor(ratios[i]), priceFor(ratios[i + 1])),
+          );
+          if (bottom <= priceTop || top >= priceTop + plotH) continue;
+          canvas.drawRect(Rect.fromLTRB(left, top, right, bottom), bandPaint);
+        }
+        for (final ratio in ratios) {
+          final price = priceFor(ratio);
+          final ly = y(price);
+          if (ly < priceTop - 1 || ly > priceTop + plotH + 1) continue;
+          final key = ratio == 0.0 || ratio == 1.0 || ratio == 0.5;
+          final linePaint = Paint()
+            ..color = drawing.ink.withAlpha(key ? 210 : 130)
+            ..strokeWidth = selected ? 2.0 : 1.1;
+          canvas.drawLine(Offset(left, ly), Offset(right, ly), linePaint);
+          final label = _painter(
+            extension
+                ? ratio.toStringAsFixed(3)
+                : '${(ratio * 100).round()}%',
+            color: ink,
+            size: 9,
+            weight: FontWeight.w600,
+          );
+          label.paint(canvas, Offset(right + 3, ly - label.height / 2));
+        }
+        break;
+      case DrawingKind.text:
+        final label = _painter(
+          drawing.text ?? '',
+          color: ink,
+          size: 12,
+          weight: FontWeight.w700,
+        );
+        final at = anchors.first;
+        final rect = Rect.fromLTWH(
+          at.dx,
+          at.dy - label.height - 2,
+          label.width + 8,
+          label.height + 4,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+          fill,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+          stroke,
+        );
+        label.paint(canvas, Offset(at.dx + 4, at.dy - label.height));
+        break;
+      case DrawingKind.arrowUp:
+      case DrawingKind.arrowDown:
+        final at = anchors.first;
+        final up = drawing.kind == DrawingKind.arrowUp;
+        final tip = at.dy + (up ? -20 : 20);
+        final base = at.dy + (up ? 6 : -6);
+        canvas.drawLine(Offset(at.dx, base), Offset(at.dx, tip), stroke);
+        final head = Path()
+          ..moveTo(at.dx, tip)
+          ..lineTo(at.dx - 5, tip + (up ? 8 : -8))
+          ..lineTo(at.dx + 5, tip + (up ? 8 : -8))
+          ..close();
+        canvas.drawPath(head, Paint()..color = drawing.ink);
+        break;
+      case DrawingKind.brush:
+        if (anchors.length < 2) break;
+        final path = Path()..moveTo(anchors.first.dx, anchors.first.dy);
+        for (final point in anchors.skip(1)) {
+          path.lineTo(point.dx, point.dy);
+        }
+        canvas.drawPath(path, stroke);
+        break;
+      case DrawingKind.measure:
+        if (anchors.length < 2) break;
+        final a = anchors.first;
+        final b = anchors.last;
+        final delta = drawing.points.last.price - drawing.points.first.price;
+        canvas.drawLine(a, b, stroke);
+        canvas.drawRect(Rect.fromPoints(a, b), fill);
+        final label = _painter(
+          '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(decimals)}',
+          color: ink,
+          size: 10,
+          weight: FontWeight.w700,
+        );
+        label.paint(
+          canvas,
+          Offset(
+            math.min(a.dx, b.dx) + 4,
+            math.min(a.dy, b.dy) - label.height - 2,
+          ),
+        );
+        break;
+      default:
+        break;
+    }
+
+    if (selected) {
+      for (final anchor in anchors) {
+        // A soft ring behind the dot: on a busy chart the handle is what says
+        // "this object is the one you are holding", and a bare 3px dot gets lost
+        // against a candle body.
+        canvas.drawCircle(
+          anchor,
+          7,
+          Paint()..color = drawing.ink.withAlpha(55),
+        );
+        canvas.drawCircle(anchor, 3.5, Paint()..color = drawing.ink);
+      }
+    }
+  }
+
   void _paintPosition(
     Canvas canvas,
     ChartDrawing drawing, {
@@ -902,6 +1199,43 @@ class TradingChartPainter extends CustomPainter {
     tag(stopY, stop, positionLossColor);
     tag(targetY, target, positionProfitColor);
     tag(entryY, entry, positionEntryColor);
+
+    // The three readings a trader checks before taking the idea: how far the
+    // target is, what the stop costs in price and percent, and the reward the
+    // risk buys. They sit on the object, as TradingView's do, so the numbers
+    // travel with the zones instead of living in a panel somewhere else.
+    final risk = (entry - stop).abs();
+    final reward = (target - entry).abs();
+    final percent = entry == 0 ? 0.0 : risk / entry.abs() * 100;
+    final ratio = risk < 1e-9 ? null : reward / risk;
+    final labelX = (left + 6)
+        .clamp(0.0, math.max(0.0, plotW - 90))
+        .toDouble();
+    void reading(double priceY, String text, Color color, {double dy = -8}) {
+      if (priceY < priceTop || priceY > priceTop + plotH) return;
+      _chip(canvas, text, Offset(labelX, priceY + dy), color);
+    }
+
+    reading(
+      targetY,
+      'Target: ${reward.toStringAsFixed(decimals)}',
+      positionProfitColor,
+    );
+    reading(
+      stopY,
+      'Stop: ${risk.toStringAsFixed(decimals)} '
+          '(${percent.toStringAsFixed(percent < 0.1 ? 3 : 2)}%)',
+      positionLossColor,
+      dy: 4,
+    );
+    if (ratio != null) {
+      reading(
+        entryY,
+        'Risk/reward: ${ratio.toStringAsFixed(1)}',
+        positionEntryColor,
+        dy: -18,
+      );
+    }
 
     // The exit: the candle whose range left a zone vertically, marked with the
     // price it crossed and the result in risk units.
@@ -1039,6 +1373,33 @@ class TradingChartPainter extends CustomPainter {
       Paint()..color = style.background.withAlpha(215),
     );
     painter.paint(canvas, Offset(offset.dx + 3, offset.dy + 1.5));
+  }
+
+  /// A dashed run between any two points, which an angled trend line needs and
+  /// the axis-aligned `_dashed` cannot give it.
+  void _dashSegment(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    Color color,
+    double width,
+  ) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round;
+    const dash = 5.0;
+    const gap = 4.0;
+    final delta = to - from;
+    final length = delta.distance;
+    if (length < 0.5) return;
+    final step = delta / length;
+    var walked = 0.0;
+    while (walked < length) {
+      final end = math.min(walked + dash, length);
+      canvas.drawLine(from + step * walked, from + step * end, paint);
+      walked = end + gap;
+    }
   }
 
   void _dashed(Canvas canvas, Offset from, Offset to, Color color) {
@@ -1204,6 +1565,7 @@ class TradingChartPainter extends CustomPainter {
         oldDelegate.style != style ||
         oldDelegate.symbol != symbol ||
         oldDelegate.drawings != drawings ||
-        oldDelegate.selectedDrawing != selectedDrawing;
+        oldDelegate.selectedDrawing != selectedDrawing ||
+        !identical(oldDelegate.preview, preview);
   }
 }

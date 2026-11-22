@@ -1,4 +1,4 @@
-# MTL Trader MT5 Expert Advisor
+# MTL Ledger MT5 Expert Advisor
 
 One EA does both jobs:
 
@@ -31,7 +31,7 @@ invalidates the old one immediately — update the EA inputs and reattach.
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `InpAppUrl` | `https://mtl-trader.vercel.app` | Your deployment. Must match the WebRequest whitelist exactly. |
+| `InpAppUrl` | `https://mtlledger.com` | Your deployment. Must match the WebRequest whitelist exactly. |
 | `InpUserId` | — | From the MT5 Sync page. |
 | `InpSyncToken` | — | From the MT5 Sync page; also used by the lock check. |
 | `InpReconcileMinutes` | `30` | Full re-read of the lookback window. |

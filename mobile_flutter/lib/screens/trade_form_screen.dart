@@ -163,11 +163,11 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
         _entry.text = _numberText(trade['entry_price']);
         _exitPrice = asNullableDouble(trade['exit_price']);
         _exitReason = null;
-        _lots.text = _numberText(trade['lot_size']);
+        _lots.text = _numberText(trade['lot_size'], decimals: 2);
         _stop.text = _numberText(trade['stop_loss']);
         _take.text = _numberText(trade['take_profit']);
-        _commission.text = _numberText(trade['commission']);
-        _swap.text = _numberText(trade['swap']);
+        _commission.text = _numberText(trade['commission'], decimals: 2);
+        _swap.text = _numberText(trade['swap'], decimals: 2);
         _strategy.text = asString(trade['strategy']) ?? '';
         _notes.text = asString(trade['notes']) ?? '';
         _tags = asStringList(trade['tags']);
@@ -186,12 +186,16 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     }
   }
 
-  String _numberText(dynamic value) {
+  /// A stored number as the form should show it.
+  ///
+  /// `toString()` on a synced price printed the float noise — a gold entry read
+  /// 3595.7380000000003 in the field — so prices go through [price] and money
+  /// through two decimals. Whole numbers lose the pointless `.0`.
+  String _numberText(dynamic value, {int decimals = 5}) {
     if (value == null) return '';
     final parsed = asDouble(value);
     if (parsed == 0) return '0';
-    if (parsed == parsed.roundToDouble()) return parsed.toInt().toString();
-    return parsed.toString();
+    return price(parsed, decimals: decimals);
   }
 
   double? _valueOf(TextEditingController controller) {

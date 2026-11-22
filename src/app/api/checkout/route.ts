@@ -68,11 +68,11 @@ export async function POST(req: Request) {
           },
           // Honest description: one payment buys one 30-day period. Access ends
           // unless it is renewed (see `expire_lapsed_subscriptions`).
-          description: `MTL Trader - ${plan.name} Plan (30 days)`,
+          description: `MTL Ledger - ${plan.name} Plan (30 days)`,
           custom_id: JSON.stringify({ userId: buyerId, planId }),
         }],
         application_context: {
-          brand_name: 'MTL Trader',
+          brand_name: 'MTL Ledger',
           landing_page: 'BILLING',
           user_action: 'PAY_NOW',
           return_url: `${process.env.NEXT_PUBLIC_APP_URL}/paypal-success`,

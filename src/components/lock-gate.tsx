@@ -218,16 +218,17 @@ export default function LockGate() {
           {resetLabel(data.day.end, now)}
         </p>
 
-        {hard ? (
+        {hard && (
           <div className="mt-6 rounded-xl border border-border bg-surface p-4">
             <p className="text-xs leading-relaxed text-gray-400">
-              Your MT5 sync EA is refusing orders until the reset. Pending orders are removed
-              while locked, and a new fill is closed immediately. A manual market order can still
-              fill before any EA sees it — only the broker can stop that click.
+              Your MT5 sync EA is refusing orders until the day rolls over. Pending orders are
+              removed while locked, and a new fill is closed immediately. A manual market order can
+              still fill before any EA sees it — only the broker can stop that click.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-gray-500">
-              This lock cannot be lifted from the journal. To change the rule, edit it after the
-              reset; it applies from the next session.
+              There is no in-app release for a hard lock. It clears at the start of your next
+              trading day, and the EA releases orders on its next poll after that. Editing the rule
+              applies from the next session.
             </p>
             <Link
               href="/support"
@@ -236,7 +237,9 @@ export default function LockGate() {
               Something is wrong — contact support
             </Link>
           </div>
-        ) : (
+        )}
+
+        {!hard && (
           <div className="mt-6">
             {!unlockOpen ? (
               <button

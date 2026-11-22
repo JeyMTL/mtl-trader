@@ -9,7 +9,7 @@
  * the entitlement gates, the signature checks and the ownership checks — it just
  * cannot prove the *happy* path works, which needs real sandbox accounts.
  *
- *   node scripts/smoke-vendors.mjs https://mtl-trader.vercel.app
+ *   node scripts/smoke-vendors.mjs https://mtlledger.com
  *   SMOKE_BASE_URL=... node scripts/smoke-vendors.mjs
  *
  * Exit code is 1 if any route answered with a status it should never give.

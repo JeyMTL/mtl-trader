@@ -1,6 +1,6 @@
 # Reply to IndieMaker
 
-Subject: Re: MTL Trader listing — live product, pre-revenue, and where the price comes from
+Subject: Re: MTL Ledger listing — live product, pre-revenue, and where the price comes from
 
 
 
@@ -10,7 +10,7 @@ Thanks for asking directly — I'd rather answer it straight than talk around it
 
 Where it lives
 
-The product is live right now at https://mtl-trader.vercel.app (returns HTTP 200 — this is a running app, not a mockup or a landing page):
+The product is live right now at https://mtlledger.com (returns HTTP 200 — this is a running app, not a mockup or a landing page):
 
 - App: Vercel — Next.js 16 / React 19 / TypeScript
 -Database + auth:** Supabase Postgres. Schema, row-level security, and the monthly-quota trigger all live in versioned migrations under `supabase/migrations/`

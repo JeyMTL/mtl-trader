@@ -97,7 +97,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'MTL Trader'**
+  /// **'MTL Ledger'**
   String get appTitle;
 
   /// No description provided for @retry.
@@ -235,14 +235,26 @@ abstract class AppLocalizations {
   /// No description provided for @brandName.
   ///
   /// In en, this message translates to:
-  /// **'MTL Trader'**
+  /// **'MTL Ledger'**
   String get brandName;
 
   /// No description provided for @brandOpenPlans.
   ///
   /// In en, this message translates to:
-  /// **'MTL Trader — open payment plans'**
+  /// **'MTL Ledger — open payment plans'**
   String get brandOpenPlans;
+
+  /// No description provided for @upgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade'**
+  String get upgrade;
+
+  /// No description provided for @rules.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get rules;
 
   /// No description provided for @loginHeadline.
   ///
@@ -1018,6 +1030,1002 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{day}: no trades'**
   String a11yHeatmapEmpty(String day);
+
+  /// No description provided for @account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get account;
+
+  /// No description provided for @accountSignOutQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out?'**
+  String get accountSignOutQuestion;
+
+  /// No description provided for @accountSignOutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your journal stays on the server. Sign back in any time.'**
+  String get accountSignOutBody;
+
+  /// No description provided for @signOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get signOut;
+
+  /// No description provided for @accountPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get accountPlan;
+
+  /// No description provided for @accountStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get accountStatus;
+
+  /// No description provided for @accountTradeLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Trade limit / month'**
+  String get accountTradeLimit;
+
+  /// No description provided for @accountUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get accountUnlimited;
+
+  /// No description provided for @accountTimezone.
+  ///
+  /// In en, this message translates to:
+  /// **'Timezone'**
+  String get accountTimezone;
+
+  /// No description provided for @accountChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get accountChange;
+
+  /// No description provided for @accountTrialEnds.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial ends'**
+  String get accountTrialEnds;
+
+  /// No description provided for @accountAccessUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Access until'**
+  String get accountAccessUntil;
+
+  /// No description provided for @accountPaidThrough.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid through'**
+  String get accountPaidThrough;
+
+  /// No description provided for @accountViewPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'View plans & billing'**
+  String get accountViewPlans;
+
+  /// No description provided for @accountBuyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy a subscription'**
+  String get accountBuyPlan;
+
+  /// No description provided for @accountSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription'**
+  String get accountSubscription;
+
+  /// No description provided for @accountSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get accountSignedIn;
+
+  /// No description provided for @accountSubError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your subscription'**
+  String get accountSubError;
+
+  /// No description provided for @commonTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get commonTryAgain;
+
+  /// No description provided for @commonSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get commonSave;
+
+  /// No description provided for @sectionTrading.
+  ///
+  /// In en, this message translates to:
+  /// **'Trading'**
+  String get sectionTrading;
+
+  /// No description provided for @sectionPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get sectionPreferences;
+
+  /// No description provided for @sectionSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get sectionSupport;
+
+  /// No description provided for @sectionAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get sectionAbout;
+
+  /// No description provided for @accountAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get accountAppearance;
+
+  /// No description provided for @accountAppearanceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark, light, the mark\'s blue, or follow the device. Saved on this phone.'**
+  String get accountAppearanceBody;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get themeBlue;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get themeSystem;
+
+  /// No description provided for @accountHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & feedback'**
+  String get accountHelp;
+
+  /// No description provided for @accountHelpBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions, bugs, or something the journal should do. Every message is read.'**
+  String get accountHelpBody;
+
+  /// No description provided for @accountEmailSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Email support'**
+  String get accountEmailSupport;
+
+  /// No description provided for @accountRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate MTL Ledger'**
+  String get accountRate;
+
+  /// No description provided for @accountAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get accountAbout;
+
+  /// No description provided for @accountAboutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Where your journal media lives.'**
+  String get accountAboutBody;
+
+  /// No description provided for @accountPrivateMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'Private media'**
+  String get accountPrivateMedia;
+
+  /// No description provided for @accountPrivateMediaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Journal photos and voice notes live in a private bucket. Each file is signed for one hour and only your account can request it.'**
+  String get accountPrivateMediaBody;
+
+  /// No description provided for @accountFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'MTL Ledger · flat mobile journal\nTrades, notes and media stay on your Supabase project.'**
+  String get accountFooter;
+
+  /// No description provided for @accountRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules & playbook'**
+  String get accountRules;
+
+  /// No description provided for @accountConnectMt5.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect MT5 account'**
+  String get accountConnectMt5;
+
+  /// No description provided for @accountImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import trade history'**
+  String get accountImport;
+
+  /// No description provided for @accountBacktest.
+  ///
+  /// In en, this message translates to:
+  /// **'Backtester (Pro)'**
+  String get accountBacktest;
+
+  /// No description provided for @accountPropFirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Prop firm simulation'**
+  String get accountPropFirm;
+
+  /// No description provided for @accountTimezoneRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Report timezone'**
+  String get accountTimezoneRow;
+
+  /// No description provided for @accountTimezoneDialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Timezone for the hour report'**
+  String get accountTimezoneDialog;
+
+  /// No description provided for @accountTimezoneSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Hour report now uses {zone}.'**
+  String accountTimezoneSaved(String zone);
+
+  /// No description provided for @accountTimezoneFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the timezone: {error}'**
+  String accountTimezoneFailed(String error);
+
+  /// No description provided for @accountPicture.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile picture'**
+  String get accountPicture;
+
+  /// No description provided for @accountPictureBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a link to an image. Leave it empty to use the picture tied to your email, or your initials when there is none.'**
+  String get accountPictureBody;
+
+  /// No description provided for @accountPictureCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile picture cleared.'**
+  String get accountPictureCleared;
+
+  /// No description provided for @accountPictureUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile picture updated.'**
+  String get accountPictureUpdated;
+
+  /// No description provided for @accountPictureFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the picture: {error}'**
+  String accountPictureFailed(String error);
+
+  /// No description provided for @accountStoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the store listing.'**
+  String get accountStoreFailed;
+
+  /// No description provided for @accountMailFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'No mail app was found. Install one and tap the button again.'**
+  String get accountMailFailed;
+
+  /// No description provided for @accountDailyStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily stop'**
+  String get accountDailyStop;
+
+  /// No description provided for @accountDailyStopBody.
+  ///
+  /// In en, this message translates to:
+  /// **'What happens when the loss budget or entry cap is reached.'**
+  String get accountDailyStopBody;
+
+  /// No description provided for @accountLossBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Loss budget'**
+  String get accountLossBudget;
+
+  /// No description provided for @accountMaxEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Max entries'**
+  String get accountMaxEntries;
+
+  /// No description provided for @accountWhenReached.
+  ///
+  /// In en, this message translates to:
+  /// **'When reached'**
+  String get accountWhenReached;
+
+  /// No description provided for @accountOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get accountOff;
+
+  /// No description provided for @accountNoCap.
+  ///
+  /// In en, this message translates to:
+  /// **'No cap'**
+  String get accountNoCap;
+
+  /// No description provided for @accountLoadingRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading your rules…'**
+  String get accountLoadingRules;
+
+  /// No description provided for @accountEditRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit rules and daily stop'**
+  String get accountEditRules;
+
+  /// No description provided for @lockSoft.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft lock'**
+  String get lockSoft;
+
+  /// No description provided for @lockHard.
+  ///
+  /// In en, this message translates to:
+  /// **'Hard lock'**
+  String get lockHard;
+
+  /// No description provided for @lockJournalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Journal only'**
+  String get lockJournalOnly;
+
+  /// No description provided for @accountStopNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No stop is set yet. Add a loss budget or an entry cap and the day ends when it is reached.'**
+  String get accountStopNone;
+
+  /// No description provided for @accountStopSoft.
+  ///
+  /// In en, this message translates to:
+  /// **'After the stop, MetaTrader 5 on this phone is covered and the journal stays open. Reset from the banner.'**
+  String get accountStopSoft;
+
+  /// No description provided for @accountStopHard.
+  ///
+  /// In en, this message translates to:
+  /// **'After the stop, the journal locks and the MT5 EA refuses orders. It clears at the start of your next trading day — a hard stop cannot be lifted.'**
+  String get accountStopHard;
+
+  /// No description provided for @accountStopOff.
+  ///
+  /// In en, this message translates to:
+  /// **'After the stop, the journal refuses new entries until the next trading day.'**
+  String get accountStopOff;
+
+  /// No description provided for @rulesIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'The checklist you trade by, the days and sessions it applies to, and the stop that ends the day.'**
+  String get rulesIntro;
+
+  /// No description provided for @rulesYourRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rules'**
+  String get rulesYourRules;
+
+  /// No description provided for @rulesYourRulesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Write them as instructions to yourself: what must be true before entry, what invalidates the trade, and what ends your session.'**
+  String get rulesYourRulesBody;
+
+  /// No description provided for @rulesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No rules yet. The first one is usually the hardest to keep.'**
+  String get rulesEmpty;
+
+  /// No description provided for @rulesAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add rule'**
+  String get rulesAdd;
+
+  /// No description provided for @rulesRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove rule'**
+  String get rulesRemove;
+
+  /// No description provided for @rulesDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days you trade'**
+  String get rulesDays;
+
+  /// No description provided for @rulesDaysBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders only fire on these days. Trading outside them is usually the leak.'**
+  String get rulesDaysBody;
+
+  /// No description provided for @rulesDailyStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily stop'**
+  String get rulesDailyStop;
+
+  /// No description provided for @rulesDailyStopBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The loss budget and entry cap you commit to before the session. Leave both at 0 to switch the stop off.'**
+  String get rulesDailyStopBody;
+
+  /// No description provided for @rulesLossBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Loss budget'**
+  String get rulesLossBudget;
+
+  /// No description provided for @rulesMaxEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Max entries'**
+  String get rulesMaxEntries;
+
+  /// No description provided for @rulesWhenReached.
+  ///
+  /// In en, this message translates to:
+  /// **'When the stop is reached'**
+  String get rulesWhenReached;
+
+  /// No description provided for @rulesJournalOnlyBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'New entries are refused in the app.'**
+  String get rulesJournalOnlyBlurb;
+
+  /// No description provided for @rulesSoftBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'MT5 freezes on this phone. The journal stays open.'**
+  String get rulesSoftBlurb;
+
+  /// No description provided for @rulesHardBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'The journal locks and the MT5 EA refuses orders until tomorrow. No reset.'**
+  String get rulesHardBlurb;
+
+  /// No description provided for @rulesSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Trading sessions'**
+  String get rulesSessions;
+
+  /// No description provided for @rulesSessionsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The windows you actually sit down for. A session that ends before it starts is treated as overnight.'**
+  String get rulesSessionsBody;
+
+  /// No description provided for @rulesNoSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'No sessions yet. Add the window you trade in.'**
+  String get rulesNoSessions;
+
+  /// No description provided for @rulesSessionName.
+  ///
+  /// In en, this message translates to:
+  /// **'Session name'**
+  String get rulesSessionName;
+
+  /// No description provided for @rulesRemoveSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove session'**
+  String get rulesRemoveSession;
+
+  /// No description provided for @rulesAddSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Add session'**
+  String get rulesAddSession;
+
+  /// No description provided for @rulesNewSession.
+  ///
+  /// In en, this message translates to:
+  /// **'New session'**
+  String get rulesNewSession;
+
+  /// No description provided for @rulesSessionFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get rulesSessionFallback;
+
+  /// No description provided for @rulesReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me before a session'**
+  String get rulesReminders;
+
+  /// No description provided for @rulesRemindersBody.
+  ///
+  /// In en, this message translates to:
+  /// **'An in-app reminder with your rules in front of you, before the first trade.'**
+  String get rulesRemindersBody;
+
+  /// No description provided for @rulesRemindersOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders on'**
+  String get rulesRemindersOn;
+
+  /// No description provided for @rulesRemindersOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders off'**
+  String get rulesRemindersOff;
+
+  /// No description provided for @rulesReminderLead.
+  ///
+  /// In en, this message translates to:
+  /// **'How long before'**
+  String get rulesReminderLead;
+
+  /// No description provided for @rulesReminderMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String rulesReminderMinutes(String minutes);
+
+  /// No description provided for @rulesNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes for yourself'**
+  String get rulesNotes;
+
+  /// No description provided for @rulesNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What usually goes wrong, and what you do about it.'**
+  String get rulesNotesHint;
+
+  /// No description provided for @rulesSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save rules'**
+  String get rulesSave;
+
+  /// No description provided for @rulesSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get rulesSaving;
+
+  /// No description provided for @rulesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules saved.'**
+  String get rulesSaved;
+
+  /// No description provided for @rulesSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save your rules: {error}'**
+  String rulesSaveError(String error);
+
+  /// No description provided for @rulesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your rules: {error}'**
+  String rulesLoadError(String error);
+
+  /// No description provided for @rulesMaxReached.
+  ///
+  /// In en, this message translates to:
+  /// **'A playbook holds 20 rules. Fewer is easier to follow.'**
+  String get rulesMaxReached;
+
+  /// No description provided for @rulesSessionsMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 6 sessions.'**
+  String get rulesSessionsMax;
+
+  /// No description provided for @lockHardBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'HARD LOCK'**
+  String get lockHardBadge;
+
+  /// No description provided for @lockSoftBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'SOFT LOCK'**
+  String get lockSoftBadge;
+
+  /// No description provided for @lockDayOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Your day is over'**
+  String get lockDayOver;
+
+  /// No description provided for @lockLossBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You reached your loss budget — {used} of {limit}. The journal is closed until the next session.'**
+  String lockLossBody(String used, String limit);
+
+  /// No description provided for @lockCapBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You reached your entry cap — {trades} of {max} entries. The journal is closed until the next session.'**
+  String lockCapBody(String trades, String max);
+
+  /// No description provided for @lockRealised.
+  ///
+  /// In en, this message translates to:
+  /// **'REALISED'**
+  String get lockRealised;
+
+  /// No description provided for @lockEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'ENTRIES'**
+  String get lockEntries;
+
+  /// No description provided for @lockAfterStop.
+  ///
+  /// In en, this message translates to:
+  /// **'AFTER STOP'**
+  String get lockAfterStop;
+
+  /// No description provided for @lockResetsNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Resets at the next session'**
+  String get lockResetsNext;
+
+  /// No description provided for @lockResetsAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Resets {clock} · {countdown}'**
+  String lockResetsAt(String clock, String countdown);
+
+  /// No description provided for @lockHardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your MT5 sync EA is refusing orders until the day rolls over. Pending orders are removed while locked, and a new fill is closed immediately.'**
+  String get lockHardBody;
+
+  /// No description provided for @lockHardBody2.
+  ///
+  /// In en, this message translates to:
+  /// **'A manual market order can still fill before any EA sees it — only the broker can stop that click. There is no release here: the lock clears at the start of your next trading day.'**
+  String get lockHardBody2;
+
+  /// No description provided for @lockUnfreezeToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfreeze today'**
+  String get lockUnfreezeToday;
+
+  /// No description provided for @lockUnfreezing.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfreezing…'**
+  String get lockUnfreezing;
+
+  /// No description provided for @lockGreenDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Reaching the stop is a green day. The trades you took before it are already in your journal.'**
+  String get lockGreenDay;
+
+  /// No description provided for @lockStopReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Your daily stop is reached.'**
+  String get lockStopReached;
+
+  /// No description provided for @lockBudgetMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily loss budget reached: {used} of {limit}.'**
+  String lockBudgetMessage(String used, String limit);
+
+  /// No description provided for @lockSoftReached.
+  ///
+  /// In en, this message translates to:
+  /// **'The daily stop is reached · the journal stays open'**
+  String get lockSoftReached;
+
+  /// No description provided for @lockSoftFrozen.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft lock · MT5 frozen'**
+  String get lockSoftFrozen;
+
+  /// No description provided for @lockFreezerOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Freezer is off — tap to turn it on'**
+  String get lockFreezerOff;
+
+  /// No description provided for @lockUnfreeze.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfreeze'**
+  String get lockUnfreeze;
+
+  /// No description provided for @lockA11yService.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility service'**
+  String get lockA11yService;
+
+  /// No description provided for @lockA11yServiceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Android shows MTL Ledger which app is in front. It never reads what is on the screen, and nothing is sent off the phone.'**
+  String get lockA11yServiceBody;
+
+  /// No description provided for @lockOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Display over other apps'**
+  String get lockOverlay;
+
+  /// No description provided for @lockOverlayBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets the journal draw the cover on top of MetaTrader 5 while the day is frozen. No other app is covered.'**
+  String get lockOverlayBody;
+
+  /// No description provided for @lockInControl.
+  ///
+  /// In en, this message translates to:
+  /// **'You stay in control'**
+  String get lockInControl;
+
+  /// No description provided for @lockInControlBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Both switches live in Android Settings and can be turned off at any time. The journal keeps working without them.'**
+  String get lockInControlBody;
+
+  /// No description provided for @lockFreezerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on the MT5 freezer?'**
+  String get lockFreezerTitle;
+
+  /// No description provided for @lockFreezerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The freezer needs two Android permissions before it can cover MetaTrader 5 after your daily stop. Android will ask for each one on the next screen.'**
+  String get lockFreezerBody;
+
+  /// No description provided for @lockNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get lockNotNow;
+
+  /// No description provided for @lockAgree.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree'**
+  String get lockAgree;
+
+  /// No description provided for @lockDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfreeze MT5'**
+  String get lockDialogTitle;
+
+  /// No description provided for @lockDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The EA releases the freeze on its next poll. If you are breaking the rule, write down why — the reason is recorded on today, not hidden.'**
+  String get lockDialogBody;
+
+  /// No description provided for @lockReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Why is trading past the stop worth it today?'**
+  String get lockReasonHint;
+
+  /// No description provided for @lockReasonFoot.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 10 characters. Your broker is not affected by this button.'**
+  String get lockReasonFoot;
+
+  /// No description provided for @lockSoftDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} of {limit} · the journal stays open'**
+  String lockSoftDetail(String used, String limit);
+
+  /// No description provided for @alertsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts'**
+  String get alertsSection;
+
+  /// No description provided for @alertsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'On this phone, while the app is open. Nothing is sent anywhere.'**
+  String get alertsBody;
+
+  /// No description provided for @alertsDailyStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily stop hit'**
+  String get alertsDailyStop;
+
+  /// No description provided for @alertsDailyStopBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell me when the loss limit is reached and trading locks.'**
+  String get alertsDailyStopBody;
+
+  /// No description provided for @alertsLevels.
+  ///
+  /// In en, this message translates to:
+  /// **'Level touched'**
+  String get alertsLevels;
+
+  /// No description provided for @alertsLevelsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell me when price crosses a level I drew on a chart.'**
+  String get alertsLevelsBody;
+
+  /// No description provided for @alertsJournal.
+  ///
+  /// In en, this message translates to:
+  /// **'Journal reminder'**
+  String get alertsJournal;
+
+  /// No description provided for @alertsJournalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A daily nudge to log the day.'**
+  String get alertsJournalBody;
+
+  /// No description provided for @alertsReminderAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder time'**
+  String get alertsReminderAt;
+
+  /// No description provided for @alertsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification history'**
+  String get alertsHistory;
+
+  /// No description provided for @alertsHistoryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything this phone has alerted on, and why it fired.'**
+  String get alertsHistoryBody;
+
+  /// No description provided for @alertsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts'**
+  String get alertsTitle;
+
+  /// No description provided for @alertsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has fired yet'**
+  String get alertsEmpty;
+
+  /// No description provided for @alertsEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'When a stop hits or a level is touched, the alert appears here with the reason it fired.'**
+  String get alertsEmptyBody;
+
+  /// No description provided for @alertsWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Why'**
+  String get alertsWhy;
+
+  /// No description provided for @alertsNotShown.
+  ///
+  /// In en, this message translates to:
+  /// **'not shown'**
+  String get alertsNotShown;
+
+  /// No description provided for @alertsClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get alertsClear;
+
+  /// No description provided for @alertsSendTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a test alert'**
+  String get alertsSendTest;
+
+  /// No description provided for @alertsPermissionMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Android is not letting this app post notifications. Allow them in system settings.'**
+  String get alertsPermissionMissing;
+
+  /// The plan pill on the desk while a free trial is running: the word Trial and the days left.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial · {days}d'**
+  String planTrialDays(int days);
 }
 
 class _AppLocalizationsDelegate

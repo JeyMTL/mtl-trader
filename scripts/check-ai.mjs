@@ -84,7 +84,7 @@ function resolve() {
   return { provider: 'openai-compatible', apiKey, baseUrl, model, keyVar: 'AI_API_KEY' }
 }
 
-console.log('MTL Trader — AI check\n')
+console.log('MTL Ledger — AI check\n')
 
 if (explicit) {
   line('AI_PROVIDER', true, `${explicit} (explicit — wins over every key)`)

@@ -11,6 +11,11 @@ void main() {
 
   testWidgets('tapping the time frame card opens the picker', (tester) async {
     SharedPreferences.setMockInitialValues({});
+    // Pinned portrait on purpose: the default test surface is 800x600, which is
+    // landscape, and landscape now opens the chart instead of this screen.
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
         theme: buildFlatTheme(AppPalette.dark),
@@ -32,7 +37,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('Chart time frame'), findsOneWidget);
+    // The sheet is titled "Time frame" with a LIVE badge beside it; the longer
+    // "Chart time frame" header was dropped when the picker became one list.
+    expect(find.text('Time frame'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump();

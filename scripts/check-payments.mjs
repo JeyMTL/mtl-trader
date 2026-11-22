@@ -48,7 +48,7 @@ function line(label, ok, detail) {
   console.log(`${ok ? '✔' : '✖'} ${label}: ${detail}`)
 }
 
-console.log('MTL Trader — payment check\n')
+console.log('MTL Ledger — payment check\n')
 
 let problems = 0
 

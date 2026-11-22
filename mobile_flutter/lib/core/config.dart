@@ -20,7 +20,7 @@ class AppConfig {
   /// deployment.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://mtl-trader.vercel.app',
+    defaultValue: 'https://mtlledger.com',
   );
 
   /// Deep link Supabase returns the Google sign-in to. It must match the scheme
@@ -29,6 +29,15 @@ class AppConfig {
   static const String oauthRedirect = String.fromEnvironment(
     'OAUTH_REDIRECT',
     defaultValue: 'com.mtltrader.app://login-callback',
+  );
+
+  /// Web OAuth client ID, used as the `serverClientId` for native Google
+  /// sign-in so the ID token's audience matches the client Supabase validates
+  /// against. Public by design — the browser bundle ships the same value.
+  static const String googleClientId = String.fromEnvironment(
+    'GOOGLE_CLIENT_ID',
+    defaultValue:
+        '896111658733-62il22avnott85bhj46dnlkpcnp0era7.apps.googleusercontent.com',
   );
 
   static bool get isConfigured =>

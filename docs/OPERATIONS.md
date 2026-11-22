@@ -74,13 +74,13 @@ is public.
    real outage, and comments on it instead of opening duplicates;
 3. closes that issue and notes the recovery when the probe goes green again.
 
-**Setup:** none. The probe defaults to `https://mtl-trader.vercel.app`, the same
+**Setup:** none. The probe defaults to `https://mtlledger.com`, the same
 domain the app itself falls back to (`src/app/layout.tsx`,
 `mobile_flutter/lib/core/config.dart`), so the monitor is green from the first
-scheduled run. If the app moves to a custom domain, add a repository *variable*
-named `PRODUCTION_URL` under Settings → Secrets and variables → Actions →
-**Variables** (not Secrets — it is a public URL); it takes precedence over the
-default.
+scheduled run. A repository *variable* named `PRODUCTION_URL` under Settings →
+Secrets and variables → Actions → **Variables** (not Secrets — it is a public
+URL) overrides that default, which is what a staging deploy or a preview URL
+should use.
 
 There is no third-party monitor, deliberately: the extra account would watch the
 same endpoint this workflow already polls, and the token is one you already
@@ -244,7 +244,7 @@ and deploy-gate runs:
 
 | Project | Role |
 | --- | --- |
-| `mtl-trader` | Owns `mtl-trader.vercel.app`, the production domain. Keep its GitHub integration connected. |
+| `mtl-trader` | Owns `mtlledger.com`, the production domain (`mtl-trader.vercel.app` redirects to it). Keep its GitHub integration connected. |
 | `mtl-trader-bumx` | Older project (first deployment August 2026). Its deployments are only reachable at team-scoped URLs, so nothing user-facing points at it. Git was disconnected; the project is kept for its history. |
 
 Exactly one project should have the GitHub integration enabled. After any project
@@ -253,13 +253,35 @@ change, prove it with a push rather than assuming:
 ```bash
 git commit --allow-empty -m "check which project deploys"   # or any real change
 git push
-curl -s https://mtl-trader.vercel.app/api/health            # commit must advance
+curl -s https://mtlledger.com/api/health            # commit must advance
 ```
 
 If `commit` stops advancing after a push, the Git integration is on a project
 that does not own the domain. Reconnect it (Project → Settings → Git) instead of
 debugging the app — and note that `Redeploy` in the dashboard is *not* a valid
 test of this, because it rebuilds the same SHA without changing `commit`.
+
+### Custom domain
+
+`mtlledger.com` is the canonical origin; `www.mtlledger.com` and
+`mtl-trader.vercel.app` 301 to it via the `redirects` block in `vercel.json`.
+Those rules only fire once the hostnames are attached to the `mtl-trader`
+project, so order matters:
+
+1. Vercel → project → Settings → Domains → add `mtlledger.com` and
+   `www.mtlledger.com`. At the registrar, point the apex at Vercel's A record
+   (`76.76.21.21`) and `www` at `cname.vercel-dns.com`.
+2. Set `NEXT_PUBLIC_APP_URL=https://mtlledger.com` in Production (and Preview)
+   and redeploy — canonical metadata, sitemap, auth redirects, PayPal return
+   URLs and email links are all built from it.
+3. Supabase → Authentication → URL Configuration: add `https://mtlledger.com` to
+   **Site URL** and to **Redirect URLs** (keep the localhost entry for dev).
+4. Paddle: a live account approves a specific website, so a new domain has to be
+   re-approved and the default payment link and webhook destination repointed.
+   See the go-live section below.
+5. Rebuild the mobile shells (`npx cap sync` in `mobile/`,
+   `--dart-define=API_BASE_URL=https://mtlledger.com` for Flutter) and the MT5
+   `InpAppUrl` / WebRequest whitelist, which must match the origin exactly.
 
 ## Paddle go-live
 
@@ -272,14 +294,14 @@ plan attached.
 ### 1. In Paddle, in **live** mode
 
 1. **Paddle → Switch to Live**, complete the business details, and get the
-   website approved for `mtl-trader.vercel.app`. This is the long pole; start it
+   website approved for `mtlledger.com`. This is the long pole; start it
    first.
 2. Create **four** prices in the live catalogue, USD, quantity 1, no trial:
    `12.00` monthly, `120.00` yearly (Basic), `29.00` monthly, `290.00` yearly
    (Pro). Note each `pri_…` id.
 3. **Developer tools → Authentication** → create a live **API key** (`pdl_live_…`).
 4. **Events → Notifications** → **New destination**, pointing at
-   `https://mtl-trader.vercel.app/api/webhooks/paddle`, subscribed to
+   `https://mtlledger.com/api/webhooks/paddle`, subscribed to
    `transaction.completed`, `subscription.canceled` and `adjustment.created`,
    and copy its **secret key** (`pdl_ntfset_…`). It is unique per destination —
    the sandbox secret will not verify live events.
@@ -298,7 +320,7 @@ plan attached.
    because the signature is per destination rather than per event, any harmless
    event (`product.updated`) proves it. Expect **200**, not 401.
 5. **Checkout settings** → set the default payment link to
-   `https://mtl-trader.vercel.app/pay`. Live accounts require the approved domain
+   `https://mtlledger.com/pay`. Live accounts require the approved domain
    here; sandbox does not, which is why this only bites on the switch.
 
 ### 2. In Vercel (Production and Preview)
@@ -333,7 +355,7 @@ then the webhook refuses the year as `amount_mismatch`.
 Then confirm the deployment itself:
 
 ```bash
-curl -s https://mtl-trader.vercel.app/api/health | node -e "
+curl -s https://mtlledger.com/api/health | node -e "
 let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.stringify(JSON.parse(s).paddle,null,1)))"
 ```
 

@@ -22,7 +22,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
 import type { DayStateResponse } from '@/lib/daily-stop'
-import { calculatePnL, cn, formatCurrency, formatDuration, getPointValue } from '@/lib/utils'
+import { calculatePnL, cn, formatCurrency, formatDuration, formatPrice, getPointValue } from '@/lib/utils'
 import { effectiveMaxTrades, UNLIMITED } from '@/lib/subscription'
 import { mergeTags, suggestTags } from '@/lib/ai/autotag'
 import { strategyColor } from '@/lib/strategy-colors'
@@ -235,13 +235,29 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
       setForm({
         symbol: data.symbol || '',
         type: data.type === 'SELL' ? 'SELL' : 'BUY',
-        entry_price: data.entry_price?.toString() || '',
-        exit_price: data.exit_price?.toString() || '',
-        lot_size: data.lot_size?.toString() || '',
-        stop_loss: data.stop_loss?.toString() || '',
-        take_profit: data.take_profit?.toString() || '',
-        commission: data.commission?.toString() || '',
-        swap: data.swap?.toString() || '',
+        // Synced prices carry float noise (3595.7380000000003), which used to be
+        // printed into these fields exactly as stored.
+        entry_price: data.entry_price === null || data.entry_price === undefined
+          ? ''
+          : formatPrice(data.entry_price),
+        exit_price: data.exit_price === null || data.exit_price === undefined
+          ? ''
+          : formatPrice(data.exit_price),
+        lot_size: data.lot_size === null || data.lot_size === undefined
+          ? ''
+          : formatPrice(data.lot_size, 2),
+        stop_loss: data.stop_loss === null || data.stop_loss === undefined
+          ? ''
+          : formatPrice(data.stop_loss),
+        take_profit: data.take_profit === null || data.take_profit === undefined
+          ? ''
+          : formatPrice(data.take_profit),
+        commission: data.commission === null || data.commission === undefined
+          ? ''
+          : formatPrice(data.commission, 2),
+        swap: data.swap === null || data.swap === undefined
+          ? ''
+          : formatPrice(data.swap, 2),
         strategy: data.strategy || '',
         notes: data.notes || '',
         tags: Array.isArray(data.tags) ? data.tags : [],

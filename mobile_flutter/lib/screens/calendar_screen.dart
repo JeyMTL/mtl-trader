@@ -105,7 +105,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
           color: AppColors.primary,
           backgroundColor: AppColors.surface,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 110),
+            // No app bar on this tab and none in the shell: the list clears the
+            // status bar itself, or the title collides with the clock.
+            padding: EdgeInsets.fromLTRB(
+              14,
+              12 + MediaQuery.paddingOf(context).top,
+              14,
+              110,
+            ),
             children: [
               Row(
                 children: [

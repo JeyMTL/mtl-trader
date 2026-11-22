@@ -19,7 +19,7 @@ export default function GlobalError({
         <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ maxWidth: '420px', textAlign: 'center' }}>
             <p style={{ fontSize: '11px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#98a1b0' }}>
-              MTL Trader
+              MTL Ledger
             </p>
             <h1 style={{ margin: '8px 0 0', fontSize: '22px', fontWeight: 600, letterSpacing: '-0.02em' }}>
               Something broke

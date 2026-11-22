@@ -10,11 +10,12 @@ import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/a11y.dart';
-import '../ui/brand.dart';
 import '../ui/motion.dart';
 import '../ui/shimmer.dart';
 import '../ui/theme.dart';
+import '../ui/upgrade_pill.dart';
 import '../ui/widgets.dart';
+import 'rules_screen.dart';
 import 'subscription_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -41,15 +42,37 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<DashboardData> _future;
 
+  /// The plan the pill in the header names. Read separately from the dashboard
+  /// so the numbers on screen never wait on it, and reloaded whenever the trader
+  /// comes back from the plans page — buying has to change the pill immediately,
+  /// or it reads as though nothing happened.
+  late Future<SubscriptionInfo> _plan = _loadPlan();
+
+  Future<SubscriptionInfo> _loadPlan() async =>
+      SubscriptionInfo.fromProfile(await widget.api.profile());
+
   @override
   void initState() {
     super.initState();
     _future = widget.api.dashboard();
   }
 
+  Future<void> _openPlans() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SubscriptionScreen(api: widget.api),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _plan = _loadPlan());
+  }
+
   Future<void> _refresh() async {
     final next = widget.api.dashboard();
-    setState(() => _future = next);
+    setState(() {
+      _future = next;
+      _plan = _loadPlan();
+    });
     try {
       await next;
     } catch (_) {
@@ -63,15 +86,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         centerTitle: true,
         toolbarHeight: 64,
-        title: BrandMark(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => SubscriptionScreen(api: widget.api),
-            ),
+        // The pill carries the mark inside it, exactly as the reference desk
+        // does: one centred unit that is both the brand and the plan entry
+        // point, with nothing else competing for the middle of the bar.
+        title: FutureBuilder<SubscriptionInfo>(
+          future: _plan,
+          builder: (context, snapshot) => UpgradePill(
+            plan: snapshot.data,
+            onTap: _openPlans,
           ),
         ),
-        // No refresh action: pull-to-refresh already covers the list, and the
-        // top-right button did nothing a trader could point at.
+        // Symmetry, not decoration: with a single action on the right the
+        // centred title would sit roughly half an action to the left of the
+        // true middle. An empty leading of the same width keeps it centred.
+        automaticallyImplyLeading: false,
+        leadingWidth: 48,
+        leading: const SizedBox.shrink(),
+        // No refresh action: pull-to-refresh already covers the list, and a
+        // refresh button did nothing a trader could point at. The checklist is
+        // opened at the start of a session, not browsed, so Rules keeps the
+        // edge where it is out of the way.
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const RulesScreen()),
+            ),
+            tooltip: AppLocalizations.of(context).rules,
+            icon: Icon(Icons.rule_outlined, size: 20, color: AppColors.muted),
+          ),
+        ],
       ),
       body: FutureBuilder<DashboardData>(
         future: _future,

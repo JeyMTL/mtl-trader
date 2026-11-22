@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'MTL Trader';
+  String get appTitle => 'MTL Ledger';
 
   @override
   String get retry => 'Retry';
@@ -79,10 +79,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get timeEdge => 'Time edge';
 
   @override
-  String get brandName => 'MTL Trader';
+  String get brandName => 'MTL Ledger';
 
   @override
-  String get brandOpenPlans => 'MTL Trader — open payment plans';
+  String get brandOpenPlans => 'MTL Ledger — open payment plans';
+
+  @override
+  String get upgrade => 'Upgrade';
+
+  @override
+  String get rules => 'Rules';
 
   @override
   String get loginHeadline => 'The journal that\nreads you back.';
@@ -544,5 +550,566 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String a11yHeatmapEmpty(String day) {
     return '$day: no trades';
+  }
+
+  @override
+  String get account => 'Account';
+
+  @override
+  String get accountSignOutQuestion => 'Sign out?';
+
+  @override
+  String get accountSignOutBody =>
+      'Your journal stays on the server. Sign back in any time.';
+
+  @override
+  String get signOut => 'Sign out';
+
+  @override
+  String get accountPlan => 'Plan';
+
+  @override
+  String get accountStatus => 'Status';
+
+  @override
+  String get accountTradeLimit => 'Trade limit / month';
+
+  @override
+  String get accountUnlimited => 'Unlimited';
+
+  @override
+  String get accountTimezone => 'Timezone';
+
+  @override
+  String get accountChange => 'Change';
+
+  @override
+  String get accountTrialEnds => 'Trial ends';
+
+  @override
+  String get accountAccessUntil => 'Access until';
+
+  @override
+  String get accountPaidThrough => 'Paid through';
+
+  @override
+  String get accountViewPlans => 'View plans & billing';
+
+  @override
+  String get accountBuyPlan => 'Buy a subscription';
+
+  @override
+  String get accountSubscription => 'Subscription';
+
+  @override
+  String get accountSignedIn => 'Signed in';
+
+  @override
+  String get accountSubError => 'Could not load your subscription';
+
+  @override
+  String get commonTryAgain => 'Try again';
+
+  @override
+  String get commonSave => 'Save';
+
+  @override
+  String get sectionTrading => 'Trading';
+
+  @override
+  String get sectionPreferences => 'Preferences';
+
+  @override
+  String get sectionSupport => 'Support';
+
+  @override
+  String get sectionAbout => 'About';
+
+  @override
+  String get accountAppearance => 'Appearance';
+
+  @override
+  String get accountAppearanceBody =>
+      'Dark, light, the mark\'s blue, or follow the device. Saved on this phone.';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeBlue => 'Blue';
+
+  @override
+  String get themeSystem => 'System';
+
+  @override
+  String get accountHelp => 'Help & feedback';
+
+  @override
+  String get accountHelpBody =>
+      'Questions, bugs, or something the journal should do. Every message is read.';
+
+  @override
+  String get accountEmailSupport => 'Email support';
+
+  @override
+  String get accountRate => 'Rate MTL Ledger';
+
+  @override
+  String get accountAbout => 'About';
+
+  @override
+  String get accountAboutBody => 'Where your journal media lives.';
+
+  @override
+  String get accountPrivateMedia => 'Private media';
+
+  @override
+  String get accountPrivateMediaBody =>
+      'Journal photos and voice notes live in a private bucket. Each file is signed for one hour and only your account can request it.';
+
+  @override
+  String get accountFooter =>
+      'MTL Ledger · flat mobile journal\nTrades, notes and media stay on your Supabase project.';
+
+  @override
+  String get accountRules => 'Rules & playbook';
+
+  @override
+  String get accountConnectMt5 => 'Connect MT5 account';
+
+  @override
+  String get accountImport => 'Import trade history';
+
+  @override
+  String get accountBacktest => 'Backtester (Pro)';
+
+  @override
+  String get accountPropFirm => 'Prop firm simulation';
+
+  @override
+  String get accountTimezoneRow => 'Report timezone';
+
+  @override
+  String get accountTimezoneDialog => 'Timezone for the hour report';
+
+  @override
+  String accountTimezoneSaved(String zone) {
+    return 'Hour report now uses $zone.';
+  }
+
+  @override
+  String accountTimezoneFailed(String error) {
+    return 'Could not save the timezone: $error';
+  }
+
+  @override
+  String get accountPicture => 'Profile picture';
+
+  @override
+  String get accountPictureBody =>
+      'Paste a link to an image. Leave it empty to use the picture tied to your email, or your initials when there is none.';
+
+  @override
+  String get accountPictureCleared => 'Profile picture cleared.';
+
+  @override
+  String get accountPictureUpdated => 'Profile picture updated.';
+
+  @override
+  String accountPictureFailed(String error) {
+    return 'Could not save the picture: $error';
+  }
+
+  @override
+  String get accountStoreFailed => 'Could not open the store listing.';
+
+  @override
+  String get accountMailFailed =>
+      'No mail app was found. Install one and tap the button again.';
+
+  @override
+  String get accountDailyStop => 'Daily stop';
+
+  @override
+  String get accountDailyStopBody =>
+      'What happens when the loss budget or entry cap is reached.';
+
+  @override
+  String get accountLossBudget => 'Loss budget';
+
+  @override
+  String get accountMaxEntries => 'Max entries';
+
+  @override
+  String get accountWhenReached => 'When reached';
+
+  @override
+  String get accountOff => 'Off';
+
+  @override
+  String get accountNoCap => 'No cap';
+
+  @override
+  String get accountLoadingRules => 'Loading your rules…';
+
+  @override
+  String get accountEditRules => 'Edit rules and daily stop';
+
+  @override
+  String get lockSoft => 'Soft lock';
+
+  @override
+  String get lockHard => 'Hard lock';
+
+  @override
+  String get lockJournalOnly => 'Journal only';
+
+  @override
+  String get accountStopNone =>
+      'No stop is set yet. Add a loss budget or an entry cap and the day ends when it is reached.';
+
+  @override
+  String get accountStopSoft =>
+      'After the stop, MetaTrader 5 on this phone is covered and the journal stays open. Reset from the banner.';
+
+  @override
+  String get accountStopHard =>
+      'After the stop, the journal locks and the MT5 EA refuses orders. It clears at the start of your next trading day — a hard stop cannot be lifted.';
+
+  @override
+  String get accountStopOff =>
+      'After the stop, the journal refuses new entries until the next trading day.';
+
+  @override
+  String get rulesIntro =>
+      'The checklist you trade by, the days and sessions it applies to, and the stop that ends the day.';
+
+  @override
+  String get rulesYourRules => 'Your rules';
+
+  @override
+  String get rulesYourRulesBody =>
+      'Write them as instructions to yourself: what must be true before entry, what invalidates the trade, and what ends your session.';
+
+  @override
+  String get rulesEmpty =>
+      'No rules yet. The first one is usually the hardest to keep.';
+
+  @override
+  String get rulesAdd => 'Add rule';
+
+  @override
+  String get rulesRemove => 'Remove rule';
+
+  @override
+  String get rulesDays => 'Days you trade';
+
+  @override
+  String get rulesDaysBody =>
+      'Reminders only fire on these days. Trading outside them is usually the leak.';
+
+  @override
+  String get rulesDailyStop => 'Daily stop';
+
+  @override
+  String get rulesDailyStopBody =>
+      'The loss budget and entry cap you commit to before the session. Leave both at 0 to switch the stop off.';
+
+  @override
+  String get rulesLossBudget => 'Loss budget';
+
+  @override
+  String get rulesMaxEntries => 'Max entries';
+
+  @override
+  String get rulesWhenReached => 'When the stop is reached';
+
+  @override
+  String get rulesJournalOnlyBlurb => 'New entries are refused in the app.';
+
+  @override
+  String get rulesSoftBlurb =>
+      'MT5 freezes on this phone. The journal stays open.';
+
+  @override
+  String get rulesHardBlurb =>
+      'The journal locks and the MT5 EA refuses orders until tomorrow. No reset.';
+
+  @override
+  String get rulesSessions => 'Trading sessions';
+
+  @override
+  String get rulesSessionsBody =>
+      'The windows you actually sit down for. A session that ends before it starts is treated as overnight.';
+
+  @override
+  String get rulesNoSessions => 'No sessions yet. Add the window you trade in.';
+
+  @override
+  String get rulesSessionName => 'Session name';
+
+  @override
+  String get rulesRemoveSession => 'Remove session';
+
+  @override
+  String get rulesAddSession => 'Add session';
+
+  @override
+  String get rulesNewSession => 'New session';
+
+  @override
+  String get rulesSessionFallback => 'Session';
+
+  @override
+  String get rulesReminders => 'Remind me before a session';
+
+  @override
+  String get rulesRemindersBody =>
+      'An in-app reminder with your rules in front of you, before the first trade.';
+
+  @override
+  String get rulesRemindersOn => 'Reminders on';
+
+  @override
+  String get rulesRemindersOff => 'Reminders off';
+
+  @override
+  String get rulesReminderLead => 'How long before';
+
+  @override
+  String rulesReminderMinutes(String minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get rulesNotes => 'Notes for yourself';
+
+  @override
+  String get rulesNotesHint =>
+      'What usually goes wrong, and what you do about it.';
+
+  @override
+  String get rulesSave => 'Save rules';
+
+  @override
+  String get rulesSaving => 'Saving…';
+
+  @override
+  String get rulesSaved => 'Rules saved.';
+
+  @override
+  String rulesSaveError(String error) {
+    return 'Could not save your rules: $error';
+  }
+
+  @override
+  String rulesLoadError(String error) {
+    return 'Could not load your rules: $error';
+  }
+
+  @override
+  String get rulesMaxReached =>
+      'A playbook holds 20 rules. Fewer is easier to follow.';
+
+  @override
+  String get rulesSessionsMax => 'Up to 6 sessions.';
+
+  @override
+  String get lockHardBadge => 'HARD LOCK';
+
+  @override
+  String get lockSoftBadge => 'SOFT LOCK';
+
+  @override
+  String get lockDayOver => 'Your day is over';
+
+  @override
+  String lockLossBody(String used, String limit) {
+    return 'You reached your loss budget — $used of $limit. The journal is closed until the next session.';
+  }
+
+  @override
+  String lockCapBody(String trades, String max) {
+    return 'You reached your entry cap — $trades of $max entries. The journal is closed until the next session.';
+  }
+
+  @override
+  String get lockRealised => 'REALISED';
+
+  @override
+  String get lockEntries => 'ENTRIES';
+
+  @override
+  String get lockAfterStop => 'AFTER STOP';
+
+  @override
+  String get lockResetsNext => 'Resets at the next session';
+
+  @override
+  String lockResetsAt(String clock, String countdown) {
+    return 'Resets $clock · $countdown';
+  }
+
+  @override
+  String get lockHardBody =>
+      'Your MT5 sync EA is refusing orders until the day rolls over. Pending orders are removed while locked, and a new fill is closed immediately.';
+
+  @override
+  String get lockHardBody2 =>
+      'A manual market order can still fill before any EA sees it — only the broker can stop that click. There is no release here: the lock clears at the start of your next trading day.';
+
+  @override
+  String get lockUnfreezeToday => 'Unfreeze today';
+
+  @override
+  String get lockUnfreezing => 'Unfreezing…';
+
+  @override
+  String get lockGreenDay =>
+      'Reaching the stop is a green day. The trades you took before it are already in your journal.';
+
+  @override
+  String get lockStopReached => 'Your daily stop is reached.';
+
+  @override
+  String lockBudgetMessage(String used, String limit) {
+    return 'Daily loss budget reached: $used of $limit.';
+  }
+
+  @override
+  String get lockSoftReached =>
+      'The daily stop is reached · the journal stays open';
+
+  @override
+  String get lockSoftFrozen => 'Soft lock · MT5 frozen';
+
+  @override
+  String get lockFreezerOff => 'Freezer is off — tap to turn it on';
+
+  @override
+  String get lockUnfreeze => 'Unfreeze';
+
+  @override
+  String get lockA11yService => 'Accessibility service';
+
+  @override
+  String get lockA11yServiceBody =>
+      'Android shows MTL Ledger which app is in front. It never reads what is on the screen, and nothing is sent off the phone.';
+
+  @override
+  String get lockOverlay => 'Display over other apps';
+
+  @override
+  String get lockOverlayBody =>
+      'Lets the journal draw the cover on top of MetaTrader 5 while the day is frozen. No other app is covered.';
+
+  @override
+  String get lockInControl => 'You stay in control';
+
+  @override
+  String get lockInControlBody =>
+      'Both switches live in Android Settings and can be turned off at any time. The journal keeps working without them.';
+
+  @override
+  String get lockFreezerTitle => 'Turn on the MT5 freezer?';
+
+  @override
+  String get lockFreezerBody =>
+      'The freezer needs two Android permissions before it can cover MetaTrader 5 after your daily stop. Android will ask for each one on the next screen.';
+
+  @override
+  String get lockNotNow => 'Not now';
+
+  @override
+  String get lockAgree => 'Agree';
+
+  @override
+  String get lockDialogTitle => 'Unfreeze MT5';
+
+  @override
+  String get lockDialogBody =>
+      'The EA releases the freeze on its next poll. If you are breaking the rule, write down why — the reason is recorded on today, not hidden.';
+
+  @override
+  String get lockReasonHint => 'Why is trading past the stop worth it today?';
+
+  @override
+  String get lockReasonFoot =>
+      'At least 10 characters. Your broker is not affected by this button.';
+
+  @override
+  String lockSoftDetail(String used, String limit) {
+    return '$used of $limit · the journal stays open';
+  }
+
+  @override
+  String get alertsSection => 'Alerts';
+
+  @override
+  String get alertsBody =>
+      'On this phone, while the app is open. Nothing is sent anywhere.';
+
+  @override
+  String get alertsDailyStop => 'Daily stop hit';
+
+  @override
+  String get alertsDailyStopBody =>
+      'Tell me when the loss limit is reached and trading locks.';
+
+  @override
+  String get alertsLevels => 'Level touched';
+
+  @override
+  String get alertsLevelsBody =>
+      'Tell me when price crosses a level I drew on a chart.';
+
+  @override
+  String get alertsJournal => 'Journal reminder';
+
+  @override
+  String get alertsJournalBody => 'A daily nudge to log the day.';
+
+  @override
+  String get alertsReminderAt => 'Reminder time';
+
+  @override
+  String get alertsHistory => 'Notification history';
+
+  @override
+  String get alertsHistoryBody =>
+      'Everything this phone has alerted on, and why it fired.';
+
+  @override
+  String get alertsTitle => 'Alerts';
+
+  @override
+  String get alertsEmpty => 'Nothing has fired yet';
+
+  @override
+  String get alertsEmptyBody =>
+      'When a stop hits or a level is touched, the alert appears here with the reason it fired.';
+
+  @override
+  String get alertsWhy => 'Why';
+
+  @override
+  String get alertsNotShown => 'not shown';
+
+  @override
+  String get alertsClear => 'Clear';
+
+  @override
+  String get alertsSendTest => 'Send a test alert';
+
+  @override
+  String get alertsPermissionMissing =>
+      'Android is not letting this app post notifications. Allow them in system settings.';
+
+  @override
+  String planTrialDays(int days) {
+    return 'Trial · ${days}d';
   }
 }

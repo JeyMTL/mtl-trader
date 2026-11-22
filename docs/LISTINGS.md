@@ -1,4 +1,4 @@
-# MTL Trader — Ready-to-Paste Listings
+# MTL Ledger — Ready-to-Paste Listings
 
 Copy-paste pack for listing the project for sale. Edit the **price** and any
 `[...]` placeholders, then post. Keep the disclosures (Section 10) in every
@@ -13,7 +13,7 @@ unserious for a pre-revenue MVP. Raise it after you add traction.
 
 ## Section 0 — Asset facts sheet (reuse anywhere)
 
-- **Name:** MTL Trader
+- **Name:** MTL Ledger
 - **What it is:** Trading-journal + analytics SaaS for MT5-style trade data
 - **Revenue:** None
 - **Users:** None (pre-launch MVP)
@@ -41,7 +41,7 @@ Short (pick one):
 
 Pitch paragraph:
 
-> MTL Trader is a working early-stage MVP for a trading journal and analytics
+> MTL Ledger is a working early-stage MVP for a trading journal and analytics
 > product. Traders import MT5-era trade history (CSV/XLSX/XML), then review P&L,
 > equity curves, a trading calendar, and performance analytics. It includes
 > Supabase auth with row-level security, PayPal subscriptions plus a
@@ -53,14 +53,14 @@ Pitch paragraph:
 
 ## Section 2 — SideProjectors listing
 
-**Title:** MTL Trader — trading journal SaaS MVP (Next.js + Supabase, pre-revenue)
+**Title:** MTL Ledger — trading journal SaaS MVP (Next.js + Supabase, pre-revenue)
 
 **Price:** $1,950 (open to offers)
 
 **Description:**
 
 ```
-MTL Trader is a working trading-journal / analytics SaaS MVP built with
+MTL Ledger is a working trading-journal / analytics SaaS MVP built with
 Next.js 16, React 19, TypeScript, Tailwind 4 and Supabase. It is pre-revenue
 with no users — I built it and did not take it to market. Selling because I
 lack the time/capital to run the go-to-market.
@@ -133,7 +133,7 @@ head start in the trading/fintech niche.
 **Description:**
 
 ```
-I built MTL Trader, a trading-journal SaaS, and never took it to market. It
+I built MTL Ledger, a trading-journal SaaS, and never took it to market. It
 works and is tested, but I don't have the capital or time for go-to-market, so
 I'm selling it as-is.
 
@@ -162,7 +162,7 @@ offers and happy to answer questions.
 **Title:** I built a trading-journal SaaS MVP, never launched it — selling the codebase
 
 ```
-Spent a few months building MTL Trader, a trading journal + analytics SaaS
+Spent a few months building MTL Ledger, a trading journal + analytics SaaS
 (Next.js, Supabase, PayPal). It's finished enough to run: trade import,
 dashboard/analytics/calendar, subscriptions with trial + quotas enforced in
 Postgres, admin payment approval, optional email summaries, and a Capacitor
@@ -215,7 +215,7 @@ integration check scripts. ~$[PRICE] or best offer. DM for a repo walkthrough.
 ### Indie Hackers (post in "Products" or "Selling")
 
 ```
-Built MTL Trader — a trading journal + analytics SaaS (Next.js/Supabase/PayPal).
+Built MTL Ledger — a trading journal + analytics SaaS (Next.js/Supabase/PayPal).
 Pre-revenue, no users; selling it as a codebase because I don't have the runway
 to grow it. 86 tests, clean build, subscription + DB-enforced quotas, admin
 payment flow, mobile wrapper. Asking ~$[PRICE] OBO. Happy to walk through the

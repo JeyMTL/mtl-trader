@@ -27,7 +27,7 @@ class Telemetry {
 
   /// Which build this is, so a fix can be tied to a version. Keep it in step
   /// with the version in `pubspec.yaml`.
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.0.10';
 
   /// Starts a session. Called once from `main`, before the widget tree exists.
   static void start({String? platform}) {

@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
-  description: 'The terms that govern your use of MTL Trader, including subscriptions, acceptable use and liability.',
+  description: 'The terms that govern your use of MTL Ledger, including subscriptions, acceptable use and liability.',
 }
 
 const UPDATED = '5 November 2026'
@@ -17,19 +17,19 @@ export default function TermsPage() {
 
       <p className="mt-6">
         These terms are an agreement between you and <strong>Jeremiah Chipeta</strong>, trading as
-        MTL Trader (&ldquo;MTL Trader&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;), of{' '}
+        MTL Ledger (&ldquo;MTL Ledger&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;), of{' '}
         <strong>Copperbelt, Zambia</strong>. By creating an account or using the service, you accept them.
         If you do not accept them, do not use the service.
       </p>
 
       <h2>1. The service</h2>
       <p>
-        MTL Trader is a trading journal. It stores the trades you provide, calculates statistics, visualises
+        MTL Ledger is a trading journal. It stores the trades you provide, calculates statistics, visualises
         performance, and produces written reviews of your own trading history. It is a record-keeping and
         analysis tool only.
       </p>
       <p>
-        <strong>MTL Trader does not provide financial, investment, trading or tax advice.</strong> Nothing in the
+        <strong>MTL Ledger does not provide financial, investment, trading or tax advice.</strong> Nothing in the
         service — including automated reviews, statistics or labels — is a recommendation to buy or sell any
         instrument. You are solely responsible for your trading decisions and their outcomes.
       </p>
@@ -39,7 +39,7 @@ export default function TermsPage() {
         <li>You must provide a valid email address and keep your password confidential.</li>
         <li>You must be at least 18 years old and legally able to enter this agreement.</li>
         <li>One person or business per account. You are responsible for activity under your account.</li>
-        <li>Tell us promptly at <strong>jfx064@gmail.com</strong> if you believe your account has been compromised.</li>
+        <li>Tell us promptly at <strong>support@mtlledger.com</strong> if you believe your account has been compromised.</li>
       </ul>
 
       <h2>3. Your data</h2>
@@ -125,7 +125,7 @@ export default function TermsPage() {
 
       <h2>11. Contact</h2>
       <p>
-        Questions about these terms: <strong>jfx064@gmail.com</strong>.
+        Questions about these terms: <strong>support@mtlledger.com</strong>.
       </p>
     </article>
   )

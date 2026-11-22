@@ -1,7 +1,7 @@
 name: mtl_trader_mobile
-description: MTL Trader — a flat, native trading journal for MT5 traders.
+description: MTL Ledger — a flat, native trading journal for MT5 traders.
 publish_to: 'none'
-version: 1.0.8+10
+version: 1.0.11+13
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
@@ -27,6 +27,9 @@ dependencies:
   in_app_purchase: ^3.2.0
   spreadsheet_decoder: ^2.3.0
   timezone: ^0.11.2
+  google_sign_in: ^7.2.0
+  flutter_local_notifications: ^23.0.3
+  flutter_timezone: ^5.1.1
 
 dev_dependencies:
   flutter_test:

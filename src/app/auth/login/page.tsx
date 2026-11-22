@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Lock, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
+import { GoogleSignInButton } from '@/components/google-signin-button'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -46,26 +47,6 @@ export default function LoginPage() {
     window.location.assign(target)
   }
 
-  const signInWithGoogle = async () => {
-    setLoading(true)
-    setError('')
-    setSuccess('')
-
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: 'select_account' },
-      },
-    })
-
-    // On success the browser leaves for Google, so nothing below runs.
-    if (oauthError) {
-      setError(oauthError.message)
-      setLoading(false)
-    }
-  }
-
   const resendVerification = async () => {
     if (!email) {
       setError('Enter your email address first.')
@@ -105,15 +86,19 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={signInWithGoogle}
+          <GoogleSignInButton
+            text="continue_with"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-background border border-border hover:border-primary text-white py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="text-[15px] font-extrabold leading-none">G</span>
-            Continue with Google
-          </button>
+            onStart={() => {
+              setLoading(true)
+              setError('')
+              setSuccess('')
+            }}
+            onError={(message) => {
+              setError(message)
+              setLoading(false)
+            }}
+          />
 
           <div className="flex items-center gap-3">
             <span className="h-px flex-1 bg-border" />

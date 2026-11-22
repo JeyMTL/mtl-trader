@@ -8,5 +8,19 @@
       "path": "/api/cron/notifications",
       "schedule": "0 7 * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "www.mtlledger.com" }],
+      "destination": "https://mtlledger.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "mtl-trader.vercel.app" }],
+      "destination": "https://mtlledger.com/$1",
+      "permanent": true
+    }
   ]
 }

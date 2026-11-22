@@ -106,6 +106,12 @@ class AppLocalizationsPack extends AppLocalizations {
   String get brandOpenPlans => _read('brandOpenPlans') ?? _en.brandOpenPlans;
 
   @override
+  String get upgrade => _read('upgrade') ?? _en.upgrade;
+
+  @override
+  String get rules => _read('rules') ?? _en.rules;
+
+  @override
   String get loginHeadline => _read('loginHeadline') ?? _en.loginHeadline;
 
   @override
@@ -602,5 +608,551 @@ class AppLocalizationsPack extends AppLocalizations {
     final template = _read('a11yHeatmapEmpty');
     if (template == null) return _en.a11yHeatmapEmpty(day);
     return _fill(template, <String, Object?>{'day': day});
+  }
+
+  @override
+  String get account => _read('account') ?? _en.account;
+
+  @override
+  String get accountSignOutQuestion => _read('accountSignOutQuestion') ?? _en.accountSignOutQuestion;
+
+  @override
+  String get accountSignOutBody => _read('accountSignOutBody') ?? _en.accountSignOutBody;
+
+  @override
+  String get signOut => _read('signOut') ?? _en.signOut;
+
+  @override
+  String get accountPlan => _read('accountPlan') ?? _en.accountPlan;
+
+  @override
+  String get accountStatus => _read('accountStatus') ?? _en.accountStatus;
+
+  @override
+  String get accountTradeLimit => _read('accountTradeLimit') ?? _en.accountTradeLimit;
+
+  @override
+  String get accountUnlimited => _read('accountUnlimited') ?? _en.accountUnlimited;
+
+  @override
+  String get accountTimezone => _read('accountTimezone') ?? _en.accountTimezone;
+
+  @override
+  String get accountChange => _read('accountChange') ?? _en.accountChange;
+
+  @override
+  String get accountTrialEnds => _read('accountTrialEnds') ?? _en.accountTrialEnds;
+
+  @override
+  String get accountAccessUntil => _read('accountAccessUntil') ?? _en.accountAccessUntil;
+
+  @override
+  String get accountPaidThrough => _read('accountPaidThrough') ?? _en.accountPaidThrough;
+
+  @override
+  String get accountViewPlans => _read('accountViewPlans') ?? _en.accountViewPlans;
+
+  @override
+  String get accountBuyPlan => _read('accountBuyPlan') ?? _en.accountBuyPlan;
+
+  @override
+  String get accountSubscription => _read('accountSubscription') ?? _en.accountSubscription;
+
+  @override
+  String get accountSignedIn => _read('accountSignedIn') ?? _en.accountSignedIn;
+
+  @override
+  String get accountSubError => _read('accountSubError') ?? _en.accountSubError;
+
+  @override
+  String get commonTryAgain => _read('commonTryAgain') ?? _en.commonTryAgain;
+
+  @override
+  String get commonSave => _read('commonSave') ?? _en.commonSave;
+
+  @override
+  String get sectionTrading => _read('sectionTrading') ?? _en.sectionTrading;
+
+  @override
+  String get sectionPreferences => _read('sectionPreferences') ?? _en.sectionPreferences;
+
+  @override
+  String get sectionSupport => _read('sectionSupport') ?? _en.sectionSupport;
+
+  @override
+  String get sectionAbout => _read('sectionAbout') ?? _en.sectionAbout;
+
+  @override
+  String get accountAppearance => _read('accountAppearance') ?? _en.accountAppearance;
+
+  @override
+  String get accountAppearanceBody => _read('accountAppearanceBody') ?? _en.accountAppearanceBody;
+
+  @override
+  String get themeDark => _read('themeDark') ?? _en.themeDark;
+
+  @override
+  String get themeLight => _read('themeLight') ?? _en.themeLight;
+
+  @override
+  String get themeBlue => _read('themeBlue') ?? _en.themeBlue;
+
+  @override
+  String get themeSystem => _read('themeSystem') ?? _en.themeSystem;
+
+  @override
+  String get accountHelp => _read('accountHelp') ?? _en.accountHelp;
+
+  @override
+  String get accountHelpBody => _read('accountHelpBody') ?? _en.accountHelpBody;
+
+  @override
+  String get accountEmailSupport => _read('accountEmailSupport') ?? _en.accountEmailSupport;
+
+  @override
+  String get accountRate => _read('accountRate') ?? _en.accountRate;
+
+  @override
+  String get accountAbout => _read('accountAbout') ?? _en.accountAbout;
+
+  @override
+  String get accountAboutBody => _read('accountAboutBody') ?? _en.accountAboutBody;
+
+  @override
+  String get accountPrivateMedia => _read('accountPrivateMedia') ?? _en.accountPrivateMedia;
+
+  @override
+  String get accountPrivateMediaBody => _read('accountPrivateMediaBody') ?? _en.accountPrivateMediaBody;
+
+  @override
+  String get accountFooter => _read('accountFooter') ?? _en.accountFooter;
+
+  @override
+  String get accountRules => _read('accountRules') ?? _en.accountRules;
+
+  @override
+  String get accountConnectMt5 => _read('accountConnectMt5') ?? _en.accountConnectMt5;
+
+  @override
+  String get accountImport => _read('accountImport') ?? _en.accountImport;
+
+  @override
+  String get accountBacktest => _read('accountBacktest') ?? _en.accountBacktest;
+
+  @override
+  String get accountPropFirm => _read('accountPropFirm') ?? _en.accountPropFirm;
+
+  @override
+  String get accountTimezoneRow => _read('accountTimezoneRow') ?? _en.accountTimezoneRow;
+
+  @override
+  String get accountTimezoneDialog => _read('accountTimezoneDialog') ?? _en.accountTimezoneDialog;
+
+  @override
+  String accountTimezoneSaved(String zone) {
+    final template = _read('accountTimezoneSaved');
+    if (template == null) return _en.accountTimezoneSaved(zone);
+    return _fill(template, <String, Object?>{'zone': zone});
+  }
+
+  @override
+  String accountTimezoneFailed(String error) {
+    final template = _read('accountTimezoneFailed');
+    if (template == null) return _en.accountTimezoneFailed(error);
+    return _fill(template, <String, Object?>{'error': error});
+  }
+
+  @override
+  String get accountPicture => _read('accountPicture') ?? _en.accountPicture;
+
+  @override
+  String get accountPictureBody => _read('accountPictureBody') ?? _en.accountPictureBody;
+
+  @override
+  String get accountPictureCleared => _read('accountPictureCleared') ?? _en.accountPictureCleared;
+
+  @override
+  String get accountPictureUpdated => _read('accountPictureUpdated') ?? _en.accountPictureUpdated;
+
+  @override
+  String accountPictureFailed(String error) {
+    final template = _read('accountPictureFailed');
+    if (template == null) return _en.accountPictureFailed(error);
+    return _fill(template, <String, Object?>{'error': error});
+  }
+
+  @override
+  String get accountStoreFailed => _read('accountStoreFailed') ?? _en.accountStoreFailed;
+
+  @override
+  String get accountMailFailed => _read('accountMailFailed') ?? _en.accountMailFailed;
+
+  @override
+  String get accountDailyStop => _read('accountDailyStop') ?? _en.accountDailyStop;
+
+  @override
+  String get accountDailyStopBody => _read('accountDailyStopBody') ?? _en.accountDailyStopBody;
+
+  @override
+  String get accountLossBudget => _read('accountLossBudget') ?? _en.accountLossBudget;
+
+  @override
+  String get accountMaxEntries => _read('accountMaxEntries') ?? _en.accountMaxEntries;
+
+  @override
+  String get accountWhenReached => _read('accountWhenReached') ?? _en.accountWhenReached;
+
+  @override
+  String get accountOff => _read('accountOff') ?? _en.accountOff;
+
+  @override
+  String get accountNoCap => _read('accountNoCap') ?? _en.accountNoCap;
+
+  @override
+  String get accountLoadingRules => _read('accountLoadingRules') ?? _en.accountLoadingRules;
+
+  @override
+  String get accountEditRules => _read('accountEditRules') ?? _en.accountEditRules;
+
+  @override
+  String get lockSoft => _read('lockSoft') ?? _en.lockSoft;
+
+  @override
+  String get lockHard => _read('lockHard') ?? _en.lockHard;
+
+  @override
+  String get lockJournalOnly => _read('lockJournalOnly') ?? _en.lockJournalOnly;
+
+  @override
+  String get accountStopNone => _read('accountStopNone') ?? _en.accountStopNone;
+
+  @override
+  String get accountStopSoft => _read('accountStopSoft') ?? _en.accountStopSoft;
+
+  @override
+  String get accountStopHard => _read('accountStopHard') ?? _en.accountStopHard;
+
+  @override
+  String get accountStopOff => _read('accountStopOff') ?? _en.accountStopOff;
+
+  @override
+  String get rulesIntro => _read('rulesIntro') ?? _en.rulesIntro;
+
+  @override
+  String get rulesYourRules => _read('rulesYourRules') ?? _en.rulesYourRules;
+
+  @override
+  String get rulesYourRulesBody => _read('rulesYourRulesBody') ?? _en.rulesYourRulesBody;
+
+  @override
+  String get rulesEmpty => _read('rulesEmpty') ?? _en.rulesEmpty;
+
+  @override
+  String get rulesAdd => _read('rulesAdd') ?? _en.rulesAdd;
+
+  @override
+  String get rulesRemove => _read('rulesRemove') ?? _en.rulesRemove;
+
+  @override
+  String get rulesDays => _read('rulesDays') ?? _en.rulesDays;
+
+  @override
+  String get rulesDaysBody => _read('rulesDaysBody') ?? _en.rulesDaysBody;
+
+  @override
+  String get rulesDailyStop => _read('rulesDailyStop') ?? _en.rulesDailyStop;
+
+  @override
+  String get rulesDailyStopBody => _read('rulesDailyStopBody') ?? _en.rulesDailyStopBody;
+
+  @override
+  String get rulesLossBudget => _read('rulesLossBudget') ?? _en.rulesLossBudget;
+
+  @override
+  String get rulesMaxEntries => _read('rulesMaxEntries') ?? _en.rulesMaxEntries;
+
+  @override
+  String get rulesWhenReached => _read('rulesWhenReached') ?? _en.rulesWhenReached;
+
+  @override
+  String get rulesJournalOnlyBlurb => _read('rulesJournalOnlyBlurb') ?? _en.rulesJournalOnlyBlurb;
+
+  @override
+  String get rulesSoftBlurb => _read('rulesSoftBlurb') ?? _en.rulesSoftBlurb;
+
+  @override
+  String get rulesHardBlurb => _read('rulesHardBlurb') ?? _en.rulesHardBlurb;
+
+  @override
+  String get rulesSessions => _read('rulesSessions') ?? _en.rulesSessions;
+
+  @override
+  String get rulesSessionsBody => _read('rulesSessionsBody') ?? _en.rulesSessionsBody;
+
+  @override
+  String get rulesNoSessions => _read('rulesNoSessions') ?? _en.rulesNoSessions;
+
+  @override
+  String get rulesSessionName => _read('rulesSessionName') ?? _en.rulesSessionName;
+
+  @override
+  String get rulesRemoveSession => _read('rulesRemoveSession') ?? _en.rulesRemoveSession;
+
+  @override
+  String get rulesAddSession => _read('rulesAddSession') ?? _en.rulesAddSession;
+
+  @override
+  String get rulesNewSession => _read('rulesNewSession') ?? _en.rulesNewSession;
+
+  @override
+  String get rulesSessionFallback => _read('rulesSessionFallback') ?? _en.rulesSessionFallback;
+
+  @override
+  String get rulesReminders => _read('rulesReminders') ?? _en.rulesReminders;
+
+  @override
+  String get rulesRemindersBody => _read('rulesRemindersBody') ?? _en.rulesRemindersBody;
+
+  @override
+  String get rulesRemindersOn => _read('rulesRemindersOn') ?? _en.rulesRemindersOn;
+
+  @override
+  String get rulesRemindersOff => _read('rulesRemindersOff') ?? _en.rulesRemindersOff;
+
+  @override
+  String get rulesReminderLead => _read('rulesReminderLead') ?? _en.rulesReminderLead;
+
+  @override
+  String rulesReminderMinutes(String minutes) {
+    final template = _read('rulesReminderMinutes');
+    if (template == null) return _en.rulesReminderMinutes(minutes);
+    return _fill(template, <String, Object?>{'minutes': minutes});
+  }
+
+  @override
+  String get rulesNotes => _read('rulesNotes') ?? _en.rulesNotes;
+
+  @override
+  String get rulesNotesHint => _read('rulesNotesHint') ?? _en.rulesNotesHint;
+
+  @override
+  String get rulesSave => _read('rulesSave') ?? _en.rulesSave;
+
+  @override
+  String get rulesSaving => _read('rulesSaving') ?? _en.rulesSaving;
+
+  @override
+  String get rulesSaved => _read('rulesSaved') ?? _en.rulesSaved;
+
+  @override
+  String rulesSaveError(String error) {
+    final template = _read('rulesSaveError');
+    if (template == null) return _en.rulesSaveError(error);
+    return _fill(template, <String, Object?>{'error': error});
+  }
+
+  @override
+  String rulesLoadError(String error) {
+    final template = _read('rulesLoadError');
+    if (template == null) return _en.rulesLoadError(error);
+    return _fill(template, <String, Object?>{'error': error});
+  }
+
+  @override
+  String get rulesMaxReached => _read('rulesMaxReached') ?? _en.rulesMaxReached;
+
+  @override
+  String get rulesSessionsMax => _read('rulesSessionsMax') ?? _en.rulesSessionsMax;
+
+  @override
+  String get lockHardBadge => _read('lockHardBadge') ?? _en.lockHardBadge;
+
+  @override
+  String get lockSoftBadge => _read('lockSoftBadge') ?? _en.lockSoftBadge;
+
+  @override
+  String get lockDayOver => _read('lockDayOver') ?? _en.lockDayOver;
+
+  @override
+  String lockLossBody(String used, String limit) {
+    final template = _read('lockLossBody');
+    if (template == null) return _en.lockLossBody(used, limit);
+    return _fill(template, <String, Object?>{'used': used, 'limit': limit});
+  }
+
+  @override
+  String lockCapBody(String trades, String max) {
+    final template = _read('lockCapBody');
+    if (template == null) return _en.lockCapBody(trades, max);
+    return _fill(template, <String, Object?>{'trades': trades, 'max': max});
+  }
+
+  @override
+  String get lockRealised => _read('lockRealised') ?? _en.lockRealised;
+
+  @override
+  String get lockEntries => _read('lockEntries') ?? _en.lockEntries;
+
+  @override
+  String get lockAfterStop => _read('lockAfterStop') ?? _en.lockAfterStop;
+
+  @override
+  String get lockResetsNext => _read('lockResetsNext') ?? _en.lockResetsNext;
+
+  @override
+  String lockResetsAt(String clock, String countdown) {
+    final template = _read('lockResetsAt');
+    if (template == null) return _en.lockResetsAt(clock, countdown);
+    return _fill(template, <String, Object?>{'clock': clock, 'countdown': countdown});
+  }
+
+  @override
+  String get lockHardBody => _read('lockHardBody') ?? _en.lockHardBody;
+
+  @override
+  String get lockHardBody2 => _read('lockHardBody2') ?? _en.lockHardBody2;
+
+  @override
+  String get lockUnfreezeToday => _read('lockUnfreezeToday') ?? _en.lockUnfreezeToday;
+
+  @override
+  String get lockUnfreezing => _read('lockUnfreezing') ?? _en.lockUnfreezing;
+
+  @override
+  String get lockGreenDay => _read('lockGreenDay') ?? _en.lockGreenDay;
+
+  @override
+  String get lockStopReached => _read('lockStopReached') ?? _en.lockStopReached;
+
+  @override
+  String lockBudgetMessage(String used, String limit) {
+    final template = _read('lockBudgetMessage');
+    if (template == null) return _en.lockBudgetMessage(used, limit);
+    return _fill(template, <String, Object?>{'used': used, 'limit': limit});
+  }
+
+  @override
+  String get lockSoftReached => _read('lockSoftReached') ?? _en.lockSoftReached;
+
+  @override
+  String get lockSoftFrozen => _read('lockSoftFrozen') ?? _en.lockSoftFrozen;
+
+  @override
+  String get lockFreezerOff => _read('lockFreezerOff') ?? _en.lockFreezerOff;
+
+  @override
+  String get lockUnfreeze => _read('lockUnfreeze') ?? _en.lockUnfreeze;
+
+  @override
+  String get lockA11yService => _read('lockA11yService') ?? _en.lockA11yService;
+
+  @override
+  String get lockA11yServiceBody => _read('lockA11yServiceBody') ?? _en.lockA11yServiceBody;
+
+  @override
+  String get lockOverlay => _read('lockOverlay') ?? _en.lockOverlay;
+
+  @override
+  String get lockOverlayBody => _read('lockOverlayBody') ?? _en.lockOverlayBody;
+
+  @override
+  String get lockInControl => _read('lockInControl') ?? _en.lockInControl;
+
+  @override
+  String get lockInControlBody => _read('lockInControlBody') ?? _en.lockInControlBody;
+
+  @override
+  String get lockFreezerTitle => _read('lockFreezerTitle') ?? _en.lockFreezerTitle;
+
+  @override
+  String get lockFreezerBody => _read('lockFreezerBody') ?? _en.lockFreezerBody;
+
+  @override
+  String get lockNotNow => _read('lockNotNow') ?? _en.lockNotNow;
+
+  @override
+  String get lockAgree => _read('lockAgree') ?? _en.lockAgree;
+
+  @override
+  String get lockDialogTitle => _read('lockDialogTitle') ?? _en.lockDialogTitle;
+
+  @override
+  String get lockDialogBody => _read('lockDialogBody') ?? _en.lockDialogBody;
+
+  @override
+  String get lockReasonHint => _read('lockReasonHint') ?? _en.lockReasonHint;
+
+  @override
+  String get lockReasonFoot => _read('lockReasonFoot') ?? _en.lockReasonFoot;
+
+  @override
+  String lockSoftDetail(String used, String limit) {
+    final template = _read('lockSoftDetail');
+    if (template == null) return _en.lockSoftDetail(used, limit);
+    return _fill(template, <String, Object?>{'used': used, 'limit': limit});
+  }
+
+  @override
+  String get alertsSection => _read('alertsSection') ?? _en.alertsSection;
+
+  @override
+  String get alertsBody => _read('alertsBody') ?? _en.alertsBody;
+
+  @override
+  String get alertsDailyStop => _read('alertsDailyStop') ?? _en.alertsDailyStop;
+
+  @override
+  String get alertsDailyStopBody => _read('alertsDailyStopBody') ?? _en.alertsDailyStopBody;
+
+  @override
+  String get alertsLevels => _read('alertsLevels') ?? _en.alertsLevels;
+
+  @override
+  String get alertsLevelsBody => _read('alertsLevelsBody') ?? _en.alertsLevelsBody;
+
+  @override
+  String get alertsJournal => _read('alertsJournal') ?? _en.alertsJournal;
+
+  @override
+  String get alertsJournalBody => _read('alertsJournalBody') ?? _en.alertsJournalBody;
+
+  @override
+  String get alertsReminderAt => _read('alertsReminderAt') ?? _en.alertsReminderAt;
+
+  @override
+  String get alertsHistory => _read('alertsHistory') ?? _en.alertsHistory;
+
+  @override
+  String get alertsHistoryBody => _read('alertsHistoryBody') ?? _en.alertsHistoryBody;
+
+  @override
+  String get alertsTitle => _read('alertsTitle') ?? _en.alertsTitle;
+
+  @override
+  String get alertsEmpty => _read('alertsEmpty') ?? _en.alertsEmpty;
+
+  @override
+  String get alertsEmptyBody => _read('alertsEmptyBody') ?? _en.alertsEmptyBody;
+
+  @override
+  String get alertsWhy => _read('alertsWhy') ?? _en.alertsWhy;
+
+  @override
+  String get alertsNotShown => _read('alertsNotShown') ?? _en.alertsNotShown;
+
+  @override
+  String get alertsClear => _read('alertsClear') ?? _en.alertsClear;
+
+  @override
+  String get alertsSendTest => _read('alertsSendTest') ?? _en.alertsSendTest;
+
+  @override
+  String get alertsPermissionMissing => _read('alertsPermissionMissing') ?? _en.alertsPermissionMissing;
+
+  @override
+  String planTrialDays(int days) {
+    final template = _read('planTrialDays');
+    if (template == null) return _en.planTrialDays(days);
+    return _fill(template, <String, Object?>{'days': days});
   }
 }

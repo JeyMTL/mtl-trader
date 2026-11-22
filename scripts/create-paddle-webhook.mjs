@@ -19,10 +19,10 @@
 
 const ENDPOINT =
   (process.env.PADDLE_WEBHOOK_URL || '').trim() ||
-  'https://mtl-trader.vercel.app/api/webhooks/paddle'
+  'https://mtlledger.com/api/webhooks/paddle'
 
 const EVENTS = ['transaction.completed', 'subscription.canceled', 'adjustment.created']
-const DESCRIPTION = 'MTL Trader — subscriptions and refunds'
+const DESCRIPTION = 'MTL Ledger — subscriptions and refunds'
 
 const dryRun = process.argv.includes('--dry-run')
 

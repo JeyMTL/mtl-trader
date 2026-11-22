@@ -37,7 +37,7 @@ jobs:
       # visits. The stable production alias is.
       - name: Smoke the deployed environment
         env:
-          TARGET: ${{ vars.PRODUCTION_URL || 'https://mtl-trader.vercel.app' }}
+          TARGET: ${{ vars.PRODUCTION_URL || 'https://mtlledger.com' }}
         run: |
           for attempt in 1 2 3; do
             echo "::group::Attempt $attempt"

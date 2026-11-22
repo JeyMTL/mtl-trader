@@ -166,6 +166,18 @@ class SubscriptionInfo {
       ? 'Buy a subscription'
       : 'Subscribe now';
 
+  /// Days left in the running trial, or 0.
+  ///
+  /// Rounded up: with eleven hours left a trial is still "1d" away from ending,
+  /// and a pill reading "0d" would look like it had already stopped.
+  int daysLeftInTrial({DateTime? now}) {
+    if (state != SubscriptionState.trial || trialEndsAt == null) return 0;
+    final clock = now ?? DateTime.now();
+    final ms = trialEndsAt!.difference(clock).inMilliseconds;
+    if (ms <= 0) return 0;
+    return (ms / Duration.millisecondsPerDay).ceil();
+  }
+
   /// Remaining days in the current paid period, or 0.
   int daysLeftInPeriod({DateTime? now}) {
     if (state != SubscriptionState.active || periodEndsAt == null) return 0;

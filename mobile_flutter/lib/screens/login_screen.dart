@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config.dart';
@@ -34,6 +37,35 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// `GoogleSignIn.initialize` must run exactly once per process, and a retry
+  /// after a cancelled sheet reuses the same instance.
+  static bool _googleReady = false;
+
+  /// Android's native account sheet returns an ID token without leaving the
+  /// app. That matters beyond convenience: the browser flow redirects through
+  /// the Supabase project URL, so Google's chooser announces
+  /// `<project-ref>.supabase.co` to the user.
+  ///
+  /// Returns null when this build cannot produce a token — iOS has no OAuth
+  /// client of its own configured yet, and a build without `GOOGLE_CLIENT_ID`
+  /// has nothing to validate against — in which case the caller keeps the
+  /// browser deep-link flow.
+  Future<String?> _nativeGoogleIdToken() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
+    final clientId = AppConfig.googleClientId;
+    if (clientId.isEmpty) return null;
+
+    final google = GoogleSignIn.instance;
+    if (!_googleReady) {
+      await google.initialize(serverClientId: clientId);
+      _googleReady = true;
+    }
+    if (!google.supportsAuthenticate()) return null;
+
+    final account = await google.authenticate();
+    return account.authentication.idToken;
+  }
+
   Future<void> _google() async {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -42,8 +74,18 @@ class _LoginScreenState extends State<LoginScreen> {
       _notice = null;
     });
     try {
-      // Opens Google in the system browser and returns through the app's deep
-      // link, so the password never passes through this screen.
+      final idToken = await _nativeGoogleIdToken();
+      if (idToken != null) {
+        // AuthGate reacts to the auth state change and swaps this screen out.
+        await Supabase.instance.client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+        );
+        return;
+      }
+
+      // Fallback: opens Google in the system browser and returns through the
+      // app's deep link, so the password never passes through this screen.
       final launched = await Supabase.instance.client.auth
           .signInWithOAuth(
             OAuthProvider.google,
@@ -64,6 +106,18 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(
         () => _notice = AppLocalizations.of(context).googleFinishNotice,
       );
+    } on GoogleSignInException catch (error) {
+      // A dismissed sheet is not a failure: leave the form as the user left
+      // it. Credential Manager reports a configuration error (a package/SHA-1
+      // Google does not recognise) the same way, and the plugin cannot tell
+      // them apart — the only evidence is logcat, so nothing shows here.
+      if (mounted && error.code != GoogleSignInExceptionCode.canceled) {
+        setState(
+          () => _error =
+              error.description ??
+              AppLocalizations.of(context).googleStartFailed,
+        );
+      }
     } on TimeoutException {
       if (mounted) {
         setState(

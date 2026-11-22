@@ -47,6 +47,27 @@ not need to open it first.
 Do not copy a terminal that is running, and do not point both the supervisor and
 `MT5_PATH` at your normal install.
 
+### Any broker, not one broker
+
+The terminal is chosen per account. For each login the supervisor tries, in
+order: the terminal that last worked for that broker and server (remembered in
+`supervisor/.terminal-cache.json`), `MT5_PATH`, then every `MT5_PATHS` entry,
+then every `terminal64.exe` it finds under `Program Files`, `Program Files (x86)`
+and `%LOCALAPPDATA%\Programs`. A terminal-side failure (`IPC timeout`, `Process
+create failed`) is retried once on the same terminal before the next one is
+tried; a rejected password or an unknown server is not retried, because it would
+answer the same way twice.
+
+That is what makes a prop-firm account work on a host whose plain MetaQuotes
+terminal cannot resolve the firm's server: install the terminal the firm gave
+you, and it is discovered automatically, or list it in `MT5_PATHS`. After one
+successful login the supervisor remembers which terminal worked, so later cycles
+go straight to it.
+
+A terminal that comes up logged into a **different** account is rejected and the
+next candidate is tried. Without that check, a terminal left on another
+customer's session would stream their trades into the wrong journal.
+
 ## 3. Supervisor environment
 
 Copy the template and fill it in:
@@ -67,6 +88,7 @@ The fields:
 | `APP_URL` | `http://127.0.0.1:3000` on this PC (IPv4; `localhost` can resolve to IPv6 only). |
 | `MT5_PATH` | `C:\MT5-Sync\terminal64.exe` for the copy. |
 | `MT5_PORTABLE` | `1` for the copy. |
+| `MT5_PATHS` | Optional. More terminals, separated by commas or semicolons, tried when the first cannot log the account in. |
 
 `load_dotenv` reads `supervisor/.env`; real environment variables still win, so
 a service manager can override any value.
@@ -149,6 +171,7 @@ that was open for hours (longer than the overlap) is still picked up.
 | `[fatal] missing environment: ...` | One of the four variables is not set in this shell. |
 | `SYNC_CREDENTIAL_KEY must decode to 32 bytes` | Wrong key, or the base64 value was truncated. |
 | `MT5 initialise failed: (-6, 'Terminal: Authorization failed')` | Open MT5 once, log in to any account, close it; or set `MT5_PATH`. Run the supervisor in a normal logged-in Windows session, not a service session. |
+| `no terminal could log in to <server> as <login> (… -> (-10005, 'IPC timeout'))` | Every installed terminal refused that account. The message names each one and its error. An `IPC timeout` / `Process create failed` means the terminal did not come up — a previous supervisor killed mid-session leaves `terminal64.exe` running and the next start cannot attach; close it and retry. `Authorization failed` means the server or investor password is wrong, or the terminal cannot resolve that broker's server: install the broker's own terminal, or add it to `MT5_PATHS`. |
 | `login rejected - check the investor password and server name` | Use the investor password (not the master), and the exact server name from MT5. |
 | `ingest rejected (HTTP 401)` | `SYNC_SUPERVISOR_TOKEN` does not match the web app. |
 | `ingest rejected (HTTP 403)` | The account's plan has no sync feature, or its email is unverified. |

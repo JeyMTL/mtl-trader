@@ -106,6 +106,9 @@ __pycache__/
 .supervisor.log
 .diag/
 .phone-now.png
+# Which terminal last worked for each broker, written by the supervisor on the
+# host that runs it. Machine-local, so it is never committed.
+supervisor/.terminal-cache.json
 
 # MT5 compiler output
 mt5/compile.log

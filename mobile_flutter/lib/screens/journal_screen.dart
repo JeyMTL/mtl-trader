@@ -93,8 +93,10 @@ class _JournalScreenState extends State<JournalScreen> {
       _loading = true;
       _error = null;
       if (reset) {
+        // The trades already on screen stay until the response replaces them.
+        // Blanking the list on every refresh is what made a slow or failed
+        // read look like an emptied journal.
         _offset = 0;
-        _items = const [];
         _hasMore = false;
       }
     });
@@ -119,13 +121,57 @@ class _JournalScreenState extends State<JournalScreen> {
         _loading = false;
       });
       if (reset) unawaited(_loadSessionSummary());
+      if (items.isEmpty && _isUnfiltered) {
+        unawaited(_confirmEmpty(requestId));
+      }
     } catch (error) {
       if (!mounted || requestId != _requestId) return;
-      setState(() {
-        _loading = false;
-        _error = error.toString();
-      });
+      final message = error.toString().replaceFirst('Exception: ', '');
+      if (_items.isNotEmpty) {
+        // A refresh that failed is not an empty journal: keep every trade on
+        // screen and say the refresh failed, instead of replacing the list with
+        // an error page the trader reads as "my trades are gone".
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not refresh: $message')),
+        );
+      } else {
+        setState(() {
+          _loading = false;
+          _error = message;
+        });
+      }
     }
+  }
+
+  /// True when no search, filter or session chip is narrowing the list, so an
+  /// empty result really should mean "no trades" rather than "none match".
+  bool get _isUnfiltered =>
+      _search.text.trim().isEmpty &&
+      _filter == 'all' &&
+      _session == 'all';
+
+  /// An empty list is the one result that can mean two very different things: a
+  /// brand-new journal, or a read that failed to see trades the account still
+  /// owns. Ask the database how many trades this month holds; when it answers
+  /// above zero, show that — a trader whose data is intact should never be told
+  /// their journal is empty.
+  Future<void> _confirmEmpty(int requestId) async {
+    int count;
+    try {
+      count = await widget.api.monthTradeCount();
+    } catch (_) {
+      // A database without the function keeps the plain empty state; this check
+      // is a safety net and must never become the error.
+      return;
+    }
+    if (!mounted || requestId != _requestId || count <= 0) return;
+    setState(
+      () => _error =
+          'Your $count trade${count == 1 ? '' : 's'} this month are saved, but '
+          'the list came back empty — most often a dropped session. Pull down '
+          'to try again.',
+    );
   }
 
   Future<void> _refresh() => _load(reset: true);
@@ -628,7 +674,8 @@ class _TradeCard extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             Text(
-              '${dayOf(trade.tradedAt)} · ${trade.entryPrice} → ${trade.exitPrice} · ${trade.lotSize} lots',
+              '${dayOf(trade.tradedAt)} · ${price(trade.entryPrice)} → '
+              '${price(trade.exitPrice)} · ${price(trade.lotSize, decimals: 2)} lots',
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: kMinLabelSize,

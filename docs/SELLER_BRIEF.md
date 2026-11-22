@@ -2,7 +2,7 @@
 
 ## Product summary
 
-MTL Trader is a trading journal and analytics SaaS focused on tracking MT5-style trade activity, displaying P&L analytics, and enforcing subscription-based usage rules.
+MTL Ledger is a trading journal and analytics SaaS focused on tracking MT5-style trade activity, displaying P&L analytics, and enforcing subscription-based usage rules.
 
 ## Key features
 

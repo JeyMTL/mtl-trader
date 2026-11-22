@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computeDayLock,
   computeDayState,
   isAfterStopEntry,
   normalizeDailyStop,
@@ -159,6 +160,68 @@ describe('tradeInstant', () => {
 
   it('returns null for an unreadable timestamp', () => {
     expect(tradeInstant({ pnl: 0, close_time: 'not a date' })).toBeNull()
+  })
+})
+
+describe('computeDayLock', () => {
+  const now = new Date('2026-11-13T18:00:00Z')
+  const trades = [
+    trade(-300, '2026-11-13T09:00:00Z'), // reaches the 250 budget
+    trade(-40, '2026-11-13T11:00:00Z'),
+  ]
+  const state = computeDayState({ rules: utcRules, trades, now })
+
+  it('locks a breached day in soft mode until it is lifted', () => {
+    expect(state.breached).toBe(true)
+    expect(
+      computeDayLock({ rules: utcRules, mode: 'soft', state, trades, now }).active
+    ).toBe(true)
+  })
+
+  it('never locks when no mode was chosen', () => {
+    expect(
+      computeDayLock({ rules: utcRules, mode: 'off', state, trades, now }).active
+    ).toBe(false)
+  })
+
+  it('stays unlocked while the fresh budget after a lift is intact', () => {
+    const lock = computeDayLock({
+      rules: utcRules,
+      mode: 'soft',
+      state,
+      trades: [...trades, trade(-40, '2026-11-13T13:00:00Z')],
+      overrideAt: new Date('2026-11-13T12:00:00Z'),
+      now,
+    })
+
+    expect(lock.active).toBe(false)
+    // The $40 loss after the lift is a fresh budget, not a spent one.
+    expect(lock.resumed?.lossUsed).toBe(40)
+    expect(lock.resumed?.headroom).toBe(210)
+  })
+
+  it('re-arms once the fresh budget is lost too', () => {
+    const lock = computeDayLock({
+      rules: utcRules,
+      mode: 'soft',
+      state,
+      trades: [...trades, trade(-260, '2026-11-13T15:00:00Z')],
+      overrideAt: new Date('2026-11-13T12:00:00Z'),
+      now,
+    })
+
+    expect(lock.active).toBe(true)
+    expect(lock.resumed?.lossUsed).toBe(260)
+  })
+
+  it('counts a trade by its open time when it has no close time', () => {
+    const openOnly: TradeForDay[] = [
+      { pnl: -300, close_time: null, open_time: '2026-11-13T09:30:00Z' },
+    ]
+    const opened = computeDayState({ rules: utcRules, trades: openOnly, now })
+
+    expect(opened.lossUsed).toBe(300)
+    expect(opened.breached).toBe(true)
   })
 })
 

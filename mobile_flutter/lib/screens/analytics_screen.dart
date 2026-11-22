@@ -100,7 +100,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           color: AppColors.primary,
           backgroundColor: AppColors.surface,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 110),
+            // This tab has no app bar of its own and the shell draws none, so
+            // the list has to clear the status bar itself. Without the inset the
+            // title sat under the clock.
+            padding: EdgeInsets.fromLTRB(
+              14,
+              12 + MediaQuery.paddingOf(context).top,
+              14,
+              110,
+            ),
             children: [
               Row(
                 children: [

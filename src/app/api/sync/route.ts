@@ -43,6 +43,23 @@ function numeric(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+/** A price with the float noise taken out.
+ *
+ * MT5 prices are averaged out of deals in binary floating point, so a gold entry
+ * of 3595.738 can arrive as 3595.7380000000003 and be stored, and shown, to the
+ * last digit. No MT5 instrument quotes more than eight decimals, so rounding
+ * here fixes every sender at once — including an older agent or EA that will
+ * never be rebuilt — rather than trusting each of them to round.
+ */
+function price(value: number): number {
+  return Math.round(value * 1e8) / 1e8
+}
+
+function round(value: number, decimals: number): number {
+  const factor = 10 ** decimals
+  return Math.round(value * factor) / factor
+}
+
 /**
  * Timestamps without an explicit offset are read as UTC. MT5 deal times are
  * broker-server time and the agent now sends them as UTC, but an older agent
@@ -102,14 +119,14 @@ function prepare(value: unknown, userId: string): PreparedTrade | string {
       ticket: numeric(trade.ticket) ?? identity,
       symbol,
       type: trade.type,
-      entry_price: entry,
-      exit_price: exit,
-      lot_size: lot,
-      stop_loss: numeric(trade.stop_loss) ?? 0,
-      take_profit: numeric(trade.take_profit) ?? 0,
-      pnl,
-      commission: numeric(trade.commission) ?? 0,
-      swap: numeric(trade.swap) ?? 0,
+      entry_price: price(entry),
+      exit_price: price(exit),
+      lot_size: round(lot, 3),
+      stop_loss: price(numeric(trade.stop_loss) ?? 0),
+      take_profit: price(numeric(trade.take_profit) ?? 0),
+      pnl: round(pnl, 2),
+      commission: round(numeric(trade.commission) ?? 0, 2),
+      swap: round(numeric(trade.swap) ?? 0, 2),
       open_time: open,
       close_time: close,
       timeframe: text(trade.timeframe),

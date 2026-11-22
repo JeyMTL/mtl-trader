@@ -10,7 +10,19 @@
  * feed, so the chart never shows prices from an unnamed source.
  */
 
-export type ChartIntervalKey = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d'
+export type ChartIntervalKey =
+  | '5s'
+  | '10s'
+  | '15s'
+  | '30s'
+  | '45s'
+  | '1m'
+  | '5m'
+  | '15m'
+  | '30m'
+  | '1h'
+  | '4h'
+  | '1d'
 
 export type CandleSource = 'oanda'
 
@@ -42,6 +54,14 @@ interface IntervalSpec {
   count: number
   /** Length of one candle in milliseconds. */
   ms: number
+  /**
+   * Vendor bars per output bar, for a size OANDA does not quote itself.
+   *
+   * OANDA offers 5, 10, 15 and 30 seconds but not 45, so a 45-second bar is
+   * three 15-second bars bucketed on the same clock grid. The data is the
+   * vendor's; only the grouping is ours.
+   */
+  aggregate?: number
 }
 
 /**
@@ -50,6 +70,18 @@ interface IntervalSpec {
  * cap: 4 hours of minutes, a month of hours, or a year of daily bars.
  */
 export const CANDLE_INTERVALS: Record<ChartIntervalKey, IntervalSpec> = {
+  // Seconds. OANDA keeps a few thousand bars at these sizes, so the counts
+  // cover a session or two rather than a week.
+  '5s': { granularity: 'S5', count: 600, ms: 5_000 },
+  '10s': { granularity: 'S10', count: 600, ms: 10_000 },
+  '15s': { granularity: 'S15', count: 720, ms: 15_000 },
+  '30s': { granularity: 'S30', count: 720, ms: 30_000 },
+  '45s': {
+    granularity: 'S15',
+    count: 720,
+    ms: 45_000,
+    aggregate: 3,
+  },
   '1m': { granularity: 'M1', count: 240, ms: 60_000 },
   '5m': { granularity: 'M5', count: 288, ms: 300_000 },
   '15m': { granularity: 'M15', count: 480, ms: 900_000 },
@@ -61,6 +93,66 @@ export const CANDLE_INTERVALS: Record<ChartIntervalKey, IntervalSpec> = {
 
 /** OANDA refuses a request for more candles than this. */
 export const MAX_CANDLES_PER_REQUEST = 5000
+
+/**
+ * How long a live series may be reused.
+ *
+ * Half a bar, so the newest candle is never more than half-formed when it is
+ * drawn — a 20-second rule on a 5-second chart would show a bar three bars old
+ * and call it live. Bounded so a daily chart is not refetched constantly.
+ */
+export function liveTtlMs(interval: ChartIntervalKey): number {
+  return Math.max(1_500, Math.min(LIVE_TTL_MS, CANDLE_INTERVALS[interval].ms / 2))
+}
+
+/**
+ * Groups vendor candles into a larger size, on the fixed clock grid.
+ *
+ * A bucket that is still filling is dropped instead of being drawn as a short
+ * candle: the chart is meant to show completed bars, and the in-progress one is
+ * what the live poll is for.
+ */
+export function aggregateCandles(
+  candles: Candle[],
+  ms: number,
+  barsPerCandle: number
+): Candle[] {
+  if (candles.length === 0 || barsPerCandle < 2) return candles
+  const out: Candle[] = []
+  const counts: number[] = []
+  for (const candle of candles) {
+    const bucket = Math.floor(candle.t / ms) * ms
+    const index = out.length - 1
+    if (index < 0 || out[index].t !== bucket) {
+      out.push({ ...candle, t: bucket })
+      counts.push(1)
+      continue
+    }
+    const bar = out[index]
+    bar.h = Math.max(bar.h, candle.h)
+    bar.l = Math.min(bar.l, candle.l)
+    bar.c = candle.c
+    bar.v += candle.v
+    counts[index] += 1
+  }
+  if (counts.length > 0 && counts[counts.length - 1] < barsPerCandle) {
+    out.pop()
+  }
+  return out
+}
+
+/**
+ * True when the vendor answered with its own trouble rather than with a verdict
+ * on our request.
+ *
+ * OANDA fronts its API with Cloudflare, which reports an origin failure as a
+ * non-standard 520 — that is why the check is a range and not a list of the
+ * codes a server normally sends. A 429 belongs here too: the vendor refusing to
+ * talk right now is not evidence that the symbol has no candles.
+ */
+export function isVendorOutage(status: number): boolean {
+  return status === 429 || status >= 500
+}
 
 export function parseChartInterval(value: string | null): ChartIntervalKey | null {
   if (!value) return null

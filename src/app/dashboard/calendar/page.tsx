@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, X, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, cn } from '@/lib/utils'
+import { formatCurrency, formatPrice, cn } from '@/lib/utils'
 import type { DailyPnlRow } from '@/types/journal'
 
 interface CalendarTrade {
@@ -367,9 +367,9 @@ export default function CalendarPage() {
                             {trade.type}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-sm text-gray-300 text-right">{trade.entry_price}</td>
-                        <td className="px-3 py-2 text-sm text-gray-300 text-right">{trade.exit_price}</td>
-                        <td className="px-3 py-2 text-sm text-gray-300 text-right">{trade.lot_size}</td>
+                        <td className="px-3 py-2 text-sm text-gray-300 text-right">{formatPrice(trade.entry_price)}</td>
+                        <td className="px-3 py-2 text-sm text-gray-300 text-right">{formatPrice(trade.exit_price)}</td>
+                        <td className="px-3 py-2 text-sm text-gray-300 text-right">{formatPrice(trade.lot_size, 2)}</td>
                         <td className={cn("px-3 py-2 text-sm font-medium text-right", tradePnl >= 0 ? "text-success" : "text-danger")}>
                           {tradePnl >= 0 ? '+' : ''}{formatCurrency(tradePnl)}
                         </td>

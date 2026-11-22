@@ -1,5 +1,5 @@
 -- ============================================================
--- MTL Trader — billing lifecycle, aggregate reads, shared limits
+-- MTL Ledger — billing lifecycle, aggregate reads, shared limits
 -- Idempotent: safe to run on an existing database.
 --
 -- What this migration fixes:

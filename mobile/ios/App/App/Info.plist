@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>MTL Trader</string>
+    <string>MTL Ledger</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -66,7 +66,7 @@
         <false/>
         <key>NSExceptionDomains</key>
         <dict>
-            <key>mtl-trader.vercel.app</key>
+            <key>mtlledger.com</key>
             <dict>
                 <key>NSExceptionAllowsInsecureHTTPLoads</key>
                 <false/>

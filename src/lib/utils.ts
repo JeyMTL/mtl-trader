@@ -13,6 +13,21 @@ export function formatCurrency(value: number): string {
   }).format(value)
 }
 
+/**
+ * A price with the float noise taken out.
+ *
+ * MT5 prices are averaged out of deals in floating point, so a gold entry of
+ * 3595.738 can reach the journal as 3595.7380000000003. Five decimals is more
+ * than any MT5 instrument quotes and trailing zeros are trimmed, so the price
+ * reads 3595.738 rather than its last binary digit.
+ */
+export function formatPrice(value: number | null | undefined, decimals: number = 5): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  let text = value.toFixed(decimals)
+  if (text.includes('.')) text = text.replace(/0+$/, '').replace(/\.$/, '')
+  return text === '-0' ? '0' : text
+}
+
 export function formatNumber(value: number, decimals: number = 2): string {
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: decimals,

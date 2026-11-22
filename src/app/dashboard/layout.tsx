@@ -21,9 +21,9 @@ import {
   BookOpenCheck,
   Lock,
 } from 'lucide-react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { HelpCircle } from 'lucide-react'
+import { CandlestickChart, HelpCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { effectiveMaxTrades, subscriptionState } from '@/lib/subscription'
 import { MT5_SYNC_ENABLED } from '@/lib/features'
@@ -38,6 +38,7 @@ const navigation = [
   { name: 'Trades', href: '/dashboard/trades', icon: TrendingUp },
   { name: 'Import', href: '/dashboard/import', icon: Upload },
   { name: 'MT5 Sync', href: '/dashboard/sync', icon: RefreshCw },
+  { name: 'Chart', href: '/dashboard/chart', icon: CandlestickChart },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
   { name: 'Rules', href: '/dashboard/playbook', icon: BookOpenCheck },
@@ -51,6 +52,7 @@ const PRO_ONLY_HREFS = ['/dashboard/backtest']
 
 /** Everything that does not fit in five bottom tabs lives in the sheet. */
 const moreNavigation = [
+  { name: 'Chart', href: '/dashboard/chart', icon: CandlestickChart },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Import trades', href: '/dashboard/import', icon: Upload },
   { name: 'MT5 auto sync', href: '/dashboard/sync', icon: RefreshCw },
@@ -145,6 +147,45 @@ export default function DashboardLayout({
     loadUser()
   }, [router])
 
+  // The dashboard routes render on the server, so a trade that arrives from the
+  // supervisor only appeared after a navigation. This keeps the open screen
+  // live: realtime is the fast path, and the visibility check covers a socket
+  // that died while the tab was in the background. Editors are skipped, so a
+  // refresh can never land in the middle of a half-written trade.
+  const pathnameRef = useRef(pathname)
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const editing = (path: string) =>
+      path === '/dashboard/trades/new' ||
+      path.endsWith('/edit') ||
+      path === '/dashboard/playbook'
+    const schedule = () => {
+      if (editing(pathnameRef.current)) return
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => router.refresh(), 600)
+    }
+
+    const channel = supabase
+      .channel('dashboard-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, schedule)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'playbooks' }, schedule)
+      .subscribe()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') schedule()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      void supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [router])
+
   const openSheet = useCallback(() => {
     trigger('light')
     setSheetOpen(true)
@@ -236,6 +277,7 @@ export default function DashboardLayout({
     '/dashboard/payment': 'Payment',
     '/dashboard/admin': 'Admin',
     '/dashboard/playbook': 'Rules',
+    '/dashboard/chart': 'Chart',
   }
   const subRouteTitle = pathname.startsWith('/dashboard/trades/') && pathname.endsWith('/edit')
     ? 'Edit trade'

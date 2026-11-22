@@ -2,7 +2,7 @@
   "name": "mtl-trader-mobile",
   "private": true,
   "version": "1.0.0",
-  "description": "Mobile app for the MTL Trader journal (loads the live Vercel app)",
+  "description": "Mobile app for the MTL Ledger journal (loads the live Vercel app)",
   "scripts": {
     "add:android": "cap add android",
     "add:ios": "cap add ios",

@@ -1,5 +1,5 @@
 -- ============================================================
--- MTL Trader — complete schema, RLS policies, and quota trigger
+-- MTL Ledger — complete schema, RLS policies, and quota trigger
 -- Idempotent: safe to run on an existing database.
 -- ============================================================
 

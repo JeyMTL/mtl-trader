@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/alerts.dart';
 import '../services/daily_stop_bus.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../services/journal_api.dart';
 import '../services/mt5_freezer.dart';
 import '../ui/theme.dart';
@@ -26,9 +28,10 @@ Future<T?> showGateDialog<T>(WidgetBuilder builder) {
 /// Wraps the app in the daily stop.
 ///
 /// A soft lock leaves the journal usable and freezes MT5 on the phone through
-/// the accessibility service; a notice offers the recorded override. A hard
-/// lock freezes every screen behind one wall with no button, while the desktop
-/// EA blocks trading — an in-app bypass would make that decorative.
+/// the accessibility service; a notice offers the recorded reset. A hard lock
+/// freezes every screen behind one wall while the desktop EA blocks trading, and
+/// has no release of its own: it clears when the trading day rolls over, which
+/// is the whole reason for choosing it over soft.
 ///
 /// The gate re-reads on resume as well as on a timer: coming back to the app
 /// the next morning must not still show yesterday's wall.
@@ -156,15 +159,50 @@ class _DayLockGateState extends State<DayLockGate> with WidgetsBindingObserver {
     _refresh();
   }
 
+  /// The day the trader was last told about, so a stop that stays on for the
+  /// rest of the session produces one notification rather than one per poll.
+  String? _notifiedDay;
+
   Future<void> _refresh() async {
     try {
       final data = await _api.dayState();
       if (!mounted) return;
       setState(() => _data = data);
       await _syncFreezer(data);
+      await _announceStop(data);
     } catch (_) {
       // A failed read must not lock someone out; the last good state stands.
     }
+  }
+
+  /// Puts the daily stop on the phone's lock screen the moment it engages.
+  ///
+  /// Once per day: the gate polls every two seconds and the stop stays on until
+  /// the day rolls over. If the trader records the override the lock goes quiet
+  /// and this is allowed to speak again, which is what re-arming means here too.
+  Future<void> _announceStop(Map<String, dynamic> data) async {
+    final lock = _asMap(data['lock']);
+    final state = _asMap(data['state']);
+    if (lock['active'] != true || state['breached'] != true) {
+      _notifiedDay = null;
+      return;
+    }
+    final day = _asMap(data['day']);
+    final key = day['key'] is String
+        ? day['key'] as String
+        : DateTime.now().toIso8601String().substring(0, 10);
+    if (_notifiedDay == key) return;
+    _notifiedDay = key;
+    final limit = state['lossLimit'] is num
+        ? (state['lossLimit'] as num).toDouble()
+        : 0.0;
+    final used =
+        state['lossUsed'] is num ? (state['lossUsed'] as num).toDouble() : 0.0;
+    await Alerts.instance.dailyStopHit(
+      lossUsed: used,
+      lossLimit: limit,
+      dayKey: key,
+    );
   }
 
   /// Carries the soft lock to Android, where the accessibility service covers
@@ -187,9 +225,13 @@ class _DayLockGateState extends State<DayLockGate> with WidgetsBindingObserver {
         : 0.0;
     final used =
         state['lossUsed'] is num ? (state['lossUsed'] as num).toDouble() : 0.0;
+    final l10n = AppLocalizations.of(context);
     final message = limit > 0
-        ? 'Daily loss budget reached: \$${used.toStringAsFixed(2)} of \$${limit.toStringAsFixed(2)}.'
-        : 'Your daily stop is reached.';
+        ? l10n.lockBudgetMessage(
+            '\$${used.toStringAsFixed(2)}',
+            '\$${limit.toStringAsFixed(2)}',
+          )
+        : l10n.lockStopReached;
     await Mt5Freezer.sync(active: true, until: end, message: message);
   }
 
@@ -266,6 +308,9 @@ class DayLockScreen extends StatefulWidget {
 }
 
 class _DayLockScreenState extends State<DayLockScreen> {
+  /// Read through the State's own context: the wall is built in helper methods
+  /// as well as in `build`.
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   late Timer _ticker;
   bool _saving = false;
 
@@ -386,7 +431,9 @@ class _DayLockScreenState extends State<DayLockScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _hard ? 'HARD LOCK' : 'SOFT LOCK',
+                    _hard
+                        ? AppLocalizations.of(context).lockHardBadge
+                        : AppLocalizations.of(context).lockSoftBadge,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.faint,
@@ -397,7 +444,7 @@ class _DayLockScreenState extends State<DayLockScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Your day is over',
+                    AppLocalizations.of(context).lockDayOver,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.text,
@@ -408,8 +455,10 @@ class _DayLockScreenState extends State<DayLockScreen> {
                   const SizedBox(height: 8),
                   Text(
                     limitReached
-                        ? 'You reached your loss budget — ${_money(lossUsed)} of ${_money(lossLimit)}. The journal is closed until the next session.'
-                        : 'You reached your entry cap — $tradesCount of $maxTrades entries. The journal is closed until the next session.',
+                        ? AppLocalizations.of(context)
+                            .lockLossBody(_money(lossUsed), _money(lossLimit))
+                        : AppLocalizations.of(context)
+                            .lockCapBody('$tradesCount', '$maxTrades'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.muted,
@@ -421,13 +470,13 @@ class _DayLockScreenState extends State<DayLockScreen> {
                   Row(
                     children: [
                       _Stat(
-                          label: 'REALISED',
+                          label: _l10n.lockRealised,
                           value: _money(_num(state['realizedPnl']))),
                       const SizedBox(width: 8),
-                      _Stat(label: 'ENTRIES', value: '$tradesCount'),
+                      _Stat(label: _l10n.lockEntries, value: '$tradesCount'),
                       const SizedBox(width: 8),
                       _Stat(
-                        label: 'AFTER STOP',
+                        label: _l10n.lockAfterStop,
                         value: '${_num(state['afterStopCount']).toInt()}',
                         danger: _num(state['afterStopCount']) > 0,
                       ),
@@ -441,20 +490,20 @@ class _DayLockScreenState extends State<DayLockScreen> {
                       const SizedBox(width: 6),
                       Text(
                         end == null
-                            ? 'Resets at the next session'
-                            : 'Resets $_clock · ${_countdown(end)}',
+                            ? _l10n.lockResetsNext
+                            : _l10n.lockResetsAt(_clock, _countdown(end)),
                         style: TextStyle(color: AppColors.faint, fontSize: 11),
                       ),
                     ],
                   ),
                   const SizedBox(height: 22),
-                  if (_hard)
+                  if (_hard) ...[
                     FlatCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Your MT5 sync EA is refusing orders until the reset. Pending orders are removed while locked, and a new fill is closed immediately.',
+                            _l10n.lockHardBody,
                             style: TextStyle(
                               color: AppColors.muted,
                               fontSize: 12,
@@ -463,7 +512,7 @@ class _DayLockScreenState extends State<DayLockScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'A manual market order can still fill before any EA sees it — only the broker can stop that click. This lock cannot be lifted from the journal.',
+                            _l10n.lockHardBody2,
                             style: TextStyle(
                               color: AppColors.faint,
                               fontSize: 11.5,
@@ -472,8 +521,13 @@ class _DayLockScreenState extends State<DayLockScreen> {
                           ),
                         ],
                       ),
-                    )
-                  else
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  // Only soft offers a release. A hard stop that a button could
+                  // undo is a stopped clock: the trader chose the mode that the
+                  // terminal will not argue with, and the wall says why.
+                  if (!_hard) ...[
                     ElevatedButton.icon(
                       onPressed: _saving ? null : _unfreeze,
                       icon: _saving
@@ -483,20 +537,23 @@ class _DayLockScreenState extends State<DayLockScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.lock_open, size: 18),
-                      label: Text(_saving ? 'Unfreezing…' : 'Unfreeze today'),
+                      label: Text(
+                        _saving ? _l10n.lockUnfreezing : _l10n.lockUnfreezeToday,
+                      ),
                     ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
+                  ],
                   Center(
                     child: TextButton(
                       onPressed: () => Supabase.instance.client.auth.signOut(),
                       child: Text(
-                        'Sign out',
+                        _l10n.signOut,
                         style: TextStyle(color: AppColors.faint, fontSize: 11),
                       ),
                     ),
                   ),
                   Text(
-                    'Reaching the stop is a green day. The trades you took before it are already in your journal.',
+                    _l10n.lockGreenDay,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.faint,
@@ -602,9 +659,13 @@ class _SoftLockBannerState extends State<_SoftLockBanner>
     final limit = state is Map && state['lossLimit'] is num
         ? (state['lossLimit'] as num).toDouble()
         : 0.0;
+    final l10n = AppLocalizations.of(context);
     final detail = limit > 0
-        ? '\$${used.toStringAsFixed(2)} of \$${limit.toStringAsFixed(2)} · the journal stays open'
-        : 'The daily stop is reached · the journal stays open';
+        ? l10n.lockSoftDetail(
+            '\$${used.toStringAsFixed(2)}',
+            '\$${limit.toStringAsFixed(2)}',
+          )
+        : l10n.lockSoftReached;
 
     // The gate sits above the Navigator, so this notice has no Material
     // ancestor of its own; without one, Text falls back to the debug underline.
@@ -633,7 +694,7 @@ class _SoftLockBannerState extends State<_SoftLockBanner>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Soft lock · MT5 frozen',
+                      l10n.lockSoftFrozen,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 12,
@@ -649,7 +710,7 @@ class _SoftLockBannerState extends State<_SoftLockBanner>
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
-                          'Freezer is off — tap to turn it on',
+                          l10n.lockFreezerOff,
                           style: TextStyle(
                             color: AppColors.primary,
                             fontSize: 10.5,
@@ -664,7 +725,7 @@ class _SoftLockBannerState extends State<_SoftLockBanner>
               TextButton(
                 onPressed: _saving ? null : _unfreeze,
                 child: Text(
-                  _saving ? 'Unfreezing…' : 'Unfreeze',
+                  _saving ? l10n.lockUnfreezing : l10n.lockUnfreeze,
                   style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 11,
@@ -730,30 +791,18 @@ class _Stat extends StatelessWidget {
 class _FreezerDisclosureDialog extends StatelessWidget {
   const _FreezerDisclosureDialog();
 
-  static const List<(String, String)> _points = [
-    (
-      'Accessibility service',
-      'Android shows MTL Trader which app is in front. It never reads what is on '
-          'the screen, and nothing is sent off the phone.',
-    ),
-    (
-      'Display over other apps',
-      'Lets the journal draw the cover on top of MetaTrader 5 while the day is '
-          'frozen. No other app is covered.',
-    ),
-    (
-      'You stay in control',
-      'Both switches live in Android Settings and can be turned off at any time. '
-          'The journal keeps working without them.',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final points = <(String, String)>[
+      (l10n.lockA11yService, l10n.lockA11yServiceBody),
+      (l10n.lockOverlay, l10n.lockOverlayBody),
+      (l10n.lockInControl, l10n.lockInControlBody),
+    ];
     return AlertDialog(
       backgroundColor: AppColors.surface,
       title: Text(
-        'Turn on the MT5 freezer?',
+        l10n.lockFreezerTitle,
         style: TextStyle(
             color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w700),
       ),
@@ -763,13 +812,11 @@ class _FreezerDisclosureDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'The freezer needs two Android permissions before it can cover '
-              'MetaTrader 5 after your daily stop. Android will ask for each one '
-              'on the next screen.',
+              l10n.lockFreezerBody,
               style:
                   TextStyle(color: AppColors.muted, fontSize: 12, height: 1.5),
             ),
-            for (final point in _points) ...[
+            for (final point in points) ...[
               const SizedBox(height: 12),
               Text(
                 point.$1,
@@ -792,11 +839,11 @@ class _FreezerDisclosureDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Not now'),
+          child: Text(l10n.lockNotNow),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Agree'),
+          child: Text(l10n.lockAgree),
         ),
       ],
     );
@@ -825,7 +872,7 @@ class _UnfreezeDialogState extends State<_UnfreezeDialog> {
     return AlertDialog(
       backgroundColor: AppColors.surface,
       title: Text(
-        'Unfreeze MT5',
+        AppLocalizations.of(context).lockDialogTitle,
         style: TextStyle(
             color: AppColors.text, fontSize: 17, fontWeight: FontWeight.w700),
       ),
@@ -834,7 +881,7 @@ class _UnfreezeDialogState extends State<_UnfreezeDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'The EA releases the freeze on its next poll. If you are breaking the rule, write down why — the reason is recorded on today, not hidden.',
+            AppLocalizations.of(context).lockDialogBody,
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.5),
           ),
           const SizedBox(height: 12),
@@ -845,14 +892,14 @@ class _UnfreezeDialogState extends State<_UnfreezeDialog> {
             maxLength: 500,
             onChanged: (_) => setState(() {}),
             style: TextStyle(color: AppColors.text, fontSize: 13),
-            decoration: const InputDecoration(
-              hintText: 'Why is trading past the stop worth it today?',
+            decoration: InputDecoration(
+              hintText: AppLocalizations.of(context).lockReasonHint,
               counterText: '',
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'At least 10 characters. Your broker is not affected by this button.',
+            AppLocalizations.of(context).lockReasonFoot,
             style: TextStyle(color: AppColors.faint, fontSize: 10.5),
           ),
         ],
@@ -860,13 +907,13 @@ class _UnfreezeDialogState extends State<_UnfreezeDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context).cancel),
         ),
         FilledButton(
           onPressed: valid
               ? () => Navigator.of(context).pop(_controller.text.trim())
               : null,
-          child: const Text('Unfreeze'),
+          child: Text(AppLocalizations.of(context).lockUnfreeze),
         ),
       ],
     );

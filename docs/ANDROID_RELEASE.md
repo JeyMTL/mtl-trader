@@ -23,7 +23,7 @@ Current Play state, burned version codes and the resume checklist live in
 | Keystore | `mobile_flutter/android/upload-keystore.jks` (4,328 bytes) |
 | Keystore SHA-256 (file) | `dea673231031f0aeff4ea1f82349f783cf4502f2969e16fea944e26ddaa75a14` |
 | Key alias | `upload` |
-| Certificate subject | `CN=MTL Trader, O=MTL Trader, L=Nairobi, C=KE` |
+| Certificate subject | `CN=MTL Ledger, O=MTL Ledger, L=Nairobi, C=KE` |
 | Certificate SHA-256 | `395115FB64473543C022A125880B546482FD1536DA5F89A270B191DB29F44CF4` |
 | Key | RSA 4096, PKCS12 store |
 | Validity | 10,000 days (until ~2054) |
@@ -50,7 +50,7 @@ dead laptop does not take the signing identity with it.
 
 ```
 D:\MTL\mtl-trader\mobile_flutter\android\upload-keystore.jks   (working copy)
-D:\Backups\MTL Trader\upload-keystore.jks                      (second disk)
+D:\Backups\MTL Ledger\upload-keystore.jks                      (second disk)
 C:\Users\<user>\OneDrive\upload-keystore.jks                   (off the machine)
 ```
 
@@ -59,7 +59,7 @@ Re-verify at any time — all three hashes must be `dea67323…`:
 ```bash
 sha256sum \
   "/d/MTL/mtl-trader/mobile_flutter/android/upload-keystore.jks" \
-  "/d/Backups/MTL Trader/upload-keystore.jks" \
+  "/d/Backups/MTL Ledger/upload-keystore.jks" \
   "$HOME/OneDrive/upload-keystore.jks"
 ```
 
@@ -102,7 +102,7 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" \
 Expected:
 
 ```
-Signer #1 certificate DN: CN=MTL Trader, O=MTL Trader, L=Nairobi, C=KE
+Signer #1 certificate DN: CN=MTL Ledger, O=MTL Ledger, L=Nairobi, C=KE
 Signer #1 certificate SHA-256 digest: 395115fb64473543c022a125880b546482fd1536da5f89a270b191db29f44cf4
 ```
 

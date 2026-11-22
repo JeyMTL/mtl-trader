@@ -19,7 +19,10 @@ describe('security headers', () => {
 
     expect(values.get('x-content-type-options')).toBe('nosniff')
     expect(values.get('x-frame-options')).toBe('DENY')
-    expect(values.get('cross-origin-opener-policy')).toBe('same-origin')
+    // allow-popups, because Google Identity Services returns the sign-in
+    // credential from a popup through window.opener and plain same-origin severs
+    // that relationship. Everything else stays cross-origin isolated.
+    expect(values.get('cross-origin-opener-policy')).toBe('same-origin-allow-popups')
     expect(values.get('cross-origin-resource-policy')).toBe('same-origin')
     expect(values.get('origin-agent-cluster')).toBe('?1')
     expect(values.get('x-permitted-cross-domain-policies')).toBe('none')

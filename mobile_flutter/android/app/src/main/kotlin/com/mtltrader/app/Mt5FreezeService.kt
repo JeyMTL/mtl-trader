@@ -111,7 +111,7 @@ class Mt5FreezeService : AccessibilityService() {
         }
         val body = TextView(this).apply {
             text = message().ifBlank { "Your daily loss limit is reached." } +
-                "\n\nMetaTrader 5 stays covered until you unfreeze the day in MTL Trader."
+                "\n\nMetaTrader 5 stays covered until you unfreeze the day in MTL Ledger."
             textSize = 15f
             setTextColor(Color.parseColor("#C9C9C9"))
             gravity = Gravity.CENTER
@@ -119,7 +119,7 @@ class Mt5FreezeService : AccessibilityService() {
             setLineSpacing(0f, 1.25f)
         }
         val unlock = Button(this).apply {
-            text = "Open MTL Trader to unfreeze"
+            text = "Open MTL Ledger to unfreeze"
             setOnClickListener { openJournal() }
         }
         root.addView(icon)

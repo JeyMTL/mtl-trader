@@ -1,4 +1,4 @@
-# MTL Trader — Flutter mobile app
+# MTL Ledger — Flutter mobile app
 
 A native, flat-design Flutter client for the same Supabase journal as the web app. It replaces the old Capacitor shell (`/mobile`) for the phone app.
 

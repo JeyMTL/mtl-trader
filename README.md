@@ -1,4 +1,4 @@
-# MTL Trader - Professional Trading Journal
+# MTL Ledger - Professional Trading Journal
 
 A SaaS trading journal web app for tracking and analyzing MT5 trades.
 
@@ -95,7 +95,7 @@ Password recovery posts to `/auth/forgot`, and the emailed link lands on `/auth/
 
 ### 6. Configure email summaries (optional)
 1. Create a free account at https://resend.com and verify the domain you want to send from
-2. Set `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `MTL Trader <reports@yourdomain.com>`)
+2. Set `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `MTL Ledger <reports@yourdomain.com>`)
 
 With neither set the app still runs: summary sends and the notifications cron simply no-op. For Supabase Auth emails, point Supabase's SMTP settings at Resend so verification mail is not rate-limited or spam-filtered.
 
@@ -146,7 +146,7 @@ node --env-file=.env.local scripts/check-payments.mjs --reconcile
 
 Trades are counted per calendar month and enforcement lives in the database trigger, not just the UI. Historical imports (older months) do not count against the limit.
 
-MT5 autosync is included from Basic, because it is the one thing a trader cannot do by hand; the backtester and market replay stay Pro, along with unlimited volume and 200 AI reviews a month (Basic gets 30). Yearly plans are card-only through Paddle and buy 365 days per payment (`apply_annual_order`); PayPal and bank transfer buy one 30-day period.
+MT5 autosync is included from Basic, because it is the one thing a trader cannot do by hand; Basic also carries the whole journal, the chart desk with its levels shared between phone and web, prop-firm rules and 30 AI reviews a month. The backtester and market replay stay Pro, along with the 200-review allowance and API access. Volume is unlimited on every plan. Yearly plans are card-only through Paddle and buy 365 days per payment (`apply_annual_order`); PayPal and bank transfer buy one 30-day period.
 
 ## Environment Variables
 
@@ -164,7 +164,7 @@ MT5 autosync is included from Basic, because it is the one thing a trader cannot
 | `PAYPAL_API_BASE` | Optional override of the PayPal REST base URL (defaults to production `https://api-m.paypal.com`; set to the sandbox URL for testing) |
 | `CRON_SECRET` | Bearer secret Vercel Cron sends to `/api/admin/reconcile` and `/api/cron/notifications` |
 | `RESEND_API_KEY` | Resend API key. When unset, email sending is a no-op (the app never fails because email is missing) |
-| `EMAIL_FROM` | From address for summary emails, e.g. `MTL Trader <reports@yourdomain.com>` (must be a Resend-verified domain) |
+| `EMAIL_FROM` | From address for summary emails, e.g. `MTL Ledger <reports@yourdomain.com>` (must be a Resend-verified domain) |
 | `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, `BANK_BRANCH` | Bank transfer details shown on the payment page. When unset, the page shows a "contact support" message instead |
 
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Optional alternative AI provider |

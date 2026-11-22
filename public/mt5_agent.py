@@ -1,8 +1,8 @@
 """
-MTL Trader - MT5 sync agent (position-keyed, resumable).
+MTL Ledger - MT5 sync agent (position-keyed, resumable).
 
 Runs on a Windows machine with MetaTrader 5 installed and pushes closed trades to
-MTL Trader. Customers who only have a phone should use the app's "connect
+MTL Ledger. Customers who only have a phone should use the app's "connect
 automatically" flow instead — this agent exists for traders who prefer their own
 PC.
 
@@ -41,7 +41,7 @@ from getpass import getpass
 import MetaTrader5 as mt5
 import requests
 
-DEFAULT_APP_URL = "https://mtl-trader.vercel.app"
+DEFAULT_APP_URL = "https://mtlledger.com"
 SYNC_INTERVAL = 60
 CHUNK = 200
 # Deals can land a little late on the broker's clock; re-read a short tail so a
@@ -240,7 +240,7 @@ def sync_trades(app_url, user_id, token, trades):
 
 def main():
     print("=" * 52)
-    print("MTL Trader - MT5 sync agent")
+    print("MTL Ledger - MT5 sync agent")
     print("=" * 52)
 
     config = {}

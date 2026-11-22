@@ -22,7 +22,7 @@ export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
         height={s.box}
         className="rounded-[7px] shrink-0"
       />
-      <span className={`font-semibold tracking-tight text-foreground ${s.text}`}>MTL Trader</span>
+      <span className={`font-semibold tracking-tight text-foreground ${s.text}`}>MTL Ledger</span>
     </div>
   )
 }

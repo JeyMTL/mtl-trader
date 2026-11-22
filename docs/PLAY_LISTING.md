@@ -6,7 +6,7 @@ paste. Limits are Play's; the character counts below are the real ones.
 ## App name (30 max, used: 27)
 
 ```text
-MTL Trader: Trading Journal
+MTL Ledger: Trading Journal
 ```
 
 ## Short description (80 max)
@@ -18,7 +18,7 @@ Journal every trade, find your edge, fix the leaks that cost you money.
 ## Full description (4000 max)
 
 ```text
-MTL Trader is a trading journal for Forex and CFD traders who want to know whether they really have an edge — and where it comes from.
+MTL Ledger is a trading journal for Forex and CFD traders who want to know whether they really have an edge — and where it comes from.
 
 Log a trade in seconds: symbol, direction, entry, stop, target, size and result, with an optional chart screenshot or voice note attached. Your notes stay with the trade, and strategy tags let you compare the setups you actually trade.
 
@@ -36,15 +36,15 @@ Read at a glance between sessions: dark interface, gold accents, monospaced numb
 
 PLANS
 
-A 14-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar, time edge, charts, photos and voice notes and 30 AI reviews a month; Pro raises the review allowance and adds the backtester and market replay. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
+A 14-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar and analytics, time edge, the chart desk with levels shared between phone and web, MT5 sync, prop-firm rules, photos and voice notes, and 30 AI reviews a month; Pro raises the review allowance and adds the backtester, market replay, API access and priority support. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
 
 Subscriptions bought in this app are sold and billed by Google Play, and you can manage or cancel them any time from your Play account.
 
 YOUR DATA
 
-Your trades are yours. You can delete your account and its data from Settings at any time. Data is encrypted in transit, never sold, and never used for advertising. Privacy policy: https://mtl-trader.vercel.app/privacy
+Your trades are yours. You can delete your account and its data from Settings at any time. Data is encrypted in transit, never sold, and never used for advertising. Privacy policy: https://mtlledger.com/privacy
 
-MTL Trader is a record-keeping and analysis tool for trades you place yourself. It does not place orders, does not connect to a broker to trade, and does not provide investment advice.
+MTL Ledger is a record-keeping and analysis tool for trades you place yourself. It does not place orders, does not connect to a broker to trade, and does not provide investment advice.
 ```
 
 ## Graphics already rendered
@@ -94,7 +94,7 @@ screens, no phone and no caption.
 
 ## Fields that are not on the Assets step
 
-- Privacy policy URL: `https://mtl-trader.vercel.app/privacy`
-- Account deletion URL: `https://mtl-trader.vercel.app/delete-account`
-- Support / website: `https://mtl-trader.vercel.app` (`/support` returns 200)
-- Contact email: `jfx064@gmail.com`
+- Privacy policy URL: `https://mtlledger.com/privacy`
+- Account deletion URL: `https://mtlledger.com/delete-account`
+- Support / website: `https://mtlledger.com` (`/support` returns 200)
+- Contact email: `support@mtlledger.com`

@@ -1,11 +1,13 @@
 {
   "appId": "com.mtltrader.journal",
-  "appName": "MTL Trader",
+  "appName": "MTL Ledger",
   "webDir": "www",
   "server": {
-    "url": "https://mtl-trader.vercel.app",
+    "url": "https://mtlledger.com",
     "cleartext": false,
     "allowNavigation": [
+      "mtlledger.com",
+      "*.mtlledger.com",
       "*vercel.app",
       "*paypal.com",
       "*paypalobjects.com",

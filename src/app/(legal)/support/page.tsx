@@ -2,10 +2,10 @@ import Link from 'next/link'
 
 export const metadata = {
   title: 'Support',
-  description: 'Get help with MTL Trader: billing, your data, imports, and the journal.',
+  description: 'Get help with MTL Ledger: billing, your data, imports, and the journal.',
 }
 
-const EMAIL = 'jfx064@gmail.com'
+const EMAIL = 'support@mtlledger.com'
 
 const FAQ = [
   {
@@ -49,7 +49,7 @@ export default function SupportPage() {
         <h2 className="text-lg font-semibold text-white">Email us</h2>
         <p className="mt-2">
           <a
-            href={`mailto:${EMAIL}?subject=${encodeURIComponent('MTL Trader support')}`}
+            href={`mailto:${EMAIL}?subject=${encodeURIComponent('MTL Ledger support')}`}
             className="text-primary font-semibold hover:underline"
           >
             {EMAIL}

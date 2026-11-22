@@ -6,13 +6,15 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/config.dart';
 import '../core/features.dart';
 import '../core/subscription.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
-import '../services/daily_stop_bus.dart';
+import '../services/alerts.dart';
 import '../services/journal_api.dart';
-import '../services/mt5_freezer.dart';
 import '../ui/language_picker.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'alerts_screen.dart';
+import 'rules_screen.dart';
 import 'subscription_screen.dart';
 import 'sync_screen.dart';
 
@@ -91,12 +93,16 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
+  /// Read through the State's own context: most of this screen's text is built
+  /// in helper methods rather than inside `build`.
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   late Future<Map<String, dynamic>> _future;
 
   String _lockMode = 'off';
   double _lossLimit = 0;
+  int _maxTrades = 0;
   bool _lockLoading = true;
-  bool _lockSaving = false;
 
   @override
   void initState() {
@@ -111,13 +117,14 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       final row = await Supabase.instance.client
           .from('playbooks')
-          .select('lock_mode, daily_loss_limit')
+          .select('lock_mode, daily_loss_limit, max_trades_per_day')
           .eq('user_id', uid)
           .maybeSingle();
       if (!mounted) return;
       setState(() {
         _lockMode = (row?['lock_mode'] as String?) ?? 'off';
         _lossLimit = (row?['daily_loss_limit'] as num?)?.toDouble() ?? 0;
+        _maxTrades = (row?['max_trades_per_day'] as num?)?.toInt() ?? 0;
         _lockLoading = false;
       });
     } catch (_) {
@@ -125,109 +132,364 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  Future<void> _setLockMode(String mode) async {
-    if (_lockSaving || mode == _lockMode) return;
-    final uid = Supabase.instance.client.auth.currentUser?.id;
-    if (uid == null) return;
-
-    final previous = _lockMode;
-    setState(() {
-      _lockMode = mode;
-      _lockSaving = true;
-    });
-    try {
-      await Supabase.instance.client.from('playbooks').upsert(
-        {'user_id': uid, 'lock_mode': mode},
-        onConflict: 'user_id',
-      );
-      // Off and hard both mean this phone is not the enforcement. Clear the
-      // cover locally straight away: the day-state read can fail on mobile
-      // data, and a failed read must never leave MT5 frozen after the trader
-      // has already turned the lock off.
-      if (mode != 'soft') {
-        await Mt5Freezer.sync(active: false);
-      }
-      DailyStopBus.refresh();
-      if (!mounted) return;
-      setState(() => _lockSaving = false);
-      final message = switch (mode) {
-        'soft' => 'Soft lock on: MT5 will freeze on this phone after the stop.',
-        'hard' => 'Hard lock on: the MT5 EA blocks trading after the stop.',
-        _ => 'Daily stop is now journal-only.',
-      };
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _lockMode = previous;
-        _lockSaving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not change the lock: $error')),
-      );
-    }
+  /// Opens the rules editor. The phone has no sixth tab to spare, and the rules
+  /// are where a session starts, so they live one tap from here.
+  Future<void> _openRules() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const RulesScreen()),
+    );
+    if (!mounted) return;
+    setState(() => _lockLoading = true);
+    await _loadDailyStop();
   }
 
+  String _money(double value) => value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(2);
+
+  /// The daily stop, summarised. The budget, the cap and the lock mode are
+  /// edited in Rules, so this card can never disagree with the screen the web
+  /// app shows or with the gate that enforces it.
   Widget _dailyStopCard() {
-    const options = <(String, String, String)>[
-      ('off', 'Off', 'Journal only'),
-      ('soft', 'Soft', 'Freeze phone MT5'),
-      ('hard', 'Hard', 'Block trading'),
-    ];
-    final description = switch (_lockMode) {
-      'soft' =>
-        'After the loss budget, MetaTrader 5 on this phone is covered and the journal stays open. Unfreeze from the banner.',
-      'hard' =>
-        'After the loss budget, the journal locks and the MT5 EA blocks orders until the next reset.',
-      _ =>
-        'After the loss budget, the journal refuses new entries. The loss budget itself is set in Rules on the web.',
+    final configured = _lossLimit > 0 || _maxTrades > 0;
+    final lockLabel = switch (_lockMode) {
+      'soft' => _l10n.lockSoft,
+      'hard' => _l10n.lockHard,
+      _ => _l10n.lockJournalOnly,
     };
+    final detail = !configured
+        ? _l10n.accountStopNone
+        : switch (_lockMode) {
+            'soft' => _l10n.accountStopSoft,
+            'hard' => _l10n.accountStopHard,
+            _ => _l10n.accountStopOff,
+          };
 
     return FlatCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle(
-            title: 'Daily stop',
+          SectionTitle(
+            title: _l10n.accountDailyStop,
             subtitle:
-                'What happens when the loss budget or entry cap is reached.',
+                _l10n.accountDailyStopBody,
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              for (var index = 0; index < options.length; index++) ...[
-                Expanded(
-                  child: _LockChoice(
-                    label: options[index].$2,
-                    hint: options[index].$3,
-                    selected: _lockMode == options[index].$1,
-                    enabled: !_lockLoading && !_lockSaving,
-                    onTap: () => _setLockMode(options[index].$1),
-                  ),
-                ),
-                if (index != options.length - 1) const SizedBox(width: 6),
-              ],
-            ],
-          ),
-          const SizedBox(height: 9),
-          Text(
-            description,
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: 11,
-              height: 1.45,
-            ),
-          ),
-          if (!_lockLoading && _lossLimit <= 0) ...[
-            const SizedBox(height: 4),
+          if (_lockLoading)
             Text(
-              'No loss budget is set yet — add one in Rules on the web.',
-              style: TextStyle(color: AppColors.faint, fontSize: 10.5),
+              _l10n.accountLoadingRules,
+              style: TextStyle(color: AppColors.faint, fontSize: 11.5),
+            )
+          else ...[
+            LabelValue(
+              label: _l10n.accountLossBudget,
+              value: _lossLimit > 0 ? _money(_lossLimit) : _l10n.accountOff,
+            ),
+            const ListDivider(),
+            LabelValue(
+              label: _l10n.accountMaxEntries,
+              value: _maxTrades > 0 ? '$_maxTrades' : _l10n.accountNoCap,
+            ),
+            const ListDivider(),
+            LabelValue(label: _l10n.accountWhenReached, value: lockLabel),
+            const SizedBox(height: 8),
+            Text(
+              detail,
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 11,
+                height: 1.45,
+              ),
             ),
           ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _openRules,
+              icon: const Icon(Icons.rule_outlined, size: 16),
+              label: Text(_l10n.accountEditRules),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// A quiet grouping label. The account tab holds every setting the app has,
+  /// so the sections matter more than the individual cards.
+  Widget _sectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 6),
+        child: Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            color: AppColors.faint,
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.3,
+          ),
+        ),
+      );
+
+  Widget _navTile({
+    required IconData icon,
+    required String label,
+    String? detail,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: AppColors.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: AppColors.text,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (detail != null)
+              Text(
+                detail,
+                style: TextStyle(color: AppColors.faint, fontSize: 11),
+              ),
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, size: 16, color: AppColors.faint),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The set-up-once tools: rules, the broker link, an import, the backtester
+  /// and the prop evaluation. They are navigation, not settings, so they stay
+  /// together instead of competing with the buttons a trader taps weekly.
+  Widget _tradingCard() {
+    final tiles = <Widget>[
+      _navTile(
+        icon: Icons.rule_outlined,
+        label: _l10n.accountRules,
+        onTap: _openRules,
+      ),
+      if (kMt5SyncEnabled)
+        _navTile(
+          icon: Icons.sync,
+          label: _l10n.accountConnectMt5,
+          onTap: _openSync,
+        ),
+      if (widget.onOpenImport != null)
+        _navTile(
+          icon: Icons.upload_file,
+          label: _l10n.accountImport,
+          onTap: widget.onOpenImport,
+        ),
+      if (widget.onOpenBacktest != null)
+        _navTile(
+          icon: Icons.science_outlined,
+          label: _l10n.accountBacktest,
+          onTap: widget.onOpenBacktest,
+        ),
+      if (widget.onOpenPropFirm != null)
+        _navTile(
+          icon: Icons.verified_user_outlined,
+          label: _l10n.accountPropFirm,
+          onTap: widget.onOpenPropFirm,
+        ),
+    ];
+
+    return FlatCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var index = 0; index < tiles.length; index++) ...[
+            tiles[index],
+            if (index != tiles.length - 1) const ListDivider(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _timezoneCard(String timezone) {
+    return FlatCard(
+      padding: EdgeInsets.zero,
+      child: _navTile(
+        icon: Icons.public,
+        label: _l10n.accountTimezoneRow,
+        detail: timezone,
+        onTap: () => _pickTimezone(timezone),
+      ),
+    );
+  }
+
+  /// The three alerts this phone can raise, plus the reminder time and the way
+  /// into the list of what has already fired.
+  ///
+  /// They are switches rather than toggles on a server setting because they are
+  /// device behaviour: the phone posts them itself, with no push service, and a
+  /// trader who turns one off expects it to stop on this phone only.
+  /// Asking here rather than at launch puts the Android permission dialog in
+  /// front of the three switches that need it, which is the only moment the
+  /// request explains itself.
+  bool _askedForAlerts = false;
+
+  Widget _alertsCard() {
+    final alerts = Alerts.instance;
+    if (!_askedForAlerts) {
+      _askedForAlerts = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final granted = await Alerts.instance.ensurePermission();
+        if (mounted && granted) setState(() {});
+      });
+    }
+    return FlatCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(
+            title: _l10n.alertsSection,
+            subtitle: _l10n.alertsBody,
+          ),
+          const SizedBox(height: 6),
+          _alertSwitch(
+            icon: Icons.shield_outlined,
+            title: _l10n.alertsDailyStop,
+            body: _l10n.alertsDailyStopBody,
+            value: alerts.dailyStopEnabled,
+            onChanged: (value) async {
+              await alerts.setDailyStop(value);
+              setState(() {});
+            },
+          ),
+          _alertSwitch(
+            icon: Icons.show_chart,
+            title: _l10n.alertsLevels,
+            body: _l10n.alertsLevelsBody,
+            value: alerts.levelsEnabled,
+            onChanged: (value) async {
+              await alerts.setLevels(value);
+              setState(() {});
+            },
+          ),
+          _alertSwitch(
+            icon: Icons.edit_note,
+            title: _l10n.alertsJournal,
+            body: _l10n.alertsJournalBody,
+            value: alerts.journalEnabled,
+            onChanged: (value) async {
+              await alerts.setJournal(value);
+              setState(() {});
+            },
+          ),
+          if (alerts.journalEnabled)
+            InkWell(
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay(
+                    hour: alerts.reminderAt.hour,
+                    minute: alerts.reminderAt.minute,
+                  ),
+                  helpText: _l10n.alertsReminderAt,
+                );
+                if (picked == null) return;
+                await alerts.setJournal(
+                  true,
+                  at: TimeOfDayValue(picked.hour, picked.minute),
+                );
+                if (mounted) setState(() {});
+              },
+              borderRadius: BorderRadius.circular(AppRadius.field),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.schedule, size: 16, color: AppColors.faint),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _l10n.alertsReminderAt,
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      alerts.reminderAt.label,
+                      style: tabular.copyWith(
+                        color: AppColors.text,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const ListDivider(),
+          const AlertsSummary(),
+        ],
+      ),
+    );
+  }
+
+  Widget _alertSwitch({
+    required IconData icon,
+    required String title,
+    required String body,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(AppRadius.field),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: AppColors.faint),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    body,
+                    style: TextStyle(
+                      color: AppColors.faint,
+                      fontSize: 10.5,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -271,9 +533,9 @@ class _AccountScreenState extends State<AccountScreen> {
     final account = Supabase.instance.client.auth.currentUser?.email ?? '';
     final uri = Uri(
       scheme: 'mailto',
-      path: 'jfx064@gmail.com',
+      path: 'support@mtlledger.com',
       queryParameters: {
-        'subject': 'MTL Trader support',
+        'subject': 'MTL Ledger support',
         'body': 'Account: $account\n\nWhat happened:\n',
       },
     );
@@ -284,11 +546,7 @@ class _AccountScreenState extends State<AccountScreen> {
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'No mail app was found. Install one and tap the button again.',
-        ),
-      ),
+      SnackBar(content: Text(_l10n.accountMailFailed)),
     );
   }
 
@@ -301,7 +559,7 @@ class _AccountScreenState extends State<AccountScreen> {
     if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open the store listing.')),
+      SnackBar(content: Text(_l10n.accountStoreFailed)),
     );
   }
 
@@ -309,9 +567,9 @@ class _AccountScreenState extends State<AccountScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sign out?'),
+        title: Text(_l10n.accountSignOutQuestion),
         content: Text(
-          'Your journal stays on the server. Sign back in any time.',
+          _l10n.accountSignOutBody,
           style: TextStyle(
             color: AppColors.muted,
             fontSize: 12.5,
@@ -321,11 +579,11 @@ class _AccountScreenState extends State<AccountScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(_l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign out'),
+            child: Text(_l10n.signOut),
           ),
         ],
       ),
@@ -340,9 +598,9 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text(
-          'Timezone for the hour report',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        title: Text(
+          _l10n.accountTimezoneDialog,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
         content: SizedBox(
@@ -375,7 +633,7 @@ class _AccountScreenState extends State<AccountScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(_l10n.cancel),
           ),
         ],
       ),
@@ -388,13 +646,13 @@ class _AccountScreenState extends State<AccountScreen> {
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hour report now uses $selected.')),
+        SnackBar(content: Text(_l10n.accountTimezoneSaved(selected))),
       );
       widget.onProfileChanged?.call();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save the timezone: $error')),
+        SnackBar(content: Text(_l10n.accountTimezoneFailed('$error'))),
       );
     }
   }
@@ -423,16 +681,16 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text(
-          'Profile picture',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        title: Text(
+          _l10n.accountPicture,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Paste a link to an image. Leave it empty to use the picture tied to your email, or your initials when there is none.',
+              _l10n.accountPictureBody,
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: 11.5,
@@ -450,11 +708,11 @@ class _AccountScreenState extends State<AccountScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(_l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
+            child: Text(_l10n.commonSave),
           ),
         ],
       ),
@@ -472,15 +730,15 @@ class _AccountScreenState extends State<AccountScreen> {
         SnackBar(
           content: Text(
             value.isEmpty
-                ? 'Profile picture cleared.'
-                : 'Profile picture updated.',
+                ? _l10n.accountPictureCleared
+                : _l10n.accountPictureUpdated,
           ),
         ),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save the picture: $error')),
+        SnackBar(content: Text(_l10n.accountPictureFailed('$error'))),
       );
     }
   }
@@ -489,11 +747,11 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Account'),
+        title: Text(_l10n.account),
         actions: [
           IconButton(
             onPressed: _refresh,
-            tooltip: 'Refresh',
+            tooltip: _l10n.refresh,
             icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
           ),
         ],
@@ -510,7 +768,7 @@ class _AccountScreenState extends State<AccountScreen> {
           final profile = snapshot.data ?? const <String, dynamic>{};
           final email = asString(profile['email']) ??
               widget.api.currentUser?.email ??
-              'Signed in';
+              _l10n.accountSignedIn;
           final name = asString(profile['full_name']);
           final timezone = asString(profile['timezone']) ?? 'UTC';
           // Resolved against the clock, not just the stored row: a period that
@@ -532,7 +790,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Could not load your subscription',
+                          _l10n.accountSubError,
                           style: TextStyle(
                             color: AppColors.danger,
                             fontSize: 12,
@@ -558,7 +816,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('Try again'),
+                          child: Text(_l10n.commonTryAgain),
                         ),
                       ],
                     ),
@@ -620,21 +878,21 @@ class _AccountScreenState extends State<AccountScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(14, 14, 14, 2),
-                        child: SectionTitle(title: 'Subscription'),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 2),
+                        child: SectionTitle(title: _l10n.accountSubscription),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         child: Column(
                           children: [
                             LabelValue(
-                              label: 'Plan',
+                              label: _l10n.accountPlan,
                               value: info.planLabel,
                             ),
                             const ListDivider(),
                             LabelValue(
-                              label: 'Status',
+                              label: _l10n.accountStatus,
                               value: info.statusLabel,
                               valueColor: info.hasAccess
                                   ? AppColors.success
@@ -642,14 +900,14 @@ class _AccountScreenState extends State<AccountScreen> {
                             ),
                             const ListDivider(),
                             LabelValue(
-                              label: 'Trade limit / month',
+                              label: _l10n.accountTradeLimit,
                               value: info.maxTrades <= 0
-                                  ? 'Unlimited'
+                                  ? _l10n.accountUnlimited
                                   : '${info.maxTrades}',
                             ),
                             const ListDivider(),
                             LabelValue(
-                              label: 'Timezone',
+                              label: _l10n.accountTimezone,
                               value: timezone,
                               trailing: TextButton(
                                 onPressed: () => _pickTimezone(timezone),
@@ -662,14 +920,14 @@ class _AccountScreenState extends State<AccountScreen> {
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
                                 ),
-                                child: const Text('Change'),
+                                child: Text(_l10n.accountChange),
                               ),
                             ),
                             if (info.state == SubscriptionState.trial &&
                                 info.trialEndsAt != null) ...[
                               const ListDivider(),
                               LabelValue(
-                                label: 'Trial ends',
+                                label: _l10n.accountTrialEnds,
                                 value: DateFormat('d MMM yyyy')
                                     .format(info.trialEndsAt!),
                               ),
@@ -679,8 +937,8 @@ class _AccountScreenState extends State<AccountScreen> {
                               const ListDivider(),
                               LabelValue(
                                 label: info.cancelAtPeriodEnd
-                                    ? 'Access until'
-                                    : 'Paid through',
+                                    ? _l10n.accountAccessUntil
+                                    : _l10n.accountPaidThrough,
                                 value: DateFormat('d MMM yyyy')
                                     .format(info.periodEndsAt!),
                               ),
@@ -734,87 +992,29 @@ class _AccountScreenState extends State<AccountScreen> {
                   icon: const Icon(Icons.credit_card, size: 16),
                   label: Text(
                     info.hasAccess
-                        ? 'View plans & billing'
-                        : 'Buy a subscription',
+                        ? _l10n.accountViewPlans
+                        : _l10n.accountBuyPlan,
                   ),
                 ),
-                if (widget.onOpenPropFirm != null) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenPropFirm,
-                    icon: const Icon(Icons.verified_user_outlined, size: 16),
-                    label: const Text('Prop firm simulation'),
-                  ),
-                ],
-                if (widget.onOpenImport != null) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenImport,
-                    icon: const Icon(Icons.upload_file, size: 16),
-                    label: const Text('Import trade history'),
-                  ),
-                ],
-                if (widget.onOpenBacktest != null) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenBacktest,
-                    icon: const Icon(Icons.science_outlined, size: 16),
-                    label: const Text('Backtester (Pro)'),
-                  ),
-                ],
-                if (kMt5SyncEnabled) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _openSync,
-                    icon: const Icon(Icons.sync, size: 16),
-                    label: const Text('Connect MT5 account'),
-                  ),
-                ],
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
+                _sectionLabel(_l10n.sectionTrading),
                 _dailyStopCard(),
+                const SizedBox(height: 8),
+                _tradingCard(),
+                const SizedBox(height: 16),
+                _sectionLabel(_l10n.sectionPreferences),
+                _timezoneCard(timezone),
+                const SizedBox(height: 10),
+                _alertsCard(),
                 const SizedBox(height: 10),
                 FlatCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SectionTitle(
-                        title: 'Help & feedback',
+                      SectionTitle(
+                        title: _l10n.accountAppearance,
                         subtitle:
-                            'Questions, bugs, or something the journal should do. Every message is read.',
-                      ),
-                      const SizedBox(height: 10),
-                      // No address is shown. The button hands the mail app the
-                      // destination, so support mail is one tap and the address
-                      // is not on screen (or in a screenshot) for scrapers.
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _emailSupport,
-                          icon: const Icon(Icons.mail_outline, size: 16),
-                          label: const Text('Email support'),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _rateApp,
-                          icon: const Icon(Icons.star_outline, size: 16),
-                          label: const Text('Rate MTL Trader'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                FlatCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionTitle(
-                        title: 'Appearance',
-                        subtitle:
-                            'Dark, light, the mark\'s blue, or follow the device. Saved on this phone.',
+                            _l10n.accountAppearanceBody,
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -831,21 +1031,57 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 const SizedBox(height: 10),
                 const LanguagePicker(),
-                const SizedBox(height: 10),
-                // Developer and behind-the-scenes detail, kept together at the
-                // bottom instead of sitting at the same weight as the settings a
-                // trader actually changes.
+                const SizedBox(height: 16),
+                _sectionLabel(_l10n.sectionSupport),
                 FlatCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SectionTitle(
-                        title: 'About',
-                        subtitle: 'Where your journal media lives.',
+                      SectionTitle(
+                        title: _l10n.accountHelp,
+                        subtitle:
+                            _l10n.accountHelpBody,
+                      ),
+                      const SizedBox(height: 10),
+                      // No address is shown. The button hands the mail app the
+                      // destination, so support mail is one tap and the address
+                      // is not on screen (or in a screenshot) for scrapers.
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _emailSupport,
+                          icon: const Icon(Icons.mail_outline, size: 16),
+                          label: Text(_l10n.accountEmailSupport),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _rateApp,
+                          icon: const Icon(Icons.star_outline, size: 16),
+                          label: Text(_l10n.accountRate),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Developer and behind-the-scenes detail, kept together at the
+                // bottom instead of sitting at the same weight as the settings a
+                // trader actually changes.
+                _sectionLabel(_l10n.sectionAbout),
+                FlatCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SectionTitle(
+                        title: _l10n.accountAbout,
+                        subtitle: _l10n.accountAboutBody,
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Private media',
+                        _l10n.accountPrivateMedia,
                         style: TextStyle(
                           color: AppColors.text,
                           fontSize: 12.5,
@@ -854,8 +1090,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Journal photos and voice notes live in a private bucket. '
-                        'Each file is signed for one hour and only your account can request it.',
+                        _l10n.accountPrivateMediaBody,
                         style: TextStyle(
                           color: AppColors.muted,
                           fontSize: 11,
@@ -873,11 +1108,11 @@ class _AccountScreenState extends State<AccountScreen> {
                     foregroundColor: AppColors.danger,
                     side: BorderSide(color: AppColors.danger),
                   ),
-                  child: const Text('Sign out'),
+                  child: Text(_l10n.signOut),
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'MTL Trader · flat mobile journal\nTrades, notes and media stay on your Supabase project.',
+                  _l10n.accountFooter,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.faint,
@@ -970,11 +1205,12 @@ class _ThemeChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = ThemeController.instance.theme == theme;
+    final l10n = AppLocalizations.of(context);
     final label = switch (theme) {
-      AppTheme.dark => 'Dark',
-      AppTheme.light => 'Light',
-      AppTheme.blue => 'Blue',
-      AppTheme.system => 'System',
+      AppTheme.dark => l10n.themeDark,
+      AppTheme.light => l10n.themeLight,
+      AppTheme.blue => l10n.themeBlue,
+      AppTheme.system => l10n.themeSystem,
     };
     final icon = switch (theme) {
       AppTheme.dark => Icons.dark_mode_outlined,
@@ -1022,60 +1258,3 @@ class _ThemeChoice extends StatelessWidget {
   }
 }
 
-class _LockChoice extends StatelessWidget {
-  const _LockChoice({
-    required this.label,
-    required this.hint,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final String label;
-  final String hint;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.10)
-              : AppColors.background,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? AppColors.primary : AppColors.text,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              hint,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.faint,
-                fontSize: 8.5,
-                height: 1.2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

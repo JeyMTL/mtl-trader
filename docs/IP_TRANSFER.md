@@ -10,7 +10,7 @@
 
 ## 2. Subject matter
 
-The software known as **MTL Trader** (the "Software"), comprising the source
+The software known as **MTL Ledger** (the "Software"), comprising the source
 code, documentation, database migrations, and design assets in the repository
 `[repo URL]` at the commit identified in Appendix A.
 

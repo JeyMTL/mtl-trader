@@ -14,27 +14,27 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://mtl-trader.vercel.app').replace(/\/$/, '')
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://mtlledger.com').replace(/\/$/, '')
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: 'MTL Trader - Professional Trading Journal',
-    template: '%s — MTL Trader',
+    default: 'MTL Ledger - Professional Trading Journal',
+    template: '%s — MTL Ledger',
   },
-  description: "Track, analyze, and improve your trading performance with MTL Trader. The professional trading journal for serious traders.",
-  applicationName: 'MTL Trader',
+  description: "Track, analyze, and improve your trading performance with MTL Ledger. The professional trading journal for serious traders.",
+  applicationName: 'MTL Ledger',
   alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
-    siteName: 'MTL Trader',
-    title: 'MTL Trader - Professional Trading Journal',
+    siteName: 'MTL Ledger',
+    title: 'MTL Ledger - Professional Trading Journal',
     description: 'Log every fill, read the decisions behind the P&L, and let the journal find your edge.',
     url: '/',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MTL Trader - Professional Trading Journal',
+    title: 'MTL Ledger - Professional Trading Journal',
     description: 'Log every fill, read the decisions behind the P&L, and let the journal find your edge.',
   },
   icons: {
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   // inside the Capacitor shell the native config takes over.
   appleWebApp: {
     capable: true,
-    title: 'MTL Trader',
+    title: 'MTL Ledger',
     statusBarStyle: 'black-translucent',
   },
   formatDetection: { telephone: false },

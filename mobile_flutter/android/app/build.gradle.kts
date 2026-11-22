@@ -34,12 +34,19 @@ android {
     // product's own name rather than the Flutter template's folder-derived one.
     // It also matches the OAuth redirect scheme in AndroidManifest.xml.
     namespace = "com.mtltrader.app"
-    compileSdk = flutter.compileSdkVersion
+    // Pinned rather than taken from Flutter: flutter_local_notifications 23
+    // pulls androidx.core 1.19, which is compiled against API 37, and the AAR
+    // metadata check refuses to build this module against 36. The root build
+    // file forces the same value on every plugin module; keep them in step.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications schedules with java.time, which needs the
+        // desugared library to reach phones below Android 8.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -85,6 +92,10 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

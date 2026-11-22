@@ -288,7 +288,7 @@ export default function PricingPage() {
 
       <footer className="border-t border-border py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-xs text-gray-500 sm:flex-row">
-          <p>&copy; 2026 MTL Trader. All rights reserved.</p>
+          <p>&copy; 2026 MTL Ledger. All rights reserved.</p>
           <div className="flex gap-4">
             <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
             <Link href="/privacy" className="transition-colors hover:text-white">Privacy</Link>

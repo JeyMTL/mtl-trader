@@ -4,7 +4,7 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Delete your account',
   description:
-    'How to delete your MTL Trader account and everything attached to it, from the app or by email.',
+    'How to delete your MTL Ledger account and everything attached to it, from the app or by email.',
 }
 
 /**
@@ -26,7 +26,7 @@ export default function DeleteAccountPage() {
       <p className="mt-2 text-xs text-gray-500">Last updated {UPDATED}</p>
 
       <p className="mt-6">
-        You can delete your MTL Trader account and every trade, photo, note and backtest stored
+        You can delete your MTL Ledger account and every trade, photo, note and backtest stored
         with it. There is no charge, and you do not need to talk to anyone first.
       </p>
 
@@ -50,7 +50,7 @@ export default function DeleteAccountPage() {
 
       <h2>Option 2 — by email</h2>
       <p>
-        If you cannot sign in, email <strong>jfx064@gmail.com</strong> from the address on the
+        If you cannot sign in, email <strong>support@mtlledger.com</strong> from the address on the
         account with the subject &ldquo;Delete my account&rdquo;. We reply within two business days and
         delete the account within 30 days of confirming you own it.
       </p>

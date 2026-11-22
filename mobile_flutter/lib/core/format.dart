@@ -36,6 +36,27 @@ String compactMoney(num value) => _compact.format(value);
 
 String percent(num value) => '${value.toStringAsFixed(1)}%';
 
+/// A price with the float noise taken out.
+///
+/// MT5 prices are averaged out of deals in binary floating point, so a gold
+/// entry of 3595.738 reaches the app as 3595.7380000000003 and, before this,
+/// the journal printed every digit of it. Five decimals is more than any MT5
+/// instrument quotes and trailing zeros are trimmed, so gold reads 3595.738 and
+/// EURUSD 1.09846 — never 1.0984600000000002, and never 3595.73800 either.
+String price(num? value, {int decimals = 5}) {
+  if (value == null || !value.isFinite) return '—';
+  var text = value.toDouble().toStringAsFixed(decimals);
+  if (text.contains('.')) {
+    while (text.endsWith('0')) {
+      text = text.substring(0, text.length - 1);
+    }
+    if (text.endsWith('.')) text = text.substring(0, text.length - 1);
+  }
+  // A value that rounds to nothing downstream of the decimal point is zero, not
+  // "-0": the sign of an underflowing price is noise too.
+  return text == '-0' ? '0' : text;
+}
+
 String timeOf(DateTime? value) =>
     value == null ? '—' : _date('HH:mm').format(value);
 

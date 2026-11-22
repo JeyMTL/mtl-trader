@@ -65,6 +65,13 @@ class JournalApi {
     return asList(data).map((row) => EquityPoint.fromMap(asMap(row))).toList();
   }
 
+  /// Trades logged this month, counted by the database. The journal uses it to
+  /// tell a brand-new journal apart from a list read that came back empty.
+  Future<int> monthTradeCount() async {
+    final data = await _db.rpc('month_trade_count');
+    return asInt(data);
+  }
+
   Future<double> depositsTotal() async {
     final data = await _db.rpc('deposits_total');
     return asDouble(data);

@@ -1,8 +1,8 @@
-# MTL Trader — Trading Journal SaaS MVP
+# MTL Ledger — Trading Journal SaaS MVP
 
 ## Product overview
 
-MTL Trader is a trading journal and analytics web app for traders who want to bring trade history together, review performance, and keep a consistent record of their decisions. It combines trade entry and import with analytics, subscription rules, and payment workflows in a buyer-ready codebase.
+MTL Ledger is a trading journal and analytics web app for traders who want to bring trade history together, review performance, and keep a consistent record of their decisions. It combines trade entry and import with analytics, subscription rules, and payment workflows in a buyer-ready codebase.
 
 **Stage:** Pre-launch; the seller reports no customers or revenue.
 **Asking price:** USD $4,500 (negotiable).

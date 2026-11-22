@@ -1,20 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../services/market_data.dart';
 import '../ui/theme.dart';
-import '../ui/widgets.dart';
 
-/// Longest window `/api/market/candles` accepts.
+/// Longest window `/api/market/candles` accepts for an explicit range.
 const Duration maxChartTimeFrame = Duration(days: 62);
 
+/// The candle sizes in the order a trader reads a chart: minutes, then hours,
+/// then the day. Not alphabetical, not enum order — the order the buttons sit
+/// in on a desk, smallest detail first.
+const List<ChartInterval> chartTimeFrames = <ChartInterval>[
+  ChartInterval.fiveSeconds,
+  ChartInterval.tenSeconds,
+  ChartInterval.fifteenSeconds,
+  ChartInterval.thirtySeconds,
+  ChartInterval.fortyFiveSeconds,
+  ChartInterval.oneMinute,
+  ChartInterval.fiveMinutes,
+  ChartInterval.fifteenMinutes,
+  ChartInterval.thirtyMinutes,
+  ChartInterval.oneHour,
+  ChartInterval.fourHours,
+  ChartInterval.oneDay,
+];
+
 /// What the trader chose: the live tail, or an explicit window and candle size.
+///
+/// The window is kept as a type because the loader still understands it, but
+/// the picker only ever returns the live tail with a candle size. A range is
+/// something you pan into, not something you set before looking.
 class ChartTimeFrame {
-  const ChartTimeFrame.live()
+  const ChartTimeFrame.live({this.interval})
       : isLive = true,
         from = null,
-        to = null,
-        interval = null;
+        to = null;
 
   const ChartTimeFrame.custom({
     required this.from,
@@ -28,157 +47,38 @@ class ChartTimeFrame {
   final ChartInterval? interval;
 }
 
-/// Asks for the period and candle size to chart. Null when dismissed.
+/// Asks for the candle size. Null when dismissed.
 Future<ChartTimeFrame?> showChartTimeFrameSheet({
   required BuildContext context,
-  required DateTime from,
-  required DateTime to,
   required ChartInterval interval,
+  Set<ChartInterval> refused = const {},
 }) {
   return showModalBottomSheet<ChartTimeFrame>(
     context: context,
     backgroundColor: AppColors.surface,
+    // Twelve sizes on a phone need the taller sheet; the cap keeps a strip of
+    // chart visible above it so the choice is not made blind.
     isScrollControlled: true,
-    builder: (_) => _TimeFrameSheet(from: from, to: to, interval: interval),
+    constraints: BoxConstraints(
+      maxWidth: 460,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+    ),
+    builder: (_) => _TimeFrameSheet(interval: interval, refused: refused),
   );
 }
 
-class _TimeFrameSheet extends StatefulWidget {
-  const _TimeFrameSheet({
-    required this.from,
-    required this.to,
-    required this.interval,
-  });
+class _TimeFrameSheet extends StatelessWidget {
+  const _TimeFrameSheet({required this.interval, required this.refused});
 
-  final DateTime from;
-  final DateTime to;
   final ChartInterval interval;
 
-  @override
-  State<_TimeFrameSheet> createState() => _TimeFrameSheetState();
-}
-
-class _TimeFrameSheetState extends State<_TimeFrameSheet> {
-  /// Common spans, one tap each: they end at the latest candle and pick a
-  /// candle size that fits the span.
-  static const Map<String, Duration> _shortcuts = {
-    '1 Day': Duration(days: 1),
-    '1 Week': Duration(days: 7),
-    '1 Month': Duration(days: 30),
-  };
-
-  late DateTime _from = widget.from;
-  late DateTime _to = widget.to;
-  late ChartInterval _interval = widget.interval;
-
-  Duration get _span => _to.difference(_from);
-
-  int? get _bars => _span.isNegative ? null : candleCountFor(_span, _interval);
-
-  bool get _valid => _problem == null;
-
-  String? get _problem {
-    if (!_to.isAfter(_from)) return 'The end has to come after the start.';
-    if (_span > maxChartTimeFrame) return 'Keep the window within 62 days.';
-    if (_bars == null) {
-      return 'That needs more than $maxCandlesPerRequest candles. Pick a larger candle size or a shorter window.';
-    }
-    return null;
-  }
-
-  Future<void> _pickDate({required bool start}) async {
-    final now = DateTime.now();
-    final current = start ? _from : _to;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current.isAfter(now) ? now : current,
-      firstDate: DateTime(now.year - 5),
-      lastDate: now,
-      helpText: start ? 'Chart starts' : 'Chart ends',
-    );
-    if (picked == null || !mounted) return;
-    _replace(
-      start,
-      DateTime(
-          picked.year, picked.month, picked.day, current.hour, current.minute),
-    );
-  }
-
-  Future<void> _pickTime({required bool start}) async {
-    final current = start ? _from : _to;
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(current),
-      helpText: start ? 'Chart starts at' : 'Chart ends at',
-    );
-    if (picked == null || !mounted) return;
-    _replace(
-      start,
-      DateTime(
-          current.year, current.month, current.day, picked.hour, picked.minute),
-    );
-  }
-
-  void _applyShortcut(Duration span) {
-    final to = DateTime.now();
-    Navigator.of(context).pop(
-      ChartTimeFrame.custom(
-        from: to.subtract(span),
-        to: to,
-        interval: defaultIntervalFor(span),
-      ),
-    );
-  }
-
-  void _replace(bool start, DateTime value) {
-    setState(() {
-      if (start) {
-        _from = value;
-      } else {
-        _to = value;
-      }
-    });
-  }
-
-  Widget _row(String label, DateTime value, {required bool start}) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 42,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () => _pickDate(start: start),
-            child: Text(DateFormat('d MMM yyyy').format(value)),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // The app theme makes outlined buttons full-width, so a button in a
-        // Row needs an explicit width or its infinite minimum size crashes
-        // layout.
-        SizedBox(
-          width: 88,
-          child: OutlinedButton(
-            onPressed: () => _pickTime(start: start),
-            child: Text(DateFormat('HH:mm').format(value)),
-          ),
-        ),
-      ],
-    );
-  }
+  /// Sizes this account's feed answered with "Unknown candle interval". They
+  /// stay listed but cannot be picked, because a row that looks available and
+  /// then empties the chart is worse than a row that says why.
+  final Set<ChartInterval> refused;
 
   @override
   Widget build(BuildContext context) {
-    final problem = _problem;
-    final bars = _bars;
     return SafeArea(
       top: false,
       child: Column(
@@ -194,26 +94,27 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: Row(
               children: [
-                Text(
-                  'Chart time frame',
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
+                Expanded(
+                  child: Text(
+                    'Time frame',
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
-                  'Pick the period and the candle size, or jump to the newest candles.',
+                  'LIVE',
                   style: TextStyle(
-                    color: AppColors.faint,
-                    fontSize: 11,
-                    height: 1.4,
+                    color: AppColors.primaryLight,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
                   ),
                 ),
               ],
@@ -221,133 +122,22 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
           ),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SettingsSection(
-                    title: 'Quick spans',
-                    children: [
-                      // Three equal targets rather than three fixed-width
-                      // buttons that wrapped onto a second line on a narrow
-                      // phone before anything else could be reached.
-                      Row(
-                        children: [
-                          for (var i = 0; i < _shortcuts.length; i++) ...[
-                            if (i > 0) const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => _applyShortcut(
-                                  _shortcuts.values.elementAt(i),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size(0, 40),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                ),
-                                child: Text(
-                                  _shortcuts.keys.elementAt(i),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                  for (final entry in chartTimeFrames)
+                    _TimeFrameRow(
+                      interval: entry,
+                      selected: entry == interval,
+                      refused: refused.contains(entry),
+                      onTap: refused.contains(entry)
+                          ? null
+                          : () => Navigator.of(context).pop(
+                                ChartTimeFrame.live(interval: entry),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Each one ends at the newest candle and picks a candle size that fits.',
-                        style: TextStyle(
-                          color: AppColors.faint,
-                          fontSize: 10,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SettingsSection(
-                    title: 'Window',
-                    children: [
-                      _row('From', _from, start: true),
-                      const SizedBox(height: 8),
-                      _row('To', _to, start: false),
-                    ],
-                  ),
-                  SettingsSection(
-                    title: 'Candle size',
-                    trailing: _interval.key.toUpperCase(),
-                    children: [
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          for (final interval in ChartInterval.values)
-                            _IntervalChip(
-                              interval: interval,
-                              selected: interval == _interval,
-                              onTap: () => setState(() => _interval = interval),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        bars == null
-                            ? 'Too many candles at this size.'
-                            : '≈ $bars candles in this window',
-                        style: TextStyle(
-                          color:
-                              bars == null ? AppColors.danger : AppColors.faint,
-                          fontSize: 10.5,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (problem != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
-                      child: Text(
-                        problem,
-                        style: TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 11.5,
-                          height: 1.4,
-                        ),
-                      ),
                     ),
                 ],
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(const ChartTimeFrame.live()),
-                    child: const Text('Latest candles'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _valid
-                        ? () => Navigator.of(context).pop(
-                              ChartTimeFrame.custom(
-                                from: _from,
-                                to: _to,
-                                interval: _interval,
-                              ),
-                            )
-                        : null,
-                    child: const Text('Apply'),
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -356,39 +146,69 @@ class _TimeFrameSheetState extends State<_TimeFrameSheet> {
   }
 }
 
-/// One selectable candle size.
-class _IntervalChip extends StatelessWidget {
-  const _IntervalChip({
+/// One candle size. A full-width row rather than a chip: the sizes read as a
+/// list, and a row is a target the thumb finds without aiming.
+class _TimeFrameRow extends StatelessWidget {
+  const _TimeFrameRow({
     required this.interval,
     required this.selected,
     required this.onTap,
+    this.refused = false,
   });
 
   final ChartInterval interval;
   final bool selected;
-  final VoidCallback onTap;
+  final bool refused;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final ink = refused
+        ? AppColors.faint
+        : (selected ? AppColors.primaryLight : AppColors.text);
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.field),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        height: 42,
+        margin: const EdgeInsets.only(bottom: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color:
-              selected ? AppColors.primary.withAlpha(30) : AppColors.surfaceAlt,
-          borderRadius: BorderRadius.circular(AppRadius.chip),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
+          color: selected ? AppColors.primary.withAlpha(24) : null,
+          borderRadius: BorderRadius.circular(AppRadius.field),
         ),
-        child: Text(
-          interval.key.toUpperCase(),
-          style: TextStyle(
-            color: selected ? AppColors.primaryLight : AppColors.muted,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 46,
+              child: Text(
+                interval.key.toUpperCase(),
+                style: TextStyle(
+                  color: ink,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                refused ? 'Not served by this chart feed yet' : interval.detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: refused
+                      ? AppColors.faint
+                      : (selected
+                          ? AppColors.primaryLight
+                          : AppColors.muted),
+                  fontSize: 11.5,
+                ),
+              ),
+            ),
+            if (selected && !refused)
+              Icon(Icons.check, size: 16, color: AppColors.primaryLight),
+          ],
         ),
       ),
     );

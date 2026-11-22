@@ -15,12 +15,17 @@ import '../core/chart_theme.dart';
 import '../core/chart_view.dart';
 import '../core/chart_zone.dart';
 import '../core/indicators.dart';
+import '../core/level_touch.dart';
 import '../core/trade_exit.dart' show ResolvedExit;
 import '../core/instruments.dart';
 import '../services/journal_api.dart';
+import '../services/alerts.dart';
+import '../services/chart_drawings_sync.dart';
 import '../services/market_data.dart';
 import '../ui/chart/chart_marker.dart';
 import '../ui/chart/chart_painter.dart';
+import '../ui/chart/drawings_sheet.dart';
+import '../ui/chart/sync_badge.dart';
 import '../ui/color_wheel.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -64,6 +69,7 @@ class ChartPickerScreen extends StatefulWidget {
     this.exit,
     this.stop,
     this.take,
+    this.debugSyncState,
   });
 
   final Instrument instrument;
@@ -72,6 +78,15 @@ class ChartPickerScreen extends StatefulWidget {
   final double? exit;
   final double? stop;
   final double? take;
+
+  /// Pins the sync badge to one state for a widget test.
+  ///
+  /// Null in production, where the badge follows the real reconciliation. A test
+  /// cannot reach the other states on its own: `saved` needs a successful sync
+  /// and `syncing` a read in flight, and neither exists without a network and a
+  /// session.
+  @visibleForTesting
+  final ChartSyncState? debugSyncState;
 
   @override
   State<ChartPickerScreen> createState() => _ChartPickerScreenState();
@@ -85,8 +100,53 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   /// Lines and boxes the trader has drawn on this instrument.
   List<ChartDrawing> _drawings = const [];
 
+  /// Keeps this chart's objects in step with the account copy the web desk
+  /// writes. Debounced, and never allowed to fail loudly.
+  final ChartDrawingsSync _cloudDrawings = ChartDrawingsSync();
+  Timer? _cloudSyncTimer;
+  bool _cloudSyncRunning = false;
+  bool _cloudSyncAgain = false;
+
+  /// Signature of each object as last written, keyed by row id (or its content
+  /// for one that has not been shared yet). Drives the edit timestamps.
+  final Map<String, String> _drawingVersions = {};
+  Timer? _syncHideTimer;
+
+  /// What the account copy is doing, shown as one small badge in the app bar
+  /// and again over the fullscreen chart.
+  ChartSyncState _syncState = ChartSyncState.idle;
+  String? _syncMessage;
+
   /// Drawing under the trader's finger, selected for drag, edit or delete.
   int? _selectedDrawing;
+
+  /// One step of undo is one whole list, because a drag commits on every frame
+  /// and a trader thinks in edits, not frames. Redo is cleared by the next edit,
+  /// exactly as it is everywhere else.
+  final List<List<ChartDrawing>> _redo = [];
+
+  /// Snap to a wick while dragging. On by default, as on a desk, but a trader
+  /// marking a fill that printed between two ticks needs it off.
+  bool _magnet = true;
+
+  /// Candle under the crosshair, so the header can show its O H L C the way a
+  /// desktop chart does while the pointer travels.
+  Candle? _hover;
+
+  /// When the candles on screen are the device's last copy rather than a live
+  /// read, this is the moment they were fetched. Null means what is painted is
+  /// the market as the feed just served it.
+  DateTime? _staleAt;
+
+  /// Whether the finger has put down the first point of the object being
+  /// placed. Only the banner needs it, and only to count.
+  bool _placing = false;
+
+  /// Tool picked from the sheet, waiting for the trader to aim it. While one is
+  /// set the chart places instead of panning, and the hint strip says what it
+  /// wants; clearing it hands the chart back.
+  DrawingKind? _armingKind;
+  PositionSide? _armingSide;
 
   /// Window the trader entered. Both null means the live tail.
   DateTime? _windowFrom;
@@ -102,6 +162,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   ChartStyle _style = ChartStyle.current;
   bool _fullscreen = false;
+
+  /// In fullscreen the canvas owns the screen, so the buy/sell bar is collapsed
+  /// to one small button until the trader asks for it.
+  bool _tradeBarOpen = false;
 
   ReplayCursor? _replay;
   Timer? _playTimer;
@@ -187,6 +251,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   @override
   void initState() {
     super.initState();
+    _syncState = widget.debugSyncState ?? ChartSyncState.idle;
     _entry = widget.entry;
     _exit = widget.exit;
     _stop = widget.stop;
@@ -213,17 +278,211 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   Future<void> _restoreDrawings() async {
     final loaded = await ChartDrawingStore.load(widget.instrument.symbol);
-    if (!mounted || loaded.isEmpty) return;
-    setState(() => _drawings = loaded);
+    if (!mounted) return;
+    if (loaded.isNotEmpty) {
+      setState(() => _drawings = loaded);
+      _rememberVersions(loaded);
+    }
+    // The device copy paints first; the account copy follows, so a level pinned
+    // on the web desk is on the chart without the trader waiting on the network.
+    _queueCloudSync();
   }
 
   /// Persists on every change so a back gesture cannot lose the trader's work.
-  void _commitDrawings(List<ChartDrawing> next) {
+  void _commitDrawings(List<ChartDrawing> next, {bool keepRedo = false}) {
     setState(() {
       _drawings = next;
       _selectedDrawing = null;
+      if (!keepRedo) _redo.clear();
     });
-    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+    _persistDrawings(next);
+  }
+
+  /// Takes back the last change of any kind — a placed object, a drag, a
+  /// restyle, a delete. The whole list is kept, so undo is never approximate.
+  void _undo() {
+    if (_drawings.isEmpty) return;
+    final before = _drawings;
+    _commitDrawings(_drawings.sublist(0, _drawings.length - 1), keepRedo: true);
+    setState(() => _redo.add(before));
+  }
+
+  void _redoLast() {
+    if (_redo.isEmpty) return;
+    final next = _redo.removeLast();
+    _commitDrawings(next, keepRedo: true);
+  }
+
+  /// Restyles the selected object without touching its geometry.
+  void _restyleSelected(
+    DrawingLook Function(DrawingLook look) change, {
+    bool reselect = true,
+  }) {
+    final index = _selectedDrawing;
+    if (index == null || index >= _drawings.length) return;
+    final drawing = _drawings[index];
+    final next = [..._drawings];
+    next[index] = drawing.withLook(change(drawing.look));
+    _commitDrawings(next);
+    if (reselect) setState(() => _selectedDrawing = index);
+  }
+
+  /// How many points the armed tool needs. A horizontal line, a vertical line
+  /// and a text label are one point; everything else is a start and an end.
+  int get _placementPoints => switch (_armingKind) {
+        DrawingKind.ray ||
+        DrawingKind.vline ||
+        DrawingKind.text ||
+        DrawingKind.arrowUp ||
+        DrawingKind.arrowDown =>
+          1,
+        _ => 2,
+      };
+
+  /// Writes the device copy now and schedules the shared one.
+  ///
+  /// Every path that changes an object ends here, so no edit can reach the phone
+  /// and miss the account. The cloud write is debounced: a drag produces a
+  /// commit per frame, and only the position the finger was lifted at matters.
+  ///
+  /// Each object whose content actually changed is stamped with the moment of
+  /// the edit. That timestamp is what settles a disagreement with the web desk;
+  /// stamping on sync instead would make an edit made hours ago look new just
+  /// because the phone had been offline.
+  void _persistDrawings(List<ChartDrawing> drawings) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final stamped = <ChartDrawing>[];
+    final versions = <String, String>{};
+    for (final drawing in drawings) {
+      final signature = drawingSignature(drawing);
+      final key = drawing.id ?? 'new:$signature';
+      final untouched = _drawingVersions[key] == signature;
+      final next = untouched ? drawing : drawing.withEditedAt(now);
+      stamped.add(next);
+      versions[key] = signature;
+    }
+    _drawingVersions
+      ..clear()
+      ..addAll(versions);
+    if (mounted) setState(() => _drawings = stamped);
+    unawaited(ChartDrawingStore.save(widget.instrument.symbol, stamped));
+    _queueCloudSync();
+  }
+
+  /// Records what every object looks like now, so the next persist can tell an
+  /// edit from a list that merely passed through untouched.
+  void _rememberVersions(List<ChartDrawing> drawings) {
+    _drawingVersions
+      ..clear()
+      ..addEntries([
+        for (final drawing in drawings)
+          MapEntry(
+            drawing.id ?? 'new:${drawingSignature(drawing)}',
+            drawingSignature(drawing),
+          ),
+      ]);
+  }
+
+  void _queueCloudSync() {
+    if (!_cloudDrawings.available) return;
+    // A change made while a reconciliation is in flight would otherwise be
+    // dropped with the running call, so it is remembered and replayed once the
+    // call returns.
+    if (_cloudSyncRunning) _cloudSyncAgain = true;
+    _cloudSyncTimer?.cancel();
+    _cloudSyncTimer = Timer(
+      const Duration(milliseconds: 1500),
+      () => unawaited(_flushCloudSync()),
+    );
+  }
+
+  /// Reconciles this chart with `chart_drawings` in both directions.
+  ///
+  /// A failure is deliberately quiet: the objects on the device are the truth
+  /// for this chart, and a share that could not happen must never look like a
+  /// lost level.
+  Future<void> _clearSharedDrawings() async {
+    final error = await _cloudDrawings.clear(widget.instrument.symbol);
+    _setSyncOutcome(error);
+  }
+
+  /// The account-copy badge, in the app bar or over the fullscreen chart.
+  ///
+  /// `overlay` is the fullscreen chart, which carries the trader's own chart
+  /// theme rather than the app palette, so the badge reads on a black canvas in
+  /// the same colours as the tools beside it.
+  Widget _syncAction({bool overlay = false}) {
+    if (_syncState == ChartSyncState.idle) return const SizedBox.shrink();
+    return ChartSyncBadge(
+      state: _syncState,
+      onExplain: _explainSyncFailure,
+      muted: overlay ? _style.muted : null,
+      savedInk: overlay ? _style.text : null,
+      failedInk: overlay ? _style.bear : null,
+    );
+  }
+
+  void _explainSyncFailure() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _syncMessage ??
+              'This chart could not reach your account. The levels on this '
+                  'device are unaffected.',
+        ),
+      ),
+    );
+  }
+
+  /// Records a share result. A success fades after a moment, because a badge
+  /// that never leaves stops meaning anything; a failure stays until the next
+  /// successful sync, because that is the one the trader may need to act on.
+  void _setSyncOutcome(String? error) {
+    if (!mounted) return;
+    _syncHideTimer?.cancel();
+    setState(() {
+      _syncMessage = error;
+      _syncState = error == null ? ChartSyncState.saved : ChartSyncState.failed;
+    });
+    if (error != null) return;
+    _syncHideTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted || _syncState != ChartSyncState.saved) return;
+      setState(() => _syncState = ChartSyncState.idle);
+    });
+  }
+
+  Future<void> _flushCloudSync() async {
+    if (_cloudSyncRunning || !mounted) return;
+    _cloudSyncRunning = true;
+    final before = _drawings;
+    setState(() => _syncState = ChartSyncState.syncing);
+    try {
+      final outcome = await _cloudDrawings.sync(
+        widget.instrument.symbol,
+        before,
+      );
+      if (!mounted) return;
+      _setSyncOutcome(outcome.error);
+      if (!outcome.changed || !identical(_drawings, before)) return;
+      setState(() => _drawings = outcome.drawings);
+      _rememberVersions(outcome.drawings);
+      unawaited(
+        ChartDrawingStore.save(widget.instrument.symbol, outcome.drawings),
+      );
+    } catch (_) {
+      // The sync handles its own network errors; this is the last line, so the
+      // badge can never sit on "syncing" for good.
+      _setSyncOutcome(
+        'This chart could not reach your account. The levels on this device '
+        'are unaffected.',
+      );
+    } finally {
+      _cloudSyncRunning = false;
+      if (_cloudSyncAgain) {
+        _cloudSyncAgain = false;
+        _queueCloudSync();
+      }
+    }
   }
 
   /// Repaints a drawing while it is being dragged; the write waits for the
@@ -236,7 +495,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   }
 
   void _finishDrawingMove() {
-    unawaited(ChartDrawingStore.save(widget.instrument.symbol, _drawings));
+    _persistDrawings(_drawings);
   }
 
   void _deleteDrawing(int index) {
@@ -248,6 +507,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     _playTimer?.cancel();
+    _cloudSyncTimer?.cancel();
+    _syncHideTimer?.cancel();
     _market.close();
     // Leaving by the back gesture must not strand immersive mode.
     if (_fullscreen) {
@@ -260,9 +521,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(
-      const Duration(seconds: 60),
+      _refreshPeriod,
       (_) => _load(silent: true),
     );
+  }
+
+  /// How often the live tail is refetched.
+  ///
+  /// A third of a bar: soon enough that the newest candle keeps moving, late
+  /// enough that a 5-second chart does not turn into a request every second.
+  /// Floored at four seconds and capped at a minute, which is what the old fixed
+  /// minute became for hourly and daily charts.
+  Duration get _refreshPeriod {
+    final third = (_interval.size.inMilliseconds / 3).round();
+    return Duration(milliseconds: third.clamp(4000, 60000));
   }
 
   /// A past window never changes, so it is fetched once and not polled.
@@ -270,6 +542,16 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     _refreshTimer?.cancel();
     _refreshTimer = null;
   }
+
+  /// Candle sizes the chart feed refused this session, because a server built
+  /// before that size existed answers "Unknown candle interval".
+  final Set<ChartInterval> _refusedIntervals = {};
+
+  /// True when the error is the feed saying it does not know this candle size,
+  /// which is a build question, not a connection one.
+  bool _unknownInterval(Object error) =>
+      error is MarketDataException &&
+      error.message.toLowerCase().contains('unknown candle interval');
 
   Future<void> _load({bool silent = false, bool force = false}) async {
     try {
@@ -281,20 +563,117 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         force: force,
       );
       if (!mounted) return;
+      final previousClose = _candles.isEmpty ? null : _candles.last.close;
       setState(() {
         _candles = candles;
         _loading = false;
         _error = null;
+        _staleAt = null;
         _updated = DateTime.now();
       });
+      _checkLevelTouches(previousClose, candles);
     } catch (error) {
       if (!mounted) return;
       // A failed background refresh must not wipe a chart the trader can use.
       if (silent && _candles.isNotEmpty) return;
+      // A size the deployed feed has never heard of is not a dead end. Drop to
+      // one minute, which every build has served, say so once, and remember the
+      // refusal so the picker stops offering a choice that cannot work.
+      if (_unknownInterval(error) && !_refusedIntervals.contains(_interval)) {
+        final refused = _interval;
+        _refusedIntervals.add(refused);
+        if (refused != ChartInterval.oneMinute) {
+          setState(() {
+            _interval = ChartInterval.oneMinute;
+            _loading = true;
+            _error = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${refused.key.toUpperCase()} candles are not served by this '
+                'chart feed yet — showing 1M.',
+              ),
+            ),
+          );
+          await _load(force: true);
+          return;
+        }
+      }
+      // With nothing in memory and the feed refusing, stand on the last market
+      // this device actually saw. It is stamped everywhere it is shown, so an
+      // old chart can never be mistaken for a live one.
+      if (_candles.isEmpty && !_customWindow) {
+        final offline = await _market.offline(widget.instrument, _interval);
+        if (!mounted) return;
+        if (offline != null && offline.candles.isNotEmpty) {
+          setState(() {
+            _candles = offline.candles;
+            _loading = false;
+            _error = null;
+            _staleAt = offline.at;
+            _updated = offline.at;
+          });
+          return;
+        }
+      }
       setState(() {
         _loading = false;
         _error = error.toString();
       });
+    }
+  }
+
+  /// When each level was last reported, so a price that hovers around a level
+  /// does not produce an alert on every poll.
+  final Map<String, DateTime> _touchedAt = {};
+
+  /// Tells the trader when price crosses a level they marked.
+  ///
+  /// The comparison is previous close against new close, so one crossing is one
+  /// alert. Levels come from the position tool and from every horizontal ray; a
+  /// hidden object still counts, because hiding a level is about what the chart
+  /// draws, not about what the trader is watching for.
+  void _checkLevelTouches(double? previousClose, List<Candle> candles) {
+    if (previousClose == null || candles.isEmpty) return;
+    final levels = <WatchedLevel>[];
+    void add(String label, double? price) {
+      if (price == null || !price.isFinite) return;
+      levels.add(WatchedLevel(label: label, price: price));
+    }
+
+    add('entry', _entry);
+    add('stop', _stop);
+    add('target', _take);
+    add('exit', _exit);
+    for (final drawing in _drawings) {
+      if (drawing.kind == DrawingKind.ray) add('level', drawing.price);
+    }
+    if (levels.isEmpty) return;
+
+    final close = candles.last.close;
+    final now = DateTime.now();
+    for (final hit in touchedLevels(
+      from: previousClose,
+      to: close,
+      levels: levels,
+    )) {
+      final key = '${widget.instrument.symbol}|${hit.label}|${hit.price}';
+      final last = _touchedAt[key];
+      if (last != null && now.difference(last) < const Duration(minutes: 5)) {
+        continue;
+      }
+      _touchedAt[key] = now;
+      unawaited(
+        Alerts.instance.levelTouched(
+          symbol: widget.instrument.symbol,
+          label: hit.label,
+          price: hit.price,
+          crossedFrom: previousClose,
+          crossedTo: close,
+          decimals: widget.instrument.decimals,
+        ),
+      );
     }
   }
 
@@ -415,13 +794,229 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Turning the phone sideways is a request, not a coincidence: it is how a
+    // trader asks for the analysis view. Landscape therefore opens the chart on
+    // its own, with the controls moved to a rail so the candles get the whole
+    // screen, and everything needed is still one tap away.
+    final landscape =
+        MediaQuery.maybeOrientationOf(context) == Orientation.landscape;
     return PopScope(
       // Back leaves the fullscreen canvas instead of the chart screen.
-      canPop: !_fullscreen,
+      canPop: !_fullscreen && !landscape,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _fullscreen) _toggleFullscreen();
+        if (didPop) return;
+        if (_fullscreen) {
+          _toggleFullscreen();
+          return;
+        }
+        // Landscape hides the app bar, so back is the way out of the screen.
+        if (landscape) Navigator.of(context).maybePop();
       },
-      child: _fullscreen ? _fullscreenView() : _screenView(),
+      child: landscape
+          ? _landscapeView()
+          : (_fullscreen ? _fullscreenView() : _screenView()),
+    );
+  }
+
+  /// The analysis posture: chart edge to edge, one narrow rail for the tools,
+  /// and the two things a trader glances at — price and interval — floating on
+  /// the canvas they belong to.
+  Widget _landscapeView() {
+    return Scaffold(
+      backgroundColor: _style.background,
+      body: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _chartPanel(widget.instrument, expand: true),
+                  ),
+                  Positioned(
+                    left: 6,
+                    top: 4,
+                    right: 6,
+                    child: _landscapeReadout(),
+                  ),
+                  if (_replay != null)
+                    Positioned(
+                      left: 6,
+                      top: 40,
+                      right: 6,
+                      child: _replayStrip(overlay: true),
+                    ),
+                  if (_tradeBarOpen)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: ColoredBox(
+                        color: _style.background.withAlpha(242),
+                        child: _tradeBar(compact: true),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            _landscapeRail(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Symbol, last price, the day's change and the interval, in the corner of the
+  /// canvas where a desk sweeps its legend. It carries the way out too, because
+  /// landscape has no app bar.
+  Widget _landscapeReadout() {
+    final instrument = widget.instrument;
+    final last = _lastVisible?.close;
+    final change = _changePercent;
+    final up = (change ?? 0) >= 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _style.background.withAlpha(200),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => Navigator.of(context).maybePop(),
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(Icons.arrow_back, size: 16, color: _style.muted),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            instrument.symbol,
+            style: TextStyle(
+              color: _style.text,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+            ),
+          ),
+          if (last != null) ...[
+            const SizedBox(width: 6),
+            Text(
+              chartPrice(last, instrument),
+              style: tabular.copyWith(
+                color: _style.text,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (change != null) ...[
+            const SizedBox(width: 5),
+            Text(
+              '${up ? '+' : ''}${change.toStringAsFixed(2)}%',
+              style: tabular.copyWith(
+                color: up ? _style.bull : _style.bear,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: _style.axis.withAlpha(120),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              _interval.key,
+              style: tabular.copyWith(
+                color: _style.text,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const Spacer(),
+          _syncAction(overlay: true),
+        ],
+      ),
+    );
+  }
+
+  /// The tools column: the same set the portrait header offers, stacked where
+  /// they cost width the chart has to spare rather than height it does not.
+  Widget _landscapeRail() {
+    Widget button({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback? onTap,
+      bool active = false,
+    }) {
+      return IconButton(
+        tooltip: tooltip,
+        onPressed: onTap,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(
+          icon,
+          size: 19,
+          color: active
+              ? AppColors.primaryLight
+              : (onTap == null ? _style.axis : _style.muted),
+        ),
+      );
+    }
+
+    return Container(
+      width: 46,
+      decoration: BoxDecoration(
+        color: _style.background,
+        border: Border(left: BorderSide(color: _style.axis, width: 0.8)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 4),
+          button(
+            icon: Icons.draw_outlined,
+            tooltip: 'Drawing tools',
+            onTap: _openDrawingTools,
+            active: _armingKind != null || _armingSide != null,
+          ),
+          button(
+            icon: Icons.timer_outlined,
+            tooltip: 'Time frame',
+            onTap: _openTimeFrameSheet,
+          ),
+          button(
+            icon: Icons.replay,
+            tooltip: 'Market replay',
+            onTap: _candles.length < 12 ? null : _toggleReplayMode,
+            active: _replay != null,
+          ),
+          button(
+            icon: Icons.hdr_strong,
+            tooltip: _magnet ? 'Magnet on' : 'Magnet off',
+            onTap: () => setState(() => _magnet = !_magnet),
+            active: _magnet,
+          ),
+          button(
+            icon: Icons.tune,
+            tooltip: 'Chart style',
+            onTap: _openStyleSheet,
+          ),
+          const Spacer(),
+          button(
+            icon: _tradeBarOpen ? Icons.close : Icons.swap_vert,
+            tooltip: _tradeBarOpen ? 'Hide buy and sell' : 'Buy / sell',
+            onTap: _activePosition() == null
+                ? null
+                : () => setState(() => _tradeBarOpen = !_tradeBarOpen),
+            active: _tradeBarOpen,
+          ),
+          const SizedBox(height: 2),
+        ],
+      ),
     );
   }
 
@@ -451,6 +1046,16 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           // only changes how it fills the screen. Clearing the levels lives in
           // the Levels card now, where the levels are, instead of sitting
           // next to fullscreen under the same finger.
+          _syncAction(),
+          IconButton(
+            tooltip: _magnet ? 'Magnet on' : 'Magnet off',
+            onPressed: () => setState(() => _magnet = !_magnet),
+            icon: Icon(
+              Icons.hdr_strong,
+              size: 20,
+              color: _magnet ? AppColors.primaryLight : AppColors.muted,
+            ),
+          ),
           Container(
             width: 1,
             height: 18,
@@ -529,7 +1134,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             Expanded(
               child: _chartPanel(widget.instrument, expand: true),
             ),
-            _tradeBar(),
+            if (_tradeBarOpen) _tradeBar(compact: true),
             _fullscreenControls(),
           ],
         ),
@@ -555,6 +1160,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               children: [
                 Text(
                   instrument.symbol,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: _style.text,
                     fontSize: 15,
@@ -592,6 +1199,19 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             onPressed: _openStyleSheet,
             icon: Icon(Icons.tune, size: 20, color: _style.muted),
           ),
+          // The same badge as the app bar: fullscreen hides the bar, and a level
+          // that did not reach the account is exactly what a trader must not
+          // discover after leaving the canvas.
+          _syncAction(overlay: true),
+          IconButton(
+            tooltip: _magnet ? 'Magnet on' : 'Magnet off',
+            onPressed: () => setState(() => _magnet = !_magnet),
+            icon: Icon(
+              Icons.hdr_strong,
+              size: 19,
+              color: _magnet ? _style.text : _style.muted,
+            ),
+          ),
           Container(
             width: 1,
             height: 16,
@@ -621,6 +1241,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           const SizedBox(height: 6),
           Row(
             children: [
+              _tradeToggle(),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Drag a level line to move it and its time',
@@ -640,6 +1262,54 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// The one small button that stands in for the buy/sell bar in fullscreen.
+  ///
+  /// The canvas is the reason for fullscreen, so the two sides are folded away
+  /// behind a single tap and come back at 32px instead of 46px.
+  Widget _tradeToggle() {
+    final ready = _activePosition() != null && !_loading && _error == null;
+    final open = _tradeBarOpen;
+    final ink = open ? AppColors.primaryLight : _style.muted;
+    return Semantics(
+      button: true,
+      label: open ? 'Hide buy and sell' : 'Show buy and sell',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: ready ? () => setState(() => _tradeBarOpen = !open) : null,
+        child: Opacity(
+          opacity: ready ? 1 : 0.4,
+          child: Container(
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            decoration: BoxDecoration(
+              color: _style.background,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: open ? AppColors.primary : _style.axis,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(open ? Icons.close : Icons.swap_vert, size: 15, color: ink),
+                const SizedBox(width: 5),
+                Text(
+                  open ? 'Hide' : 'Buy / sell',
+                  style: TextStyle(
+                    color: ink,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -691,9 +1361,220 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       onDrawingMoved: _moveDrawing,
       onDrawingMoveEnd: _finishDrawingMove,
       onReachStart: _loadingOlder ? null : _loadOlder,
+      pendingKind: _armingKind,
+      pendingSide: _armingSide,
+      magnet: _magnet,
+      onCrosshair: (candle) {
+        if (identical(candle, _hover)) return;
+        setState(() => _hover = candle);
+      },
+      onPlacing: (down) {
+        if (down == _placing) return;
+        setState(() => _placing = down);
+      },
+      onDrawingCreated: (drawing) => unawaited(_placeDrawing(drawing)),
     );
 
-    return canvas;
+    final armed = _armingKind != null || _armingSide != null;
+    final selected = _selectedDrawing;
+    final showBar = selected != null &&
+        selected < _drawings.length &&
+        !armed &&
+        !_drawings[selected].look.locked;
+    if (!armed && !showBar) return canvas;
+    // The banners sit above the chart rather than floating over it, so they can
+    // never cover the candles the object is being aimed at.
+    return Column(
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        if (armed) _placementBanner(),
+        if (showBar) _objectBar(selected),
+        if (expand) Expanded(child: canvas) else canvas,
+      ],
+    );
+  }
+
+  /// The placement banner, as TradingView draws it: how far through the object
+  /// the finger is on the left, what to do next in the middle, and a bin on the
+  /// right to walk away from the tool.
+  Widget _placementBanner() {
+    final total = _placementPoints;
+    final placed = _placing ? total : 1;
+    final title = _placing
+        ? (total > 1 ? 'Lift to finish up' : 'Lift to place')
+        : (total > 1 ? 'Tap or drag to place' : 'Tap to place');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      height: 34,
+      padding: const EdgeInsets.only(left: 10, right: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111417),
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        border: Border.all(color: drawingColor.withAlpha(70)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: drawingColor.withAlpha(38),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '$placed of $total',
+              style: tabular.copyWith(
+                color: drawingColor,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFF2F4F7),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Put the tool away',
+            onPressed: _disarmTool,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(
+              Icons.delete_outline,
+              size: 18,
+              color: Color(0xFFF2F4F7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The selected object's own toolbar, the way a desk swaps its tool row for
+  /// the object it is holding: clone, colour, weight, line style and remove,
+  /// with everything else behind the overflow.
+  Widget _objectBar(int index) {
+    final drawing = _drawings[index];
+    final look = drawing.look;
+    Widget action({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback? onTap,
+      bool active = false,
+      Color? tone,
+    }) {
+      return IconButton(
+        tooltip: tooltip,
+        onPressed: onTap,
+        visualDensity: VisualDensity.compact,
+        icon: Icon(
+          icon,
+          size: 18,
+          color: onTap == null
+              ? AppColors.faint
+              : (tone ?? (active ? drawingColor : AppColors.muted)),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      height: 38,
+      padding: const EdgeInsets.only(left: 6, right: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 14,
+            alignment: Alignment.center,
+            child: Icon(Icons.drag_indicator, size: 14, color: AppColors.faint),
+          ),
+          Expanded(
+            child: Text(
+              _drawingTitle(drawing),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          action(
+            icon: Icons.copy_all_outlined,
+            tooltip: 'Clone',
+            onTap: () => _cloneDrawing(index),
+          ),
+          action(
+            icon: Icons.palette_outlined,
+            tooltip: 'Colour',
+            active: look.tint != null,
+            onTap: () => unawaited(
+              _pickCustomColor(
+                _drawingTitle(drawing),
+                look.tint ?? drawingColor,
+                (picked) => _restyleSelected(
+                  (current) => current.copyWith(tint: picked),
+                ),
+              ),
+            ),
+          ),
+          action(
+            icon: Icons.line_weight,
+            tooltip: 'Line width',
+            active: look.weight != null,
+            onTap: () {
+              // 1, 2, 3 and back to the chart's own weight.
+              final nextWeight = switch (look.weight) {
+                null => 2.0,
+                2.0 => 3.0,
+                3.0 => null,
+                _ => 1.0,
+              };
+              _restyleSelected(
+                (current) => nextWeight == null
+                    ? current.copyWith(clearWeight: true)
+                    : current.copyWith(weight: nextWeight),
+              );
+            },
+          ),
+          action(
+            icon: Icons.more_horiz,
+            tooltip: 'Line style',
+            active: look.dashed,
+            onTap: () => _restyleSelected(
+              (current) => current.copyWith(dashed: !current.dashed),
+            ),
+          ),
+          action(
+            icon: Icons.lock_outline,
+            tooltip: 'Lock',
+            onTap: () => _restyleSelected(
+              (current) => current.copyWith(locked: true),
+              reselect: false,
+            ),
+          ),
+          action(
+            icon: Icons.delete_outline,
+            tooltip: 'Remove',
+            tone: AppColors.danger,
+            onTap: () => _deleteDrawing(index),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _jumpToDate() async {
@@ -756,10 +1637,40 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         _candles = candles;
         _loading = false;
         _error = null;
+        // A fetched window is the feed's own read, whatever was on screen
+        // before it.
+        _staleAt = null;
       });
       return candles;
     } catch (error) {
       if (!mounted) return null;
+      // The day the trader jumped to may already be on this phone from an
+      // earlier visit: stand on it and say when it was fetched.
+      final copy = await _market.offline(
+        widget.instrument,
+        _interval,
+        from: start,
+        to: end,
+      );
+      if (!mounted) return null;
+      if (copy != null) {
+        setState(() {
+          _candles = copy.candles;
+          _loading = false;
+          _error = null;
+          _staleAt = copy.at;
+          _updated = copy.at;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Feed down — showing this window from the copy saved '
+              '${DateFormat('EEE HH:mm').format(copy.at)}.',
+            ),
+          ),
+        );
+        return copy.candles;
+      }
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString())),
@@ -808,6 +1719,31 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _loadingOlder = false);
+      // Panning into history the phone already holds is not a failure, even
+      // with the feed down.
+      final copy = await _market.offline(
+        widget.instrument,
+        _interval,
+        from: oldest.subtract(_rangeSpan),
+        to: oldest,
+      );
+      if (!mounted) return;
+      if (copy != null) {
+        final fresh = copy.candles
+            .where((candle) => candle.time.isBefore(oldest))
+            .toList();
+        if (fresh.isNotEmpty) {
+          setState(() {
+            _candles = [...fresh, ..._candles];
+            _replay = ReplayCursor(
+              count: _candles.length,
+              index: replay.index + fresh.length,
+            );
+            _staleAt = copy.at;
+          });
+          return;
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString())),
       );
@@ -1094,50 +2030,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _toolCard(
-                        icon: Icons.trending_up,
-                        label: 'Long position',
-                        subtitle: 'Profit above entry',
-                        onTap: () => pick('long'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _toolCard(
-                        icon: Icons.trending_down,
-                        label: 'Short position',
-                        subtitle: 'Profit below entry',
-                        onTap: () => pick('short'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _toolCard(
-                        icon: Icons.show_chart,
-                        label: 'Trend line',
-                        subtitle: 'Two points',
-                        onTap: () => pick('trend'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _toolCard(
-                        icon: Icons.horizontal_rule,
-                        label: 'Horizontal ray',
-                        subtitle: 'One price',
-                        onTap: () => pick('ray'),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 10),
+                DrawingsPanel(onPick: pick),
                 if (hasSelection) ...[
                   const SizedBox(height: 14),
                   _sheetLabel('SELECTED OBJECT'),
@@ -1180,9 +2074,25 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.undo, size: 20),
-                  title: const Text('Undo last drawing'),
+                  title: const Text('Undo last change'),
                   enabled: _drawings.isNotEmpty,
                   onTap: () => pick('undo'),
+                ),
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.redo, size: 20),
+                  title: const Text('Redo'),
+                  enabled: _redo.isNotEmpty,
+                  onTap: () => pick('redo'),
+                ),
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.account_tree_outlined, size: 20),
+                  title: const Text('Object tree'),
+                  enabled: _drawings.isNotEmpty,
+                  onTap: () => pick('tree'),
                 ),
                 ListTile(
                   dense: true,
@@ -1199,28 +2109,46 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       },
     );
     if (!mounted || action == null || action == 'close') return;
+    // The position tools arm like every other tool: the entry lands where the
+    // trader presses, and the drag sets how far forward the box runs.
     if (action == 'long') {
-      _addPosition(PositionSide.long);
+      _armTool(DrawingKind.position, side: PositionSide.long);
       return;
     }
     if (action == 'short') {
-      _addPosition(PositionSide.short);
+      _armTool(DrawingKind.position, side: PositionSide.short);
       return;
     }
     if (action == 'trend') {
-      _addTrend();
+      _armTool(DrawingKind.trend);
       return;
     }
     if (action == 'ray') {
-      _addRay();
+      _armTool(DrawingKind.ray);
       return;
     }
-    if (action == 'undo' && _drawings.isNotEmpty) {
-      _commitDrawings(_drawings.sublist(0, _drawings.length - 1));
+    final objectKind = _objectKindFor(action);
+    if (objectKind != null) {
+      _armTool(objectKind);
+      return;
+    }
+    if (action == 'undo') {
+      _undo();
+      return;
+    }
+    if (action == 'redo') {
+      _redoLast();
+      return;
+    }
+    if (action == 'tree') {
+      await _openObjectTree();
       return;
     }
     if (action == 'clear') {
       _commitDrawings(const []);
+      // The account copy goes too, so a level pinned on the web desk cannot
+      // reappear the moment the next sync runs.
+      unawaited(_clearSharedDrawings());
       return;
     }
     if (!hasSelection) return;
@@ -1316,56 +2244,108 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     return (average * 2).clamp(price * 0.0005, price * 0.03).toDouble();
   }
 
-  /// Places a long or short position box across the recent candles.
+  /// Arms a tool and waits for the trader to say where it goes.
   ///
-  /// The tool used to arm a mode and create the box wherever the trader tapped,
-  /// so a stray tap marked a point. Now the tool places the box itself: the
-  /// levels are on screen at once and the trader drags them, the way
-  /// TradingView's position tool behaves.
-  ///
-  /// The box ends on the newest candle instead of running right forever. A
-  /// calibration is a record of the move it was drawn on, not a level projected
-  /// across the days that come after it.
-  void _addPosition(PositionSide side) {
-    final candles = _visibleCandles;
-    if (candles.isEmpty) return;
-    final last = candles.last;
-    final from = (candles.length - 24).clamp(0, candles.length - 1);
-    final risk = _defaultRisk(last.close);
-    final long = side == PositionSide.long;
-    _addDrawing(
-      ChartDrawing.position(
-        side: side,
-        startMs: candles[from].time.millisecondsSinceEpoch,
-        endMs: last.time.millisecondsSinceEpoch,
-        entry: last.close,
-        stop: long ? last.close - risk : last.close + risk,
-        target: long ? last.close + risk * 2 : last.close - risk * 2,
-      ),
-    );
+  /// Every tool used to place its own object at a spot the app chose — the last
+  /// two dozen candles — which meant the first thing anyone did with a shape was
+  /// drag it out of the way. Aiming first is how every desk works: pick the
+  /// tool, then put it where it belongs. The canvas shows the object growing
+  /// under the finger, so the size is decided before it is committed.
+  void _armTool(DrawingKind kind, {PositionSide? side}) {
+    setState(() {
+      _armingKind = kind;
+      _armingSide = side;
+      _selectedDrawing = null;
+    });
   }
 
-  /// A trend line across the recent window, ready to be dragged into place.
-  void _addTrend() {
-    final candles = _visibleCandles;
-    if (candles.length < 2) return;
-    final last = candles.last;
-    final from = (candles.length - 24).clamp(0, candles.length - 1);
-    _addDrawing(
-      ChartDrawing.trend(
-        startMs: candles[from].time.millisecondsSinceEpoch,
-        startPrice: candles[from].close,
-        endMs: last.time.millisecondsSinceEpoch,
-        endPrice: last.close,
-      ),
-    );
+  void _disarmTool() {
+    if (_armingKind == null && _armingSide == null) return;
+    setState(() {
+      _armingKind = null;
+      _armingSide = null;
+      _placing = false;
+    });
   }
 
-  /// A horizontal ray at the last price.
-  void _addRay() {
-    final last = _lastVisible;
-    if (last == null) return;
-    _addDrawing(ChartDrawing.ray(price: last.close));
+  /// An object the trader has placed. Text asks for its words afterwards, so the
+  /// label lands where they pointed rather than in the middle of the chart, and
+  /// it is not created at all if they back out of the dialog.
+  Future<void> _placeDrawing(ChartDrawing drawing) async {
+    _disarmTool();
+    if (drawing.kind == DrawingKind.text) {
+      final words = await _askWords();
+      if (!mounted || words == null || words.isEmpty) return;
+      _addDrawing(
+        ChartDrawing.points(
+          kind: DrawingKind.text,
+          text: words,
+          points: drawing.points,
+        ),
+      );
+      return;
+    }
+    _addDrawing(drawing);
+  }
+
+  Future<String?> _askWords() async {
+    final controller = TextEditingController();
+    final words = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Text',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 80,
+          style: TextStyle(color: AppColors.text, fontSize: 13),
+          decoration: const InputDecoration(hintText: 'Note on the chart'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return null;
+    return words;
+  }
+
+  /// Maps the sheet's tool id onto the object it creates.
+  DrawingKind? _objectKindFor(String id) {
+    switch (id) {
+      case 'vline':
+        return DrawingKind.vline;
+      case 'rectangle':
+        return DrawingKind.rectangle;
+      case 'ellipse':
+        return DrawingKind.ellipse;
+      case 'fib':
+        return DrawingKind.fib;
+      case 'fibExtension':
+        return DrawingKind.fibExtension;
+      case 'measure':
+        return DrawingKind.measure;
+      case 'text':
+        return DrawingKind.text;
+      case 'arrowUp':
+        return DrawingKind.arrowUp;
+      case 'arrowDown':
+        return DrawingKind.arrowDown;
+      case 'brush':
+        return DrawingKind.brush;
+    }
+    return null;
   }
 
   /// Adds a drawing and selects it, so its handles are visible without a
@@ -1376,7 +2356,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       _drawings = next;
       _selectedDrawing = next.length - 1;
     });
-    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+    _persistDrawings(next);
   }
 
   /// Copies a drawing, nudged a fraction of its own risk so the copy is visible
@@ -1405,6 +2385,14 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           stop: (source.stop ?? base) + nudge,
           target: (source.target ?? base) + nudge,
         ),
+      _ => ChartDrawing.points(
+          kind: source.kind,
+          text: source.text,
+          points: [
+            for (final point in source.points)
+              ChartPoint(ms: point.ms, price: point.price + nudge),
+          ],
+        ),
     };
     _addDrawing(copy);
   }
@@ -1419,6 +2407,26 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         return drawing.side == PositionSide.short
             ? 'Short position'
             : 'Long position';
+      case DrawingKind.rectangle:
+        return 'Rectangle';
+      case DrawingKind.ellipse:
+        return 'Ellipse';
+      case DrawingKind.vline:
+        return 'Vertical line';
+      case DrawingKind.fib:
+        return 'Fib retracement';
+      case DrawingKind.fibExtension:
+        return 'Fib extension';
+      case DrawingKind.text:
+        return drawing.text == null ? 'Text' : 'Text — ${drawing.text}';
+      case DrawingKind.arrowUp:
+        return 'Arrow up';
+      case DrawingKind.arrowDown:
+        return 'Arrow down';
+      case DrawingKind.brush:
+        return 'Brush';
+      case DrawingKind.measure:
+        return 'Measure';
     }
   }
 
@@ -1513,6 +2521,41 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              // The rest of the object menu, where TradingView keeps it: the
+              // switches that decide whether this object can be touched or seen,
+              // and the door to every other object on the chart.
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  drawing.look.locked ? Icons.lock : Icons.lock_open,
+                  size: 19,
+                ),
+                title: Text(drawing.look.locked ? 'Unlock' : 'Lock'),
+                subtitle: Text(
+                  drawing.look.locked
+                      ? 'Let the finger move it again'
+                      : 'Hold it exactly where it is',
+                ),
+                onTap: () => Navigator.of(sheetContext).pop('lock'),
+              ),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.visibility_off_outlined, size: 19),
+                title: const Text('Hide'),
+                subtitle: const Text('Clear it off the chart, keep the idea'),
+                onTap: () => Navigator.of(sheetContext).pop('hide'),
+              ),
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.account_tree_outlined, size: 19),
+                title: const Text('Object tree'),
+                subtitle: Text('${_drawings.length} objects on this chart'),
+                onTap: () => Navigator.of(sheetContext).pop('tree'),
+              ),
             ],
           ),
         ),
@@ -1527,7 +2570,196 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       _cloneDrawing(index);
       return;
     }
-    if (action == 'delete') _deleteDrawing(index);
+    if (action == 'delete') {
+      _deleteDrawing(index);
+      return;
+    }
+    if (action == 'lock') {
+      final next = [..._drawings];
+      next[index] = drawing.withLook(
+        drawing.look.copyWith(locked: !drawing.look.locked),
+      );
+      _commitDrawings(next);
+      return;
+    }
+    if (action == 'hide') {
+      final next = [..._drawings];
+      next[index] = drawing.withLook(drawing.look.copyWith(hidden: true));
+      _commitDrawings(next);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Object hidden.'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              if (!mounted) return;
+              final restore = [..._drawings];
+              final at = restore.indexWhere(
+                (item) => item.id == drawing.id &&
+                    item.kind == drawing.kind &&
+                    item.look.hidden,
+              );
+              if (at < 0) return;
+              restore[at] = restore[at].withLook(
+                restore[at].look.copyWith(hidden: false),
+              );
+              _commitDrawings(restore);
+            },
+          ),
+        ),
+      );
+      return;
+    }
+    if (action == 'tree') {
+      await _openObjectTree();
+    }
+  }
+
+  /// Every object on this chart, visible or not: tap one to select it on the
+  /// canvas, or flip its eye and lock from here. TradingView's object tree is
+  /// the only place a hidden object can be found again.
+  Future<void> _openObjectTree() async {
+    if (_drawings.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void update(int index, DrawingLook Function(DrawingLook) change) {
+              final next = [..._drawings];
+              next[index] = next[index].withLook(change(next[index].look));
+              _commitDrawings(next);
+              setSheetState(() {});
+            }
+
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 6, 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Object tree',
+                              style: TextStyle(
+                                color: AppColors.text,
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Close',
+                            onPressed: () =>
+                                Navigator.of(sheetContext).pop(),
+                            icon: Icon(
+                              Icons.close,
+                              size: 18,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        itemCount: _drawings.length,
+                        itemBuilder: (context, index) {
+                          final item = _drawings[index];
+                          return ListTile(
+                            dense: true,
+                            leading: Icon(
+                              item.look.hidden
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              size: 19,
+                              color: item.look.hidden
+                                  ? AppColors.faint
+                                  : item.ink,
+                            ),
+                            title: Text(
+                              _drawingTitle(item),
+                              style: TextStyle(
+                                color: item.look.hidden
+                                    ? AppColors.muted
+                                    : AppColors.text,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: item.isPosition
+                                ? Text(
+                                    _positionSummary(item),
+                                    style: TextStyle(
+                                      color: AppColors.faint,
+                                      fontSize: 10.5,
+                                    ),
+                                  )
+                                : null,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              setState(() => _selectedDrawing = index);
+                            },
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: item.look.locked
+                                      ? 'Unlock'
+                                      : 'Lock',
+                                  onPressed: () => update(
+                                    index,
+                                    (look) =>
+                                        look.copyWith(locked: !look.locked),
+                                  ),
+                                  icon: Icon(
+                                    item.look.locked
+                                        ? Icons.lock
+                                        : Icons.lock_open,
+                                    size: 17,
+                                    color: item.look.locked
+                                        ? drawingColor
+                                        : AppColors.faint,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: item.look.hidden ? 'Show' : 'Hide',
+                                  onPressed: () => update(
+                                    index,
+                                    (look) =>
+                                        look.copyWith(hidden: !look.hidden),
+                                  ),
+                                  icon: Icon(
+                                    item.look.hidden
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    size: 17,
+                                    color: AppColors.faint,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   /// The object's settings: its prices, and for a position its side. Times are
@@ -1597,13 +2829,19 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             }
 
             ChartDrawing build() {
+              // Every rebuild carries the row id, so retyping a level updates
+              // the shared object instead of leaving the old one behind.
               if (drawing.kind == DrawingKind.ray) {
                 return ChartDrawing.ray(
+                  id: drawing.id,
+                  look: drawing.look,
                   price: read('Price', drawing.price ?? 0),
                 );
               }
               if (drawing.isPosition) {
                 return ChartDrawing.position(
+                  id: drawing.id,
+                  look: drawing.look,
                   side: side,
                   startMs: drawing.startMs,
                   endMs: drawing.endMs,
@@ -1613,6 +2851,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                 );
               }
               return ChartDrawing.trend(
+                id: drawing.id,
+                look: drawing.look,
                 startMs: drawing.startMs,
                 startPrice: read('Start price', drawing.startPrice),
                 endMs: drawing.endMs,
@@ -1738,7 +2978,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       _drawings = next;
       _selectedDrawing = index;
     });
-    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+    _persistDrawings(next);
   }
 
   Widget _sideChip({
@@ -1812,7 +3052,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       );
       _selectionDirection = side == PositionSide.short ? 'SELL' : 'BUY';
     });
-    unawaited(ChartDrawingStore.save(widget.instrument.symbol, next));
+    _persistDrawings(next);
     await _confirmLevels();
   }
 
@@ -1821,12 +3061,14 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   /// Docked rather than floating: a button over the candles hid the bars it was
   /// meant to trade and sat under the thumb while panning. Full width keeps the
   /// tap that turns a calibration into a trade the largest target on screen.
-  Widget _tradeBar() {
+  Widget _tradeBar({bool compact = false}) {
     final active = _activePosition();
     final ready = active != null && !_loading && _error == null;
     final price = active?.drawing.entry;
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      padding: compact
+          ? const EdgeInsets.fromLTRB(8, 4, 8, 4)
+          : const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(
         color: _style.background,
         border: Border(top: BorderSide(color: _style.grid.withAlpha(110))),
@@ -1839,6 +3081,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               price: price,
               color: AppColors.danger,
               enabled: ready,
+              compact: compact,
               onTap: () => _tradeFromDrawing(PositionSide.short),
             ),
           ),
@@ -1849,6 +3092,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               price: price,
               color: AppColors.success,
               enabled: ready,
+              compact: compact,
               onTap: () => _tradeFromDrawing(PositionSide.long),
             ),
           ),
@@ -1863,6 +3107,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     required Color color,
     required bool enabled,
     required VoidCallback onTap,
+    bool compact = false,
   }) {
     final decimals = widget.instrument.decimals;
     return Opacity(
@@ -1874,7 +3119,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           borderRadius: BorderRadius.circular(AppRadius.field),
           onTap: enabled ? onTap : null,
           child: Container(
-            height: 46,
+            height: compact ? 32 : 46,
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: FittedBox(
@@ -1886,7 +3131,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                     label,
                     style: TextStyle(
                       color: AppColors.ink,
-                      fontSize: 13,
+                      fontSize: compact ? 11.5 : 13,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.8,
                     ),
@@ -1914,7 +3159,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   void _toggleFullscreen() {
     final next = !_fullscreen;
-    setState(() => _fullscreen = next);
+    setState(() {
+      _fullscreen = next;
+      // Leaving fullscreen restores the normal layout, and the bar there is
+      // always visible, so the toggle starts closed again next time.
+      _tradeBarOpen = false;
+    });
     SystemChrome.setEnabledSystemUIMode(
       next ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
     );
@@ -2812,8 +4062,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           Text(
             _error!,
             textAlign: TextAlign.center,
+            // The card behind this is the chart's own background, which is
+            // white on the day theme. The app palette writes white here and the
+            // button vanished, so both take the canvas colours.
             style: TextStyle(
-              color: AppColors.muted,
+              color: _style.muted,
               fontSize: 11.5,
               height: 1.45,
             ),
@@ -2824,6 +4077,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 36),
               padding: const EdgeInsets.symmetric(horizontal: 16),
+              foregroundColor: _style.text,
+              side: BorderSide(color: _style.axis),
             ),
             child: const Text('Try again'),
           ),
@@ -2901,24 +4156,45 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               ),
               const SizedBox(width: 6),
               Pill(
-                text: 'LIVE',
-                tone: Tone.positive,
+                text: _staleAt == null ? 'LIVE' : 'OFFLINE',
+                tone: _staleAt == null ? Tone.positive : Tone.negative,
               ),
               const SizedBox(width: 8),
               // Expanded instead of Spacer: the timestamp is the part that has
               // to give way when the pills and a doubled text size leave no
               // room, and a Spacer only reports the overflow.
               Expanded(
-                child: _updated == null
-                    ? const SizedBox.shrink()
+                // While the crosshair is out, the legend reads that candle
+                // instead of the clock: O H L C is what a trader measures a
+                // level against, and it is where a desk puts it.
+                child: _hover == null
+                    ? (_updated == null
+                        ? const SizedBox.shrink()
+                        : Text(
+                            'Updated '
+                            '${DateFormat('HH:mm:ss').format(_updated!)}',
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tabular.copyWith(
+                              color: AppColors.faint,
+                              fontSize: 9.5,
+                            ),
+                          ))
                     : Text(
-                        'Updated ${DateFormat('HH:mm:ss').format(_updated!)}',
+                        'O ${_hover!.open.toStringAsFixed(widget.instrument.decimals)}'
+                        '  H ${_hover!.high.toStringAsFixed(widget.instrument.decimals)}'
+                        '  L ${_hover!.low.toStringAsFixed(widget.instrument.decimals)}'
+                        '  C ${_hover!.close.toStringAsFixed(widget.instrument.decimals)}',
                         textAlign: TextAlign.right,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tabular.copyWith(
-                          color: AppColors.faint,
+                          color: _hover!.isUp
+                              ? AppColors.success
+                              : AppColors.danger,
                           fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
               ),
@@ -2932,24 +4208,60 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   String get _windowLabel {
     final from = _windowFrom;
     final to = _windowTo;
-    if (from == null || to == null) return 'Live · newest candles';
+    if (from == null || to == null) {
+      return _staleAt == null
+          ? 'Live · newest candles'
+          : 'Offline · last known candles';
+    }
     return '${_stamp(from)} → ${_stamp(to)}';
   }
 
   Future<void> _openTimeFrameSheet() async {
-    final now = DateTime.now();
     final choice = await showChartTimeFrameSheet(
       context: context,
-      from: _windowFrom ?? now.subtract(const Duration(days: 1)),
-      to: _windowTo ?? now,
       interval: _interval,
+      refused: _refusedIntervals,
     );
     if (choice == null || !mounted) return;
-    if (choice.isLive) {
-      _setLive();
+    // The picker only returns the live tail, but the type still carries a
+    // window: a caller that builds one keeps working instead of silently
+    // ignoring its dates.
+    if (!choice.isLive && choice.from != null && choice.to != null) {
+      await _applyWindow(
+        choice.from!,
+        choice.to!,
+        choice.interval ?? _interval,
+      );
       return;
     }
-    await _applyWindow(choice.from!, choice.to!, choice.interval!);
+    final picked = choice.interval;
+    if (picked == null) return;
+    await _setInterval(picked);
+  }
+
+  /// Switches candle size on the live tail.
+  ///
+  /// The picker no longer sets a date range: a chart is a candle size and a
+  /// stream of bars, and the range is what the trader pans into. The window
+  /// never changes here, so the refresh timer keeps rolling and the newest bar
+  /// keeps arriving.
+  Future<void> _setInterval(ChartInterval next) async {
+    if (next == _interval && !_customWindow) return;
+    _stopPlay();
+    final cached = _market.cached(widget.instrument, next);
+    setState(() {
+      _interval = next;
+      _windowFrom = null;
+      _windowTo = null;
+      _replay = null;
+      _error = null;
+      // A different size is a different series: the stamp of the old one says
+      // nothing about these candles.
+      _staleAt = null;
+      _candles = cached ?? const [];
+      _loading = cached == null || cached.isEmpty;
+    });
+    await _load();
   }
 
   Widget _timeFrame({bool overlay = false}) {
@@ -3026,7 +4338,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        '${_interval.detail} · tap to change',
+                        _staleAt == null
+                            ? '${_interval.detail} · tap to change'
+                            : '${_interval.detail} · offline copy from '
+                                '${DateFormat('EEE HH:mm').format(_staleAt!)}',
                         style: TextStyle(
                           color: idleInk,
                           fontSize: 9.5,
@@ -3351,6 +4666,12 @@ class _ChartCanvas extends StatefulWidget {
     required this.onDrawingMoveEnd,
     this.height,
     this.onReachStart,
+    this.pendingKind,
+    this.pendingSide,
+    required this.onDrawingCreated,
+    this.magnet = true,
+    this.onCrosshair,
+    this.onPlacing,
   });
 
   final List<Candle> candles;
@@ -3385,6 +4706,26 @@ class _ChartCanvas extends StatefulWidget {
   final void Function(int index, ChartDrawing drawing) onDrawingMoved;
   final VoidCallback onDrawingMoveEnd;
 
+  /// The tool waiting for a place on the chart, armed from the tools sheet.
+  /// While one is set the canvas stops panning and starts placing: press and
+  /// drag sizes the object, a plain tap drops it at a usable default size.
+  final DrawingKind? pendingKind;
+  final PositionSide? pendingSide;
+
+  /// A placed object, finished and ready for the screen to keep.
+  final ValueChanged<ChartDrawing> onDrawingCreated;
+
+  /// Snap a placed or dragged point onto a wick, open, high, low or close.
+  final bool magnet;
+
+  /// The candle under the crosshair, or null when the crosshair is away. The
+  /// screen uses it for the O H L C legend in the header.
+  final ValueChanged<Candle?>? onCrosshair;
+
+  /// True once the finger has put down the first point of the object being
+  /// placed, so the banner can count.
+  final ValueChanged<bool>? onPlacing;
+
   @override
   State<_ChartCanvas> createState() => _ChartCanvasState();
 }
@@ -3409,6 +4750,20 @@ class _ChartCanvasState extends State<_ChartCanvas>
   int? _drawingIndex;
   ChartDrawing? _drawingOriginal;
   Offset _dragOrigin = Offset.zero;
+
+  /// Which anchor of the object under the finger is being dragged. Null means
+  /// the finger is on the body, so the object moves as one piece.
+  int? _dragHandle;
+
+  /// Placement in progress: where the finger went down, and the object it has
+  /// built so far. Both are cleared the moment it is committed or abandoned.
+  Offset? _placeFrom;
+  ChartDrawing? _preview;
+
+  /// Where the last touch was, so a release can finish what the drag was doing
+  /// without needing a focal point from the end event.
+  Offset _lastTouch = Offset.zero;
+  List<ChartPoint> _brush = const [];
   double _baseSpan = 0;
   double _baseStart = 0;
 
@@ -3446,6 +4801,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
   @override
   void didUpdateWidget(covariant _ChartCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.pendingKind != null && widget.pendingKind == null) {
+      _cancelPlace();
+    }
     if (!identical(oldWidget.candles, widget.candles) ||
         oldWidget.interval != widget.interval) {
       final oldLength = oldWidget.candles.length;
@@ -3590,6 +4948,214 @@ class _ChartCanvasState extends State<_ChartCanvas>
             panes.priceH;
   }
 
+  /// The price under a finger, pulled onto the nearest open, high, low or close
+  /// of the candle beneath it when it lands within a few pixels.
+  ///
+  /// This is the magnet every desk has. Without it a level placed "on the wick"
+  /// is a level placed near the wick, and nothing on screen says so; with it a
+  /// press that looks like the high is the high, while a press out in open space
+  /// still lands exactly where it was released.
+  double _priceAt(Offset local) {
+    final raw = _priceFor(local);
+    if (!widget.magnet) return raw;
+    final plotW = _size.width - TradingChartPainter.axisWidth;
+    final candles = widget.candles;
+    if (plotW <= 0 || candles.isEmpty) return raw;
+    final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
+    final index = _view.indexAt(ratio, candles.length);
+    var bestDy = 7.0;
+    double? best;
+    for (
+      var i = math.max(0, index - 1);
+      i <= math.min(candles.length - 1, index + 1);
+      i++
+    ) {
+      final candle = candles[i];
+      for (final price in [candle.open, candle.high, candle.low, candle.close]) {
+        final dy = (_yFor(price) - local.dy).abs();
+        if (dy < bestDy) {
+          bestDy = dy;
+          best = price;
+        }
+      }
+    }
+    return best ?? raw;
+  }
+
+  /// A finger position as a chart point. Time is the candle's own stamp, so an
+  /// object dropped today still sits on the same bar when the window moves.
+  ChartPoint _pointAt(Offset local) {
+    final time = _timeFor(local);
+    return ChartPoint(
+      ms: time == null
+          ? DateTime.now().toUtc().millisecondsSinceEpoch
+          : time.toUtc().millisecondsSinceEpoch,
+      price: _priceAt(local),
+    );
+  }
+
+  /// The second point a tap uses when the trader did not drag: far enough right
+  /// to read as a box or a line, with the trend tools sloping so they are not a
+  /// zero-height smear.
+  Offset _defaultEnd(DrawingKind kind, Offset from) {
+    final plotW = _size.width - TradingChartPainter.axisWidth;
+    final dx = math.min(plotW * 0.3, 120.0);
+    final dy = switch (kind) {
+      DrawingKind.trend || DrawingKind.measure => -24.0,
+      DrawingKind.fibExtension => 40.0,
+      _ => 70.0,
+    };
+    return Offset(from.dx + dx, from.dy + dy);
+  }
+
+  double _defaultRisk(double price) => price == 0 ? 1 : (price.abs() * 0.0025);
+
+  /// Builds the object a tool would produce between two finger positions.
+  ChartDrawing _draftFor(
+    DrawingKind kind,
+    Offset from,
+    Offset to, {
+    required bool sized,
+  }) {
+    final start = _pointAt(from);
+    final endPoint = _pointAt(sized ? to : _defaultEnd(kind, from));
+    final side = widget.pendingSide;
+    switch (kind) {
+      case DrawingKind.ray:
+        return ChartDrawing.ray(price: start.price);
+      case DrawingKind.position:
+        final long = (side ?? PositionSide.long) == PositionSide.long;
+        final risk = _defaultRisk(start.price);
+        return ChartDrawing.position(
+          side: side ?? PositionSide.long,
+          startMs: start.ms,
+          endMs: endPoint.ms,
+          entry: start.price,
+          stop: long ? start.price - risk : start.price + risk,
+          target: long ? start.price + risk * 2 : start.price - risk * 2,
+        );
+      case DrawingKind.trend:
+        return ChartDrawing.trend(
+          startMs: start.ms,
+          startPrice: start.price,
+          endMs: endPoint.ms,
+          endPrice: endPoint.price,
+        );
+      case DrawingKind.vline ||
+          DrawingKind.text ||
+          DrawingKind.arrowUp ||
+          DrawingKind.arrowDown:
+        return ChartDrawing.points(kind: kind, points: [start]);
+      case DrawingKind.brush:
+        return ChartDrawing.points(
+          kind: kind,
+          points: _brush.length < 2 ? [start, endPoint] : _brush,
+        );
+      default:
+        return ChartDrawing.points(kind: kind, points: [start, endPoint]);
+    }
+  }
+
+  void _beginPlace(Offset local) {
+    final kind = widget.pendingKind;
+    if (kind == null) return;
+    _settle.stop();
+    widget.onPlacing?.call(true);
+    setState(() {
+      _placeFrom = local;
+      _brush = [_pointAt(local)];
+      _crosshair = local;
+      _preview = _draftFor(kind, local, local, sized: false);
+    });
+  }
+
+  void _updatePlace(Offset local) {
+    final kind = widget.pendingKind;
+    final from = _placeFrom;
+    if (kind == null || from == null) return;
+    final moved = (local - from).distance > 6;
+    setState(() {
+      if (kind == DrawingKind.brush && moved) {
+        _brush = [..._brush, _pointAt(local)];
+      }
+      _crosshair = local;
+      _preview = _draftFor(kind, from, local, sized: moved);
+    });
+  }
+
+  void _commitPlace() {
+    final placed = _preview;
+    setState(() {
+      _preview = null;
+      _placeFrom = null;
+      _brush = const [];
+      _crosshair = null;
+    });
+    widget.onPlacing?.call(false);
+    widget.onCrosshair?.call(null);
+    if (placed != null) widget.onDrawingCreated(placed);
+  }
+
+  /// Abandons a placement in progress. Called when the tool is disarmed from
+  /// outside the canvas, so a half-built object cannot be left on screen.
+  void _cancelPlace() {
+    if (_preview == null && _placeFrom == null) return;
+    setState(() {
+      _preview = null;
+      _placeFrom = null;
+      _brush = const [];
+    });
+    widget.onPlacing?.call(false);
+  }
+
+  /// Whether a press has landed on the object that is already selected.
+  bool _hitsSelected(Offset local) {
+    final selected = widget.selectedDrawing;
+    if (selected == null || selected >= widget.drawings.length) return false;
+    final drawing = widget.drawings[selected];
+    // A locked object is held exactly where it is. Tapping it still opens its
+    // menu, which is the only way back to unlocking it.
+    if (drawing.look.locked || drawing.look.hidden) return false;
+    final plotW = _size.width - TradingChartPainter.axisWidth;
+    if (plotW <= 0) return false;
+    final distance = _drawingDistance(drawing, local, plotW);
+    return distance != null && distance <= 14;
+  }
+
+  /// The draggable dots of an object: its anchors, or a trend line's two ends.
+  List<Offset> _anchorsOf(ChartDrawing drawing, double plotW) {
+    if (drawing.kind == DrawingKind.trend) {
+      final start = _indexForTime(drawing.startMs);
+      final end = _indexForTime(drawing.endMs);
+      if (start == null || end == null) return const [];
+      return [
+        Offset(_xForIndex(start, plotW), _yFor(drawing.startPrice)),
+        Offset(_xForIndex(end, plotW), _yFor(drawing.endPrice)),
+      ];
+    }
+    if (!drawing.isAnchored) return const [];
+    return [
+      for (final point in drawing.points)
+        if (_indexForTime(point.ms) case final index?)
+          Offset(_xForIndex(index, plotW), _yFor(point.price)),
+    ];
+  }
+
+  /// Which anchor a press has taken hold of, or null when it is on the body.
+  int? _handleAt(ChartDrawing drawing, Offset local, double plotW) {
+    final anchors = _anchorsOf(drawing, plotW);
+    int? best;
+    var bestDistance = 18.0;
+    for (var i = 0; i < anchors.length; i++) {
+      final distance = (anchors[i] - local).distance;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    }
+    return best;
+  }
+
   void _setDraft(Marker marker, double price) {
     switch (marker) {
       case Marker.entry:
@@ -3611,6 +5177,14 @@ class _ChartCanvasState extends State<_ChartCanvas>
     if (widget.candles.isEmpty) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     if (plotW <= 0 || local.dx > plotW) return;
+    // An armed tool owns the next tap: it lands where the trader put their
+    // finger, at a size they can already see. Nothing is created invisibly in
+    // the middle of the window.
+    if (widget.pendingKind != null) {
+      if (_preview == null) _beginPlace(local);
+      _commitPlace();
+      return;
+    }
     final panes = TradingChartPainter.paneLayout(_size.height, widget.style);
     final inPricePane =
         local.dy >= panes.priceTop && local.dy <= panes.priceTop + panes.priceH;
@@ -3633,6 +5207,18 @@ class _ChartCanvasState extends State<_ChartCanvas>
   void _onScaleStart(ScaleStartDetails details) {
     // A new touch owns the chart: stop the coast where it is.
     _settle.stop();
+    _lastTouch = details.localFocalPoint;
+    if (widget.pendingKind != null) {
+      _beginPlace(details.localFocalPoint);
+      return;
+    }
+    // A selected object is grabbed directly: press on it and drag, instead of
+    // the long press every other object needs. Once it is selected, the trader
+    // has already said which thing they mean.
+    if (_hitsSelected(details.localFocalPoint)) {
+      _startDrag(details.localFocalPoint);
+      return;
+    }
     _baseSpan = _view.span;
     _baseStart = _view.start;
   }
@@ -3676,7 +5262,20 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// Lift-off: the finger's speed becomes candle travel with friction, then the
   /// window settles onto a whole bar instead of resting between two.
   void _onScaleEnd(ScaleEndDetails details) {
+    // Whatever was being placed is finished on lift-off: the finger has said
+    // how big it should be, and leaving it hanging would be a tool that never
+    // commits.
+    if (_placeFrom != null) {
+      _commitPlace();
+      return;
+    }
+    if (_drawingIndex != null) {
+      _endDrag(_lastTouch);
+      _reportCrosshair(null);
+      return;
+    }
     setState(() => _crosshair = null);
+    _reportCrosshair(null);
     final count = widget.candles.length;
     if (count < 2 || _dragging != null || _drawingIndex != null) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
@@ -3693,6 +5292,15 @@ class _ChartCanvasState extends State<_ChartCanvas>
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
+    if (_placeFrom != null) {
+      _updatePlace(details.localFocalPoint);
+      return;
+    }
+    if (_drawingIndex != null) {
+      _lastTouch = details.localFocalPoint;
+      _updateDrag(details.localFocalPoint);
+      return;
+    }
     if (widget.candles.length < 2) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     if (plotW <= 0) return;
@@ -3729,6 +5337,22 @@ class _ChartCanvasState extends State<_ChartCanvas>
       }
       _crosshair = details.localFocalPoint;
     });
+    _reportCrosshair(details.localFocalPoint);
+  }
+
+  /// Tells the screen which candle the crosshair is over. The chart itself has
+  /// no legend to write into, and the header does.
+  void _reportCrosshair(Offset? local) {
+    final report = widget.onCrosshair;
+    if (report == null) return;
+    final plotW = _size.width - TradingChartPainter.axisWidth;
+    if (local == null || widget.candles.isEmpty || plotW <= 0) {
+      report(null);
+      return;
+    }
+    final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
+    final index = _view.indexAt(ratio, widget.candles.length);
+    report(widget.candles[index.clamp(0, widget.candles.length - 1)]);
   }
 
   Marker? _nearestLevel(Offset local) {
@@ -3780,6 +5404,35 @@ class _ChartCanvasState extends State<_ChartCanvas>
       if (price == null) return null;
       return (_yFor(price) - local.dy).abs();
     }
+    if (drawing.points.isNotEmpty && drawing.kind != DrawingKind.trend) {
+      if (widget.candles.isEmpty) return double.infinity;
+      // Distance to the object's bounding box: zero inside it, which is what
+      // makes a box or a fib ladder selectable by tapping anywhere on it.
+      final xs = <double>[];
+      final ys = <double>[];
+      for (final point in drawing.points) {
+        final index = _indexForTime(point.ms);
+        xs.add(
+          index == null
+              ? (point.ms < widget.candles.first.time.millisecondsSinceEpoch
+                  ? 0.0
+                  : plotW)
+              : _xForIndex(index, plotW),
+        );
+        ys.add(_yFor(point.price));
+      }
+      final left = xs.reduce(math.min);
+      final right = xs.reduce(math.max);
+      final top = ys.reduce(math.min);
+      final bottom = ys.reduce(math.max);
+      final dx = local.dx < left
+          ? left - local.dx
+          : (local.dx > right ? local.dx - right : 0.0);
+      final dy = local.dy < top
+          ? top - local.dy
+          : (local.dy > bottom ? local.dy - bottom : 0.0);
+      return math.sqrt(dx * dx + dy * dy);
+    }
     if (drawing.isPosition) {
       final start = _indexForTime(drawing.startMs);
       // An anchor older than the loaded window draws from the left edge, so a
@@ -3804,7 +5457,21 @@ class _ChartCanvasState extends State<_ChartCanvas>
         if (price == null) continue;
         best = math.min(best, (_yFor(price) - local.dy).abs());
       }
-      return best.isFinite ? best : null;
+      if (!best.isFinite) return null;
+      // Inside the box the whole tool is the target, not just its three lines.
+      // Distance is measured to the nearest level, so anything nearer than the
+      // box's own half-height is a hit on the body — which is what makes the
+      // position draggable from anywhere on it, the way the desktop tool is.
+      final top = math.max(
+        _yFor(drawing.target ?? drawing.levelFor(PositionLevel.target) ?? 0),
+        _yFor(drawing.stop ?? drawing.levelFor(PositionLevel.stop) ?? 0),
+      );
+      final bottom = math.min(
+        _yFor(drawing.target ?? drawing.levelFor(PositionLevel.target) ?? 0),
+        _yFor(drawing.stop ?? drawing.levelFor(PositionLevel.stop) ?? 0),
+      );
+      if (local.dy >= top && local.dy <= bottom) return 0;
+      return best;
     }
     final start = _indexForTime(drawing.startMs);
     final end = _indexForTime(drawing.endMs);
@@ -3833,6 +5500,8 @@ class _ChartCanvasState extends State<_ChartCanvas>
     int? best;
     var bestDistance = 14.0;
     for (var i = 0; i < widget.drawings.length; i++) {
+      // Hidden objects are not on the chart, so the finger cannot find them.
+      if (widget.drawings[i].look.hidden) continue;
       final distance = _drawingDistance(widget.drawings[i], local, plotW);
       if (distance != null && distance < bestDistance) {
         bestDistance = distance;
@@ -3845,9 +5514,20 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// Moves a drawing with the finger: prices follow vertically, and a trend
   /// line's times follow horizontally so its slope stays put.
   ChartDrawing _movedDrawing(ChartDrawing original, Offset local) {
-    final priceDelta = _priceFor(_dragOrigin) - _priceFor(local);
+    // A drag on a dot moves that dot. Anything else slides the whole object.
+    final handle = _dragHandle;
+    if (handle != null) {  
+      return original.withPoint(handle, _pointAt(local));
+    }
+    // Down the screen is down the price axis. This used to be written the other
+    // way round, which is why an object travelled upwards under a finger
+    // travelling downwards.
+    final priceDelta = _priceFor(local) - _priceFor(_dragOrigin);
     if (original.kind == DrawingKind.ray) {
-      return ChartDrawing.ray(price: (original.price ?? 0) + priceDelta);
+      return ChartDrawing.ray(
+        id: original.id,
+        price: (original.price ?? 0) + priceDelta,
+      );
     }
     final plotW = _size.width - TradingChartPainter.axisWidth;
     final shift =
@@ -3858,6 +5538,15 @@ class _ChartCanvasState extends State<_ChartCanvas>
       if (index == null) return ms;
       final moved = (index + shift).round().clamp(0, candles.length - 1);
       return candles[moved].time.millisecondsSinceEpoch;
+    }
+
+    // An anchor-based object moves as one piece: every point takes the same
+    // price and time shift, so dragging a fib ladder does not stretch it.
+    if (original.points.isNotEmpty && original.kind != DrawingKind.trend) {
+      return original.translated(
+        shiftTime: shiftTime,
+        priceDelta: priceDelta,
+      );
     }
 
     if (original.isPosition) {
@@ -3888,6 +5577,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
     }
 
     return ChartDrawing.trend(
+      id: original.id,
       startMs: shiftTime(original.startMs),
       startPrice: original.startPrice + priceDelta,
       endMs: shiftTime(original.endMs),
@@ -3899,13 +5589,15 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// whole box instead of one line.
   PositionLevel? _nearestPositionLevel(ChartDrawing drawing, Offset local) {
     PositionLevel? best;
-    var bestDistance = 26.0;
+    // Deliberate, not incidental: a level line is grabbed only when the finger
+    // lands on it, so a drag from the middle of the box moves the whole tool.
+    var distance = 14.0;
     for (final level in PositionLevel.values) {
       final price = drawing.levelFor(level);
       if (price == null) continue;
       final dy = (_yFor(price) - local.dy).abs();
-      if (dy < bestDistance) {
-        bestDistance = dy;
+      if (dy < distance) {
+        distance = dy;
         best = level;
       }
     }
@@ -3913,16 +5605,24 @@ class _ChartCanvasState extends State<_ChartCanvas>
   }
 
   void _startDrag(Offset local) {
+    if (widget.pendingKind != null) return;
     final drawing = _nearestDrawing(local);
     if (drawing != null) {
       final original = widget.drawings[drawing];
+      if (original.look.locked) {
+        widget.onDrawingSelected(drawing);
+        return;
+      }
       final plotW = _size.width - TradingChartPainter.axisWidth;
       setState(() {
         _crosshair = null;
         _drawingIndex = drawing;
         _drawingOriginal = original;
         _dragOrigin = local;
-        _dragEdge = plotW > 0 && _nearRightEdge(original, local, plotW);
+        _dragHandle = plotW > 0 ? _handleAt(original, local, plotW) : null;
+        _dragEdge = plotW > 0 &&
+            _dragHandle == null &&
+            _nearRightEdge(original, local, plotW);
         _dragLevel = original.isPosition && !_dragEdge
             ? _nearestPositionLevel(original, local)
             : null;
@@ -3990,6 +5690,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
         _drawingOriginal = null;
         _dragLevel = null;
         _dragEdge = false;
+        _dragHandle = null;
       });
       widget.onDrawingMoveEnd();
       return;
@@ -4075,6 +5776,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       drawings: widget.drawings,
                       selectedDrawing: widget.selectedDrawing,
                       positionOutcomes: widget.positionOutcomes,
+                      preview: _preview,
                       style: widget.style,
                       symbol: widget.symbol,
                     ),

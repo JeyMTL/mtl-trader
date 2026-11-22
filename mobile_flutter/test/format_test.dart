@@ -18,4 +18,37 @@ void main() {
     expect(durationText(95), '1h 35m');
     expect(durationText(120), '2h');
   });
+
+  group('prices', () {
+    test('a synced gold price loses its float noise', () {
+      expect(price(3595.7380000000003), '3595.738');
+      expect(price(3587.8869999999997), '3587.887');
+      expect(price(3625.1949999999997), '3625.195');
+    });
+
+    test('a synced forex price reads as it was quoted', () {
+      expect(price(1.0984600000000002), '1.09846');
+    });
+
+    test('trailing zeros are trimmed, so a whole price has no decimal point', () {
+      expect(price(3595), '3595');
+      expect(price(1.0), '1');
+      expect(price(2400.50000), '2400.5');
+    });
+
+    test('lots lose their own noise at two decimals', () {
+      expect(price(0.1 + 0.2, decimals: 2), '0.3');
+      expect(price(0.5, decimals: 2), '0.5');
+    });
+
+    test('an unknown or non-finite value is a dash, not NaN', () {
+      expect(price(null), '—');
+      expect(price(double.nan), '—');
+      expect(price(double.infinity), '—');
+    });
+
+    test('a value that underflows to nothing reads zero, without a sign', () {
+      expect(price(-0.0000001), '0');
+    });
+  });
 }

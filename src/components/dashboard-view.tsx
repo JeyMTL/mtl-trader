@@ -325,7 +325,7 @@ export function DashboardView({
     <div className="space-y-4 lg:space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="eyebrow">MTL Trader</p>
+          <p className="eyebrow">MTL Ledger</p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-white lg:text-2xl">Desk</h1>
           <p className="mt-1 text-xs text-gray-500">
             {today.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

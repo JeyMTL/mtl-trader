@@ -328,8 +328,8 @@ export default function DayOver() {
 
           {!data.debrief && !data.overridden && data.lock?.mode === 'hard' && (
             <p className="text-xs leading-relaxed text-gray-500">
-              Hard lock is enforced by your MT5 sync EA. It cannot be overridden here — it
-              releases at the next reset.
+              Hard lock is enforced by your MT5 sync EA. It has no in-app release — it clears when
+              the trading day rolls over.
             </p>
           )}
 
@@ -345,7 +345,9 @@ export default function DayOver() {
                 </button>
               ) : (
                 <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="text-xs font-medium text-white">Override the stop</p>
+                  <p className="text-xs font-medium text-white">
+                    Override the stop
+                  </p>
                   <p className="mt-0.5 text-xs text-gray-500">
                     This reopens the journal for today. It is recorded on the day, not hidden.
                   </p>

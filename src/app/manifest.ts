@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'MTL Trader — Trading Journal',
-    short_name: 'MTL Trader',
+    name: 'MTL Ledger — Trading Journal',
+    short_name: 'MTL Ledger',
     description: 'A professional trading journal: log fills, read your edge, and review the decisions behind the P&L.',
     start_url: '/dashboard',
     scope: '/',

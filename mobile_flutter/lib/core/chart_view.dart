@@ -9,8 +9,13 @@ class ChartViewport {
   double start;
   double span;
 
-  /// Never show fewer than this many candles, so zooming stays readable.
-  static const double minSpan = 12;
+  /// Never show fewer than this many candles.
+  ///
+  /// Four is the point where a candle still has a body and a wick you can read
+  /// at a thumb's width: below that the chart stops being a chart. It is well
+  /// past the old floor of twelve, which made a tight zoom feel like it had hit
+  /// a wall before the bars got big enough to count off.
+  static const double minSpan = 4;
 
   /// How much blank space past the newest candle a drag may pull in, as a share
   /// of the visible span.

@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "MTL Trader",
+  "appTitle": "MTL Ledger",
   "retry": "Retry",
   "cancel": "Cancel",
   "refresh": "Refresh",
@@ -23,8 +23,10 @@
   "navAccount": "Account",
   "newTrade": "Journal a trade",
   "timeEdge": "Time edge",
-  "brandName": "MTL Trader",
-  "brandOpenPlans": "MTL Trader — open payment plans",
+  "brandName": "MTL Ledger",
+  "brandOpenPlans": "MTL Ledger — open payment plans",
+  "upgrade": "Upgrade",
+  "rules": "Rules",
   "loginHeadline": "The journal that\nreads you back.",
   "loginTagline": "Log the fill, the screenshot and the voice note. Find the hours that pay.",
   "continueWithGoogle": "Continue with Google",
@@ -399,6 +401,270 @@
       "day": {
         "type": "String"
       }
+    }
+  },
+  "account": "Account",
+  "accountSignOutQuestion": "Sign out?",
+  "accountSignOutBody": "Your journal stays on the server. Sign back in any time.",
+  "signOut": "Sign out",
+  "accountPlan": "Plan",
+  "accountStatus": "Status",
+  "accountTradeLimit": "Trade limit / month",
+  "accountUnlimited": "Unlimited",
+  "accountTimezone": "Timezone",
+  "accountChange": "Change",
+  "accountTrialEnds": "Trial ends",
+  "accountAccessUntil": "Access until",
+  "accountPaidThrough": "Paid through",
+  "accountViewPlans": "View plans & billing",
+  "accountBuyPlan": "Buy a subscription",
+  "accountSubscription": "Subscription",
+  "accountSignedIn": "Signed in",
+  "accountSubError": "Could not load your subscription",
+  "commonTryAgain": "Try again",
+  "commonSave": "Save",
+  "sectionTrading": "Trading",
+  "sectionPreferences": "Preferences",
+  "sectionSupport": "Support",
+  "sectionAbout": "About",
+  "accountAppearance": "Appearance",
+  "accountAppearanceBody": "Dark, light, the mark's blue, or follow the device. Saved on this phone.",
+  "themeDark": "Dark",
+  "themeLight": "Light",
+  "themeBlue": "Blue",
+  "themeSystem": "System",
+  "accountHelp": "Help & feedback",
+  "accountHelpBody": "Questions, bugs, or something the journal should do. Every message is read.",
+  "accountEmailSupport": "Email support",
+  "accountRate": "Rate MTL Ledger",
+  "accountAbout": "About",
+  "accountAboutBody": "Where your journal media lives.",
+  "accountPrivateMedia": "Private media",
+  "accountPrivateMediaBody": "Journal photos and voice notes live in a private bucket. Each file is signed for one hour and only your account can request it.",
+  "accountFooter": "MTL Ledger · flat mobile journal\nTrades, notes and media stay on your Supabase project.",
+  "accountRules": "Rules & playbook",
+  "accountConnectMt5": "Connect MT5 account",
+  "accountImport": "Import trade history",
+  "accountBacktest": "Backtester (Pro)",
+  "accountPropFirm": "Prop firm simulation",
+  "accountTimezoneRow": "Report timezone",
+  "accountTimezoneDialog": "Timezone for the hour report",
+  "accountTimezoneSaved": "Hour report now uses {zone}.",
+  "@accountTimezoneSaved": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "accountTimezoneFailed": "Could not save the timezone: {error}",
+  "@accountTimezoneFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "accountPicture": "Profile picture",
+  "accountPictureBody": "Paste a link to an image. Leave it empty to use the picture tied to your email, or your initials when there is none.",
+  "accountPictureCleared": "Profile picture cleared.",
+  "accountPictureUpdated": "Profile picture updated.",
+  "accountPictureFailed": "Could not save the picture: {error}",
+  "@accountPictureFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "accountStoreFailed": "Could not open the store listing.",
+  "accountMailFailed": "No mail app was found. Install one and tap the button again.",
+  "accountDailyStop": "Daily stop",
+  "accountDailyStopBody": "What happens when the loss budget or entry cap is reached.",
+  "accountLossBudget": "Loss budget",
+  "accountMaxEntries": "Max entries",
+  "accountWhenReached": "When reached",
+  "accountOff": "Off",
+  "accountNoCap": "No cap",
+  "accountLoadingRules": "Loading your rules…",
+  "accountEditRules": "Edit rules and daily stop",
+  "lockSoft": "Soft lock",
+  "lockHard": "Hard lock",
+  "lockJournalOnly": "Journal only",
+  "accountStopNone": "No stop is set yet. Add a loss budget or an entry cap and the day ends when it is reached.",
+  "accountStopSoft": "After the stop, MetaTrader 5 on this phone is covered and the journal stays open. Reset from the banner.",
+  "accountStopHard": "After the stop, the journal locks and the MT5 EA refuses orders. It clears at the start of your next trading day — a hard stop cannot be lifted.",
+  "accountStopOff": "After the stop, the journal refuses new entries until the next trading day.",
+  "rulesIntro": "The checklist you trade by, the days and sessions it applies to, and the stop that ends the day.",
+  "rulesYourRules": "Your rules",
+  "rulesYourRulesBody": "Write them as instructions to yourself: what must be true before entry, what invalidates the trade, and what ends your session.",
+  "rulesEmpty": "No rules yet. The first one is usually the hardest to keep.",
+  "rulesAdd": "Add rule",
+  "rulesRemove": "Remove rule",
+  "rulesDays": "Days you trade",
+  "rulesDaysBody": "Reminders only fire on these days. Trading outside them is usually the leak.",
+  "rulesDailyStop": "Daily stop",
+  "rulesDailyStopBody": "The loss budget and entry cap you commit to before the session. Leave both at 0 to switch the stop off.",
+  "rulesLossBudget": "Loss budget",
+  "rulesMaxEntries": "Max entries",
+  "rulesWhenReached": "When the stop is reached",
+  "rulesJournalOnlyBlurb": "New entries are refused in the app.",
+  "rulesSoftBlurb": "MT5 freezes on this phone. The journal stays open.",
+  "rulesHardBlurb": "The journal locks and the MT5 EA refuses orders until tomorrow. No reset.",
+  "rulesSessions": "Trading sessions",
+  "rulesSessionsBody": "The windows you actually sit down for. A session that ends before it starts is treated as overnight.",
+  "rulesNoSessions": "No sessions yet. Add the window you trade in.",
+  "rulesSessionName": "Session name",
+  "rulesRemoveSession": "Remove session",
+  "rulesAddSession": "Add session",
+  "rulesNewSession": "New session",
+  "rulesSessionFallback": "Session",
+  "rulesReminders": "Remind me before a session",
+  "rulesRemindersBody": "An in-app reminder with your rules in front of you, before the first trade.",
+  "rulesRemindersOn": "Reminders on",
+  "rulesRemindersOff": "Reminders off",
+  "rulesReminderLead": "How long before",
+  "rulesReminderMinutes": "{minutes} min",
+  "@rulesReminderMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "rulesNotes": "Notes for yourself",
+  "rulesNotesHint": "What usually goes wrong, and what you do about it.",
+  "rulesSave": "Save rules",
+  "rulesSaving": "Saving…",
+  "rulesSaved": "Rules saved.",
+  "rulesSaveError": "Could not save your rules: {error}",
+  "@rulesSaveError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "rulesLoadError": "Could not load your rules: {error}",
+  "@rulesLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "rulesMaxReached": "A playbook holds 20 rules. Fewer is easier to follow.",
+  "rulesSessionsMax": "Up to 6 sessions.",
+  "lockHardBadge": "HARD LOCK",
+  "lockSoftBadge": "SOFT LOCK",
+  "lockDayOver": "Your day is over",
+  "lockLossBody": "You reached your loss budget — {used} of {limit}. The journal is closed until the next session.",
+  "lockCapBody": "You reached your entry cap — {trades} of {max} entries. The journal is closed until the next session.",
+  "lockRealised": "REALISED",
+  "lockEntries": "ENTRIES",
+  "lockAfterStop": "AFTER STOP",
+  "lockResetsNext": "Resets at the next session",
+  "lockResetsAt": "Resets {clock} · {countdown}",
+  "lockHardBody": "Your MT5 sync EA is refusing orders until the day rolls over. Pending orders are removed while locked, and a new fill is closed immediately.",
+  "lockHardBody2": "A manual market order can still fill before any EA sees it — only the broker can stop that click. There is no release here: the lock clears at the start of your next trading day.",
+  "lockUnfreezeToday": "Unfreeze today",
+  "lockUnfreezing": "Unfreezing…",
+  "lockGreenDay": "Reaching the stop is a green day. The trades you took before it are already in your journal.",
+  "lockStopReached": "Your daily stop is reached.",
+  "lockBudgetMessage": "Daily loss budget reached: {used} of {limit}.",
+  "lockSoftReached": "The daily stop is reached · the journal stays open",
+  "lockSoftFrozen": "Soft lock · MT5 frozen",
+  "lockFreezerOff": "Freezer is off — tap to turn it on",
+  "lockUnfreeze": "Unfreeze",
+  "lockA11yService": "Accessibility service",
+  "lockA11yServiceBody": "Android shows MTL Ledger which app is in front. It never reads what is on the screen, and nothing is sent off the phone.",
+  "lockOverlay": "Display over other apps",
+  "lockOverlayBody": "Lets the journal draw the cover on top of MetaTrader 5 while the day is frozen. No other app is covered.",
+  "lockInControl": "You stay in control",
+  "lockInControlBody": "Both switches live in Android Settings and can be turned off at any time. The journal keeps working without them.",
+  "lockFreezerTitle": "Turn on the MT5 freezer?",
+  "lockFreezerBody": "The freezer needs two Android permissions before it can cover MetaTrader 5 after your daily stop. Android will ask for each one on the next screen.",
+  "lockNotNow": "Not now",
+  "lockAgree": "Agree",
+  "lockDialogTitle": "Unfreeze MT5",
+  "lockDialogBody": "The EA releases the freeze on its next poll. If you are breaking the rule, write down why — the reason is recorded on today, not hidden.",
+  "lockReasonHint": "Why is trading past the stop worth it today?",
+  "lockReasonFoot": "At least 10 characters. Your broker is not affected by this button.",
+  "lockSoftDetail": "{used} of {limit} · the journal stays open",
+  "@lockBudgetMessage": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "@lockLossBody": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "@lockCapBody": {
+    "placeholders": {
+      "trades": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "@lockResetsAt": {
+    "placeholders": {
+      "clock": {
+        "type": "String"
+      },
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "@lockSoftDetail": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "alertsSection": "Alerts",
+  "alertsBody": "On this phone, while the app is open. Nothing is sent anywhere.",
+  "alertsDailyStop": "Daily stop hit",
+  "alertsDailyStopBody": "Tell me when the loss limit is reached and trading locks.",
+  "alertsLevels": "Level touched",
+  "alertsLevelsBody": "Tell me when price crosses a level I drew on a chart.",
+  "alertsJournal": "Journal reminder",
+  "alertsJournalBody": "A daily nudge to log the day.",
+  "alertsReminderAt": "Reminder time",
+  "alertsHistory": "Notification history",
+  "alertsHistoryBody": "Everything this phone has alerted on, and why it fired.",
+  "alertsTitle": "Alerts",
+  "alertsEmpty": "Nothing has fired yet",
+  "alertsEmptyBody": "When a stop hits or a level is touched, the alert appears here with the reason it fired.",
+  "alertsWhy": "Why",
+  "alertsNotShown": "not shown",
+  "alertsClear": "Clear",
+  "alertsSendTest": "Send a test alert",
+  "alertsPermissionMissing": "Android is not letting this app post notifications. Allow them in system settings.",
+  "planTrialDays": "Trial · {days}d",
+  "@planTrialDays": {
+    "description": "The plan pill on the desk while a free trial is running: the word Trial and the days left.",
+    "placeholders": {
+      "days": { "type": "int" }
     }
   }
 }

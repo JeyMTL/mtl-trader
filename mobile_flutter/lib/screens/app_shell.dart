@@ -4,7 +4,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/format.dart';
 import '../l10n/gen/app_localizations.dart';
+import '../services/alerts.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
 import 'account_screen.dart';
@@ -26,7 +28,7 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final JournalApi _api = JournalApi();
 
   /// Quick fade whenever the tab changes, so the shell feels like one surface
@@ -52,6 +54,17 @@ class _AppShellState extends State<AppShell>
   RealtimeChannel? _tradeChannel;
   Timer? _tradePoll;
   DateTime? _lastSyncedAt;
+  String? _watchingUser;
+  StreamSubscription<AuthState>? _authWatch;
+  Timer? _invalidateDebounce;
+
+  /// One notice per sync, not one per row: the first sync of an account can
+  /// land forty trades at once, and forty snackbars is noise. Rows inside a
+  /// short window are counted and reported together.
+  Timer? _syncedBurst;
+  int _syncedCount = 0;
+  double _syncedPnl = 0;
+  String _syncedSymbol = 'Trade';
 
   /// The newest synced trade that still needs photos or notes. A banner, not a
   /// snackbar: a trader mid-chart will not read a message that disappears.
@@ -60,12 +73,44 @@ class _AppShellState extends State<AppShell>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Channels, the saved switches and the daily journal reminder, set up once
+    // the session exists. A refusal here costs nothing else in the app.
+    unawaited(Alerts.instance.init());
     _startTradeWatch();
+    // The shell can outlive a sign-out and sign-in pair, and the session is not
+    // always there on the first frame. Watching the auth stream is what makes
+    // the sync arrive after a re-login without restarting the app.
+    _authWatch = Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+      if (state.event == AuthChangeEvent.signedIn ||
+          state.event == AuthChangeEvent.tokenRefreshed ||
+          state.event == AuthChangeEvent.initialSession) {
+        unawaited(_startTradeWatch());
+      } else if (state.event == AuthChangeEvent.signedOut) {
+        _watchingUser = null;
+        _tradeChannel?.unsubscribe();
+        _tradeChannel = null;
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    // A phone drops the socket while backgrounded. Coming back, the watch is
+    // rebuilt and the tabs are refreshed here instead of leaving yesterday's
+    // numbers on screen until the trader pulls down on them.
+    unawaited(_startTradeWatch(force: true));
+    _invalidate();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _authWatch?.cancel();
     _tradePoll?.cancel();
+    _syncedBurst?.cancel();
+    _invalidateDebounce?.cancel();
     _tradeChannel?.unsubscribe();
     _fade.dispose();
     super.dispose();
@@ -87,9 +132,19 @@ class _AppShellState extends State<AppShell>
         .maybeSingle();
   }
 
-  Future<void> _startTradeWatch() async {
+  Future<void> _startTradeWatch({bool force = false}) async {
     final userId = _api.userId;
     if (userId == null) return;
+    if (!force && _watchingUser == userId) return;
+    _watchingUser = userId;
+
+    // A re-login or a resume starts a fresh watch: the old socket and its poll
+    // belong to the previous session and would report its trades as new.
+    _tradePoll?.cancel();
+    _tradePoll = null;
+    final previous = _tradeChannel;
+    if (previous != null) unawaited(previous.unsubscribe());
+    _tradeChannel = null;
 
     // Prime the cursor so a trade that existed before this launch does not
     // pop a reminder. If this read fails, the first poll primes it instead.
@@ -152,9 +207,71 @@ class _AppShellState extends State<AppShell>
     if (!mounted) return;
 
     // Refresh the tabs in place and keep the reminder on screen until it is
-    // opened or dismissed.
+    // opened or dismissed. One rebuild per burst: a first sync can insert
+    // dozens of rows, and reloading every screen for each of them would both
+    // stutter and hammer the database.
     _needsDetails = row;
-    _invalidate();
+    _invalidateDebounce?.cancel();
+    _invalidateDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) _invalidate();
+    });
+    _announceSynced(row);
+  }
+
+  /// Says that the trade landed, on whatever tab the trader is looking at.
+  ///
+  /// The banner above asks for screenshots; this answers the other question —
+  /// "did my MT5 sync work?" — with the symbol and the result, within a second
+  /// of the supervisor pushing it. It is in-app rather than a system
+  /// notification because a push would need its own permission and a server to
+  /// address the device, for a message that is only useful while the app is
+  /// open.
+  void _announceSynced(Map<String, dynamic> row) {
+    _syncedSymbol = row['symbol']?.toString() ?? 'Trade';
+    _syncedCount++;
+    final pnl = row['pnl'];
+    if (pnl is num) _syncedPnl += pnl;
+    _syncedBurst?.cancel();
+    _syncedBurst = Timer(const Duration(milliseconds: 1200), _flushSyncedNotice);
+  }
+
+  void _flushSyncedNotice() {
+    final count = _syncedCount;
+    final pnl = _syncedPnl;
+    final symbol = _syncedSymbol;
+    _syncedCount = 0;
+    _syncedPnl = 0;
+    if (count == 0 || !mounted) return;
+
+    final text = count == 1
+        ? '$symbol synced · ${signedMoney(pnl)}'
+        : '$count trades synced · ${signedMoney(pnl)}';
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_done_outlined, size: 18, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.surface,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        ),
+      );
   }
 
   Future<void> _openNeedsDetails() async {

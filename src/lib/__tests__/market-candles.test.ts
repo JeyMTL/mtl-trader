@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   CANDLE_INTERVALS,
   MAX_CANDLES_PER_REQUEST,
+  aggregateCandles,
   candlesForWindow,
+  isVendorOutage,
+  liveTtlMs,
   normalizeOandaCandles,
   normalizeSymbol,
   oandaDate,
@@ -10,6 +13,20 @@ import {
   parseChartInterval,
   parseWindow,
 } from '@/lib/market-candles'
+
+describe('vendor outages', () => {
+  it('treats a 5xx or a throttle as the vendor being down', () => {
+    // Cloudflare reports an OANDA origin failure as a non-standard 520.
+    expect(isVendorOutage(520)).toBe(true)
+    expect(isVendorOutage(500)).toBe(true)
+    expect(isVendorOutage(503)).toBe(true)
+    expect(isVendorOutage(429)).toBe(true)
+    // A refused request is our fault and must stay a plain "no data".
+    expect(isVendorOutage(400)).toBe(false)
+    expect(isVendorOutage(401)).toBe(false)
+    expect(isVendorOutage(404)).toBe(false)
+  })
+})
 
 describe('candle intervals', () => {
   it('accepts exactly the sizes the mobile chart offers', () => {
@@ -32,6 +49,23 @@ describe('candle intervals', () => {
     expect(CANDLE_INTERVALS['1d'].granularity).toBe('D')
   })
 
+  it('serves the second sizes from OANDA and buckets 45s from 15s', () => {
+    expect(CANDLE_INTERVALS['5s'].granularity).toBe('S5')
+    expect(CANDLE_INTERVALS['10s'].granularity).toBe('S10')
+    expect(CANDLE_INTERVALS['15s'].granularity).toBe('S15')
+    expect(CANDLE_INTERVALS['30s'].granularity).toBe('S30')
+    // OANDA has no 45-second size: three 15-second bars make one.
+    expect(CANDLE_INTERVALS['45s'].granularity).toBe('S15')
+    expect(CANDLE_INTERVALS['45s'].aggregate).toBe(3)
+  })
+
+  it('keeps the live cache inside half a bar', () => {
+    expect(liveTtlMs('5s')).toBe(2500)
+    expect(liveTtlMs('30s')).toBe(15000)
+    // Bounded: a daily chart is not refetched every few minutes for nothing.
+    expect(liveTtlMs('1d')).toBe(20000)
+  })
+
   it('counts the bars a window needs and refuses past the vendor cap', () => {
     const day = { from: 0, to: 24 * 60 * 60 * 1000 }
     expect(candlesForWindow(day, '1m')).toBe(1440)
@@ -42,6 +76,42 @@ describe('candle intervals', () => {
     expect(candlesForWindow(month, '1m')).toBeNull()
     expect(candlesForWindow(month, '1h')).toBe(720)
     expect(MAX_CANDLES_PER_REQUEST).toBe(5000)
+  })
+})
+
+describe('aggregateCandles', () => {
+  const bar = (t: number, o: number, h: number, l: number, c: number, v: number) => ({
+    t,
+    o,
+    h,
+    l,
+    c,
+    v,
+  })
+
+  it('merges three 15-second bars into one 45-second bar', () => {
+    const bars = [
+      bar(0, 1.0, 1.1, 0.9, 1.05, 3),
+      bar(15_000, 1.05, 1.2, 1.0, 1.15, 4),
+      bar(30_000, 1.15, 1.25, 1.1, 1.2, 5),
+      bar(45_000, 1.2, 1.3, 1.15, 1.25, 6),
+      bar(60_000, 1.25, 1.35, 1.2, 1.3, 7),
+      bar(75_000, 1.3, 1.4, 1.25, 1.35, 8),
+    ]
+    const merged = aggregateCandles(bars, 45_000, 3)
+    expect(merged).toHaveLength(2)
+    expect(merged[0]).toEqual({ t: 0, o: 1.0, h: 1.25, l: 0.9, c: 1.2, v: 12 })
+    expect(merged[1]).toEqual({ t: 45_000, o: 1.2, h: 1.4, l: 1.15, c: 1.35, v: 21 })
+  })
+
+  it('drops a group that is still filling', () => {
+    const bars = [
+      bar(0, 1.0, 1.1, 0.9, 1.05, 3),
+      bar(15_000, 1.05, 1.2, 1.0, 1.15, 4),
+      bar(30_000, 1.15, 1.25, 1.1, 1.2, 5),
+      bar(45_000, 1.2, 1.3, 1.15, 1.25, 6),
+    ]
+    expect(aggregateCandles(bars, 45_000, 3)).toHaveLength(1)
   })
 })
 

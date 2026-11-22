@@ -4,8 +4,10 @@ import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
 import {
   CANDLE_INTERVALS,
-  LIVE_TTL_MS,
+  aggregateCandles,
   candlesForWindow,
+  isVendorOutage,
+  liveTtlMs,
   normalizeOandaCandles,
   normalizeSymbol,
   oandaDate,
@@ -56,6 +58,20 @@ function oandaConfig(): OandaConfig | null {
   return { token, base }
 }
 
+/**
+ * The vendor itself is failing: an outage, not a symbol with nothing to show.
+ *
+ * The two used to be the same answer, so a trader looking at an empty chart on
+ * a Saturday could not tell "this instrument has no bars" from "OANDA is down",
+ * and neither could the app. They are different promises and get different
+ * statuses.
+ */
+class FeedOutage extends Error {
+  constructor(readonly status: number) {
+    super(`OANDA answered ${status}`)
+  }
+}
+
 async function fetchOanda(
   config: OandaConfig,
   symbol: string,
@@ -65,10 +81,13 @@ async function fetchOanda(
   const instrument = oandaInstrument(symbol)
   if (!instrument) return null
   const spec = CANDLE_INTERVALS[interval]
+  // A re-bucketed size needs its own count of vendor bars: 45 seconds is three
+  // 15-second bars, so asking for 720 of them would return a third of the chart.
+  const wanted = spec.aggregate ? spec.count * spec.aggregate : spec.count
   const bounds = window
     ? `&from=${encodeURIComponent(oandaDate(window.from))}` +
       `&to=${encodeURIComponent(oandaDate(window.to))}`
-    : `&count=${spec.count}`
+    : `&count=${wanted}`
   const url =
     `${config.base}/v3/instruments/${encodeURIComponent(instrument)}/candles` +
     `?granularity=${spec.granularity}${bounds}&price=M`
@@ -91,10 +110,20 @@ async function fetchOanda(
       status: response.status,
       reason: oandaErrorMessage(payload),
     })
+    // A 5xx or a throttle is the vendor's own trouble. Saying "no chart data"
+    // for it blames the symbol, so it is raised and answered as an outage.
+    if (isVendorOutage(response.status)) throw new FeedOutage(response.status)
     return null
   }
 
-  const candles = normalizeOandaCandles(payload)
+  const raw = normalizeOandaCandles(payload)
+  if (raw.length === 0) {
+    logEvent('warn', 'market.candles.oanda_empty', { symbol, instrument, interval })
+    return null
+  }
+  const candles = spec.aggregate
+    ? aggregateCandles(raw, spec.ms, spec.aggregate)
+    : raw
   if (candles.length === 0) {
     logEvent('warn', 'market.candles.oanda_empty', { symbol, instrument, interval })
     return null
@@ -139,9 +168,11 @@ export async function GET(req: Request) {
     }
   }
 
-  // One open chart screen polls about 60 times an hour; 300 leaves room for
-  // size switches without letting a client hammer the vendor on our key.
-  const limit = await rateLimit(`market:${user.id}`, 300, 60 * 60 * 1000)
+  // A chart on the live tail polls about four times a minute at the finest
+  // size — around 900 an hour — so the ceiling has to clear a single chart's own
+  // cadence and still stop a script. Size switches are cheap: they are served
+  // from the series cache.
+  const limit = await rateLimit(`market:${user.id}`, 1200, 60 * 60 * 1000)
   if (!limit.ok) {
     return NextResponse.json(
       { error: 'Too many chart requests. Try again shortly.' },
@@ -157,11 +188,7 @@ export async function GET(req: Request) {
   const cached = seriesCache.get(key)
   // A historical window never changes, so it can be kept far longer than the
   // live tail that keeps moving.
-  const ttl = window
-    ? 30 * 60 * 1000
-    : cached
-      ? LIVE_TTL_MS
-      : 0
+  const ttl = window ? 30 * 60 * 1000 : cached ? liveTtlMs(interval) : 0
   if (cached && Date.now() - cached.at < ttl) {
     return NextResponse.json(cached.series)
   }
@@ -200,6 +227,25 @@ export async function GET(req: Request) {
     }
     return NextResponse.json(series)
   } catch (error) {
+    if (error instanceof FeedOutage) {
+      logEvent('error', 'market.candles.outage', {
+        symbol,
+        interval,
+        status: error.status,
+      })
+      return NextResponse.json(
+        {
+          error:
+            'The chart feed is down at the broker right now — this is not your connection. The chart retries on its own.',
+          outage: true,
+        },
+        {
+          status: 503,
+          // An outage answer must not be cached as if it were a series.
+          headers: { 'Cache-Control': 'no-store' },
+        }
+      )
+    }
     return apiError(
       'market.candles.failed',
       error,

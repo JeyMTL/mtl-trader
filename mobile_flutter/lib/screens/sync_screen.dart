@@ -226,6 +226,29 @@ class _SyncScreenState extends State<SyncScreen> {
     );
   }
 
+  /// The sentence under the status pill.
+  ///
+  /// A recorded error is the only thing that actually explains a stall, so it
+  /// leads. The credential hint used to appear even when the failure was on the
+  /// sync host (a terminal that never started), which sent the trader to check a
+  /// password that was never the problem.
+  String _hint() {
+    if (_status == 'connected') {
+      return 'Closed trades arrive automatically, even with the app shut.';
+    }
+    final error = asString(_connection['lastError']);
+    if (_stalled) {
+      if (error != null && error.isNotEmpty) {
+        return 'Still not connected. The sync host reported: $error';
+      }
+      return 'Still not connected after two minutes, and nothing has reported a '
+          'sign-in attempt. The sync service is probably not running — start it, '
+          'then disconnect here and connect again.';
+    }
+    return 'A session usually connects in under a minute. If it does not, '
+        'disconnect and check the account number, server and investor password.';
+  }
+
   Widget _statusCard() {
     final label = switch (_status) {
       'connected' => 'Connected',
@@ -295,11 +318,7 @@ class _SyncScreenState extends State<SyncScreen> {
         ),
         const SizedBox(height: 10),
         Text(
-          _status == 'connected'
-              ? 'Closed trades arrive automatically, even with the app shut.'
-              : _stalled
-                  ? 'Still not connected after two minutes. That normally means the account number, server or investor password was rejected. Disconnect below and enter the details again.'
-                  : 'A session usually connects in under a minute. If it does not, disconnect and check the account number, server and investor password.',
+          _hint(),
           style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
         ),
         const SizedBox(height: 14),

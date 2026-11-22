@@ -18,7 +18,42 @@ const Color positionProfitColor = Color(0xFF26A69A);
 const Color positionLossColor = Color(0xFFF23645);
 const Color positionEntryColor = Color(0xFF5D6675);
 
-enum DrawingKind { trend, ray, position }
+/// Every object the chart can hold.
+///
+/// `trend`, `ray` and `position` keep their own shapes because they are edited
+/// level by level. The rest are anchor-based: a list of points in chart space,
+/// which is enough for a box, an ellipse, a fib ladder, a brush stroke or a
+/// text label without a class per tool.
+enum DrawingKind {
+  trend,
+  ray,
+  position,
+  rectangle,
+  ellipse,
+  vline,
+  fib,
+  fibExtension,
+  text,
+  arrowUp,
+  arrowDown,
+  brush,
+  measure,
+}
+
+/// A point in chart space: a candle time and a price. Times rather than indices,
+/// so an object stays where it was drawn when the window or candle size changes.
+@immutable
+class ChartPoint {
+  const ChartPoint({required this.ms, required this.price});
+
+  final int ms;
+  final double price;
+
+  ChartPoint shifted({required int ms, required double price}) =>
+      ChartPoint(ms: ms, price: price);
+
+  List<num> toJson() => [ms, price];
+}
 
 /// Whether a position tool is marking a long or a short.
 enum PositionSide { long, short }
@@ -26,6 +61,80 @@ enum PositionSide { long, short }
 /// One of the three levels of a position tool, in the order they are stacked
 /// on a long.
 enum PositionLevel { entry, target, stop }
+
+/// How one object is drawn, and whether the finger may touch it.
+///
+/// Kept as a value of its own so it travels through every rebuild: a restyle
+/// must not drop the geometry, and a drag must not drop the restyle. Null tint
+/// or weight means "the chart style decides", so an object nobody restyled
+/// still follows a theme change like every other one.
+@immutable
+class DrawingLook {
+  const DrawingLook({
+    this.tint,
+    this.weight,
+    this.dashed = false,
+    this.locked = false,
+    this.hidden = false,
+  });
+
+  /// Colour of the stroke and its tags; null follows the chart style.
+  final Color? tint;
+
+  /// Stroke width in logical pixels; null follows the chart style.
+  final double? weight;
+
+  final bool dashed;
+
+  /// Locked objects stay exactly where they were drawn: no drag, no handle.
+  final bool locked;
+
+  /// Hidden objects keep their place in the list and stop being painted, which
+  /// is how a trader clears the chart without throwing the idea away.
+  final bool hidden;
+
+  bool get isDefault =>
+      tint == null && weight == null && !dashed && !locked && !hidden;
+
+  DrawingLook copyWith({
+    Color? tint,
+    double? weight,
+    bool? dashed,
+    bool? locked,
+    bool? hidden,
+    bool clearTint = false,
+    bool clearWeight = false,
+  }) {
+    return DrawingLook(
+      tint: clearTint ? null : (tint ?? this.tint),
+      weight: clearWeight ? null : (weight ?? this.weight),
+      dashed: dashed ?? this.dashed,
+      locked: locked ?? this.locked,
+      hidden: hidden ?? this.hidden,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    if (tint != null) 'c': tint!.toARGB32(),
+    if (weight != null) 'w': weight,
+    if (dashed) 'd': true,
+    if (locked) 'lk': true,
+    if (hidden) 'hd': true,
+  };
+
+  static DrawingLook fromJson(Object? value) {
+    if (value is! Map) return const DrawingLook();
+    final rawTint = value['c'];
+    final rawWeight = value['w'];
+    return DrawingLook(
+      tint: rawTint is num ? Color(rawTint.toInt()) : null,
+      weight: rawWeight is num ? rawWeight.toDouble() : null,
+      dashed: value['d'] == true,
+      locked: value['lk'] == true,
+      hidden: value['hd'] == true,
+    );
+  }
+}
 
 /// A line the trader drew, anchored to candle **times** rather than indices, so
 /// it survives a different window, a different candle size or a new session.
@@ -36,19 +145,49 @@ class ChartDrawing {
     required this.startPrice,
     required this.endMs,
     required this.endPrice,
+    this.id,
+    this.editedAtMs,
+    this.look = const DrawingLook(),
   })  : kind = DrawingKind.trend,
         price = null,
         side = null,
         entry = null,
         stop = null,
-        target = null;
+        target = null,
+        points = const [],
+        text = null;
 
-  const ChartDrawing.ray({required this.price})
-      : kind = DrawingKind.ray,
+  const ChartDrawing.ray({
+    required this.price,
+    this.id,
+    this.editedAtMs,
+    this.look = const DrawingLook(),
+  })  : kind = DrawingKind.ray,
         startMs = 0,
         startPrice = 0,
         endMs = 0,
         endPrice = 0,
+        side = null,
+        entry = null,
+        stop = null,
+        target = null,
+        points = const [],
+        text = null;
+
+  /// One of the anchor-based objects: everything that is drawn from a list of
+  /// points rather than from the three position levels.
+  const ChartDrawing.points({
+    required this.kind,
+    required this.points,
+    this.text,
+    this.id,
+    this.editedAtMs,
+    this.look = const DrawingLook(),
+  })  : startMs = 0,
+        startPrice = 0,
+        endMs = 0,
+        endPrice = 0,
+        price = null,
         side = null,
         entry = null,
         stop = null,
@@ -69,12 +208,32 @@ class ChartDrawing {
     required double this.stop,
     required double this.target,
     this.endMs = 0,
+    this.id,
+    this.editedAtMs,
+    this.look = const DrawingLook(),
   })  : kind = DrawingKind.position,
         startPrice = 0,
         endPrice = 0,
-        price = null;
+        price = null,
+        points = const [],
+        text = null;
 
   final DrawingKind kind;
+
+  /// The row in `chart_drawings` this object lives in, once it is shared.
+  ///
+  /// Objects drawn on the phone start without one; the first sync inserts the
+  /// row and writes the id back. Every copy keeps it, which is what lets a drag
+  /// update that row instead of deleting it and inserting a replacement.
+  final String? id;
+
+  /// When the trader last changed this object, in epoch milliseconds.
+  ///
+  /// This is the clock conflicts are settled by: if two devices hold different
+  /// content for the same row, the later edit stands, even when it reaches the
+  /// table second. A null value means the object has never been edited since it
+  /// was loaded, so any remote edit is treated as the truth.
+  final int? editedAtMs;
 
   /// First point of a trend line, or the left edge of a position box, as epoch
   /// milliseconds of the candle under it.
@@ -95,6 +254,67 @@ class ChartDrawing {
   final double? entry;
   final double? stop;
   final double? target;
+
+  /// Anchors of an anchor-based object, in drawing order.
+  final List<ChartPoint> points;
+
+  /// The words on a text label; null for every other drawing.
+  final String? text;
+
+  /// How this object is drawn and whether it can be touched.
+  final DrawingLook look;
+
+  /// The colour the painter uses: the object's own, else the chart's.
+  Color get ink => look.tint ?? drawingColor;
+
+  /// The same object restyled, geometry untouched.
+  ChartDrawing withLook(DrawingLook next) {
+    switch (kind) {
+      case DrawingKind.trend:
+        return ChartDrawing.trend(
+          id: id,
+          editedAtMs: editedAtMs,
+          look: next,
+          startMs: startMs,
+          startPrice: startPrice,
+          endMs: endMs,
+          endPrice: endPrice,
+        );
+      case DrawingKind.ray:
+        return ChartDrawing.ray(
+          id: id,
+          editedAtMs: editedAtMs,
+          look: next,
+          price: price ?? 0,
+        );
+      case DrawingKind.position:
+        return ChartDrawing.position(
+          id: id,
+          editedAtMs: editedAtMs,
+          look: next,
+          side: side ?? PositionSide.long,
+          startMs: startMs,
+          endMs: endMs,
+          entry: entry ?? 0,
+          stop: stop ?? 0,
+          target: target ?? 0,
+        );
+      default:
+        return ChartDrawing.points(
+          id: id,
+          editedAtMs: editedAtMs,
+          look: next,
+          kind: kind,
+          points: points,
+          text: text,
+        );
+    }
+  }
+
+  /// True for the objects drawn from [points] rather than from levels.
+  bool get isAnchored => points.isNotEmpty &&
+      kind != DrawingKind.trend &&
+      kind != DrawingKind.position;
 
   bool get isPosition => kind == DrawingKind.position;
 
@@ -124,6 +344,9 @@ class ChartDrawing {
     final s = stop ?? 0;
     final t = target ?? 0;
     return ChartDrawing.position(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
       side: side ?? PositionSide.long,
       startMs: startMs,
       endMs: endMs,
@@ -140,6 +363,9 @@ class ChartDrawing {
     double? target,
   }) {
     return ChartDrawing.position(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
       side: side ?? PositionSide.long,
       startMs: startMs,
       endMs: endMs,
@@ -160,6 +386,9 @@ class ChartDrawing {
     final risk = (e - s).abs();
     final reward = (t - e).abs();
     return ChartDrawing.position(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
       side: next,
       startMs: startMs,
       endMs: endMs,
@@ -173,6 +402,9 @@ class ChartDrawing {
   ChartDrawing withEnd(int ms) {
     if (!isPosition) return this;
     return ChartDrawing.position(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
       side: side ?? PositionSide.long,
       startMs: startMs,
       endMs: ms < startMs ? startMs : ms,
@@ -192,6 +424,9 @@ class ChartDrawing {
     final t = target ?? 0;
     final nextEnd = endMs == 0 ? this.endMs : endMs;
     return ChartDrawing.position(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
       side: side ?? PositionSide.long,
       startMs: startMs,
       endMs: nextEnd < startMs ? startMs : nextEnd,
@@ -201,10 +436,136 @@ class ChartDrawing {
     );
   }
 
+  /// Replaces one anchor and leaves every other point where it is.
+  ///
+  /// This is what makes a handle a handle. Grabbing the end of a fib ladder or
+  /// one corner of a box adjusts that point alone, the way every desktop chart
+  /// behaves; sliding the whole object is the fallback only when the finger
+  /// landed on the body rather than on a dot.
+  ChartDrawing withPoint(int index, ChartPoint point) {
+    if (kind == DrawingKind.trend) {
+      return ChartDrawing.trend(
+        id: id,
+        editedAtMs: editedAtMs,
+        look: look,
+        startMs: index == 0 ? point.ms : startMs,
+        startPrice: index == 0 ? point.price : startPrice,
+        endMs: index == 0 ? endMs : point.ms,
+        endPrice: index == 0 ? endPrice : point.price,
+      );
+    }
+    if (kind == DrawingKind.position || index < 0 || index >= points.length) {
+      return this;
+    }
+    final next = [...points];
+    next[index] = point;
+    return ChartDrawing.points(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
+      kind: kind,
+      points: next,
+      text: text,
+    );
+  }
+
+  /// The same object carrying `next` as its shared row id.
+  ///
+  /// Used when a row is inserted and its id comes back from the database, and
+  /// when a local object matches a row that another device created: adopting the
+  /// id is what makes the next drag an update rather than a fresh insert.
+  ChartDrawing withId(String? next) {
+    switch (kind) {
+      case DrawingKind.trend:
+        return ChartDrawing.trend(
+          id: next,
+          editedAtMs: editedAtMs,
+          look: look,
+          startMs: startMs,
+          startPrice: startPrice,
+          endMs: endMs,
+          endPrice: endPrice,
+        );
+      case DrawingKind.ray:
+        return ChartDrawing.ray(
+          id: next,
+          editedAtMs: editedAtMs,
+          look: look,
+          price: price ?? 0,
+        );
+      case DrawingKind.position:
+        return ChartDrawing.position(
+          id: next,
+          editedAtMs: editedAtMs,
+          look: look,
+          side: side ?? PositionSide.long,
+          startMs: startMs,
+          endMs: endMs,
+          entry: entry ?? 0,
+          stop: stop ?? 0,
+          target: target ?? 0,
+        );
+      default:
+        return ChartDrawing.points(
+          id: next,
+          editedAtMs: editedAtMs,
+          look: look,
+          kind: kind,
+          points: points,
+          text: text,
+        );
+    }
+  }
+
+  /// The same object stamped with the moment the trader changed it.
+  ///
+  /// Stamped once per edit, centrally, so two devices can settle which version
+  /// of a level is the later one instead of whichever reached the table last.
+  ChartDrawing withEditedAt(int ms) {
+    switch (kind) {
+      case DrawingKind.trend:
+        return ChartDrawing.trend(
+          id: id,
+          editedAtMs: ms,
+          look: look,
+          startMs: startMs,
+          startPrice: startPrice,
+          endMs: endMs,
+          endPrice: endPrice,
+        );
+      case DrawingKind.ray:
+        return ChartDrawing.ray(id: id, editedAtMs: ms, price: price ?? 0);
+      case DrawingKind.position:
+        return ChartDrawing.position(
+          id: id,
+          editedAtMs: ms,
+          look: look,
+          side: side ?? PositionSide.long,
+          startMs: startMs,
+          endMs: endMs,
+          entry: entry ?? 0,
+          stop: stop ?? 0,
+          target: target ?? 0,
+        );
+      default:
+        return ChartDrawing.points(
+          id: id,
+          editedAtMs: ms,
+          look: look,
+          kind: kind,
+          points: points,
+          text: text,
+        );
+    }
+  }
+
   Map<String, Object?> toJson() {
     switch (kind) {
       case DrawingKind.trend:
         return {
+          if (id != null) 'id': id,
+          if (editedAtMs != null) 'ea': editedAtMs,
+          if (!look.isDefault) 'lk': look.toJson(),
           'k': kind.name,
           'st': startMs,
           'sp': startPrice,
@@ -212,9 +573,18 @@ class ChartDrawing {
           'ep': endPrice,
         };
       case DrawingKind.ray:
-        return {'k': kind.name, 'p': price};
+        return {
+          if (id != null) 'id': id,
+          if (editedAtMs != null) 'ea': editedAtMs,
+          if (!look.isDefault) 'lk': look.toJson(),
+          'k': kind.name,
+          'p': price,
+        };
       case DrawingKind.position:
         return {
+          if (id != null) 'id': id,
+          if (editedAtMs != null) 'ea': editedAtMs,
+          if (!look.isDefault) 'lk': look.toJson(),
           'k': kind.name,
           'side': side?.name,
           'st': startMs,
@@ -223,12 +593,49 @@ class ChartDrawing {
           'sl': stop,
           'tp': target,
         };
+      default:
+        return {
+          if (id != null) 'id': id,
+          if (editedAtMs != null) 'ea': editedAtMs,
+          if (!look.isDefault) 'lk': look.toJson(),
+          'k': kind.name,
+          'pts': [for (final point in points) point.toJson()],
+          if (text != null) 'txt': text,
+        };
     }
+  }
+
+  /// Moves an anchor-based object: prices follow the finger, times follow the
+  /// horizontal drag. `shiftTime` keeps the mapping inside the screen, which is
+  /// the only place that knows what index a finger is over.
+  ChartDrawing translated({
+    required int Function(int ms) shiftTime,
+    required double priceDelta,
+  }) {
+    return ChartDrawing.points(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
+      kind: kind,
+      text: text,
+      points: [
+        for (final point in points)
+          ChartPoint(
+            ms: shiftTime(point.ms),
+            price: point.price + priceDelta,
+          ),
+      ],
+    );
   }
 
   /// Null for anything unreadable, so one corrupt entry cannot drop the rest.
   static ChartDrawing? fromJson(Object? value) {
     if (value is! Map) return null;
+    final rawId = value['id'];
+    final id = rawId is String && rawId.isNotEmpty ? rawId : null;
+    final rawEdit = value['ea'];
+    final editedAtMs = rawEdit is num ? rawEdit.toInt() : null;
+    final look = DrawingLook.fromJson(value['lk']);
     final kind = value['k'];
     if (kind == DrawingKind.trend.name) {
       final st = value['st'];
@@ -237,6 +644,9 @@ class ChartDrawing {
       final ep = value['ep'];
       if (st is! num || sp is! num || et is! num || ep is! num) return null;
       return ChartDrawing.trend(
+        id: id,
+        editedAtMs: editedAtMs,
+        look: look,
         startMs: st.toInt(),
         startPrice: sp.toDouble(),
         endMs: et.toInt(),
@@ -246,7 +656,12 @@ class ChartDrawing {
     if (kind == DrawingKind.ray.name) {
       final price = value['p'];
       if (price is! num) return null;
-      return ChartDrawing.ray(price: price.toDouble());
+      return ChartDrawing.ray(
+        id: id,
+        editedAtMs: editedAtMs,
+        look: look,
+        price: price.toDouble(),
+      );
     }
     if (kind == DrawingKind.position.name) {
       final st = value['st'];
@@ -257,6 +672,9 @@ class ChartDrawing {
       final et = value['et'];
       if (st is! num || e is! num || sl is! num || tp is! num) return null;
       return ChartDrawing.position(
+        id: id,
+        editedAtMs: editedAtMs,
+        look: look,
         side: side == PositionSide.short.name
             ? PositionSide.short
             : PositionSide.long,
@@ -267,7 +685,42 @@ class ChartDrawing {
         target: tp.toDouble(),
       );
     }
-    return null;
+
+    // Anchor-based objects share one shape on disk: the kind name plus its
+    // points. An unknown kind is dropped, so a newer build's tool cannot break
+    // an older one.
+    DrawingKind? parsed;
+    for (final candidate in DrawingKind.values) {
+      if (candidate.name == kind) parsed = candidate;
+    }
+    if (parsed == null ||
+        parsed == DrawingKind.trend ||
+        parsed == DrawingKind.ray ||
+        parsed == DrawingKind.position) {
+      return null;
+    }
+    final raw = value['pts'];
+    if (raw is! List) return null;
+    final parsedPoints = <ChartPoint>[];
+    for (final entry in raw) {
+      if (entry is! List || entry.length < 2) continue;
+      final ms = entry[0];
+      final price = entry[1];
+      if (ms is! num || price is! num) continue;
+      parsedPoints.add(
+        ChartPoint(ms: ms.toInt(), price: price.toDouble()),
+      );
+    }
+    if (parsedPoints.isEmpty) return null;
+    final label = value['txt'];
+    return ChartDrawing.points(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
+      kind: parsed,
+      points: parsedPoints,
+      text: label is String ? label : null,
+    );
   }
 }
 

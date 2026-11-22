@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config.dart';
@@ -47,6 +48,13 @@ const int maxCandlesPerRequest = 5000;
 /// Candle sizes the candle route understands. The trader picks one; the server
 /// maps it onto the vendor's granularity code.
 enum ChartInterval {
+  // Seconds. OANDA quotes 5, 10, 15 and 30 directly; 45 is three 15-second
+  // bars bucketed on the server, because the vendor has no 45-second size.
+  fiveSeconds('5s', '5-sec candles', Duration(seconds: 5)),
+  tenSeconds('10s', '10-sec candles', Duration(seconds: 10)),
+  fifteenSeconds('15s', '15-sec candles', Duration(seconds: 15)),
+  thirtySeconds('30s', '30-sec candles', Duration(seconds: 30)),
+  fortyFiveSeconds('45s', '45-sec candles', Duration(seconds: 45)),
   oneMinute('1m', '1-min candles', Duration(minutes: 1)),
   fiveMinutes('5m', '5-min candles', Duration(minutes: 5)),
   fifteenMinutes('15m', '15-min candles', Duration(minutes: 15)),
@@ -99,6 +107,36 @@ class MarketDataService {
   /// going blank while another request runs.
   static final Map<String, _CachedCandles> _cache = {};
   static const int _maxEntries = 30;
+
+  /// Device archive of every candle this phone has been shown, one entry per
+  /// symbol and candle size.
+  ///
+  /// It is a union, not a tail: opening Thursday leaves Thursday in it, jumping
+  /// back to Monday adds Monday, and the next fetch merges instead of replacing.
+  /// That is what makes a past day reachable when the feed is down. Only the
+  /// newest [historyLimit] bars are kept per entry, so a size whose history grows
+  /// fastest (seconds, one minute) forgets its oldest days first — a bound, not a
+  /// bug, because a prefs blob cannot hold a decade of ticks.
+  static const String historyPrefix = 'chart.history.v1.';
+  static const String historyIndexKey = 'chart.history.v1.index';
+  static const int historyLimit = 12000;
+
+  /// How many symbol+size archives are kept before the least recently written
+  /// one is dropped. Twelve sizes for twenty instruments is already far more
+  /// than one trader uses, and the bound keeps the store from growing forever.
+  static const int historyMaxEntries = 20;
+
+  /// The archive currently in memory, newest last. A few entries only: reading
+  /// one is what the chart does, and twelve thousand bars per entry is real
+  /// memory.
+  static final Map<String, OfflineCandles> _archiveCache = {};
+  static const int _archiveCacheEntries = 6;
+
+  /// When each archive last reached the disk. A live chart polls every few
+  /// seconds and the newest bar moves each time; rewriting half a megabyte of
+  /// JSON on every poll would be a battery bug, not a feature.
+  static final Map<String, int> _archiveWrittenAt = {};
+  static const int archiveWriteGapMs = 15000;
 
   final String? Function() _accessToken;
 
@@ -187,10 +225,15 @@ class MarketDataService {
     final key = _cacheKey(instrument, interval, fromMs: fromMs, toMs: toMs);
     final entry = _cache[key];
     // A past window never changes, so it is kept far longer than the live tail.
-    // Every instrument is real-time OANDA data now, so one short TTL applies to
-    // all of them instead of a 10-minute window for the exchange-traded classes.
-    final ttl =
-        hasWindow ? const Duration(minutes: 30) : const Duration(seconds: 45);
+    // The live tail is cached for half a bar: a flat 45 seconds would freeze a
+    // 5-second chart nine bars behind the market.
+    final ttl = hasWindow
+        ? const Duration(minutes: 30)
+        : Duration(
+            milliseconds: (interval.size.inMilliseconds / 2)
+                .round()
+                .clamp(2000, 45000),
+          );
     if (!force && entry != null && DateTime.now().difference(entry.at) < ttl) {
       return entry.candles;
     }
@@ -231,11 +274,141 @@ class MarketDataService {
     if (candles.isEmpty) {
       throw MarketDataException('No candles came back for this instrument.');
     }
-    _cache[key] = _CachedCandles(candles, DateTime.now());
+    final at = DateTime.now();
+    _cache[key] = _CachedCandles(candles, at);
     if (_cache.length > _maxEntries) {
       _cache.remove(_cache.keys.first);
     }
+    // Every series the trader sees is merged into the device archive, windows
+    // included: the day they opened Thursday and the day they jumped back to
+    // Monday both belong on this phone afterwards.
+    unawaited(
+      _archive(instrument, interval, candles, at, immediate: hasWindow),
+    );
     return candles;
+  }
+
+  static String _historyKey(Instrument instrument, ChartInterval interval) =>
+      '$historyPrefix${instrument.symbol}|${interval.key}';
+
+  Future<void> _archive(
+    Instrument instrument,
+    ChartInterval interval,
+    List<Candle> candles,
+    DateTime at, {
+    bool immediate = false,
+  }) async {
+    try {
+      final key = _historyKey(instrument, interval);
+      // Merge in memory; read the file only when this entry is not loaded.
+      final base = _archiveCache[key] ?? await _readArchive(key);
+      final merged = mergeCandles(base?.candles ?? const [], candles);
+      _rememberArchive(key, OfflineCandles(merged, at));
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final writtenAt = _archiveWrittenAt[key] ?? 0;
+      if (!immediate && now - writtenAt < archiveWriteGapMs) return;
+      _archiveWrittenAt[key] = now;
+      final file = await _archiveFile(key);
+      await file.writeAsString(encodeOfflineCandles(merged, at), flush: false);
+      await _pruneArchives(key);
+    } catch (_) {
+      // A device copy is a convenience; losing it must never fail a fetch.
+    }
+  }
+
+  /// One JSON file per symbol and size, in the app's support directory.
+  ///
+  /// Files rather than SharedPreferences on purpose: prefs are parsed whole at
+  /// startup, and a dozen sizes of a dozen thousand bars would become a
+  /// multi-megabyte XML blob in front of the first frame.
+  static Future<File> _archiveFile(String key) async {
+    final base = await getApplicationSupportDirectory();
+    final dir = Directory('${base.path}/candles');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    final safe = key.replaceAll(RegExp(r'[^A-Za-z0-9|._-]'), '_');
+    return File('${dir.path}/$safe.json');
+  }
+
+  static Future<OfflineCandles?> _readArchive(String key) async {
+    try {
+      final file = await _archiveFile(key);
+      if (!await file.exists()) return null;
+      return decodeOfflineCandles(await file.readAsString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Keeps the archive in memory between writes, bounded so twenty instruments
+  /// cannot sit in RAM at once.
+  static void _rememberArchive(String key, OfflineCandles archive) {
+    _archiveCache.remove(key);
+    _archiveCache[key] = archive;
+    while (_archiveCache.length > _archiveCacheEntries) {
+      _archiveCache.remove(_archiveCache.keys.first);
+    }
+  }
+
+  /// Marks [key] as the most recently written archive and drops the least
+  /// recently used files once the store is over [historyMaxEntries].
+  ///
+  /// The index is the order of use, so opening a chart keeps its archive and
+  /// opening a new one evicts the oldest — a bounded store without a database.
+  Future<void> _pruneArchives(String key) async {
+    final order = <String>[];
+    try {
+      final base = await getApplicationSupportDirectory();
+      final index = File('${base.path}/candles/_index.json');
+      if (await index.exists()) {
+        final decoded = jsonDecode(await index.readAsString());
+        if (decoded is List) {
+          for (final entry in decoded) {
+            if (entry is String && entry != key) order.add(entry);
+          }
+        }
+      }
+      order.add(key);
+      while (order.length > historyMaxEntries) {
+        final dropped = order.removeAt(0);
+        final file = await _archiveFile(dropped);
+        if (await file.exists()) await file.delete();
+      }
+      await index.writeAsString(jsonEncode(order), flush: false);
+    } catch (_) {
+      // Pruning is housekeeping: never let it cost a chart its candles.
+    }
+  }
+
+  /// The candles this device has seen for [interval], or null when it has never
+  /// held any. With [from] and [to], only the stored bars inside that window.
+  ///
+  /// Read when the feed itself failed, so the chart can stand on what was true
+  /// rather than on nothing.
+  Future<OfflineCandles?> offline(
+    Instrument instrument,
+    ChartInterval interval, {
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    try {
+      final key = _historyKey(instrument, interval);
+      final stored = _archiveCache[key] ?? await _readArchive(key);
+      if (stored == null) return null;
+      if (from == null || to == null) return stored;
+      final start = from.toUtc().millisecondsSinceEpoch;
+      final end = to.toUtc().millisecondsSinceEpoch;
+      final slice = [
+        for (final candle in stored.candles)
+          if (candle.time.millisecondsSinceEpoch >= start &&
+              candle.time.millisecondsSinceEpoch <= end)
+            candle,
+      ];
+      if (slice.isEmpty) return null;
+      return OfflineCandles(slice, stored.at);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<String> _fetch(Uri uri) async {
@@ -325,6 +498,109 @@ List<Candle> parseCandlePayload(dynamic payload) {
 
   candles.sort((a, b) => a.time.compareTo(b.time));
   return candles;
+}
+
+/// The last series this device saw for one symbol and candle size, with the
+/// moment it arrived.
+///
+/// It exists for one situation: the chart feed is down and there is nothing on
+/// screen. Showing the market as it last really was, stamped, beats an empty
+/// canvas — but it is never presented as live, and never used to price an order.
+class OfflineCandles {
+  const OfflineCandles(this.candles, this.at);
+
+  final List<Candle> candles;
+  final DateTime at;
+}
+
+/// Every candle from both lists once, oldest first, capped to the newest
+/// [MarketDataService.historyLimit].
+///
+/// A later read of the same bar wins, because the feed revises the newest candle
+/// as it prints and the stored copy before it is the older opinion of the same
+/// minute. Merging by time is what lets windows join the archive instead of
+/// fighting over one slot.
+List<Candle> mergeCandles(List<Candle> existing, List<Candle> fresh) {
+  final byTime = <int, Candle>{};
+  for (final candle in existing) {
+    byTime[candle.time.millisecondsSinceEpoch] = candle;
+  }
+  for (final candle in fresh) {
+    byTime[candle.time.millisecondsSinceEpoch] = candle;
+  }
+  final merged = byTime.values.toList()
+    ..sort((a, b) => a.time.compareTo(b.time));
+  const limit = MarketDataService.historyLimit;
+  if (merged.length <= limit) return merged;
+  return merged.sublist(merged.length - limit);
+}
+
+/// Writes the newest candles as a compact device copy.
+///
+/// Only the tail is kept: the chart opens on the newest bars, so an old chart
+/// scrolled far back is not what this is for, and a prefs blob has to stay small.
+String encodeOfflineCandles(List<Candle> candles, DateTime at) {
+  const limit = MarketDataService.historyLimit;
+  final tail = candles.length <= limit
+      ? candles
+      : candles.sublist(candles.length - limit);
+  return jsonEncode({
+    'at': at.toUtc().millisecondsSinceEpoch,
+    'c': [
+      for (final candle in tail)
+        [
+          candle.time.millisecondsSinceEpoch,
+          candle.open,
+          candle.high,
+          candle.low,
+          candle.close,
+          candle.volume,
+        ],
+    ],
+  });
+}
+
+/// Reads a device copy back. Null for a missing, empty or unreadable blob, and
+/// for one whose every row was unusable.
+OfflineCandles? decodeOfflineCandles(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final stamp = decoded['at'];
+    final rows = decoded['c'];
+    if (stamp is! num || rows is! List) return null;
+    final candles = <Candle>[];
+    for (final row in rows) {
+      if (row is! List || row.length < 5) continue;
+      final t = row[0];
+      final o = row[1];
+      final h = row[2];
+      final l = row[3];
+      final c = row[4];
+      final v = row.length > 5 ? row[5] : 0;
+      if (t is! num || o is! num || h is! num || l is! num || c is! num) {
+        continue;
+      }
+      candles.add(
+        Candle(
+          time: DateTime.fromMillisecondsSinceEpoch(t.toInt(), isUtc: true),
+          open: o.toDouble(),
+          high: h.toDouble(),
+          low: l.toDouble(),
+          close: c.toDouble(),
+          volume: v is num ? v.toDouble() : 0,
+        ),
+      );
+    }
+    if (candles.isEmpty) return null;
+    return OfflineCandles(
+      candles,
+      DateTime.fromMillisecondsSinceEpoch(stamp.toInt()),
+    );
+  } catch (_) {
+    return null;
+  }
 }
 
 /// The `error` string a refused request carried, if any.
