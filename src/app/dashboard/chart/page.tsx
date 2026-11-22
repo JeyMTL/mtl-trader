@@ -21,16 +21,28 @@ export default async function ChartPage() {
   let tableMissing = false
 
   if (supabase) {
-    const { data, error } = await supabase
-      .from('chart_drawings')
-      .select('id, symbol, kind, points, text, edited_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
+    const read = (columns: string) =>
+      supabase
+        .from('chart_drawings')
+        .select(columns)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
 
-    if (error) {
+    const first = await read('id, symbol, kind, points, text, style, edited_at')
+    let rows = first.data as Record<string, unknown>[] | null
+    let readError = first.error
+    // The first paint must not depend on a migration: if the style column is
+    // not there yet, the chart still opens with the objects it has.
+    if (readError && /style/i.test(readError.message ?? '')) {
+      const retry = await read('id, symbol, kind, points, text, edited_at')
+      rows = retry.data as Record<string, unknown>[] | null
+      readError = retry.error
+    }
+
+    if (readError) {
       tableMissing = true
     } else {
-      drawings = (data ?? []).map((row) => ({
+      drawings = (rows ?? []).map((row) => ({
         id: String(row.id),
         symbol: String(row.symbol),
         kind: String(row.kind),
@@ -40,6 +52,10 @@ export default async function ChartPage() {
             )
           : [],
         text: row.text == null ? null : String(row.text),
+        style:
+          row.style && typeof row.style === 'object'
+            ? (row.style as Record<string, unknown>)
+            : {},
         editedAtMs: row.edited_at ? Date.parse(String(row.edited_at)) : null,
       }))
     }

@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import {
+  ChartObjectBar,
+  ChartObjectSettings,
+  styleColour,
+  styleFill,
+  type DrawingStyle,
+} from '@/components/chart-object-panel'
 
 /**
  * The chart desk: candles, pan, zoom and the objects a trader pins to them.
@@ -22,6 +29,11 @@ export interface ChartDrawingRow {
   kind: string
   points: { t: number; p: number }[]
   text: string | null
+  /**
+   * Colour, weight, dash, fill and the lock/hide flags. The same JSON keys the
+   * phone writes into the `style` column, so the two desks agree.
+   */
+  style: DrawingStyle
   /** When the trader made the edit, epoch milliseconds. Settles conflicts. */
   editedAtMs: number | null
 }
@@ -118,6 +130,8 @@ export function ChartWorkspace({
   const [view, setView] = useState<View>({ start: 0, span: 120 })
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  /** The object whose settings dialog is open, by id. */
+  const [settingsId, setSettingsId] = useState<string | null>(null)
   const [showVwap, setShowVwap] = useState(false)
   const [showSessions, setShowSessions] = useState(false)
 
@@ -242,6 +256,16 @@ export function ChartWorkspace({
   const symbolDrawings = useMemo(
     () => drawings.filter((row) => row.symbol === chartSymbol(symbol)),
     [drawings, symbol]
+  )
+
+  /** The object the strip below the tools acts on. */
+  const selectedRow = useMemo(
+    () => symbolDrawings.find((row) => row.id === selectedId) ?? null,
+    [symbolDrawings, selectedId]
+  )
+  const settingsRow = useMemo(
+    () => symbolDrawings.find((row) => row.id === settingsId) ?? null,
+    [settingsId, symbolDrawings]
   )
 
   /**
@@ -418,21 +442,48 @@ export function ChartWorkspace({
     for (const row of symbolDrawings) {
       const points = row.points ?? []
       if (points.length === 0) continue
+      // A hidden object keeps its row and stops being painted, which is how a
+      // trader clears the chart without throwing the idea away.
+      if (row.style?.hd) continue
       const selected = row.id === selectedId
-      context.strokeStyle = selected ? '#60a5fa' : '#94a3b8'
-      context.fillStyle = selected ? 'rgba(96, 165, 250, 0.12)' : 'rgba(148, 163, 184, 0.08)'
-      context.lineWidth = selected ? 2 : 1.2
-      context.setLineDash([])
+      const colour = styleColour(row.style, selected)
+      context.strokeStyle = colour
+      context.fillStyle = styleFill(row.style, colour, selected)
+      context.lineWidth = row.style?.w ?? (selected ? 2 : 1.2)
+      context.setLineDash(row.style?.d ? [5, 4] : [])
+
+      if (row.kind === 'text') {
+        // A label pinned on the phone has to read here too: the words are the
+        // object, and a dot with no text would be a bug with a shadow.
+        const at = { x: xForIndex(indexForTime(points[0].t)), y: yForPrice(points[0].p) }
+        const words = row.text ?? ''
+        if (words) {
+          context.font = '600 11px ui-sans-serif, system-ui, sans-serif'
+          const width = context.measureText(words).width + 10
+          context.fillRect(at.x, at.y - 16, width, 16)
+          context.strokeRect(at.x, at.y - 16, width, 16)
+          context.fillStyle = colour
+          context.setLineDash([])
+          context.fillText(words, at.x + 5, at.y - 4)
+          context.font = '11px ui-sans-serif, system-ui, sans-serif'
+        }
+        if (selected) {
+          context.fillStyle = colour
+          context.beginPath()
+          context.arc(at.x, at.y, 3.5, 0, Math.PI * 2)
+          context.fill()
+        }
+        continue
+      }
 
       if (row.kind === 'ray') {
         const y = yForPrice(points[0].p)
-        context.setLineDash([4, 4])
         context.beginPath()
         context.moveTo(0, y)
         context.lineTo(plotW, y)
         context.stroke()
         context.setLineDash([])
-        context.fillStyle = selected ? '#60a5fa' : '#94a3b8'
+        context.fillStyle = colour
         const tag = points[0].p.toFixed(pricePrecision(points[0].p))
         const width = context.measureText(tag).width + 8
         context.fillRect(plotW + 2, y - 8, width, 16)
@@ -444,7 +495,6 @@ export function ChartWorkspace({
       if (row.kind === 'vline') {
         const x = xForIndex(indexForTime(points[0].t))
         if (x >= -1 && x <= plotW + 1) {
-          context.setLineDash([4, 4])
           context.beginPath()
           context.moveTo(x, 0)
           context.lineTo(x, plotH)
@@ -497,7 +547,7 @@ export function ChartWorkspace({
           context.lineTo(right, y)
           context.stroke()
           context.globalAlpha = 1
-          context.fillStyle = '#94a3b8'
+          context.fillStyle = colour
           context.fillText(`${Math.round(ratio * 100)}%`, right + 4, y - 2)
         }
       } else {
@@ -508,7 +558,7 @@ export function ChartWorkspace({
       }
 
       if (selected) {
-        context.fillStyle = '#60a5fa'
+        context.fillStyle = colour
         for (const point of [a, b]) {
           context.beginPath()
           context.arc(point.x, point.y, 3.5, 0, Math.PI * 2)
@@ -585,7 +635,7 @@ export function ChartWorkspace({
 
   // ------------------------------------------------------------- persistence
   const addDrawing = useCallback(
-    async (kind: string, points: Point[]) => {
+    async (kind: string, points: Point[], style: DrawingStyle = {}, text: string | null = null) => {
       const clean = chartSymbol(symbol)
       const editedAtMs = Date.now()
       const optimistic: ChartDrawingRow = {
@@ -593,7 +643,8 @@ export function ChartWorkspace({
         symbol: clean,
         kind,
         points,
-        text: null,
+        text,
+        style,
         editedAtMs,
       }
       setDrawings((current) => [...current, optimistic])
@@ -606,6 +657,10 @@ export function ChartWorkspace({
             symbol: clean,
             kind,
             points,
+            text,
+            // Only sent when there is something to say: a project that has not
+            // applied the style migration still draws its objects.
+            ...(Object.keys(style).length > 0 ? { style } : {}),
             edited_at: new Date(editedAtMs).toISOString(),
           })
           .select('id')
@@ -633,25 +688,93 @@ export function ChartWorkspace({
     [symbol]
   )
 
-  const persistPoints = useCallback(async (id: string, points: Point[]) => {
-    if (id.startsWith('local-')) return
-    // Stamped here, at the end of the drag: this is when the trader moved it,
-    // not when the request happened to reach the server.
-    const editedAtMs = Date.now()
-    setDrawings((current) =>
-      current.map((row) => (row.id === id ? { ...row, points, editedAtMs } : row))
-    )
-    pendingWrites.current += 1
-    try {
-      const { error: writeError } = await supabase
-        .from('chart_drawings')
-        .update({ points, edited_at: new Date(editedAtMs).toISOString() })
-        .eq('id', id)
-      if (writeError) setNotice('Could not save the move. Check your connection.')
-    } finally {
-      pendingWrites.current -= 1
-    }
-  }, [])
+  /**
+   * Writes one object: where it sits, how it looks, what it says.
+   *
+   * One path for all three, because they are one row and one edit time — a
+   * restyle that reused the drag path, or the other way round, is how the two
+   * start disagreeing about which version the table holds.
+   */
+  const persistObject = useCallback(
+    async (
+      id: string,
+      patch: { points?: Point[]; style?: DrawingStyle; text?: string | null }
+    ) => {
+      // Stamped here, at the moment of the change: this is when the trader
+      // moved or restyled it, not when the request reached the server.
+      const editedAtMs = Date.now()
+      setDrawings((current) =>
+        current.map((row) => (row.id === id ? { ...row, ...patch, editedAtMs } : row))
+      )
+      if (id.startsWith('local-')) return
+      pendingWrites.current += 1
+      try {
+        const { error: writeError } = await supabase
+          .from('chart_drawings')
+          .update({
+            ...(patch.points ? { points: patch.points } : {}),
+            ...(patch.style ? { style: patch.style } : {}),
+            ...(patch.text === undefined ? {} : { text: patch.text }),
+            edited_at: new Date(editedAtMs).toISOString(),
+          })
+          .eq('id', id)
+        if (writeError) {
+          // A missing `style` column is a named state with a named fix, not a
+          // connection problem, and saying so saves the trader a dead end.
+          setNotice(
+            /style/i.test(writeError.message)
+              ? 'The look was applied here but could not be saved: apply ' +
+                'supabase/migrations/20261126_chart_drawing_style.sql.'
+              : 'Could not save that change. Check your connection.'
+          )
+        }
+      } finally {
+        pendingWrites.current -= 1
+      }
+    },
+    []
+  )
+
+  const persistPoints = useCallback(
+    async (id: string, points: Point[]) => persistObject(id, { points }),
+    [persistObject]
+  )
+
+  /**
+   * Copies an object, nudged a touch so the copy is visible beside the original
+   * instead of exactly under it. Style and label travel with it; lock and hide
+   * do not, because a copy that cannot be grabbed looks like the clone failed.
+   */
+  const cloneObject = useCallback(
+    (row: ChartDrawingRow) => {
+      const base = candles[candles.length - 1]?.c ?? row.points[0]?.p ?? 0
+      const nudge = Math.max(Math.abs(base) * 0.0006, 1e-6)
+      const style: DrawingStyle = { ...row.style }
+      delete style.lk
+      delete style.hd
+      void addDrawing(
+        row.kind,
+        row.points.map((point) => ({ t: point.t, p: point.p + nudge })),
+        style,
+        row.text
+      )
+    },
+    [addDrawing, candles]
+  )
+
+  /** Restyles one object without touching its geometry. */
+  const restyleObject = useCallback(
+    (id: string, patch: Partial<DrawingStyle>) => {
+      const row = drawings.find((item) => item.id === id)
+      if (!row) return
+      const style: DrawingStyle = { ...row.style, ...patch }
+      for (const key of Object.keys(patch) as (keyof DrawingStyle)[]) {
+        if (patch[key] === undefined) delete style[key]
+      }
+      void persistObject(id, { style })
+    },
+    [drawings, persistObject]
+  )
 
   const removeDrawing = useCallback(async (id: string) => {
     setDrawings((current) => current.filter((row) => row.id !== id))
@@ -693,13 +816,24 @@ export function ChartWorkspace({
   const pullDrawings = useCallback(async () => {
     if (pendingWrites.current > 0 || drag.current) return
     const clean = chartSymbol(symbol)
-    const { data, error: readError } = await supabase
-      .from('chart_drawings')
-      .select('id, symbol, kind, points, text, edited_at')
-      .eq('symbol', clean)
-      .order('created_at', { ascending: true })
+    const read = (columns: string) =>
+      supabase
+        .from('chart_drawings')
+        .select(columns)
+        .eq('symbol', clean)
+        .order('created_at', { ascending: true })
+    const first = await read('id, symbol, kind, points, text, style, edited_at')
+    let data = first.data as Record<string, unknown>[] | null
+    let readError = first.error
+    // A project that has not applied the style migration yet still charts its
+    // objects: the read falls back to the columns that have always been there.
+    if (readError && /style/i.test(readError.message)) {
+      const retry = await read('id, symbol, kind, points, text, edited_at')
+      data = retry.data as Record<string, unknown>[] | null
+      readError = retry.error
+    }
     if (readError || !data) return
-    const rows: ChartDrawingRow[] = (data as Record<string, unknown>[]).map((row) => ({
+    const rows: ChartDrawingRow[] = data.map((row) => ({
       id: String(row.id),
       symbol: String(row.symbol),
       kind: String(row.kind),
@@ -709,6 +843,10 @@ export function ChartWorkspace({
           )
         : [],
       text: row.text == null ? null : String(row.text),
+      style:
+        row.style && typeof row.style === 'object'
+          ? (row.style as DrawingStyle)
+          : {},
       editedAtMs: row.edited_at ? Date.parse(String(row.edited_at)) : null,
     }))
     setDrawings((current) => mergeSymbolDrawings(current, rows, clean))
@@ -758,6 +896,9 @@ export function ChartWorkspace({
       for (const row of symbolDrawings) {
         const points = row.points ?? []
         if (points.length === 0) continue
+        // A hidden object cannot be grabbed: it is not on the chart, so a
+        // pointer over that patch of candles is not over anything.
+        if (row.style?.hd) continue
         if (row.kind === 'ray') {
           const distance = Math.abs(yForPrice(points[0].p) - y)
           if (distance < bestDistance) {
@@ -807,6 +948,9 @@ export function ChartWorkspace({
       const hit = hitTest(x, y)
       if (hit) {
         setSelectedId(hit.id)
+        // A locked object still selects, so its settings can be opened and it
+        // can be unlocked; it just refuses to move.
+        if (hit.style?.lk) return
         drag.current = {
           mode: 'object',
           id: hit.id,
@@ -1066,6 +1210,19 @@ export function ChartWorkspace({
         )}
       </div>
 
+      {/* The object strip sits directly above the canvas, where the eye
+          already is: selecting something must not push the tools it was drawn
+          with out from under the pointer. */}
+      {selectedRow && (
+        <ChartObjectBar
+          row={selectedRow}
+          onStyle={(patch) => restyleObject(selectedRow.id, patch)}
+          onClone={() => cloneObject(selectedRow)}
+          onDelete={() => void removeDrawing(selectedRow.id)}
+          onOpenSettings={() => setSettingsId(selectedRow.id)}
+        />
+      )}
+
       <div
         ref={boxRef}
         className="relative h-[62vh] min-h-[380px] w-full overflow-hidden rounded-xl border border-border bg-[#0b1220]"
@@ -1118,6 +1275,25 @@ export function ChartWorkspace({
         points, percent and bars. Both overlays are computed from the candles and
         never touch your saved objects.
       </p>
+
+      {settingsRow && (
+        <ChartObjectSettings
+          row={settingsRow}
+          onClose={() => setSettingsId(null)}
+          onClone={() => {
+            cloneObject(settingsRow)
+            setSettingsId(null)
+          }}
+          onDelete={() => {
+            void removeDrawing(settingsRow.id)
+            setSettingsId(null)
+          }}
+          onSave={(next) => {
+            void persistObject(settingsRow.id, next)
+            setSettingsId(null)
+          }}
+        />
+      )}
 
       {notice && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-[11px] text-gray-300">

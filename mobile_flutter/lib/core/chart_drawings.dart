@@ -76,6 +76,7 @@ class DrawingLook {
     this.dashed = false,
     this.locked = false,
     this.hidden = false,
+    this.fill,
   });
 
   /// Colour of the stroke and its tags; null follows the chart style.
@@ -93,8 +94,17 @@ class DrawingLook {
   /// is how a trader clears the chart without throwing the idea away.
   final bool hidden;
 
+  /// How solidly a zone, a fib band or a label is filled, 0–100 percent.
+  /// Null follows the chart's own restraint, so an untouched object stays quiet.
+  final int? fill;
+
   bool get isDefault =>
-      tint == null && weight == null && !dashed && !locked && !hidden;
+      tint == null &&
+      weight == null &&
+      !dashed &&
+      !locked &&
+      !hidden &&
+      fill == null;
 
   DrawingLook copyWith({
     Color? tint,
@@ -102,8 +112,10 @@ class DrawingLook {
     bool? dashed,
     bool? locked,
     bool? hidden,
+    int? fill,
     bool clearTint = false,
     bool clearWeight = false,
+    bool clearFill = false,
   }) {
     return DrawingLook(
       tint: clearTint ? null : (tint ?? this.tint),
@@ -111,6 +123,7 @@ class DrawingLook {
       dashed: dashed ?? this.dashed,
       locked: locked ?? this.locked,
       hidden: hidden ?? this.hidden,
+      fill: clearFill ? null : (fill ?? this.fill),
     );
   }
 
@@ -120,18 +133,21 @@ class DrawingLook {
     if (dashed) 'd': true,
     if (locked) 'lk': true,
     if (hidden) 'hd': true,
+    if (fill != null) 'f': fill,
   };
 
   static DrawingLook fromJson(Object? value) {
     if (value is! Map) return const DrawingLook();
     final rawTint = value['c'];
     final rawWeight = value['w'];
+    final rawFill = value['f'];
     return DrawingLook(
       tint: rawTint is num ? Color(rawTint.toInt()) : null,
       weight: rawWeight is num ? rawWeight.toDouble() : null,
       dashed: value['d'] == true,
       locked: value['lk'] == true,
       hidden: value['hd'] == true,
+      fill: rawFill is num ? rawFill.toInt().clamp(0, 100) : null,
     );
   }
 }
@@ -318,6 +334,18 @@ class ChartDrawing {
 
   bool get isPosition => kind == DrawingKind.position;
 
+  /// Kinds that paint a filled body, and so have something to make translucent.
+  bool get hasFill =>
+      kind == DrawingKind.rectangle ||
+      kind == DrawingKind.ellipse ||
+      kind == DrawingKind.text ||
+      kind == DrawingKind.fib ||
+      kind == DrawingKind.fibExtension ||
+      kind == DrawingKind.position;
+
+  /// Kinds that show words a trader can retype — the text tool's whole object.
+  bool get carriesText => kind == DrawingKind.text;
+
   /// The level a long loses money towards, and a short profits towards.
   double? levelFor(PositionLevel level) {
     switch (level) {
@@ -395,6 +423,25 @@ class ChartDrawing {
       entry: e,
       stop: next == PositionSide.long ? e - risk : e + risk,
       target: next == PositionSide.long ? e + reward : e - reward,
+    );
+  }
+
+  /// Slides the position box's two time edges, leaving its prices alone.
+  ///
+  /// This is the position tool's half of the Coordinates tab: the levels are
+  /// typed there, and the stretch of candles the box covers is picked there too.
+  ChartDrawing withTimes({required int startMs, required int endMs}) {
+    if (!isPosition) return this;
+    return ChartDrawing.position(
+      id: id,
+      editedAtMs: editedAtMs,
+      look: look,
+      side: side ?? PositionSide.long,
+      startMs: startMs,
+      endMs: endMs < startMs ? startMs : endMs,
+      entry: entry ?? 0,
+      stop: stop ?? 0,
+      target: target ?? 0,
     );
   }
 
@@ -534,7 +581,12 @@ class ChartDrawing {
           endPrice: endPrice,
         );
       case DrawingKind.ray:
-        return ChartDrawing.ray(id: id, editedAtMs: ms, price: price ?? 0);
+        return ChartDrawing.ray(
+          id: id,
+          editedAtMs: ms,
+          look: look,
+          price: price ?? 0,
+        );
       case DrawingKind.position:
         return ChartDrawing.position(
           id: id,

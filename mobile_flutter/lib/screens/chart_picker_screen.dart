@@ -25,6 +25,7 @@ import '../services/market_data.dart';
 import '../ui/chart/chart_marker.dart';
 import '../ui/chart/chart_painter.dart';
 import '../ui/chart/drawings_sheet.dart';
+import '../ui/chart/object_settings.dart';
 import '../ui/chart/sync_badge.dart';
 import '../ui/color_wheel.dart';
 import '../ui/theme.dart';
@@ -1500,15 +1501,30 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
             alignment: Alignment.center,
             child: Icon(Icons.drag_indicator, size: 14, color: AppColors.faint),
           ),
+          // The name is the door to the object's settings, the way tapping a
+          // title opens settings in every charting app: one obvious place for
+          // style, coordinates and the label.
           Expanded(
-            child: Text(
-              _drawingTitle(drawing),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.text,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+            child: InkWell(
+              onTap: () => _editDrawing(index),
+              borderRadius: BorderRadius.circular(AppRadius.field),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      _drawingTitle(drawing),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.tune, size: 13, color: AppColors.muted),
+                ],
               ),
             ),
           ),
@@ -2361,23 +2377,30 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   /// Copies a drawing, nudged a fraction of its own risk so the copy is visible
   /// next to the original instead of hidden under it.
-  void _cloneDrawing(int index) {
-    if (index < 0 || index >= _drawings.length) return;
-    final source = _drawings[index];
+  ///
+  /// Style and label travel with it: a clone of a dashed red zone is a dashed
+  /// red zone. Lock and hide do not — the copy is a working object, and one that
+  /// cannot be grabbed or seen would look like the clone failed.
+  ChartDrawing _nudgedCopy(ChartDrawing source) {
     final last = _lastVisible;
     final base = last?.close ?? source.entry ?? source.startPrice;
     final nudge = _defaultRisk(base) * 0.3;
+    final look = source.look.copyWith(locked: false, hidden: false);
 
     final copy = switch (source.kind) {
-      DrawingKind.ray =>
-        ChartDrawing.ray(price: (source.price ?? base) + nudge),
+      DrawingKind.ray => ChartDrawing.ray(
+          look: look,
+          price: (source.price ?? base) + nudge,
+        ),
       DrawingKind.trend => ChartDrawing.trend(
+          look: look,
           startMs: source.startMs,
           startPrice: source.startPrice + nudge,
           endMs: source.endMs,
           endPrice: source.endPrice + nudge,
         ),
       DrawingKind.position => ChartDrawing.position(
+          look: look,
           side: source.side ?? PositionSide.long,
           startMs: source.startMs,
           endMs: source.endMs,
@@ -2386,6 +2409,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           target: (source.target ?? base) + nudge,
         ),
       _ => ChartDrawing.points(
+          look: look,
           kind: source.kind,
           text: source.text,
           points: [
@@ -2394,7 +2418,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
           ],
         ),
     };
-    _addDrawing(copy);
+    return copy.withEditedAt(DateTime.now().millisecondsSinceEpoch);
+  }
+
+  void _cloneDrawing(int index) {
+    if (index < 0 || index >= _drawings.length) return;
+    _addDrawing(_nudgedCopy(_drawings[index]));
   }
 
   String _drawingTitle(ChartDrawing drawing) {
@@ -2762,260 +2791,44 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     );
   }
 
-  /// The object's settings: its prices, and for a position its side. Times are
-  /// still moved by dragging on the chart, where they can be seen against the
-  /// candles.
+  /// The object's settings: how it looks, exactly where it sits, what it says,
+  /// and the actions that belong with it. Everything is a draft until Ok, so
+  /// Cancel really cancels — a widened box comes back the width it was.
   Future<void> _editDrawing(int index) async {
     if (index < 0 || index >= _drawings.length) return;
     final drawing = _drawings[index];
-    final decimals = widget.instrument.decimals;
-    String fmt(double value) => value.toStringAsFixed(decimals);
-
-    final priceFields = <String, TextEditingController>{};
-    if (drawing.kind == DrawingKind.ray) {
-      priceFields['Price'] = TextEditingController(
-        text: fmt(drawing.price ?? 0),
-      );
-    } else if (drawing.isPosition) {
-      priceFields['Entry'] = TextEditingController(
-        text: fmt(drawing.entry ?? 0),
-      );
-      priceFields['Stop'] = TextEditingController(
-        text: fmt(drawing.stop ?? 0),
-      );
-      priceFields['Target'] = TextEditingController(
-        text: fmt(drawing.target ?? 0),
-      );
-    } else {
-      priceFields['Start price'] = TextEditingController(
-        text: fmt(drawing.startPrice),
-      );
-      priceFields['End price'] = TextEditingController(
-        text: fmt(drawing.endPrice),
-      );
-    }
-    var side = drawing.side ?? PositionSide.long;
-
-    double read(String label, double fallback) {
-      final raw = priceFields[label]?.text.trim() ?? '';
-      final value = double.tryParse(raw);
-      return value == null || value <= 0 ? fallback : value;
-    }
-
-    final edited = await showModalBottomSheet<ChartDrawing>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            void flip(PositionSide next) {
-              if (next == side) return;
-              side = next;
-              // Flipping the side mirrors the levels, so the box keeps the same
-              // risk and reward instead of pointing the stop and target the
-              // wrong way round.
-              final mirrored = drawing.withSide(next);
-              if (mirrored.entry != null) {
-                priceFields['Entry']!.text = fmt(mirrored.entry!);
-              }
-              if (mirrored.stop != null) {
-                priceFields['Stop']!.text = fmt(mirrored.stop!);
-              }
-              if (mirrored.target != null) {
-                priceFields['Target']!.text = fmt(mirrored.target!);
-              }
-              setSheetState(() {});
-            }
-
-            ChartDrawing build() {
-              // Every rebuild carries the row id, so retyping a level updates
-              // the shared object instead of leaving the old one behind.
-              if (drawing.kind == DrawingKind.ray) {
-                return ChartDrawing.ray(
-                  id: drawing.id,
-                  look: drawing.look,
-                  price: read('Price', drawing.price ?? 0),
-                );
-              }
-              if (drawing.isPosition) {
-                return ChartDrawing.position(
-                  id: drawing.id,
-                  look: drawing.look,
-                  side: side,
-                  startMs: drawing.startMs,
-                  endMs: drawing.endMs,
-                  entry: read('Entry', drawing.entry ?? 0),
-                  stop: read('Stop', drawing.stop ?? 0),
-                  target: read('Target', drawing.target ?? 0),
-                );
-              }
-              return ChartDrawing.trend(
-                id: drawing.id,
-                look: drawing.look,
-                startMs: drawing.startMs,
-                startPrice: read('Start price', drawing.startPrice),
-                endMs: drawing.endMs,
-                endPrice: read('End price', drawing.endPrice),
-              );
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Edit ${_drawingTitle(drawing).toLowerCase()}',
-                        style: TextStyle(
-                          color: AppColors.text,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (drawing.isPosition) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _sideChip(
-                                label: 'Long',
-                                selected: side == PositionSide.long,
-                                color: AppColors.success,
-                                onTap: () => flip(PositionSide.long),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _sideChip(
-                                label: 'Short',
-                                selected: side == PositionSide.short,
-                                color: AppColors.danger,
-                                onTap: () => flip(PositionSide.short),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      for (final field in priceFields.entries) ...[
-                        Text(
-                          field.key,
-                          style: TextStyle(
-                            color: AppColors.faint,
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: field.value,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          style: TextStyle(
-                            color: AppColors.text,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      Text(
-                        'Times are moved by dragging the object on the chart.',
-                        style: TextStyle(
-                          color: AppColors.faint,
-                          fontSize: 10,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.of(sheetContext).pop(),
-                              child: const Text('Cancel'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: () =>
-                                  Navigator.of(sheetContext).pop(build()),
-                              child: const Text('Save'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+    final result = await showObjectSettings(
+      context,
+      drawing: drawing,
+      title: _drawingTitle(drawing),
+      decimals: widget.instrument.decimals,
     );
+    if (!mounted || result == null) return;
 
-    for (final controller in priceFields.values) {
-      controller.dispose();
+    if (result.remove) {
+      _deleteDrawing(index);
+      return;
     }
-    if (edited == null || !mounted) return;
+
+    final changed = result.drawing;
+    if (changed == null) return;
+    // Stamped now, at the moment the trader pressed Ok, so the other device
+    // compares against the edit rather than against when the sheet opened.
+    final stamped = changed.withEditedAt(DateTime.now().millisecondsSinceEpoch);
+
+    if (result.clone) {
+      _addDrawing(_nudgedCopy(stamped));
+      return;
+    }
+
     final next = [..._drawings];
-    next[index] = edited;
+    next[index] = stamped;
     setState(() {
       _drawings = next;
       _selectedDrawing = index;
     });
     _persistDrawings(next);
   }
-
-  Widget _sideChip({
-    required String label,
-    required bool selected,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: selected ? color.withAlpha(38) : AppColors.surfaceAlt,
-      borderRadius: BorderRadius.circular(AppRadius.field),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.field),
-        onTap: onTap,
-        child: Container(
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.field),
-            border: Border.all(
-              color: selected ? color : AppColors.border,
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? color : AppColors.muted,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   /// The position tool the BUY/SELL buttons act on: the selected box, or the
   /// most recent one when nothing is selected.
   ({int index, ChartDrawing drawing})? _activePosition() {

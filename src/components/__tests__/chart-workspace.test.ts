@@ -20,6 +20,7 @@ function row(
     kind: 'ray',
     points: [{ t: 1_760_000_000_000, p: price }],
     text: null,
+    style: {},
     editedAtMs,
   }
 }

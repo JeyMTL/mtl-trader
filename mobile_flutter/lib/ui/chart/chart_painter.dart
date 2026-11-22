@@ -935,8 +935,14 @@ class TradingChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
+    // A fill the trader set is read as a percentage, because that is what the
+    // slider said: 0 is an empty box, 100 a solid one. Untouched objects keep
+    // the chart's own restraint rather than a number the trader never chose.
+    final fillAlpha = drawing.look.fill == null
+        ? 16
+        : ((drawing.look.fill! / 100) * 255).round().clamp(0, 255);
     final fill = Paint()
-      ..color = drawing.ink.withAlpha(16)
+      ..color = drawing.ink.withAlpha(fillAlpha)
       ..style = PaintingStyle.fill;
     final ink = drawing.ink.withAlpha(235);
 
@@ -980,8 +986,11 @@ class TradingChartPainter extends CustomPainter {
         // a stack of lines and the trader has to count which zone price is in;
         // with them the 38.2–61.8% pocket is a thing you can see at a glance,
         // which is the whole reason the tool exists.
+        final bandAlpha = drawing.look.fill == null
+            ? (selected ? 30 : 18)
+            : ((drawing.look.fill! / 100) * 255).round().clamp(0, 255);
         final bandPaint = Paint()
-          ..color = drawing.ink.withAlpha(selected ? 30 : 18)
+          ..color = drawing.ink.withAlpha(bandAlpha)
           ..style = PaintingStyle.fill;
         for (var i = 0; i + 1 < ratios.length; i++) {
           if (i.isOdd) continue;

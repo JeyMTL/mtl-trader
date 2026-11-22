@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mtl_trader_mobile/core/chart_drawings.dart';
 import 'package:mtl_trader_mobile/core/trade_exit.dart';
+import 'package:mtl_trader_mobile/services/chart_drawings_sync.dart'
+    show lookSignature;
 import 'package:mtl_trader_mobile/services/market_data.dart' show Candle;
 
 /// One bar, [minute] minutes after the position's start.
@@ -390,5 +392,40 @@ void _lookTests() {
     expect(drawing.look.isDefault, isTrue);
     expect(drawing.toJson().containsKey('lk'), isFalse);
     expect(drawing.ink, drawingColor);
+  });
+
+  test('a fill percent survives storage and marks the object as styled', () {
+    const drawing = ChartDrawing.points(
+      kind: DrawingKind.rectangle,
+      points: [
+        ChartPoint(ms: 1762899000000, price: 1.25),
+        ChartPoint(ms: 1762900600000, price: 1.26),
+      ],
+      look: DrawingLook(fill: 35),
+    );
+
+    expect(drawing.look.fill, 35);
+    expect(drawing.look.isDefault, isFalse);
+    expect(drawing.hasFill, isTrue);
+
+    final restored = ChartDrawing.fromJson(drawing.toJson());
+    expect(restored!.look.fill, 35);
+  });
+
+  test('a fill is clamped to a percentage when read back', () {
+    expect(DrawingLook.fromJson({'f': 400}).fill, 100);
+    expect(DrawingLook.fromJson({'f': -8}).fill, 0);
+    expect(DrawingLook.fromJson({'f': 'wide'}).fill, isNull);
+  });
+
+  test('a restyle makes the cloud signature differ', () {
+    const plain = ChartDrawing.ray(price: 1.10);
+    final tinted = plain.withLook(const DrawingLook(tint: Color(0xFF45D29A)));
+    expect(lookSignature(plain.look), isNot(lookSignature(tinted.look)));
+    // Geometry alone must not move the signature when nothing was restyled.
+    expect(
+      lookSignature(const DrawingLook()),
+      lookSignature(const DrawingLook()),
+    );
   });
 }

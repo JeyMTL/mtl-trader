@@ -97,7 +97,7 @@ class ChartDrawingsSync {
     try {
       final data = await db
           .from('chart_drawings')
-          .select('id, kind, points, text, edited_at')
+          .select('id, kind, points, text, style, edited_at')
           .eq('symbol', cloudSymbol);
       rows = [
         for (final row in data as List)
@@ -194,6 +194,9 @@ class ChartDrawingsSync {
           'kind': drawing.kind.name,
           'points': drawingToPoints(drawing),
           'text': drawing.text,
+          // The look travels with the geometry: a zone made red and half-solid
+          // on the phone must be the same zone on the web desk.
+          'style': drawing.look.toJson(),
           // The edit time, not the arrival time: this is what the other device
           // compares against when it comes back.
           'edited_at': _isoTime(
@@ -218,6 +221,7 @@ class ChartDrawingsSync {
               'kind': drawing.kind.name,
               'points': drawingToPoints(drawing),
               'text': drawing.text,
+              'style': drawing.look.toJson(),
               'edited_at': _isoTime(
                 drawing.editedAtMs ?? DateTime.now().millisecondsSinceEpoch,
               ),
@@ -341,6 +345,7 @@ class ChartDrawingsSync {
       return ChartDrawing.ray(
         id: id,
         editedAtMs: editedAtMs,
+        look: DrawingLook.fromJson(row['style']),
         price: points.first.price,
       );
     }
@@ -349,6 +354,7 @@ class ChartDrawingsSync {
       return ChartDrawing.trend(
         id: id,
         editedAtMs: editedAtMs,
+        look: DrawingLook.fromJson(row['style']),
         startMs: points[0].ms,
         startPrice: points[0].price,
         endMs: points[1].ms,
@@ -364,6 +370,7 @@ class ChartDrawingsSync {
     return ChartDrawing.points(
       id: id,
       editedAtMs: editedAtMs,
+      look: DrawingLook.fromJson(row['style']),
       kind: kind,
       points: points,
       text: label is String && label.isNotEmpty ? label : null,
@@ -492,7 +499,21 @@ String drawingSignature(ChartDrawing drawing) {
       if (drawing.text != null) buffer.write('|t:${drawing.text}');
       break;
   }
+  // Style belongs in the signature: without it a restyle would look identical
+  // to the row it came from, and the cloud copy would keep the old colour
+  // forever while the phone showed the new one.
+  buffer.write('|s:${lookSignature(drawing.look)}');
   return buffer.toString();
 }
+
+/// The look as one comparable string, for signatures and tests.
+String lookSignature(DrawingLook look) => <Object?>[
+      look.tint?.toARGB32() ?? '',
+      look.weight ?? '',
+      look.dashed ? 'd' : '',
+      look.locked ? 'lk' : '',
+      look.hidden ? 'hd' : '',
+      look.fill ?? '',
+    ].join(',');
 
 String _money(double value) => value.toStringAsFixed(7);
