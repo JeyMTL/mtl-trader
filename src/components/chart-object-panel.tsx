@@ -20,6 +20,10 @@ export interface DrawingStyle {
   f?: number
   lk?: boolean
   hd?: boolean
+  /** An alert line: the same level, but it tells you when price reaches it. */
+  al?: boolean
+  /** Set once that alert has been delivered. Kept so the level is not lost. */
+  fd?: boolean
 }
 
 export interface ObjectRow {
@@ -65,8 +69,18 @@ export function hasFill(kind: string): boolean {
   return ['rectangle', 'ellipse', 'fib', 'fibExtension', 'measure', 'text'].includes(kind)
 }
 
-export function objectName(kind: string): string {
+export function objectName(kind: string, style?: DrawingStyle): string {
+  // A level and an alert line are the same object on the chart; only the flag
+  // separates them, so the name has to read the flag.
+  if (kind === 'ray' && style?.al) {
+    return style.fd ? 'Alert line — fired' : 'Alert line'
+  }
   return KIND_NAMES[kind] ?? kind
+}
+
+/** True when the object is a level that announces itself. */
+export function isAlertLine(kind: string, style?: DrawingStyle): boolean {
+  return kind === 'ray' && Boolean(style?.al)
 }
 
 /** An ARGB int from the phone as a CSS colour, with a fallback per state. */
@@ -133,7 +147,7 @@ export function ChartObjectBar({
         title="Style, coordinates and the label"
       >
         <CandlestickChart className="h-3.5 w-3.5 text-primary" />
-        {objectName(row.kind)}
+        {objectName(row.kind, row.style)}
         <SlidersHorizontal className="h-3 w-3 text-gray-500" />
       </button>
 
@@ -319,7 +333,10 @@ export function ChartObjectSettings({
   const [points, setPoints] = useState(row.points.map((point) => ({ ...point })))
   const [text, setText] = useState(row.text ?? '')
 
-  const label = useMemo(() => objectName(row.kind), [row.kind])
+  const label = useMemo(
+    () => objectName(row.kind, row.style),
+    [row.kind, row.style]
+  )
   const singleAnchor = row.kind === 'ray' || row.kind === 'vline'
 
   const patchStyle = (patch: Partial<DrawingStyle>) =>

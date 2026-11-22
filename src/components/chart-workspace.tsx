@@ -55,6 +55,7 @@ interface Point {
 type ToolId =
   | 'select'
   | 'ray'
+  | 'alert'
   | 'trend'
   | 'fib'
   | 'rectangle'
@@ -89,6 +90,11 @@ const INTERVALS = [
 const TOOLS: { id: ToolId; label: string; hint: string }[] = [
   { id: 'select', label: 'Select', hint: 'Drag objects, pan the chart' },
   { id: 'ray', label: 'Level', hint: 'Tap a price to pin a level' },
+  {
+    id: 'alert',
+    label: 'Alert',
+    hint: 'Tap a price to be told when it is reached',
+  },
   { id: 'trend', label: 'Trend', hint: 'Two points' },
   { id: 'fib', label: 'Fib', hint: 'Two points, retracement ladder' },
   { id: 'rectangle', label: 'Zone', hint: 'Two corners' },
@@ -125,6 +131,12 @@ export function ChartWorkspace({
   const [error, setError] = useState<string | null>(null)
   const [drawings, setDrawings] = useState<ChartDrawingRow[]>(initialDrawings)
   const [tool, setTool] = useState<ToolId>('select')
+  /**
+   * Hide alert lines that have already fired. The rows are kept — a level that
+   * was reached is still the record of a level — this only decides what the
+   * desk draws, the same choice Settings offers on the phone.
+   */
+  const [activeAlertsOnly, setActiveAlertsOnly] = useState(false)
   const [pending, setPending] = useState<Point | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<View>({ start: 0, span: 120 })
@@ -445,6 +457,10 @@ export function ChartWorkspace({
       // A hidden object keeps its row and stops being painted, which is how a
       // trader clears the chart without throwing the idea away.
       if (row.style?.hd) continue
+      // A fired alert is kept as the record of a level that was reached; the
+      // filter is about what the trader still wants to see.
+      const firedAlert = Boolean(row.style?.al && row.style?.fd)
+      if (firedAlert && activeAlertsOnly) continue
       const selected = row.id === selectedId
       const colour = styleColour(row.style, selected)
       context.strokeStyle = colour
@@ -480,10 +496,25 @@ export function ChartWorkspace({
 
       if (row.kind === 'ray') {
         const y = yForPrice(points[0].p)
+        // A fired line keeps its colour but loses its weight, so the live
+        // alerts are what the eye lands on.
+        const alpha = context.globalAlpha
+        if (firedAlert) context.globalAlpha = 0.5
         context.beginPath()
         context.moveTo(0, y)
         context.lineTo(plotW, y)
         context.stroke()
+        context.globalAlpha = alpha
+        if (row.style?.al) {
+          // The same left-edge mark the phone draws: hollow while the alert is
+          // waiting, solid once it has fired.
+          context.setLineDash([])
+          if (firedAlert) {
+            context.fillRect(0, y - 3.5, 4, 7)
+          } else {
+            context.strokeRect(0, y - 3.5, 4, 7)
+          }
+        }
         context.setLineDash([])
         context.fillStyle = colour
         const tag = points[0].p.toFixed(pricePrecision(points[0].p))
@@ -625,6 +656,7 @@ export function ChartWorkspace({
       }
     }
   }, [
+    activeAlertsOnly,
     candles,
     hover,
     interval,
@@ -885,7 +917,7 @@ export function ChartWorkspace({
       document.removeEventListener('visibilitychange', tick)
       window.removeEventListener('focus', tick)
     }
-  }, [pullDrawings])
+  }, [activeAlertsOnly, pullDrawings])
 
   const undo = useCallback(() => {
     const last = symbolDrawings[symbolDrawings.length - 1]
@@ -912,6 +944,7 @@ export function ChartWorkspace({
         // A hidden object cannot be grabbed: it is not on the chart, so a
         // pointer over that patch of candles is not over anything.
         if (row.style?.hd) continue
+        if (row.style?.al && row.style?.fd && activeAlertsOnly) continue
         if (row.kind === 'ray') {
           const distance = Math.abs(yForPrice(points[0].p) - y)
           if (distance < bestDistance) {
@@ -949,7 +982,7 @@ export function ChartWorkspace({
       }
       return best
     },
-    [indexForTime, symbolDrawings, xForIndex, yForPrice]
+    [activeAlertsOnly, indexForTime, symbolDrawings, xForIndex, yForPrice]
   )
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -983,6 +1016,20 @@ export function ChartWorkspace({
       void addDrawing('vline', [
         { t: timeForIndex(view.start + (x / plotW) * view.span), p: priceForY(y) },
       ])
+      return
+    }
+
+    if (tool === 'alert') {
+      const price = priceForY(y)
+      // Above the market is waiting for a rise, below for a fall, so the line
+      // takes the up or down colour the phone uses for the same choice.
+      const last = candles.length > 0 ? candles[candles.length - 1].c : price
+      const colour = price < last ? 0xffef4444 : 0xff22c55e
+      void addDrawing(
+        'ray',
+        [{ t: timeForIndex(view.start + (x / plotW) * view.span), p: price }],
+        { al: true, c: colour }
+      )
       return
     }
 
@@ -1169,6 +1216,19 @@ export function ChartWorkspace({
           </button>
         ))}
         <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            title="Hide alert lines that have already fired"
+            aria-pressed={activeAlertsOnly}
+            onClick={() => setActiveAlertsOnly((current) => !current)}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+              activeAlertsOnly
+                ? 'border-primary bg-primary/15 text-primary'
+                : 'border-border bg-surface text-gray-400 hover:text-white'
+            }`}
+          >
+            Active alerts
+          </button>
           <button
             type="button"
             onClick={undo}

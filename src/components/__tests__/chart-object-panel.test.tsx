@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import {
   ChartObjectBar,
   ChartObjectSettings,
+  isAlertLine,
   objectName,
   styleColour,
   styleFill,
@@ -21,6 +22,22 @@ const zone: ObjectRow = {
   text: null,
   style: {},
 }
+
+describe('alert lines', () => {
+  it('names a flagged level as an alert, and says when it has fired', () => {
+    expect(objectName('ray')).toBe('Level')
+    expect(objectName('ray', { al: true })).toBe('Alert line')
+    expect(objectName('ray', { al: true, fd: true })).toBe('Alert line — fired')
+    // The flag only means anything on a level.
+    expect(objectName('trend', { al: true })).toBe('Trend line')
+  })
+
+  it('tells an alert line from a plain level', () => {
+    expect(isAlertLine('ray', { al: true })).toBe(true)
+    expect(isAlertLine('ray', {})).toBe(false)
+    expect(isAlertLine('rectangle', { al: true })).toBe(false)
+  })
+})
 
 describe('chart object style helpers', () => {
   it('reads the phone ARGB colour and falls back to the chart mood', () => {
