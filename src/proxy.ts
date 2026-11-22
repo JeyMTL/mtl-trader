@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { AUTH_COOKIE_OPTIONS } from '@/lib/auth-cookie'
 
 /**
  * Refreshes the Supabase session on every page request.
@@ -32,6 +33,7 @@ export default async function proxy(request: NextRequest) {
   if (!url || !key) return response
 
   const supabase = createServerClient(url, key, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return request.cookies.getAll()
@@ -56,7 +58,12 @@ export default async function proxy(request: NextRequest) {
   // its own the session would still expire mid-visit. The result is unused: this
   // file refreshes, it does not gate. Redirecting to login from here would trap
   // a user whose profile write failed behind a page they can never reach.
-  await supabase.auth.getUser()
+  try {
+    await supabase.auth.getUser()
+  } catch {
+    // A Supabase outage must not take the whole site down with it. The cached
+    // cookie is returned untouched, and the next request tries again.
+  }
 
   return response
 }

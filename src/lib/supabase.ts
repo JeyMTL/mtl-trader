@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { AUTH_COOKIE_OPTIONS } from '@/lib/auth-cookie'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -22,7 +23,9 @@ function getSupabase(): SupabaseClient {
     throw new Error('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in the deployment environment.')
   }
 
-  supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey)
+  supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
+  })
   return supabaseInstance
 }
 

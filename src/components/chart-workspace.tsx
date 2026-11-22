@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { loadDeskPrefs, saveDeskPrefs } from '@/lib/desk-prefs'
 import {
   ChartObjectBar,
   ChartObjectSettings,
@@ -146,6 +147,39 @@ export function ChartWorkspace({
   const [settingsId, setSettingsId] = useState<string | null>(null)
   const [showVwap, setShowVwap] = useState(false)
   const [showSessions, setShowSessions] = useState(false)
+
+  // Restoring the workspace happens after mount, not in the initial state: the
+  // server renders this component too, and reading localStorage while rendering
+  // would hand React two different first frames.
+  useEffect(() => {
+    // Deferred by a tick: the server rendered this frame with the default
+    // instrument, and applying storage during the same paint would hand React a
+    // different tree than the HTML it just hydrated.
+    const restore = window.setTimeout(() => {
+      const prefs = loadDeskPrefs()
+      if (prefs.symbol) {
+        setSymbolInput(prefs.symbol)
+        setSymbolDraft(prefs.symbol)
+      }
+      if (prefs.interval) setIntervalKey(prefs.interval)
+      if (typeof prefs.activeAlertsOnly === 'boolean') setActiveAlertsOnly(prefs.activeAlertsOnly)
+      if (typeof prefs.vwap === 'boolean') setShowVwap(prefs.vwap)
+      if (typeof prefs.sessions === 'boolean') setShowSessions(prefs.sessions)
+    }, 0)
+    return () => window.clearTimeout(restore)
+  }, [])
+
+  // One effect for the lot: every one of these is a workspace choice, and each
+  // change is merged into what is already stored.
+  useEffect(() => {
+    saveDeskPrefs({
+      symbol,
+      interval,
+      activeAlertsOnly,
+      vwap: showVwap,
+      sessions: showSessions,
+    })
+  }, [symbol, interval, activeAlertsOnly, showVwap, showSessions])
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)

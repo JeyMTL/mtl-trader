@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
+import { AUTH_COOKIE_OPTIONS } from '@/lib/auth-cookie'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 
 /**
@@ -31,6 +32,7 @@ export async function createServerSupabase(): Promise<SupabaseClient | null> {
   const cookieStore = await cookies()
 
   return createServerClient(url, key, {
+    cookieOptions: AUTH_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return cookieStore.getAll()

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Lock, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
@@ -26,14 +26,15 @@ export default function LoginPage() {
     })
 
     if (authError) {
-      setError(authError.message)
-      setLoading(false)
-      return
-    }
-
-    if (!data.user?.email_confirmed_at) {
-      await supabase.auth.signOut()
-      setError('Please verify your email address before logging in.')
+      // Supabase itself refuses an unconfirmed sign-in when the project requires
+      // confirmation, so this is where that case belongs — and it is a sentence,
+      // not a sign-out. The old code signed the trader out on any null
+      // `email_confirmed_at`, which threw away a session it had just created.
+      setError(
+        authError.code === 'email_not_confirmed'
+          ? 'Check your inbox and confirm the address, then log in again.'
+          : authError.message
+      )
       setLoading(false)
       return
     }
@@ -46,6 +47,14 @@ export default function LoginPage() {
       : '/dashboard'
     window.location.assign(target)
   }
+
+  // Coming from the dashboard's "unverified" exit: show the resend box straight
+  // away instead of making the trader hunt for it.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('verify') === '1') {
+      setError('This account has not confirmed its email address yet.')
+    }
+  }, [])
 
   const resendVerification = async () => {
     if (!email) {

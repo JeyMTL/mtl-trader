@@ -25,6 +25,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { CandlestickChart, HelpCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { resolveSession } from '@/lib/session'
 import { effectiveMaxTrades, subscriptionState } from '@/lib/subscription'
 import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
@@ -87,12 +88,19 @@ export default function DashboardLayout({
 
   useEffect(() => {
     async function loadUser() {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser || !authUser.email_confirmed_at) {
-        if (authUser) await supabase.auth.signOut()
+      // A cached session is enough to render the shell: resolving this through
+      // the network meant a bad connection signed a trader out of their own
+      // journal and asked for the password again.
+      const session = await resolveSession(supabase)
+      if (session.status === 'signed-out') {
         router.push('/auth/login')
         return
       }
+      if (session.status === 'unverified') {
+        router.push('/auth/login?verify=1')
+        return
+      }
+      const authUser = session.user
       let { data } = await supabase
         .from('users')
         .select('full_name, email, subscription_tier, subscription_status, max_trades, trial_ends_at, current_period_end, cancel_at_period_end, is_admin')
