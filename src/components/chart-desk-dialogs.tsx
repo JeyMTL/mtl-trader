@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import type { ChartLayout } from '@/lib/desk-settings'
+import { useDialogFocus } from '@/components/use-dialog-focus'
 
 /**
  * The desk's layouts library and analysis hub: the two surfaces the phone has
@@ -40,6 +41,7 @@ export function ChartLayoutsDialog({
   onDelete: (id: string) => void
   onClose: () => void
 }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose)
   const [query, setQuery] = useState('')
   const [name, setName] = useState('')
   const visible = useMemo(() => {
@@ -59,6 +61,7 @@ export function ChartLayoutsDialog({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Layouts"
@@ -71,7 +74,7 @@ export function ChartLayoutsDialog({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 hover:bg-surface-light hover:text-white"
+            className="grid h-11 w-11 place-items-center rounded-md text-gray-400 hover:bg-surface-light hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -85,7 +88,7 @@ export function ChartLayoutsDialog({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search layouts"
               aria-label="Search layouts"
-              className="w-full bg-transparent text-xs text-white outline-none placeholder:text-gray-500"
+              className="min-h-11 w-full bg-transparent text-xs text-white outline-none placeholder:text-gray-500"
             />
           </label>
         </div>
@@ -107,7 +110,7 @@ export function ChartLayoutsDialog({
                 <button
                   type="button"
                   onClick={() => onOpen(layout)}
-                  className="min-w-0 flex-1 py-2 text-left"
+                  className="min-h-11 min-w-0 flex-1 py-2 text-left"
                 >
                   <span className="block truncate text-xs font-semibold text-white">{layout.name}</span>
                   <span className="block text-[10px] text-gray-500">
@@ -126,7 +129,7 @@ export function ChartLayoutsDialog({
                   type="button"
                   aria-label={`Delete ${layout.name}`}
                   onClick={() => onDelete(layout.id)}
-                  className="rounded-md p-1.5 text-gray-500 hover:bg-surface-light hover:text-danger"
+                  className="grid h-11 w-11 place-items-center rounded-md text-gray-500 hover:bg-surface-light hover:text-danger"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -142,7 +145,7 @@ export function ChartLayoutsDialog({
               onChange={(event) => setName(event.target.value)}
               placeholder={`Layout name (${currentSymbol}, ${currentInterval})`}
               aria-label="New layout name"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1.5 text-xs text-white outline-none placeholder:text-gray-500"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1.5 text-xs text-white outline-none placeholder:text-gray-500"
             />
             <button
               type="button"
@@ -152,7 +155,7 @@ export function ChartLayoutsDialog({
                 onSave(trimmed)
                 setName('')
               }}
-              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black"
+              className="min-h-11 shrink-0 rounded-lg bg-primary px-4 text-xs font-bold text-black"
             >
               Save
             </button>
@@ -191,6 +194,7 @@ export function AnalysisHubDialog({
   alertCount: number
   onClose: () => void
 }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose)
   const cards = [
     {
       label: 'Layouts',
@@ -222,6 +226,7 @@ export function AnalysisHubDialog({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Analysis hub"
@@ -235,7 +240,7 @@ export function AnalysisHubDialog({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 hover:bg-surface-light hover:text-white"
+            className="grid h-11 w-11 place-items-center rounded-md text-gray-400 hover:bg-surface-light hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -247,7 +252,7 @@ export function AnalysisHubDialog({
               key={card.label}
               type="button"
               onClick={card.onClick}
-              className="rounded-xl border border-border bg-surface-light/40 p-2 text-left hover:border-primary/50"
+              className="min-h-11 rounded-xl border border-border bg-surface-light/40 p-2 text-left hover:border-primary/50"
             >
               <card.icon className="mb-1 h-4 w-4 text-primary" />
               <span className="block text-[11px] font-bold text-white">{card.label}</span>

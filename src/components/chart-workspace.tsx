@@ -28,6 +28,7 @@ import {
 } from '@/lib/chart-templates-cloud'
 import {
   ChartObjectBar,
+  ChartObjectList,
   ChartObjectSettings,
   styleColour,
   styleFill,
@@ -1576,6 +1577,15 @@ export function ChartWorkspace({
           : 'space-y-3'
       }
     >
+      {/* The desk has a lot of controls between the top of the page and the
+          candles. A keyboard user should not have to walk all of them to pan. */}
+      <a
+        href="#chart-canvas"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:border focus:border-primary focus:bg-surface focus:px-3 focus:py-2 focus:text-xs focus:font-semibold focus:text-white"
+      >
+        Skip to chart
+      </a>
+
       <div className="flex flex-wrap items-center gap-2">
         <form
           onSubmit={(event) => {              event.preventDefault()
@@ -1593,7 +1603,7 @@ export function ChartWorkspace({
             onChange={(event) => setSymbolDraft(event.target.value)}
             aria-label="Symbol"
             spellCheck={false}
-            className="w-28 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-white outline-none focus:border-primary"
+            className="min-h-11 w-28 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-white outline-none focus:border-primary"
           />
         </form>
         <div className="flex items-center gap-1">
@@ -1605,7 +1615,7 @@ export function ChartWorkspace({
                 setSymbolDraft(item)
                 setSymbolInput(item)
               }}
-              className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
+              className={`min-h-11 min-w-11 rounded-md px-2.5 py-1 text-[11px] font-semibold ${
                 symbol === item
                   ? 'bg-primary/20 text-primary'
                   : 'text-gray-500 hover:text-gray-300'
@@ -1621,7 +1631,7 @@ export function ChartWorkspace({
               key={item.key}
               type="button"
               onClick={() => setIntervalKey(item.key)}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${
+              className={`min-h-11 min-w-11 rounded-md px-2.5 py-1 text-[11px] font-semibold ${
                 interval === item.key
                   ? 'bg-surface-light text-white'
                   : 'text-gray-500 hover:text-gray-300'
@@ -1643,7 +1653,7 @@ export function ChartWorkspace({
               setTool(item.id)
               setPending(null)
             }}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+            className={`min-h-11 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
               tool === item.id
                 ? 'border-primary bg-primary/15 text-primary'
                 : 'border-border bg-surface text-gray-400 hover:text-white'
@@ -1658,7 +1668,7 @@ export function ChartWorkspace({
             title="Hide alert lines that have already fired"
             aria-pressed={activeAlertsOnly}
             onClick={() => setActiveAlertsOnly((current) => !current)}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+            className={`min-h-11 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
               activeAlertsOnly
                 ? 'border-primary bg-primary/15 text-primary'
                 : 'border-border bg-surface text-gray-400 hover:text-white'
@@ -1671,7 +1681,7 @@ export function ChartWorkspace({
             title={expanded ? 'Back to the dashboard' : 'Give the chart the whole screen'}
             aria-pressed={expanded}
             onClick={() => setExpanded((value) => !value)}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+            className={`min-h-11 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
               expanded
                 ? 'border-primary bg-primary/15 text-primary'
                 : 'border-border bg-surface text-gray-400 hover:text-white'
@@ -1682,14 +1692,14 @@ export function ChartWorkspace({
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white"
+            className="min-h-11 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white"
           >
             Settings
           </button>
           <button
             type="button"
             onClick={() => setHubOpen(true)}
-            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white"
+            className="min-h-11 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white"
           >
             Hub
           </button>
@@ -1698,7 +1708,7 @@ export function ChartWorkspace({
               <button
                 type="button"
                 onClick={() => setReplayPlaying((playing) => !playing)}
-                className="rounded px-1.5 py-1 text-[11px] font-bold text-primary"
+                className="grid min-h-11 min-w-11 place-items-center rounded px-2 text-[11px] font-bold text-primary"
                 aria-label={replayPlaying ? 'Pause replay' : 'Play replay'}
               >
                 {replayPlaying ? 'Pause' : 'Play'}
@@ -1706,7 +1716,7 @@ export function ChartWorkspace({
               <button
                 type="button"
                 onClick={stepReplay}
-                className="rounded px-1.5 py-1 text-[11px] font-bold text-primary"
+                className="grid min-h-11 min-w-11 place-items-center rounded px-2 text-[11px] font-bold text-primary"
                 aria-label="Next bar"
               >
                 Step
@@ -1714,7 +1724,7 @@ export function ChartWorkspace({
               <button
                 type="button"
                 onClick={stopReplay}
-                className="rounded px-1.5 py-1 text-[11px] font-bold text-primary"
+                className="grid min-h-11 min-w-11 place-items-center rounded px-2 text-[11px] font-bold text-primary"
                 aria-label="Stop replay"
               >
                 Stop
@@ -1728,7 +1738,7 @@ export function ChartWorkspace({
               type="button"
               onClick={startReplay}
               disabled={candles.length < 20}
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white disabled:opacity-40"
+              className="min-h-11 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-gray-400 hover:text-white disabled:opacity-40"
             >
               Replay
             </button>
@@ -1764,8 +1774,7 @@ export function ChartWorkspace({
           onClick={() => {
             setCompareOpen((open) => !open)
             setCompareError(null)
-          }}
-          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+          }}            className={`min-h-11 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
             compareSymbol
               ? 'border-violet-400/60 bg-violet-400/10 text-violet-300'
               : 'border-border bg-surface text-gray-500 hover:text-gray-300'
@@ -1774,7 +1783,7 @@ export function ChartWorkspace({
           Compare
         </button>
         {compareSymbol && (
-          <span className="flex items-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-400/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums">
+          <span className="flex min-h-11 items-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-400/10 px-2 text-[10px] font-semibold tabular-nums">
             <span
               aria-hidden
               className="h-1.5 w-1.5 rounded-full"
@@ -1792,7 +1801,7 @@ export function ChartWorkspace({
               type="button"
               aria-label={`Remove compare ${compareSymbol}`}
               onClick={removeCompare}
-              className="text-violet-300/70 hover:text-white"
+              className="grid h-11 w-11 place-items-center rounded text-violet-300/70 hover:text-white"
             >
               ×
             </button>
@@ -1801,8 +1810,7 @@ export function ChartWorkspace({
         <button
           type="button"
           title="Session VWAP, reset each UTC day"
-          onClick={() => setShowVwap((value) => !value)}
-          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+          onClick={() => setShowVwap((value) => !value)}            className={`min-h-11 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
             showVwap
               ? 'border-amber-400/60 bg-amber-400/10 text-amber-300'
               : 'border-border bg-surface text-gray-500 hover:text-gray-300'
@@ -1813,8 +1821,7 @@ export function ChartWorkspace({
         <button
           type="button"
           title="Asia, London and New York high and low for the latest session day"
-          onClick={() => setShowSessions((value) => !value)}
-          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+          onClick={() => setShowSessions((value) => !value)}            className={`min-h-11 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
             showSessions
               ? 'border-sky-400/60 bg-sky-400/10 text-sky-300'
               : 'border-border bg-surface text-gray-500 hover:text-gray-300'
@@ -1843,11 +1850,11 @@ export function ChartWorkspace({
             aria-label="Compare symbol"
             placeholder="XAU_USD"
             spellCheck={false}
-            className="w-24 rounded-md border border-border bg-surface-light px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white outline-none focus:border-primary"
+            className="min-h-11 w-24 rounded-md border border-border bg-surface-light px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white outline-none focus:border-primary"
           />
           <button
             type="submit"
-            className="rounded-md bg-primary px-2 py-1 text-[11px] font-bold text-black"
+            className="min-h-11 rounded-md bg-primary px-3 text-[11px] font-bold text-black"
           >
             Overlay
           </button>
@@ -1858,7 +1865,7 @@ export function ChartWorkspace({
                 key={item}
                 type="button"
                 onClick={() => addCompare(item)}
-                className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-gray-400 hover:text-white"
+                className="min-h-11 rounded-md border border-border px-3 text-[11px] font-semibold text-gray-400 hover:text-white"
               >
                 {item.replace('_', '/')}
               </button>
@@ -1869,7 +1876,7 @@ export function ChartWorkspace({
               setCompareOpen(false)
               setCompareError(null)
             }}
-            className="ml-auto text-[11px] font-semibold text-gray-500 hover:text-white"
+            className="ml-auto min-h-11 rounded-md px-2 text-[11px] font-semibold text-gray-500 hover:text-white"
           >
             Cancel
           </button>
@@ -1894,6 +1901,16 @@ export function ChartWorkspace({
         />
       )}
 
+      <ChartObjectList
+        rows={symbolDrawings}
+        selectedId={selectedId}
+        interval={interval}
+        onSelect={(id) => setSelectedId(id)}
+        onDelete={(id) => void removeDrawing(id)}
+        formatPrice={(price) => price.toFixed(decimals(price))}
+        formatTime={(ms) => tickLabel(ms, interval, settings)}
+      />
+
       <p id="chart-live" aria-live="polite" className="sr-only">
         {hoverCandle
           ? `${tickLabel(hoverCandle.t, interval, settings)} open ${hoverCandle.o.toFixed(decimals(hoverCandle.o))}, high ${hoverCandle.h.toFixed(decimals(hoverCandle.h))}, low ${hoverCandle.l.toFixed(decimals(hoverCandle.l))}, close ${hoverCandle.c.toFixed(decimals(hoverCandle.c))}`
@@ -1910,14 +1927,16 @@ export function ChartWorkspace({
         ref={boxRef}
         className={`relative w-full overflow-hidden rounded-xl border border-border bg-[#0b1220] ${
           expanded
-            ? 'h-[calc(100vh-14rem)] min-h-[320px]'
+            ? 'h-[calc(100vh-20rem)] min-h-[320px]'
             : 'h-[62vh] min-h-[380px]'
         }`}
       >
         <canvas
           ref={canvasRef}
+          id="chart-canvas"
           role="img"
           tabIndex={0}
+          className="outline-none focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary"
           aria-label={`${symbol} ${interval} chart with ${symbolDrawings.length} saved object${
             symbolDrawings.length === 1 ? '' : 's'
           }${compareSymbol ? `, compared with ${compareSymbol}` : ''}. Arrow keys pan, plus and minus zoom.`}

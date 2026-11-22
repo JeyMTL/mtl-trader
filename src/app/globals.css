@@ -393,6 +393,16 @@ button, a {
 }
 .input:disabled { opacity: 0.6; cursor: not-allowed; }
 
+/* Every control shows where the keyboard is. `:focus-visible` keeps the ring
+   off a mouse click, where it is noise, and on for Tab, where it is the only
+   cursor a keyboard user has. An outline rather than a shadow, so it follows a
+   rounded button instead of painting a box around it. */
+:where(a, button, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .segmented {
   display: inline-flex;
   padding: 3px;
