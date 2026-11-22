@@ -185,6 +185,9 @@ export function ChartWorkspace({
    * sidebar and two headers around it; analysis on a laptop wants the candles.
    */
   const [expanded, setExpanded] = useState(false)
+  /** The desk's own frame, which is the element handed to the browser when the
+   * address bar is asked to go away. */
+  const frameRef = useRef<HTMLDivElement | null>(null)
 
   /** What the canvas paints: colours, decimals, crosshair, clock, log axis. */
   const [settings, setSettings] = useState<DeskSettings>(DEFAULT_SETTINGS)
@@ -412,6 +415,44 @@ export function ChartWorkspace({
     [candles]
   )
 
+  // The browser can leave fullscreen without asking — Escape, the phone's back
+  // gesture, a system dialog. When it does, the desk's expanded layout goes with
+  // it, so the two modes can never disagree about what is on screen.
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement) setExpanded(false)
+    }
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  /**
+   * Full screen, twice over: the desk fills the viewport in CSS, and the browser
+   * is asked to drop its own chrome on top of that.
+   *
+   * The CSS half is the one that always works. `requestFullscreen` is refused on
+   * iPhone Safari for anything but a video, can be blocked by an embedding
+   * iframe, and is gone in older browsers — every one of those falls back to the
+   * overlay rather than doing nothing, which is why the two are not a choice.
+   */
+  const toggleFullScreen = () => {
+    if (expanded) {
+      setExpanded(false)
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {
+          // Exiting is best-effort too: the overlay is already gone.
+        })
+      }
+      return
+    }
+    setExpanded(true)
+    const frame = frameRef.current
+    if (!document.fullscreenEnabled || !frame?.requestFullscreen) return
+    void frame.requestFullscreen().catch(() => {
+      // A refused request leaves the expanded overlay doing the job.
+    })
+  }
+
   // Full screen is a mode, so it owns the page while it is on: the dashboard
   // behind it must not scroll under the canvas, and Escape has to give the
   // screen back even when the canvas is not the focused element.
@@ -420,7 +461,13 @@ export function ChartWorkspace({
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setExpanded(false)
+      if (event.key !== 'Escape') return
+      setExpanded(false)
+      // The browser usually takes Escape for itself; when it hands the key to
+      // the page instead, the chrome goes with the overlay.
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {})
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => {
@@ -1571,6 +1618,7 @@ export function ChartWorkspace({
 
   return (
     <div
+      ref={frameRef}
       className={
         expanded
           ? 'fixed inset-0 z-[45] flex flex-col gap-2 overflow-y-auto bg-background p-3'
@@ -1678,9 +1726,13 @@ export function ChartWorkspace({
           </button>
           <button
             type="button"
-            title={expanded ? 'Back to the dashboard' : 'Give the chart the whole screen'}
+            title={
+              expanded
+                ? 'Back to the dashboard'
+                : 'Give the chart the whole screen, without the browser chrome'
+            }
             aria-pressed={expanded}
-            onClick={() => setExpanded((value) => !value)}
+            onClick={toggleFullScreen}
             className={`min-h-11 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
               expanded
                 ? 'border-primary bg-primary/15 text-primary'
