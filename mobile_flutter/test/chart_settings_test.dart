@@ -101,9 +101,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    // The Symbol entry pushed Grid below the fold on a 320pt phone at 2x
-    // text, so the list has to be scrolled to it first.
-    await tester.ensureVisible(find.text('Grid'));
+    // The Canvas and Symbol entries pushed Grid below the fold on a 320pt
+    // phone at 2x text, far enough that it is not even built until the list
+    // is scrolled to it.
+    await tester.scrollUntilVisible(
+      find.text('Grid'),
+      120,
+      // The chart page behind the sheet has scrollables of its own; the sheet's
+      // list is the last one built.
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.pump();
     await tester.tap(find.text('Grid'));
     await tester.pump();

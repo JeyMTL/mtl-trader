@@ -39,6 +39,24 @@ extension ChartTypeLabel on ChartType {
   }
 }
 
+/// How the crosshair is drawn across the canvas.
+enum CrosshairStyle {
+  solid('Solid'),
+  dashed('Dashed'),
+  dotted('Dotted');
+
+  const CrosshairStyle(this.label);
+
+  final String label;
+
+  static CrosshairStyle byName(Object? value, {CrosshairStyle? fallback}) {
+    for (final style in values) {
+      if (style.name == value) return style;
+    }
+    return fallback ?? dashed;
+  }
+}
+
 /// Colours and overlays for the price canvas.
 ///
 /// The chart keeps its own palette instead of borrowing `AppColors`, so a
@@ -94,6 +112,9 @@ class ChartStyle {
     this.showCountdown = false,
     this.dayOfWeekLabels = false,
     this.use24Hour = true,
+    this.backgroundTo,
+    this.crosshairWidth = 1,
+    this.crosshairStyle = CrosshairStyle.dashed,
   });
 
   /// Stable key for the preset, used for selection state.
@@ -192,6 +213,15 @@ class ChartStyle {
   /// 24-hour clock on the axis and the crosshair badge, or 12-hour with AM/PM.
   final bool use24Hour;
 
+  /// The second stop of a vertical background gradient. Null paints the flat
+  /// [background], which is what every preset ships with.
+  final Color? backgroundTo;
+
+  /// Crosshair line weight in logical pixels, and whether it is drawn solid or
+  /// broken. Dashed is the default, as on a desktop terminal.
+  final double crosshairWidth;
+  final CrosshairStyle crosshairStyle;
+
   /// The zone this chart is drawn in.
   ChartZone get zone => ChartZone.byId(zoneId);
 
@@ -200,7 +230,15 @@ class ChartStyle {
 
   /// Whether the canvas is a light one — used to fade the watermark and pick
   /// the chip palette that sits on top of the chart.
-  bool get isLight => background.computeLuminance() > 0.5;
+  bool get isLight {
+    // A gradient is judged by its two stops together: a canvas that falls from
+    // white to grey is still a light canvas, and every chip drawn on it has to
+    // know that.
+    final second = backgroundTo;
+    if (second == null) return background.computeLuminance() > 0.5;
+    return (background.computeLuminance() + second.computeLuminance()) / 2 >
+        0.5;
+  }
 
   ChartStyle copyWith({
     Color? bull,
@@ -237,6 +275,12 @@ class ChartStyle {
     bool? showCountdown,
     bool? dayOfWeekLabels,
     bool? use24Hour,
+    Color? backgroundTo,
+    double? crosshairWidth,
+    CrosshairStyle? crosshairStyle,
+
+    /// Drop back to a flat background; null cannot mean that in a copyWith.
+    bool clearBackgroundTo = false,
   }) {
     return ChartStyle(
       id: id,
@@ -277,6 +321,10 @@ class ChartStyle {
       showCountdown: showCountdown ?? this.showCountdown,
       dayOfWeekLabels: dayOfWeekLabels ?? this.dayOfWeekLabels,
       use24Hour: use24Hour ?? this.use24Hour,
+      backgroundTo:
+          clearBackgroundTo ? null : (backgroundTo ?? this.backgroundTo),
+      crosshairWidth: crosshairWidth ?? this.crosshairWidth,
+      crosshairStyle: crosshairStyle ?? this.crosshairStyle,
     );
   }
 
@@ -416,6 +464,9 @@ class ChartStyle {
         'countdown': showCountdown,
         'dayOfWeek': dayOfWeekLabels,
         'hour24': use24Hour,
+        if (backgroundTo != null) 'backgroundTo': backgroundTo!.toARGB32(),
+        'crosshairWidth': crosshairWidth,
+        'crosshairStyle': crosshairStyle.name,
       };
 
   static String encode(ChartStyle style) => jsonEncode(style.toJson());
@@ -472,6 +523,11 @@ class ChartStyle {
       showCountdown: _readFlag(decoded['countdown']),
       dayOfWeekLabels: _readFlag(decoded['dayOfWeek']),
       use24Hour: _readFlag(decoded['hour24']),
+      backgroundTo: _readColor(decoded['backgroundTo']),
+      crosshairWidth: decoded['crosshairWidth'] is num
+          ? (decoded['crosshairWidth'] as num).toDouble().clamp(0.5, 4.0)
+          : null,
+      crosshairStyle: CrosshairStyle.byName(decoded['crosshairStyle']),
     );
   }
 

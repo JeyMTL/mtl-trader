@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -160,7 +161,22 @@ class TradingChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = style.background);
+    // One flat fill unless the trader asked for a gradient, in which case the
+    // canvas falls from the background to [ChartStyle.backgroundTo].
+    final second = style.backgroundTo;
+    if (second == null) {
+      canvas.drawRect(Offset.zero & size, Paint()..color = style.background);
+    } else {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset.zero,
+            Offset(0, size.height),
+            [style.background, second],
+          ),
+      );
+    }
     final plotW = size.width - axisWidth;
     final panes = paneLayout(size.height, style);
     final plotH = panes.priceH;
@@ -730,17 +746,15 @@ class TradingChartPainter extends CustomPainter {
         pointer.dx <= plotW &&
         pointer.dy >= topPad &&
         pointer.dy <= topPad + plotH) {
-      _dashed(
+      _crosshairLine(
         canvas,
         Offset(pointer.dx, topPad),
         Offset(pointer.dx, size.height - bottomPad),
-        style.crosshair,
       );
-      _dashed(
+      _crosshairLine(
         canvas,
         Offset(0, pointer.dy),
         Offset(plotW, pointer.dy),
-        style.crosshair,
       );
       final price = priceForRatio(
         ratio: (pointer.dy - topPad) / plotH,
@@ -1499,23 +1513,59 @@ class TradingChartPainter extends CustomPainter {
     }
   }
 
-  void _dashed(Canvas canvas, Offset from, Offset to, Color color) {
+  /// The crosshair, in the weight and style the trader chose. The axis badges
+  /// keep their own solid fill either way: they are read at a glance.
+  void _crosshairLine(Canvas canvas, Offset from, Offset to) {
     final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1;
-    const dash = 4.0;
-    const gap = 3.0;
+      ..color = style.crosshair
+      ..strokeWidth = style.crosshairWidth
+      ..strokeCap = StrokeCap.round;
+    switch (style.crosshairStyle) {
+      case CrosshairStyle.solid:
+        canvas.drawLine(from, to, paint);
+      case CrosshairStyle.dashed:
+        _stroke(canvas, from, to, paint, dash: 4, gap: 3);
+      case CrosshairStyle.dotted:
+        _stroke(canvas, from, to, paint, dash: 1.2, gap: 3.2);
+    }
+  }
+
+  void _dashed(Canvas canvas, Offset from, Offset to, Color color) {
+    _stroke(
+      canvas,
+      from,
+      to,
+      Paint()
+        ..color = color
+        ..strokeWidth = 1,
+    );
+  }
+
+  /// A straight rule, solid or broken into dashes of [dash] with [gap] between.
+  void _stroke(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    Paint paint, {
+    double? dash,
+    double gap = 3,
+  }) {
+    final on = dash;
+    if (on == null) {
+      canvas.drawLine(from, to, paint);
+      return;
+    }
     if ((from.dx - to.dx).abs() < 0.01) {
       var point = from.dy;
       while (point < to.dy) {
-        final end = math.min(point + dash, to.dy);
+        final end = math.min(point + on, to.dy);
         canvas.drawLine(Offset(from.dx, point), Offset(from.dx, end), paint);
         point = end + gap;
       }
     } else {
       var point = from.dx;
       while (point < to.dx) {
-        final end = math.min(point + dash, to.dx);
+        final end = math.min(point + on, to.dx);
         canvas.drawLine(Offset(point, from.dy), Offset(end, from.dy), paint);
         point = end + gap;
       }

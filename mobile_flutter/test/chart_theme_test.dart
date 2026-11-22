@@ -59,6 +59,45 @@ void main() {
     expect(decoded.use24Hour, isFalse);
   });
 
+  test('the canvas gradient and crosshair survive a save', () {
+    final edited = ChartStyle.slate.copyWith(
+      backgroundTo: const Color(0xFF101421),
+      crosshairWidth: 2,
+      crosshairStyle: CrosshairStyle.dotted,
+    );
+    final decoded = ChartStyle.decode(ChartStyle.encode(edited));
+
+    expect(decoded.backgroundTo, const Color(0xFF101421));
+    expect(decoded.crosshairWidth, 2);
+    expect(decoded.crosshairStyle, CrosshairStyle.dotted);
+    // A preset that never touched the crosshair keeps the desktop default.
+    expect(
+      ChartStyle.decode(ChartStyle.encode(ChartStyle.ink)).crosshairStyle,
+      CrosshairStyle.dashed,
+    );
+  });
+
+  test('a flat canvas clears the gradient colour', () {
+    final gradient =
+        ChartStyle.slate.copyWith(backgroundTo: const Color(0xFF101421));
+    expect(gradient.copyWith(clearBackgroundTo: true).backgroundTo, isNull);
+    expect(
+      ChartStyle.decode(ChartStyle.encode(gradient)).backgroundTo,
+      const Color(0xFF101421),
+    );
+  });
+
+  test('a gradient is judged light or dark by both of its stops', () {
+    expect(
+      ChartStyle.paper.copyWith(backgroundTo: const Color(0xFFE8EBF0)).isLight,
+      isTrue,
+    );
+    expect(
+      ChartStyle.slate.copyWith(backgroundTo: const Color(0xFF0B0E14)).isLight,
+      isFalse,
+    );
+  });
+
   test('precision goes back to the instrument when told to clear', () {
     final pinned = ChartStyle.ink.copyWith(precision: 2);
     expect(pinned.copyWith(clearPrecision: true).precision, isNull);

@@ -3925,6 +3925,14 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
         ),
         _settingsDivider(),
         _settingsEntry(
+          _SettingsPage.canvas,
+          Icons.layers_outlined,
+          '${style.backgroundTo == null ? 'Flat' : 'Gradient'} · '
+          '${style.crosshairStyle.label.toLowerCase()} crosshair',
+          onNavigate,
+        ),
+        _settingsDivider(),
+        _settingsEntry(
           _SettingsPage.appearance,
           Icons.palette_outlined,
           '${style.chartType.label} · ${style.name}',
@@ -4011,6 +4019,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
     ValueChanged<ChartStyle> onChanged,
   ) {
     switch (page) {
+      case _SettingsPage.canvas:
+        return _canvasSettings(style, onChanged);
       case _SettingsPage.symbol:
         return _symbolSettings(style, onChanged);
       case _SettingsPage.appearance:
@@ -4030,6 +4040,82 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
       case _SettingsPage.home:
         return const SizedBox.shrink();
     }
+  }
+
+  /// The canvas itself: what it is painted on, and how the crosshair reads
+  /// against it.
+  Widget _canvasSettings(ChartStyle style, ValueChanged<ChartStyle> onChanged) {
+    final stop = style.backgroundTo;
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 30),
+      children: [
+        _settingsGroupLabel('Background'),
+        _settingsSwitch(
+          'Gradient',
+          subtitle: 'The canvas falls from the theme colour to a second one, '
+              'which keeps a tall chart from reading as a slab.',
+          value: stop != null,
+          onChanged: (value) => onChanged(
+            value
+                ? style.copyWith(backgroundTo: _gradientStop(style.background))
+                : style.copyWith(clearBackgroundTo: true),
+          ),
+        ),
+        if (stop != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _colorRow('Bottom colour', stop, (color) {
+              onChanged(style.copyWith(backgroundTo: color));
+            }),
+          ),
+          _settingsDivider(),
+        ],
+        _settingsGroupLabel('Crosshair'),
+        _settingsControlRow(
+          'Style',
+          _segmented(
+            selected: style.crosshairStyle,
+            options: [
+              for (final option in CrosshairStyle.values)
+                (value: option, label: option.label),
+            ],
+            onSelect: (option) =>
+                onChanged(style.copyWith(crosshairStyle: option)),
+          ),
+        ),
+        _settingsDivider(),
+        _settingsRow(
+          title: 'Thickness',
+          subtitle: 'How heavy the crosshair rules are, in pixels.',
+          value: '${style.crosshairWidth.toStringAsFixed(0)} px',
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final width in const [1.0, 2.0, 3.0, 4.0])
+                _StylePill(
+                  label: '${width.toStringAsFixed(0)} px',
+                  selected: style.crosshairWidth == width,
+                  onTap: () => onChanged(style.copyWith(crosshairWidth: width)),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// A second background colour that is a step off the theme's own: lighter on
+  /// a dark canvas, darker on a light one, so the gradient never fights the
+  /// candles before the trader has chosen one.
+  Color _gradientStop(Color base) {
+    final toward = base.computeLuminance() > 0.5
+        ? const Color(0xFF000000)
+        : const Color(0xFFFFFFFF);
+    return Color.lerp(base, toward, 0.08)!;
   }
 
   /// What the bars are made of, and how many decimals every price on the chart
@@ -6024,8 +6110,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
       final point = details.localFocalPoint;
       if (plotW > 0 && point.dx >= plotW) {
         _axisDrag = _AxisDrag.price;
-      } else if (point.dy >=
-          _size.height - TradingChartPainter.bottomPad) {
+      } else if (point.dy >= _size.height - TradingChartPainter.bottomPad) {
         _axisDrag = _AxisDrag.time;
       }
     }
@@ -7493,6 +7578,7 @@ class _ZoneSheetState extends State<_ZoneSheet> {
 /// same way: a short list of names, each opening its own page.
 enum _SettingsPage {
   home('Chart settings'),
+  canvas('Canvas'),
   symbol('Symbol'),
   appearance('Appearance'),
   scales('Scales'),
