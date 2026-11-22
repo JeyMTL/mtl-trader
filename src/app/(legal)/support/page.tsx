@@ -29,6 +29,14 @@ const FAQ = [
     a: 'Trades are stored net: profit plus commission plus swap. MT5 lists those in separate columns, so a single trade differs by its costs while the totals still match MT5’s total net profit.',
   },
   {
+    q: 'How do I pin entry, stop and target levels from a chart?',
+    a: 'Open the trade form and choose Pin levels from chart. The live chart opens with three markers: tap the price you want for entry, stop or target and it fills the form, so nothing is typed from another window. The same markers can be dragged on the phone\u2019s chart before you save the trade.',
+  },
+  {
+    q: 'What is the difference between a soft lock and a hard lock?',
+    a: 'Both are set in Rules with your daily loss limit. A soft lock freezes MT5 and keeps the journal open, and can be lifted only by writing down a reason that is stored with the day. A hard lock freezes MT5 and locks the journal completely until the next trading day, with no release. The MT5 guard that syncs your trades enforces it in the terminal: it refuses programmatic orders and deletes pending ones, though a manual market order can still fill before it is seen.',
+  },
+  {
     q: 'A chart or a page will not load. What do you need from me?',
     a: 'The time it happened, the email on the account, and the browser or phone you were on. A screenshot of the console is ideal but not required.',
   },

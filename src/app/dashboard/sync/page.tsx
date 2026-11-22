@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Download, Key, Server, XCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -111,6 +112,25 @@ export default function SyncPage() {
       </div>
 
       {MT5_HOSTED_SYNC_ENABLED ? <BrokerConnect /> : null}
+
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <h2 className="text-lg font-semibold text-white">Daily stop guard — soft and hard</h2>
+        <p className="mt-2 text-sm leading-relaxed text-gray-400">
+          Set a daily loss limit in Rules and the MT5 guard carries it into your terminal.
+          A <strong className="text-gray-300">soft lock</strong> freezes MT5 and keeps the
+          journal open, so you can lift it only by writing down why. A{' '}
+          <strong className="text-gray-300">hard lock</strong> freezes MT5 and locks the
+          journal completely until the next trading day, with no in-app release. The guard
+          refuses programmatic orders and removes pending ones; a manual market-order click
+          can still fill before it is seen.
+        </p>
+        <Link
+          href="/dashboard/playbook"
+          className="mt-3 inline-flex text-sm font-medium text-primary hover:text-primary-light"
+        >
+          Choose the lock in Rules
+        </Link>
+      </div>
 
       {/* The manual route stays available for traders who run their own
           terminal, but it is folded away: the hosted connection above needs no

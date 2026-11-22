@@ -77,6 +77,29 @@ export async function POST(req: Request) {
       return apiError('auth.signup.profile', error, 500, 'Could not create your profile. Please try again.')
     }
 
+    // The database trigger creates the profile with its own trial length. Until
+    // `20261128_seven_day_trial.sql` is applied it still writes 14 days, so an
+    // account created by this request is aligned with TRIAL_DAYS here. A trial
+    // that already started keeps the days it was given; only a row created in
+    // the last few minutes is touched.
+    const createdAt = Date.parse(authData.user.created_at)
+    if (Number.isFinite(createdAt) && Date.now() - createdAt < 15 * 60 * 1000) {
+      const trial = trialFields()
+      const { error: trialError } = await supabase
+        .from('users')
+        .update({
+          subscription_status: trial.subscription_status,
+          trial_ends_at: trial.trial_ends_at,
+          max_trades: trial.max_trades,
+          trades_remaining: trial.trades_remaining,
+        })
+        .eq('id', userId)
+        .eq('subscription_status', 'trial')
+      if (trialError) {
+        logEvent('warn', 'auth.signup.trial', { userId, error: trialError })
+      }
+    }
+
     logEvent('info', 'auth.signup.profile', { userId })
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
