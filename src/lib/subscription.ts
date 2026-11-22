@@ -275,11 +275,11 @@ export function canUseFeature(
 /**
  * Monthly AI review allowance. The trial is treated as Pro.
  *
- * Basic gets a review a day rather than a token few: a review costs well under a
- * cent on the default model and cached journals do not bill at all, so a tight
- * cap saved no real money and cost the paid tier its best demonstration.
+ * Fifteen on Basic and forty on Pro: enough to review most trading days, while
+ * keeping the model bill predictable. The trial runs at the Pro allowance so a
+ * new account can judge the feature before paying for it.
  */
-export const AI_REVIEW_QUOTA: Record<string, number> = { free: 0, basic: 30, pro: 200 }
+export const AI_REVIEW_QUOTA: Record<string, number> = { free: 0, basic: 15, pro: 40 }
 
 /** How many AI reviews the account may generate this month. */
 export function aiReviewQuota(account: AccountState, now: Date = new Date()): number {

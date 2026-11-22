@@ -95,9 +95,9 @@ describe('aiReviewQuota', () => {
     expect(aiReviewQuota(TRIAL)).toBe(AI_REVIEW_QUOTA.pro)
   })
 
-  it('gives Basic a review a day and Pro the full monthly allowance', () => {
-    expect(aiReviewQuota(paid('basic'))).toBe(30)
-    expect(aiReviewQuota(paid('pro'))).toBe(200)
+  it('gives Basic fifteen reviews a month and Pro forty', () => {
+    expect(aiReviewQuota(paid('basic'))).toBe(15)
+    expect(aiReviewQuota(paid('pro'))).toBe(40)
   })
 
   it('gives nothing once the period ends', () => {

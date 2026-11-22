@@ -12,8 +12,8 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Analytics** - Win rate, profit factor, equity curve, strategy analysis, and the time-of-day edge report
 - **Trading Calendar** - Daily P&L heatmap
 - **MT5 Auto Sync** - Python agent that syncs closed trades every 60s with proper entry/exit pairing; its token can be rotated or revoked from Settings
-- **Subscription System** - 7-day unlimited free trial, then paid 30-day periods (PayPal + bank transfer). Each payment buys a period; access lapses unless it is renewed
-- **PayPal Webhook** - Signature-verified webhook applies upgrades server-side, so a closed tab no longer loses a payment; refunds, reversals and disputes revoke access
+- **Subscription System** - 7-day unlimited free trial, then paid 30-day periods (card through Paddle, or bank transfer). Each payment buys a period; access lapses unless it is renewed
+- **PayPal Webhook (legacy)** - Signature-verified webhook keeps subscriptions started before card checkout renewing; it is closed to new orders
 - **Paddle Card Subscriptions** - Auto-renewing monthly card payments through Paddle, the merchant of record. Paddle handles sales tax and receipts; every renewal is applied by the signed webhook, and cancelling stops the card at the gateway while keeping the paid period
 - **Email Verification** - Users must verify a real email address before using the journal
 - **Monthly Trade Quota** - Enforced server-side by a Postgres trigger, which also rejects writes once a paid period has lapsed
@@ -34,7 +34,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Backend:** Next.js API Routes
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase Auth
-- **Payments:** PayPal Checkout (one-time capture), Paddle card subscriptions (auto-renewing), and bank transfer with unique references and admin approval
+- **Payments:** Paddle card subscriptions (auto-renewing), and bank transfer with unique references and admin approval. PayPal checkout is closed; its webhook only serves existing subscribers
 - **Email:** Resend (transactional summaries; optional in production, no-ops when unconfigured)
 - **Charts:** Recharts
 - **CSV Parsing:** PapaParse + SheetJS (xlsx)
@@ -146,7 +146,7 @@ node --env-file=.env.local scripts/check-payments.mjs --reconcile
 
 Trades are counted per calendar month and enforcement lives in the database trigger, not just the UI. Historical imports (older months) do not count against the limit.
 
-MT5 autosync is included from Basic, because it is the one thing a trader cannot do by hand; Basic also carries the whole journal, the chart desk with its levels shared between phone and web, prop-firm rules and 30 AI reviews a month. The backtester and market replay stay Pro, along with the 200-review allowance and API access. Volume is unlimited on every plan. Yearly plans are card-only through Paddle and buy 365 days per payment (`apply_annual_order`); PayPal and bank transfer buy one 30-day period.
+MT5 autosync is included from Basic, because it is the one thing a trader cannot do by hand; Basic also carries the whole journal, the chart desk with its levels shared between phone and web, prop-firm rules and 15 AI reviews a month. The backtester and market replay stay Pro, along with the 40-review allowance and API access. Volume is unlimited on every plan. Yearly plans are card-only through Paddle and buy 365 days per payment (`apply_annual_order`); bank transfer buys one 30-day period.
 
 ## Environment Variables
 
@@ -193,7 +193,7 @@ src/
 │   │   ├── admin/page.tsx    # Payment approval (is_admin only)
 │   │   ├── payment/page.tsx  # Bank transfer flow
 │   │   └── settings/page.tsx # User settings
-│   ├── pricing/page.tsx      # Pricing page (PayPal + bank transfer)
+│   ├── pricing/page.tsx      # Pricing page (card + bank transfer)
 │   └── api/                  # auth, checkout, paypal/capture, webhooks/paypal,
 │                             # payment-requests, plans, subscription, sync (rotate),
 │                             # admin (payments/users/reconcile), ai, bank-details,

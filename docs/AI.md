@@ -226,7 +226,7 @@ counts that is cents per customer per month, see the cost note below.
   shared store (e.g. Redis) before scaling.
 - A review is roughly 2,000 input and 600 output tokens: free on the Gemini
   free tier, about 1.5 cents on Claude Sonnet. The monthly
-  allowance (30 on Basic, 200 on Pro, `AI_REVIEW_QUOTA`) is what bounds the
+  allowance (15 on Basic, 40 on Pro, `AI_REVIEW_QUOTA`) is what bounds the
   worst case per customer — check `provider` in the response `meta` to see which
   path actually served it.
 

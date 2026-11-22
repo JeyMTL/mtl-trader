@@ -5,9 +5,11 @@ import { SubscriptionPlan } from '@/types'
  * Settings, the Paddle checkout, `apply_paid_order`
  * and the Flutter app (`mobile_flutter/lib/core/plans.dart`).
  *
- * What a plan covers is now genuinely split: Basic adds the desk (calendar, time
- * edge, journal media, charts, import/export) and a review a day, Pro adds the
- * analysis workflow (backtester, replay) and the full review allowance. MT5
+ * What a plan covers is genuinely split: Basic carries the whole journal, the
+ * analytics desk and the chart workspace, with fifteen AI reviews a month; Pro
+ * adds the analysis workbench (backtester, custom strategy compiler, replay)
+ * and forty reviews. Each line below describes something the tier can actually
+ * open — the gate list is in `PRO_ONLY` (`src/lib/subscription.ts`). MT5
  * autosync is not listed on any plan while the hosted agent is unfunded — see
  * `MT5_SYNC_ENABLED` in `src/lib/features.ts`. Trade volume is
  * deliberately *not* a differentiator: capping Basic below the unlimited trial
@@ -43,18 +45,18 @@ export const PLANS: SubscriptionPlan[] = [
     annual_price: 120,
     max_trades: -1,
     features: [
-      'Unlimited trades',
-      'Dashboard, journal and calendar',
-      'Equity curve, daily and monthly P&L',
-      'Session, symbol, tag and setup analytics',
-      'Time edge: best hours and sessions',
-      'Chart desk with candles, studies and pinned levels',
-      'Levels shared between the phone and the web desk',
-      'MT5 automatic sync from your own terminal',
-      'Prop-firm rule tracking and the daily stop',
-      'Journal photos and voice notes',
-      '30 AI reviews a month',
-      'Strategy tags, CSV import/export and email summaries',
+      'Unlimited trades and unlimited history',
+      'Journal with photos, voice notes, tags, setups and mistakes',
+      'Dashboard: equity curve, P&L calendar, daily and monthly results',
+      'Session, symbol, tag and setup analytics, plus your time edge',
+      'Chart desk on phone and web, from seconds to daily candles',
+      'VWAP, session high/low levels, drawings and price alerts',
+      'Drawings, layouts and templates that follow your account',
+      'Compare a second instrument on the web chart',
+      'MT5 auto sync, plus XML, CSV and XLSX import',
+      'Playbook, prop-firm rules and the daily-stop lock',
+      'CSV and full account export, with email summaries',
+      '15 AI reviews a month',
     ],
     popular: true,
   },
@@ -65,11 +67,11 @@ export const PLANS: SubscriptionPlan[] = [
     annual_price: 290,
     max_trades: -1,
     features: [
-      'Unlimited trades',
       'Everything in Basic',
-      'AI journal review (200 a month)',
-      'Backtester with saved runs',
-      'Market replay that steps through a session',
+      'Backtester with saved runs and AI rule suggestions',
+      'Write a strategy in plain English, by voice or screenshot, and run it',
+      'Market replay that steps candle by candle through a session',
+      '40 AI reviews a month',
       'API access and a sync token per account',
       'Priority support',
     ],
