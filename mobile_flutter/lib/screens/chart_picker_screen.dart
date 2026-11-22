@@ -1439,9 +1439,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   Widget _placementBanner() {
     final total = _placementPoints;
     final placed = _placing ? total : 1;
+    // The wording the spec asks for: tell the trader which point they are on,
+    // then what the finger has to do next — not "drag", which hides the tap
+    // that also works.
     final title = _placing
-        ? (total > 1 ? 'Lift to finish up' : 'Lift to place')
-        : (total > 1 ? 'Tap or drag to place' : 'Tap to place');
+        ? (total > 1 ? 'Move to size it, then lift to finish' : 'Lift to place')
+        : (total > 1 ? 'Tap to set the first point' : 'Tap to place');
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       height: 34,
@@ -1481,6 +1484,27 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
               ),
             ),
           ),
+          // Which magnet the anchors will obey, said out loud while it still
+          // matters. A trader placing a level should not have to remember what
+          // the corner button was set to.
+          if (_magnet != MagnetMode.off) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_magnetIcon, size: 13, color: AppColors.muted),
+                const SizedBox(width: 3),
+                Text(
+                  '${_magnet.label} magnet',
+                  style: tabular.copyWith(
+                    color: AppColors.muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 6),
+          ],
           IconButton(
             tooltip: 'Put the tool away',
             onPressed: _disarmTool,
