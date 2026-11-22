@@ -3,14 +3,21 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   CHART_LAYOUTS_KEY,
+  CHART_TEMPLATES_KEY,
   DEFAULT_SETTINGS,
   DESK_SETTINGS_KEY,
+  MAX_TEMPLATES,
+  MAX_TEMPLATE_NAME,
   loadLayouts,
   loadSettings,
+  loadTemplates,
   removeLayout,
+  removeTemplate,
   saveSettings,
   upsertLayout,
+  upsertTemplate,
   type ChartLayout,
+  type ChartTemplate,
 } from '@/lib/desk-settings'
 
 function layout(overrides: Partial<ChartLayout> = {}): ChartLayout {
@@ -114,5 +121,55 @@ describe('chart layouts', () => {
     expect(loadLayouts()).toEqual([])
     window.localStorage.setItem(CHART_LAYOUTS_KEY, '[{"nope":1},{"id":"a","name":"ok"}]')
     expect(loadLayouts().map((entry) => entry.name)).toEqual(['ok'])
+  })
+
+  it('keeps a template as paint only, with the name it was given', () => {
+    expect(loadTemplates()).toEqual([])
+    upsertTemplate([], { name: ' MTL ', settings: { ...DEFAULT_SETTINGS, bull: '#26a69a', logScale: true } })
+
+    const [saved] = loadTemplates()
+    expect(saved.name).toBe('MTL')
+    expect(saved.settings.bull).toBe('#26a69a')
+    expect(saved.settings.logScale).toBe(true)
+    // No instrument or interval on a template: it is stamped onto the open chart.
+    expect(saved).not.toHaveProperty('symbol')
+    expect(saved).not.toHaveProperty('interval')
+  })
+
+  it('replaces a template saved under the same name, ignoring case', () => {
+    let templates = upsertTemplate([], { name: 'MTL', settings: { ...DEFAULT_SETTINGS, bear: '#f23645' } })
+    templates = upsertTemplate(templates, { name: 'mtl', settings: { ...DEFAULT_SETTINGS, bear: '#ef4444' } })
+    expect(templates).toHaveLength(1)
+    expect(templates[0].name).toBe('mtl')
+    expect(loadTemplates()[0].settings.bear).toBe('#ef4444')
+
+    templates = removeTemplate(templates, 'mtl')
+    expect(loadTemplates()).toEqual([])
+  })
+
+  it('caps the template list and trims absurd names', () => {
+    let templates: ChartTemplate[] = []
+    for (let index = 0; index < MAX_TEMPLATES + 5; index += 1) {
+      templates = upsertTemplate(templates, { name: `t${index}`, settings: DEFAULT_SETTINGS })
+    }
+    expect(templates).toHaveLength(MAX_TEMPLATES)
+    expect(loadTemplates()).toHaveLength(MAX_TEMPLATES)
+
+    const long = `  ${'x'.repeat(MAX_TEMPLATE_NAME + 10)}  `
+    const [saved] = upsertTemplate([], { name: long, settings: DEFAULT_SETTINGS })
+    expect(saved.name).toHaveLength(MAX_TEMPLATE_NAME)
+  })
+
+  it('drops template entries that are not templates', () => {
+    window.localStorage.setItem(CHART_TEMPLATES_KEY, 'not json')
+    expect(loadTemplates()).toEqual([])
+    window.localStorage.setItem(
+      CHART_TEMPLATES_KEY,
+      JSON.stringify([{ name: '   ' }, { name: 'ok', settings: 'nope' }])
+    )
+    const [only] = loadTemplates()
+    expect(only.name).toBe('ok')
+    // A broken settings payload falls back to the defaults rather than throwing.
+    expect(only.settings).toEqual(DEFAULT_SETTINGS)
   })
 })

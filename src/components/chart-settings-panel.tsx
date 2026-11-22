@@ -5,6 +5,8 @@ import { ArrowLeft, X } from 'lucide-react'
 
 import {
   DEFAULT_SETTINGS,
+  MAX_TEMPLATE_NAME,
+  type ChartTemplate,
   type CrosshairStyle,
   type DeskSettings,
 } from '@/lib/desk-settings'
@@ -90,15 +92,29 @@ export function ChartSettingsDialog({
   onClose,
   activeAlertsOnly,
   onActiveAlertsOnly,
+  templates,
+  onSaveTemplate,
+  onDeleteTemplate,
 }: {
   settings: DeskSettings
   onChange: (next: DeskSettings) => void
   onClose: () => void
   activeAlertsOnly: boolean
   onActiveAlertsOnly: (next: boolean) => void
+  templates: ChartTemplate[]
+  onSaveTemplate: (name: string) => void
+  onDeleteTemplate: (name: string) => void
 }) {
   const [section, setSection] = useState<SectionId | null>(null)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
   const patch = (next: Partial<DeskSettings>) => onChange({ ...settings, ...next })
+
+  /** Applies a template and returns to the section list, the way the phone does. */
+  const applyTemplate = (template: ChartTemplate) => {
+    onChange({ ...template.settings })
+    setTemplatesOpen(false)
+  }
 
   return (
     <div
@@ -114,18 +130,25 @@ export function ChartSettingsDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          {section && (
+          {(section || templatesOpen) && (
             <button
               type="button"
               aria-label="Back"
-              onClick={() => setSection(null)}
+              onClick={() => {
+                setSection(null)
+                setTemplatesOpen(false)
+              }}
               className="rounded-md p-1 text-gray-400 hover:bg-surface-light hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
           )}
           <h2 className="flex-1 text-sm font-bold text-white">
-            {section ? SECTIONS.find((item) => item.id === section)?.label : 'Chart settings'}
+            {templatesOpen
+              ? 'Templates'
+              : section
+                ? SECTIONS.find((item) => item.id === section)?.label
+                : 'Chart settings'}
           </h2>
           <button
             type="button"
@@ -138,7 +161,115 @@ export function ChartSettingsDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-1">
-          {!section && (
+          {templatesOpen && (
+            <div className="py-1">
+              <button
+                type="button"
+                onClick={() => applyTemplate({ name: 'Defaults', settings: DEFAULT_SETTINGS })}
+                className="flex w-full items-center justify-between rounded-lg px-2 py-2.5 text-left hover:bg-surface-light"
+              >
+                <span>
+                  <span className="block text-xs font-semibold text-white">Apply defaults</span>
+                  <span className="block text-[11px] text-gray-500">
+                    Back to the desk&apos;s own palette
+                  </span>
+                </span>
+              </button>
+
+              <div className="mt-1 flex items-center gap-2 border-y border-border/60 py-2">
+                <input
+                  value={templateName}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                  placeholder="Template name"
+                  aria-label="Template name"
+                  maxLength={MAX_TEMPLATE_NAME}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return
+                    const name = templateName.trim()
+                    if (!name) return
+                    onSaveTemplate(name)
+                    setTemplateName('')
+                  }}
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-surface-light px-2 py-1.5 text-xs text-white outline-none placeholder:text-gray-500"
+                />
+                <button
+                  type="button"
+                  disabled={templateName.trim().length === 0}
+                  onClick={() => {
+                    const name = templateName.trim()
+                    if (!name) return
+                    onSaveTemplate(name)
+                    setTemplateName('')
+                  }}
+                  className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-black disabled:opacity-40"
+                >
+                  Save
+                </button>
+              </div>
+              <p className="py-1 text-[10px] leading-relaxed text-gray-500">
+                A template keeps this chart&apos;s colours, scales and crosshair, not
+                the instrument. Saved in this browser, like layouts.
+              </p>
+
+              {templates.length === 0 ? (
+                <p className="py-3 text-center text-[11px] text-gray-500">
+                  No templates yet. Name one above to keep the look you are using.
+                </p>
+              ) : (
+                <ul>
+                  {templates.map((template) => (
+                    <li
+                      key={template.name}
+                      className="flex items-center gap-2 border-b border-border/60 last:border-b-0"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => applyTemplate(template)}
+                        className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left"
+                      >
+                        <span className="flex shrink-0" aria-hidden>
+                          <span
+                            className="h-3 w-1.5 rounded-l-sm"
+                            style={{ background: template.settings.bull }}
+                          />
+                          <span
+                            className="h-3 w-1.5 rounded-r-sm"
+                            style={{ background: template.settings.bear }}
+                          />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-semibold text-white">
+                            {template.name}
+                          </span>
+                          <span className="block text-[10px] text-gray-500">
+                            {template.settings.logScale ? 'Log' : 'Linear'}
+                            {' · '}
+                            {template.settings.gradient ? 'Gradient' : 'Flat'}
+                            {' · '}
+                            {template.settings.precision === null
+                              ? 'Auto dp'
+                              : `${template.settings.precision} dp`}
+                            {' · '}
+                            {template.settings.crosshairStyle} crosshair
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Delete template ${template.name}`}
+                        onClick={() => onDeleteTemplate(template.name)}
+                        className="shrink-0 rounded-md border border-border px-2 py-1 text-[10px] font-semibold text-gray-400 hover:border-danger/50 hover:text-danger"
+                      >
+                        Delete
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {!templatesOpen && !section && (
             <ul className="py-1">
               {SECTIONS.map((item) => (
                 <li key={item.id}>
@@ -336,13 +467,27 @@ export function ChartSettingsDialog({
         </div>
 
         <div className="flex items-center justify-between border-t border-border px-3 py-2">
-          <button
-            type="button"
-            onClick={() => onChange({ ...DEFAULT_SETTINGS })}
-            className="text-[11px] font-semibold text-gray-400 hover:text-white"
-          >
-            Reset
-          </button>
+          <div className="flex items-center gap-3">
+            {!templatesOpen && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSection(null)
+                  setTemplatesOpen(true)
+                }}
+                className="text-[11px] font-semibold text-gray-400 hover:text-white"
+              >
+                Templates
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onChange({ ...DEFAULT_SETTINGS })}
+              className="text-[11px] font-semibold text-gray-400 hover:text-white"
+            >
+              Reset
+            </button>
+          </div>
           <button
             type="button"
             onClick={onClose}

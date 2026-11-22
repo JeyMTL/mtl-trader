@@ -7,10 +7,14 @@ import {
   DEFAULT_SETTINGS,
   loadLayouts,
   loadSettings,
+  loadTemplates,
   removeLayout,
+  removeTemplate,
   saveSettings,
   upsertLayout,
+  upsertTemplate,
   type ChartLayout,
+  type ChartTemplate,
   type DeskSettings,
 } from '@/lib/desk-settings'
 import { ChartSettingsDialog } from '@/components/chart-settings-panel'
@@ -162,6 +166,7 @@ export function ChartWorkspace({
   /** What the canvas paints: colours, decimals, crosshair, clock, log axis. */
   const [settings, setSettings] = useState<DeskSettings>(DEFAULT_SETTINGS)
   const [layouts, setLayouts] = useState<ChartLayout[]>([])
+  const [templates, setTemplates] = useState<ChartTemplate[]>([])
   const [activeLayoutId, setActiveLayoutId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [layoutsOpen, setLayoutsOpen] = useState(false)
@@ -193,6 +198,7 @@ export function ChartWorkspace({
     const restoreSettings = window.setTimeout(() => {
       setSettings(loadSettings())
       setLayouts(loadLayouts())
+      setTemplates(loadTemplates())
     }, 0)
     return () => {
       window.clearTimeout(restore)
@@ -485,6 +491,15 @@ export function ChartWorkspace({
   const deleteLayout = (id: string) => {
     setLayouts(removeLayout(layouts, id))
     if (activeLayoutId === id) setActiveLayoutId(null)
+  }
+
+  /** Templates carry the paint only, so saving one never touches instrument or interval. */
+  const saveTemplate = (name: string) => {
+    setTemplates(upsertTemplate(templates, { name, settings }))
+  }
+
+  const deleteTemplate = (name: string) => {
+    setTemplates(removeTemplate(templates, name))
   }
 
   const newLayout = () => {
@@ -1714,6 +1729,9 @@ export function ChartWorkspace({
           onClose={() => setSettingsOpen(false)}
           activeAlertsOnly={activeAlertsOnly}
           onActiveAlertsOnly={setActiveAlertsOnly}
+          templates={templates}
+          onSaveTemplate={saveTemplate}
+          onDeleteTemplate={deleteTemplate}
         />
       )}
 

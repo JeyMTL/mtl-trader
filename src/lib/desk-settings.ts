@@ -1,5 +1,5 @@
 /**
- * The web desk's chart settings, and the layouts that carry them.
+ * The web desk's chart settings, and the layouts and templates that carry them.
  *
  * The phone keeps both in SharedPreferences; the desk keeps them here, in this
  * browser. They are viewer preferences, not account data — nothing on the server
@@ -192,5 +192,90 @@ export function upsertLayout(layouts: ChartLayout[], layout: ChartLayout): Chart
 export function removeLayout(layouts: ChartLayout[], id: string): ChartLayout[] {
   const next = layouts.filter((entry) => entry.id !== id)
   saveLayouts(next)
+  return next
+}
+
+/**
+ * A named set of canvas settings, the phone's `ChartPreset`.
+ *
+ * A template sits between the defaults and a layout: it carries the paint only —
+ * colours, scales, crosshair, background, countdown — and no instrument or
+ * interval, so "MTL" can be stamped onto whichever chart is open. That is the
+ * whole value of one: a look worth keeping should not drag the market with it.
+ */
+export interface ChartTemplate {
+  name: string
+  settings: DeskSettings
+}
+
+export const CHART_TEMPLATES_KEY = 'mtl.desk.templates.v1'
+
+/** Enough for a handful of house looks; a longer list is one nobody reads. */
+export const MAX_TEMPLATES = 20
+
+/** Matches the phone's name field, so a template renamed on either desk fits. */
+export const MAX_TEMPLATE_NAME = 30
+
+function cleanName(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const name = value.trim().slice(0, MAX_TEMPLATE_NAME).trim()
+  return name.length > 0 ? name : null
+}
+
+export function loadTemplates(): ChartTemplate[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(CHART_TEMPLATES_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const templates: ChartTemplate[] = []
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== 'object') continue
+      const value = entry as Record<string, unknown>
+      const name = cleanName(value.name)
+      if (!name) continue
+      templates.push({ name, settings: normaliseSettings(value.settings) })
+      if (templates.length >= MAX_TEMPLATES) break
+    }
+    return templates
+  } catch {
+    return []
+  }
+}
+
+export function saveTemplates(templates: ChartTemplate[]): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(
+      CHART_TEMPLATES_KEY,
+      JSON.stringify(templates.slice(0, MAX_TEMPLATES))
+    )
+  } catch {
+    // A template that can't be stored is still applied to the open chart.
+  }
+}
+
+/** Saves under a name, replacing one that reads the same instead of duplicating. */
+export function upsertTemplate(
+  templates: ChartTemplate[],
+  template: ChartTemplate
+): ChartTemplate[] {
+  // Cleaned here rather than only on load, so the list the dialog shows is the
+  // list that will come back on the next visit.
+  const name = cleanName(template.name)
+  if (!name) return templates
+  const saved: ChartTemplate = { name, settings: template.settings }
+  const without = templates.filter(
+    (entry) => entry.name.toLowerCase() !== name.toLowerCase()
+  )
+  const next = [saved, ...without].slice(0, MAX_TEMPLATES)
+  saveTemplates(next)
+  return next
+}
+
+export function removeTemplate(templates: ChartTemplate[], name: string): ChartTemplate[] {
+  const next = templates.filter((entry) => entry.name !== name)
+  saveTemplates(next)
   return next
 }
