@@ -117,7 +117,8 @@ beforeEach(() => {
   process.env.CRON_SECRET = 'test-secret'
   process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.com'
   vi.useFakeTimers()
-  vi.setSystemTime(new Date('2026-06-02T07:00:00.000Z')) // Tuesday
+  // Tuesday 18:00 UTC: the daily pass, and the local evening for UTC users.
+  vi.setSystemTime(new Date('2026-06-02T18:00:00.000Z'))
 })
 
 afterEach(() => {
@@ -167,6 +168,7 @@ describe('notifications cron', () => {
 
   it('holds the journal reminder until the user local evening', async () => {
     // 07:00 UTC is 2am in New York, which is the bug this gate exists for.
+    vi.setSystemTime(new Date('2026-06-02T07:00:00.000Z'))
     state.users = [user({ notifications_journal_reminders: true, timezone: 'America/New_York' })]
 
     const { body } = await runCron(AUTH_HEADERS)
@@ -216,7 +218,7 @@ describe('notifications cron', () => {
     const midweek = await runCron(AUTH_HEADERS)
     expect(midweek.body.emailsSent).toBe(0)
 
-    vi.setSystemTime(new Date('2026-06-01T07:00:00.000Z')) // Monday
+    vi.setSystemTime(new Date('2026-06-01T18:00:00.000Z')) // Monday
     state.sent = []
     state.trades = [{ pnl: 50, close_time: '2026-05-29T10:00:00.000Z' }]
     const monday = await runCron(AUTH_HEADERS)
@@ -225,7 +227,7 @@ describe('notifications cron', () => {
   })
 
   it('drives the monthly email from its own preference', async () => {
-    vi.setSystemTime(new Date('2026-06-01T07:00:00.000Z')) // 1st
+    vi.setSystemTime(new Date('2026-06-01T18:00:00.000Z')) // 1st
     state.users = [user({ notifications_monthly_email: true })]
     state.trades = [{ pnl: 50, close_time: '2026-05-15T10:00:00.000Z' }]
 

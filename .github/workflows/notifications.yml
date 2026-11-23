@@ -2,14 +2,12 @@ name: Notifications
 
 # Delivers the journal reminder in each user's own evening.
 #
-# Vercel Cron on the Hobby plan may only run a job once a day, which is a fixed
-# UTC instant — 07:00 UTC is 2am in New York — so the hourly pass lives here.
-# The route itself decides who is due: it only sends in the user's local
-# 18:00–20:00 window, and only on weekdays with nothing journaled yet. Calling it
-# every hour is safe because every send is claimed in `notification_sends`.
-#
-# The Vercel cron still runs the daily 07:00 UTC pass, so digests and trial
-# notices go out even if scheduled Actions are delayed or disabled.
+# Vercel Cron on the Hobby plan may only run a job once a day, and GitHub
+# throttles scheduled workflows to a few runs a day, so this pass is best
+# effort — the daily Vercel run at 18:00 UTC is what guarantees delivery. The
+# route itself decides who is due: it only sends in the user's local 18:00–20:00
+# window, and only on weekdays with nothing journaled yet. Calling it every hour
+# is safe because every send is claimed in `notification_sends`.
 #
 # Setup: add the same value as Vercel's CRON_SECRET as a repository secret
 # (Settings → Secrets and variables → Actions → Secrets). PRODUCTION_URL is an

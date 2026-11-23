@@ -21,8 +21,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Sends the notification emails users opted into. Triggered with
- * `Authorization: Bearer $CRON_SECRET` by the Vercel cron (the daily 07:00 UTC
- * pass) and by `.github/workflows/notifications.yml` (hourly, for the reminder).
+ * `Authorization: Bearer $CRON_SECRET` by the Vercel cron (the daily 18:00 UTC
+ * pass) and by `.github/workflows/notifications.yml` (hourly, best effort).
  *
  *   - daily summary    → every day, for the previous calendar day
  *   - weekly report    → on Mondays, for the previous 7 days
@@ -32,9 +32,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *   - trial ending     → within 3 days of the end, then once when it passes
  *
  * The hourly pass runs outside Vercel (Hobby allows only daily crons) so the
- * journal reminder can follow each user's clock. The digests and the trial
- * notice still go out on the 07:00 UTC pass only, so their timing is unchanged;
- * the send ledger makes the extra passes harmless.
+ * journal reminder can follow each user's clock, but GitHub throttles scheduled
+ * workflows to a few runs a day, so it is best effort. The daily Vercel pass is
+ * what guarantees delivery: it runs at 18:00 UTC, which is the local evening for
+ * the users on UTC, London and South Africa. Digests and the trial notice still
+ * go out once, on that pass; the send ledger makes the extra passes harmless.
  *
  * The trial notice is an account email, not a digest: it goes to every trial
  * account with an address, whatever the digest toggles say, because it is the
@@ -58,7 +60,7 @@ const PAGE_SIZE = 200
 const CONCURRENCY = 5
 const TIME_BUDGET_MS = 240_000
 /** The UTC hour the daily/weekly/monthly digests and trial notices go out in. */
-const SUMMARY_HOUR_UTC = 7
+const SUMMARY_HOUR_UTC = 18
 
 interface UserPrefs {
   id: string
@@ -77,7 +79,7 @@ interface UserPrefs {
 }
 
 interface RunOptions {
-  /** Digests and the trial notice: the 07:00 UTC pass, or a manual `?job=summary`. */
+  /** Digests and the trial notice: the 18:00 UTC pass, or a manual `?job=summary`. */
   summaries: boolean
   /** Journal reminders: every pass, gated per user on their local evening. */
   journal: boolean

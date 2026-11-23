@@ -120,26 +120,34 @@ its database therefore fails visibly instead of quietly serving errors.
 ## Crons
 
 `vercel.json` schedules two jobs: billing reconciliation (03:00) and the daily
-notification pass (07:00). Vercel Cron on the Hobby plan may only run a job once
-a day, and one fixed UTC instant cannot be an evening everywhere — 07:00 UTC is
-2am in New York — so the hourly journal-reminder pass lives in
-`.github/workflows/notifications.yml` instead.
+notification pass (18:00 UTC). Vercel Cron on the Hobby plan may only run a job
+once a day, and GitHub Actions throttles scheduled workflows hard — this repo's
+15-minute uptime cron actually fires a few times a day — so the hourly
+journal-reminder pass in `.github/workflows/notifications.yml` is **best
+effort**, not a guarantee. The daily Vercel pass is what delivers.
+
+18:00 UTC is the local evening for the accounts on UTC, London and South
+Africa, which is almost everyone today. A New York account is at 13:00 and skips
+the reminder on that pass; the hourly workflow covers it when GitHub fires. If
+per-user evening delivery becomes important, Vercel Pro is what buys a real
+hourly cron, or `CRON_SECRET` can be handed to an external scheduler.
 
 The route decides who is due on every pass: digests and the trial notice only on
-the 07:00 UTC pass, and journal reminders only in the user's local 18:00–20:00
+the 18:00 UTC pass, and journal reminders only in the user's local 18:00–20:00
 window on a weekday with nothing journaled yet. The send ledger makes the extra
-passes harmless, and the Vercel daily run is what delivers digests if scheduled
-Actions are delayed or disabled. `?job=summary` or `?job=journal` forces one half
-for a manual run at any hour.
+passes harmless. `?job=summary` or `?job=journal` forces one half for a manual
+run at any hour.
 
-**Setup:** add the same value as Vercel's `CRON_SECRET` as a repository secret
-under Settings → Secrets and variables → Actions → Secrets. Without it the
-Notifications workflow fails on its first step, which is deliberate: a silent
-jobs list is how an hourly job that never ran goes unnoticed. A cron that stops
-running does **not** fail the uptime probe — it only proves the app is
-reachable.The reconciliation cron is
-idempotent, so the safe response to a suspected missed run is triggering it
-manually from the Vercel dashboard and checking the logs for the period.
+**Setup:** the `Notifications` workflow reads a repository secret named
+`CRON_SECRET` (Settings → Secrets and variables → Actions → Secrets), which must
+hold this deployment's `CRON_SECRET`. It is set. Without it the workflow fails
+on its first step, which is deliberate: a silent jobs list is how an hourly job
+that never ran goes unnoticed. A cron that stops running does **not** fail the
+uptime probe — it only proves the app is reachable.
+
+The reconciliation cron is idempotent, so the safe response to a suspected
+missed run is triggering it manually from the Vercel dashboard and checking the
+logs for the period.
 
 Sends that Resend rejects are logged as `cron.notifications.send_failed` with the
 provider's reason, so Vercel logs name the cause (unverified domain, bad key)
