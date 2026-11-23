@@ -6,8 +6,8 @@ import { SubscriptionPlan } from '@/types'
  * and the Flutter app (`mobile_flutter/lib/core/plans.dart`).
  *
  * What a plan covers is genuinely split: Basic carries the whole journal, the
- * analytics desk and the chart workspace, with fifteen AI reviews a month; Pro
- * adds the analysis workbench (backtester, custom strategy compiler, replay)
+ * analytics desk and the chart workspace, with fifteen AI journal summaries a
+ * month; Pro adds the analysis workbench (backtester, rules builder, replay)
  * and forty reviews. Each line below describes something the tier can actually
  * open — the gate list is in `PRO_ONLY` (`src/lib/subscription.ts`). MT5
  * autosync is not listed on any plan while the hosted agent is unfunded — see
@@ -60,7 +60,7 @@ export const PLANS: SubscriptionPlan[] = [
       'MT5 auto sync, plus XML, CSV and XLSX import',
       'Playbook, prop-firm rules and the daily-stop lock',
       'CSV and full account export',
-      '15 AI reviews a month',
+      '15 AI journal summaries a month',
     ],
     popular: true,
   },
@@ -72,10 +72,10 @@ export const PLANS: SubscriptionPlan[] = [
     max_trades: -1,
     features: [
       'Everything in Basic',
-      'Backtester with saved runs and AI rule suggestions',
-      'Write a strategy in plain English, by voice or screenshot, and run it',
+      'Backtester with saved runs',
+      'Define your own rules, then test them against past sessions',
       'Market replay that steps candle by candle through a session',
-      '40 AI reviews a month',
+      '40 AI journal summaries a month',
       'API access and a sync token per account',
       'Priority support',
     ],

@@ -43,23 +43,23 @@ const features = [
   },
   {
     icon: BarChart3,
-    title: 'Analytics that name the leak',
+    title: 'Analytics that show the pattern',
     description:
       'Win rate, profit factor, expectancy and max drawdown, split by session, symbol, tag and setup, with your best hours and days.',
     tile: 'icon-tile-blue',
   },
   {
     icon: Zap,
-    title: 'AI journal review',
+    title: 'AI journal summary',
     description:
-      'A read of your own fills: what worked, what repeated, and what to stop doing. Fifteen reviews a month on Basic, forty on Pro.',
+      'A written summary of your own fills: how your results broke down by setup, session and day. Fifteen summaries a month on Basic, forty on Pro.',
     tile: 'icon-tile-violet',
   },
   {
     icon: FlaskConical,
     title: 'Backtest and replay',
     description:
-      'Pro steps a session candle by candle, keeps saved backtests, and compiles a strategy from plain English, a voice note or a screenshot.',
+      'Pro steps a session candle by candle, keeps saved backtests, and runs rules you define yourself against past sessions.',
     tile: 'icon-tile-amber',
   },
   {
@@ -141,8 +141,8 @@ export default function HomePage() {
             Track. Analyze. <span className="text-gradient">Improve.</span>
           </h1>
           <p className="fade-up-2 text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
-            The professional trading journal that helps you identify patterns,
-            eliminate mistakes, and maximize your trading edge.
+            The professional trading journal that helps you see your own patterns,
+            catch repeated mistakes, and keep your process consistent.
           </p>
           <div className="fade-up-3 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/auth/signup" className="btn-gradient glow-primary text-white px-8 py-4 rounded-xl text-lg font-semibold flex items-center justify-center gap-2">
@@ -280,7 +280,13 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
         <div className="max-w-7xl mx-auto flex flex-col items-center justify-between gap-3 text-gray-500 text-sm sm:flex-row">
-          <p>&copy; 2026 MTL Ledger. All rights reserved.</p>
+          <p>
+            &copy; 2026 MTL Ledger. All rights reserved.
+          </p>
+          <p className="max-w-md text-center text-xs text-gray-500 sm:text-left">
+            MTL Ledger is a record-keeping and analytics tool. It does not provide financial advice,
+            trading signals or trade recommendations.
+          </p>
           <nav className="flex flex-wrap items-center justify-center gap-4 text-xs">
             <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
