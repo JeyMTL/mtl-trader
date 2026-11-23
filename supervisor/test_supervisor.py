@@ -66,6 +66,30 @@ def make_terminal(directory, name="terminal64.exe"):
     return str(binary)
 
 
+class ServerSpellingTests(unittest.TestCase):
+    def test_fixes_the_missing_space_in_an_old_fundednext_row(self):
+        self.assertEqual(
+            sup.canonical_server_name("FundedNext", "fundednext-server3"),
+            "FundedNext-Server 3",
+        )
+
+    def test_matches_the_broker_through_an_alias(self):
+        self.assertEqual(
+            sup.canonical_server_name("Funding Pips", "fundingpips-sim1"),
+            "FundingPips-SIM1",
+        )
+
+    def test_leaves_an_unknown_server_alone(self):
+        self.assertEqual(
+            sup.canonical_server_name("FundedNext", "FundedNext-Unknown"),
+            "FundedNext-Unknown",
+        )
+        self.assertEqual(
+            sup.canonical_server_name("Some Local Broker", "Any-Server 1"),
+            "Any-Server 1",
+        )
+
+
 class TerminalResolutionTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -117,7 +141,8 @@ class TerminalResolutionTests(unittest.TestCase):
             os.environ.pop("MT5_PATHS", None)
 
         stored = json.loads(self.cache.read_text(encoding="utf-8"))
-        self.assertEqual(stored["fundednext|fundednext-server3"], second)
+        self.assertEqual(stored["fundednext|fundednext-server 3"], second)
+        self.assertEqual(sup.mt5.calls[0][2], "FundedNext-Server 3")
 
         # The next login goes straight to the terminal that worked.
         sup.mt5 = FakeMt5([("ok", None)])
@@ -195,7 +220,7 @@ class TerminalResolutionTests(unittest.TestCase):
             os.environ.pop("MT5_PATHS", None)
 
         message = str(caught.exception)
-        self.assertIn("no terminal could log in to FundedNext-Server3", message)
+        self.assertIn("no terminal could log in to FundedNext-Server 3", message)
         self.assertIn(first, message)
         self.assertIn(second, message)
 
@@ -205,13 +230,18 @@ class TerminalResolutionTests(unittest.TestCase):
         branded.mkdir(parents=True)
         (branded / "terminal64.exe").write_text("", encoding="utf-8")
 
+        # Prop-firm installers often nest the executable under a vendor folder.
+        nested = roots / "Vendor" / "MT5"
+        nested.mkdir(parents=True)
+        (nested / "terminal64.exe").write_text("", encoding="utf-8")
+
         saved_local = os.environ.get("LOCALAPPDATA")
         saved_pf = os.environ.get("ProgramFiles")
         os.environ["LOCALAPPDATA"] = str(Path(self.tmp.name))
         os.environ["ProgramFiles"] = str(Path(self.tmp.name) / "nothing-here")
         try:
             # The real discovery function, not the suite's empty stand-in.
-            found = self._saved["discover_terminals"]()
+            found = self._saved["discover_terminals"](force=True)
         finally:
             if saved_local is None:
                 os.environ.pop("LOCALAPPDATA", None)
@@ -223,6 +253,24 @@ class TerminalResolutionTests(unittest.TestCase):
                 os.environ["ProgramFiles"] = saved_pf
 
         self.assertIn(str(branded / "terminal64.exe"), found)
+        self.assertIn(str(nested / "terminal64.exe"), found)
+
+
+class ClaimPriorityTests(unittest.TestCase):
+    def test_new_connections_are_processed_before_refreshes(self):
+        rows = [
+            {"user_id": "old", "status": "connected", "last_sync_at": "2026-01-01"},
+            {"user_id": "new", "status": "pending", "last_sync_at": None},
+            {"user_id": "retry", "status": "connecting", "last_sync_at": "2026-01-02"},
+            {"user_id": "failed", "status": "failed", "last_sync_at": None},
+        ]
+
+        ordered = sup.prioritize_connections(rows)
+
+        self.assertEqual(
+            [row["user_id"] for row in ordered],
+            ["new", "retry", "failed", "old"],
+        )
 
 
 class SymbolDigitsTests(unittest.TestCase):

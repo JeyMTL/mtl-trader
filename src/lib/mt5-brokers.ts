@@ -20,6 +20,10 @@
  * ranked so an exact or prefix hit on the name comes first. It runs in the
  * browser and on the server from the same table, so the web form, the mobile
  * picker and `/api/brokers` can never disagree.
+ *
+ * The Windows supervisor reads the same table from `shared/mt5-brokers.json`
+ * to correct server spellings on rows saved before this directory existed. A
+ * test keeps that copy identical to this one.
  */
 
 export interface Mt5Broker {
@@ -55,6 +59,37 @@ export const MT5_BROKERS: Mt5Broker[] = [
   { name: 'FXTM', aliases: ['ForexTime'], servers: [
       'FXTM-Live01', 'FXTM-Live02', 'FXTM-Demo01', 'FXTM-Demo02',
     ] },
+  { name: 'FundedNext', aliases: ['Funded Next', 'FN'], servers: [
+      // The space is part of the server name; `FundedNext-Server3` will not log in.
+      'FundedNext-Server', 'FundedNext-Server 2', 'FundedNext-Server 3', 'FundedNext-Server 4',
+    ] },
+  // Prop firms run their own MT5 servers; these are the names the terminal uses.
+  { name: 'FTMO', servers: [
+      'FTMO-Demo', 'FTMO-Demo2', 'FTMO-Server', 'FTMO-Server2',
+      'FTMO-Server3', 'FTMO-Server4', 'FTMO-Server5',
+    ] },
+  { name: 'FundingPips', aliases: ['Funding Pips', 'FundingPips Corp'], servers: [
+      'FundingPips-SIM1', 'FundingPips2-SIM', 'FundingPips-Prime',
+      'FundingPips-SIM', 'FundingPips-Trial',
+    ] },
+  { name: 'The5ers', aliases: ['The 5ers', '5ERS', 'Five Percent Online'], servers: [
+      'FivePercentOnline-Real', 'FivePercentOnline-Experience',
+    ] },
+  { name: 'Alpha Capital Group', aliases: ['Alpha Capital', 'ACG'], servers: [
+      'ACGMarkets-Main',
+    ] },
+  { name: 'Goat Funded Trader', aliases: ['GoatFunded', 'GFT'], servers: [
+      'GoatFunded-Server', 'GoatFunded-Server2', 'GoatFunded-Server3',
+    ] },
+  { name: 'Maven Trading', aliases: ['Maven'], servers: ['MavenTrade-Server'] },
+  { name: 'For Traders', servers: ['fttrading-server'] },
+  { name: 'Funded Trading Plus', servers: ['FundedTradingPlus-Live'] },
+  { name: 'FundedElite', aliases: ['Funded Elite'], servers: ['Fundedelite-Server'] },
+  { name: 'FunderPro', servers: ['FunderPro-Live01'] },
+  { name: 'Funded Trader Markets', servers: ['FundedTraderMarkets-Server'] },
+  { name: 'FTrade Markets', servers: ['FTradeMarkets-Trade'] },
+  { name: 'FTT Sweden', aliases: ['FTT'], servers: ['FTT-Demo', 'FTT-MT5'] },
+  { name: 'Hola Prime', aliases: ['HolaPrime'], servers: ['HolaPrime-Server 1'] },
   { name: 'RoboForex', servers: [
       'RoboForex-Pro', 'RoboForex-ECN', 'RoboForex-Demo',
     ] },
@@ -283,6 +318,25 @@ export function findMt5Broker(name: string): Mt5Broker | null {
       entry.aliases.some((alias) => alias.startsWith(target))
   )
   return prefixed ? prefixed.broker : null
+}
+
+/**
+ * The canonical spelling of a known server, ignoring case, spaces and
+ * punctuation. `FundedNext-Server3` becomes `FundedNext-Server 3`, which is the
+ * only spelling MT5 accepts. Unknown servers are returned unchanged, because
+ * the directory is a shortcut, not a whitelist.
+ */
+export function canonicalServerName(brokerName: string, server: string): string {
+  const broker = findMt5Broker(brokerName)
+  if (!broker) return server
+
+  const key = normalizeBrokerQuery(server).replace(/\s+/g, '')
+  if (!key) return server
+
+  const matches = broker.servers.filter(
+    (candidate) => normalizeBrokerQuery(candidate).replace(/\s+/g, '') === key
+  )
+  return matches.length === 1 ? matches[0] : server
 }
 
 /**

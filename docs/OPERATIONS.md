@@ -223,7 +223,9 @@ supervisor on our own Windows hosts logs in and streams closed trades to
   is what makes holding a credential defensible. The customer's revoke buttons
   are "Disconnect" in the app and changing the investor password in MT5.
 * **Running it:** `supervisor/mt5_supervisor.py` on a Windows host with MT5
-  installed. It needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+  installed, with `shared/mt5-brokers.json` copied beside it as
+  `mt5-brokers.json` so old rows get the same server spelling as the app. It
+  needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
   `SYNC_CREDENTIAL_KEY` (the same value as the app) and `SYNC_SUPERVISOR_TOKEN`
   (which `/api/sync` accepts in place of a customer's agent token). It logs in
   sequentially — one terminal, one account at a time — so 40 connections cost a

@@ -3,6 +3,7 @@ import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
+import { canonicalServerName } from '@/lib/mt5-brokers'
 import {
   credentialKeyConfigured,
   encryptCredential,
@@ -122,14 +123,17 @@ export async function POST(req: Request) {
       return apiWarn('broker.connect.invalid_broker', 'Enter the broker name shown in MT5.', 400)
     }
 
-    const server = normalizeServerName(body.server)
-    if (!server) {
+    const rawServer = normalizeServerName(body.server)
+    if (!rawServer) {
       return apiWarn(
         'broker.connect.invalid_server',
         'Enter the server exactly as MT5 shows it, for example ICMarketsSC-Live12.',
         400
       )
     }
+    // A known broker's spacing and casing are fixed; `FundedNext-Server3` is
+    // the same server as `FundedNext-Server 3`, but only the latter logs in.
+    const server = canonicalServerName(broker, rawServer)
 
     const login = normalizeAccountLogin(body.login)
     if (!login) {

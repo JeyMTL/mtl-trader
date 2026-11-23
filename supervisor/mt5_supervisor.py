@@ -44,8 +44,10 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 import time
+import unicodedata
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -125,6 +127,11 @@ def check_config():
             f"MT5_PATH is not a file: {MT5_PATH!r}. Leave the value unquoted in "
             ".env, e.g. MT5_PATH=C:\\Program Files\\MetaTrader 5\\terminal64.exe"
         )
+    if not BROKER_DIRECTORY:
+        print(
+            "[warn] mt5-brokers.json is missing beside the supervisor; known "
+            "server spellings will not be corrected"
+        )
 
 
 def decrypt_credential(blob):
@@ -137,6 +144,26 @@ def decrypt_credential(blob):
     tag = base64.b64decode(tag_b64)
     data = base64.b64decode(data_b64)
     return AESGCM(base64.b64decode(CREDENTIAL_KEY)).decrypt(iv, data + tag, None).decode("utf-8")
+
+
+STATUS_PRIORITY = {"pending": 0, "connecting": 1, "failed": 2, "connected": 3}
+
+
+def prioritize_connections(rows):
+    """Put new work before periodic refreshes.
+
+    With several users, a batch of stale `connected` rows must not fill the
+    claim limit and push a new `pending` account out; otherwise a new customer
+    waits behind every existing one. `connecting` is included because a
+    supervisor that died mid-login leaves that status behind.
+    """
+    return sorted(
+        rows,
+        key=lambda row: (
+            STATUS_PRIORITY.get(row.get("status"), 9),
+            row.get("last_sync_at") or "",
+        ),
+    )
 
 
 def claim():
@@ -177,7 +204,7 @@ def claim():
     if response.status_code != 200:
         print(f"[warn] claim failed ({response.status_code}): {response.text[:200]}")
         return []
-    return response.json()
+    return prioritize_connections(response.json())
 
 
 def mark(user_id, status, error=None, synced_at=None):
@@ -343,25 +370,143 @@ def push(user_id, trades):
 TERMINAL_CACHE = Path(__file__).with_name(".terminal-cache.json")
 
 
-def discover_terminals():
-    """terminal64.exe under the usual install roots, plus broker-branded ones."""
-    roots = [
-        os.environ.get("ProgramFiles"),
-        os.environ.get("ProgramFiles(x86)"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
+# ---------------------------------------------------------------------------
+# Server spelling
+#
+# The app canonicalises a known server before saving it, but rows created
+# before the directory existed still carry the typed spelling. The same table
+# the app uses is shipped beside this script, so an old `FundedNext-Server3`
+# row still logs in as `FundedNext-Server 3` without asking the customer to
+# reconnect. Unknown servers are left exactly as saved; this is a correction,
+# not a whitelist.
+# ---------------------------------------------------------------------------
+
+def normalize_broker_query(value):
+    decomposed = unicodedata.normalize("NFD", str(value or ""))
+    stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", " ", stripped.lower()).strip()
+
+
+def load_broker_directory():
+    candidates = (
+        Path(__file__).with_name("mt5-brokers.json"),
+        Path(__file__).resolve().parent.parent / "shared" / "mt5-brokers.json",
+    )
+    for path in candidates:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, list):
+            return [
+                entry
+                for entry in data
+                if isinstance(entry, dict) and entry.get("name")
+            ]
+    return []
+
+
+BROKER_DIRECTORY = load_broker_directory()
+
+
+def canonical_server_name(broker_name, server):
+    target = normalize_broker_query(broker_name)
+    if not target:
+        return server
+
+    exact = next(
+        (
+            entry
+            for entry in BROKER_DIRECTORY
+            if normalize_broker_query(entry["name"]) == target
+            or any(
+                normalize_broker_query(alias) == target
+                for alias in entry.get("aliases") or []
+            )
+        ),
+        None,
+    )
+    broker = exact or next(
+        (
+            entry
+            for entry in BROKER_DIRECTORY
+            if normalize_broker_query(entry["name"]).startswith(target)
+            or any(
+                normalize_broker_query(alias).startswith(target)
+                for alias in entry.get("aliases") or []
+            )
+        ),
+        None,
+    )
+    if not broker:
+        return server
+
+    key = normalize_broker_query(server).replace(" ", "")
+    if not key:
+        return server
+    matches = [
+        candidate
+        for candidate in broker.get("servers") or []
+        if normalize_broker_query(candidate).replace(" ", "") == key
     ]
+    return matches[0] if len(matches) == 1 else server
+
+
+TERMINAL_SCAN_DEPTH = 3
+TERMINAL_SCAN_TTL = 60
+_SKIP_INSTALL_DIRS = {
+    "common files",
+    "modifiablewindowsapps",
+    "windows defender",
+    "windowsapps",
+}
+_terminal_scan = {"roots": (), "at": 0.0, "paths": []}
+
+
+def discover_terminals(force=False):
+    """terminal64.exe under the usual install roots, including nested ones.
+
+    Broker and prop-firm installers do not agree on a layout: some put
+    terminal64.exe directly under Program Files, others nest it under a vendor
+    or product folder. Walk a few levels deep so a branded terminal is found
+    without requiring MT5_PATHS, but stop early and cache the result because
+    this runs for every login.
+    """
+    roots = tuple(
+        root
+        for root in (
+            os.environ.get("ProgramFiles"),
+            os.environ.get("ProgramFiles(x86)"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
+        )
+        if root and os.path.isdir(root)
+    )
+    now = time.monotonic()
+    if (
+        not force
+        and _terminal_scan["roots"] == roots
+        and now - _terminal_scan["at"] < TERMINAL_SCAN_TTL
+    ):
+        return list(_terminal_scan["paths"])
+
     found = []
     for root in roots:
-        if not root or not os.path.isdir(root):
-            continue
-        try:
-            names = sorted(os.listdir(root))
-        except OSError:
-            continue
-        for name in names:
-            candidate = os.path.join(root, name, "terminal64.exe")
-            if os.path.isfile(candidate) and candidate not in found:
+        for current, dirs, files in os.walk(root):
+            relative = os.path.relpath(current, root)
+            depth = 0 if relative == "." else relative.count(os.sep) + 1
+            if depth >= TERMINAL_SCAN_DEPTH:
+                dirs[:] = []
+            else:
+                dirs[:] = sorted(
+                    name for name in dirs if name.lower() not in _SKIP_INSTALL_DIRS
+                )
+            if "terminal64.exe" not in files:
+                continue
+            candidate = os.path.join(current, "terminal64.exe")
+            if candidate not in found:
                 found.append(candidate)
+
+    _terminal_scan.update({"roots": roots, "at": now, "paths": list(found)})
     return found
 
 
@@ -403,7 +548,8 @@ def remember_terminal(key, path):
 
 
 def terminal_key(row):
-    return f"{row.get('broker_name') or ''}|{row['server']}".lower()
+    server = canonical_server_name(row.get("broker_name"), row["server"])
+    return f"{row.get('broker_name') or ''}|{server}".lower()
 
 
 def terminal_order(row):
@@ -445,7 +591,8 @@ def open_session(row):
     # separate `login()` is ever reached, so a plain initialize-then-login never
     # works on a fresh machine.
     login = int(row["account_login"])
-    session = {"login": login, "password": password, "server": row["server"]}
+    server = canonical_server_name(row.get("broker_name"), row["server"])
+    session = {"login": login, "password": password, "server": server}
     key = terminal_key(row)
 
     attempts = []
@@ -476,7 +623,7 @@ def open_session(row):
 
     tried = "; ".join(f"{where} -> {why}" for where, why in attempts)
     raise RuntimeError(
-        f"no terminal could log in to {row['server']} as {login} ({tried}). "
+        f"no terminal could log in to {server} as {login} ({tried}). "
         "Install the broker's own terminal and list it in MT5_PATHS, or open MT5 "
         "once by hand, log in, and close it."
     )

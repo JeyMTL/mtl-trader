@@ -68,6 +68,12 @@ A terminal that comes up logged into a **different** account is rejected and the
 next candidate is tried. Without that check, a terminal left on another
 customer's session would stream their trades into the wrong journal.
 
+Keep `supervisor/mt5-brokers.json` beside `mt5_supervisor.py` on the host. It is
+the same directory the app uses, and lets the supervisor correct a known server
+spelling on rows saved before that directory existed (`FundedNext-Server3` →
+`FundedNext-Server 3`). Without it the supervisor still runs, but uses the
+server exactly as stored.
+
 ## 3. Supervisor environment
 
 Copy the template and fill it in:

@@ -1,0 +1,805 @@
+[
+  {
+    "name": "IC Markets",
+    "aliases": [
+      "ICMarkets"
+    ],
+    "servers": [
+      "ICMarketsSC-Live01",
+      "ICMarketsSC-Live02",
+      "ICMarketsEU-Live01",
+      "ICMarketsSC-Demo",
+      "ICMarketsEU-Demo"
+    ]
+  },
+  {
+    "name": "Pepperstone",
+    "servers": [
+      "Pepperstone-Live01",
+      "Pepperstone-Live02",
+      "Pepperstone-Demo01",
+      "Pepperstone-Demo02"
+    ]
+  },
+  {
+    "name": "Exness",
+    "servers": [
+      "Exness-MT5Trial8",
+      "Exness-MT5Trial15",
+      "Exness-MT5Trial2",
+      "Exness-MT5Real8",
+      "Exness-MT5Real2"
+    ]
+  },
+  {
+    "name": "XM",
+    "aliases": [
+      "XM Global",
+      "XMGlobal"
+    ],
+    "servers": [
+      "XMGlobal-Real 5",
+      "XMGlobal-Real 8",
+      "XMGlobal-Demo 5",
+      "XMGlobal-Demo 8"
+    ]
+  },
+  {
+    "name": "FXTM",
+    "aliases": [
+      "ForexTime"
+    ],
+    "servers": [
+      "FXTM-Live01",
+      "FXTM-Live02",
+      "FXTM-Demo01",
+      "FXTM-Demo02"
+    ]
+  },
+  {
+    "name": "FundedNext",
+    "aliases": [
+      "Funded Next",
+      "FN"
+    ],
+    "servers": [
+      "FundedNext-Server",
+      "FundedNext-Server 2",
+      "FundedNext-Server 3",
+      "FundedNext-Server 4"
+    ]
+  },
+  {
+    "name": "FTMO",
+    "servers": [
+      "FTMO-Demo",
+      "FTMO-Demo2",
+      "FTMO-Server",
+      "FTMO-Server2",
+      "FTMO-Server3",
+      "FTMO-Server4",
+      "FTMO-Server5"
+    ]
+  },
+  {
+    "name": "FundingPips",
+    "aliases": [
+      "Funding Pips",
+      "FundingPips Corp"
+    ],
+    "servers": [
+      "FundingPips-SIM1",
+      "FundingPips2-SIM",
+      "FundingPips-Prime",
+      "FundingPips-SIM",
+      "FundingPips-Trial"
+    ]
+  },
+  {
+    "name": "The5ers",
+    "aliases": [
+      "The 5ers",
+      "5ERS",
+      "Five Percent Online"
+    ],
+    "servers": [
+      "FivePercentOnline-Real",
+      "FivePercentOnline-Experience"
+    ]
+  },
+  {
+    "name": "Alpha Capital Group",
+    "aliases": [
+      "Alpha Capital",
+      "ACG"
+    ],
+    "servers": [
+      "ACGMarkets-Main"
+    ]
+  },
+  {
+    "name": "Goat Funded Trader",
+    "aliases": [
+      "GoatFunded",
+      "GFT"
+    ],
+    "servers": [
+      "GoatFunded-Server",
+      "GoatFunded-Server2",
+      "GoatFunded-Server3"
+    ]
+  },
+  {
+    "name": "Maven Trading",
+    "aliases": [
+      "Maven"
+    ],
+    "servers": [
+      "MavenTrade-Server"
+    ]
+  },
+  {
+    "name": "For Traders",
+    "servers": [
+      "fttrading-server"
+    ]
+  },
+  {
+    "name": "Funded Trading Plus",
+    "servers": [
+      "FundedTradingPlus-Live"
+    ]
+  },
+  {
+    "name": "FundedElite",
+    "aliases": [
+      "Funded Elite"
+    ],
+    "servers": [
+      "Fundedelite-Server"
+    ]
+  },
+  {
+    "name": "FunderPro",
+    "servers": [
+      "FunderPro-Live01"
+    ]
+  },
+  {
+    "name": "Funded Trader Markets",
+    "servers": [
+      "FundedTraderMarkets-Server"
+    ]
+  },
+  {
+    "name": "FTrade Markets",
+    "servers": [
+      "FTradeMarkets-Trade"
+    ]
+  },
+  {
+    "name": "FTT Sweden",
+    "aliases": [
+      "FTT"
+    ],
+    "servers": [
+      "FTT-Demo",
+      "FTT-MT5"
+    ]
+  },
+  {
+    "name": "Hola Prime",
+    "aliases": [
+      "HolaPrime"
+    ],
+    "servers": [
+      "HolaPrime-Server 1"
+    ]
+  },
+  {
+    "name": "RoboForex",
+    "servers": [
+      "RoboForex-Pro",
+      "RoboForex-ECN",
+      "RoboForex-Demo"
+    ]
+  },
+  {
+    "name": "Tickmill",
+    "servers": [
+      "Tickmill-Live",
+      "TickmillUK-Live",
+      "Tickmill-Demo",
+      "TickmillUK-Demo"
+    ]
+  },
+  {
+    "name": "Vantage",
+    "aliases": [
+      "Vantage FX",
+      "Vantage Markets"
+    ],
+    "servers": [
+      "VantageInternational-Live 1",
+      "VantageInternational-Live 10",
+      "VantageInternational-Demo"
+    ]
+  },
+  {
+    "name": "FP Markets",
+    "aliases": [
+      "First Prudential Markets",
+      "FPMarkets"
+    ],
+    "servers": [
+      "FPMarkets-Live",
+      "FPMarkets-Live2",
+      "FPMarkets-Demo"
+    ]
+  },
+  {
+    "name": "Admirals",
+    "aliases": [
+      "Admiral Markets",
+      "AdmiralMarkets"
+    ],
+    "servers": [
+      "AdmiralMarkets-Live",
+      "AdmiralMarkets-Demo"
+    ]
+  },
+  {
+    "name": "Deriv",
+    "aliases": [
+      "Binary.com"
+    ],
+    "servers": [
+      "Deriv-Server",
+      "Deriv-Server 02",
+      "Deriv-Demo"
+    ]
+  },
+  {
+    "name": "Fusion Markets",
+    "servers": [
+      "FusionMarkets-Live",
+      "FusionMarkets-Demo"
+    ]
+  },
+  {
+    "name": "ThinkMarkets",
+    "aliases": [
+      "ThinkForex"
+    ],
+    "servers": [
+      "ThinkMarkets-Live",
+      "ThinkMarkets-Demo"
+    ]
+  },
+  {
+    "name": "Eightcap",
+    "servers": [
+      "Eightcap-Live",
+      "Eightcap-Demo"
+    ]
+  },
+  {
+    "name": "Axi",
+    "aliases": [
+      "AxiTrader"
+    ],
+    "servers": [
+      "Axi-US50-Live",
+      "Axi-US50-Demo"
+    ]
+  },
+  {
+    "name": "MultiBank Group",
+    "aliases": [
+      "MultiBank"
+    ],
+    "servers": [
+      "MultiBank-Live",
+      "MultiBank-Demo"
+    ]
+  },
+  {
+    "name": "PU Prime",
+    "aliases": [
+      "PUPrime"
+    ],
+    "servers": [
+      "PUPrime-Live",
+      "PUPrime-Demo"
+    ]
+  },
+  {
+    "name": "JustMarkets",
+    "aliases": [
+      "JustForex"
+    ],
+    "servers": [
+      "JustMarkets-Live",
+      "JustMarkets-Demo"
+    ]
+  },
+  {
+    "name": "HFM",
+    "aliases": [
+      "HotForex"
+    ],
+    "servers": [
+      "HFM-Live",
+      "HFM-Demo"
+    ]
+  },
+  {
+    "name": "FBS",
+    "servers": [
+      "FBS-Real",
+      "FBS-Demo"
+    ]
+  },
+  {
+    "name": "Octa",
+    "aliases": [
+      "OctaFX"
+    ],
+    "servers": [
+      "OctaFX-Real",
+      "OctaFX-Demo"
+    ]
+  },
+  {
+    "name": "AvaTrade",
+    "aliases": [
+      "Ava FX"
+    ],
+    "servers": [
+      "Ava-Real",
+      "Ava-Demo"
+    ]
+  },
+  {
+    "name": "XTB",
+    "aliases": [
+      "X-Trade Brokers"
+    ],
+    "servers": [
+      "XTB-MT5",
+      "XTB-Demo"
+    ]
+  },
+  {
+    "name": "Alpari",
+    "servers": [
+      "Alpari-MT5",
+      "Alpari-MT5-Demo"
+    ]
+  },
+  {
+    "name": "InstaForex",
+    "servers": [
+      "InstaForex-Server",
+      "InstaForex-Demo"
+    ]
+  },
+  {
+    "name": "NordFX",
+    "servers": [
+      "NordFX-Real",
+      "NordFX-Demo"
+    ]
+  },
+  {
+    "name": "LiteFinance",
+    "aliases": [
+      "LiteForex"
+    ],
+    "servers": [
+      "LiteFinance-Live",
+      "LiteFinance-Demo"
+    ]
+  },
+  {
+    "name": "FXCM",
+    "servers": [
+      "FXCM-Live",
+      "FXCM-Demo"
+    ]
+  },
+  {
+    "name": "OANDA",
+    "servers": [
+      "OANDA-Live",
+      "OANDA-Demo"
+    ]
+  },
+  {
+    "name": "Swissquote",
+    "servers": [
+      "Swissquote-Live",
+      "Swissquote-Demo"
+    ]
+  },
+  {
+    "name": "Dukascopy",
+    "aliases": [
+      "Dukascopy Bank"
+    ],
+    "servers": [
+      "Dukascopy-Live",
+      "Dukascopy-Demo"
+    ]
+  },
+  {
+    "name": "Capital.com",
+    "aliases": [
+      "Capital Com"
+    ],
+    "servers": [
+      "Capital-Live",
+      "Capital-Demo"
+    ]
+  },
+  {
+    "name": "Skilling",
+    "servers": [
+      "Skilling-Live",
+      "Skilling-Demo"
+    ]
+  },
+  {
+    "name": "BlackBull Markets",
+    "aliases": [
+      "BlackBull"
+    ],
+    "servers": [
+      "BlackBull-Live",
+      "BlackBull-Demo"
+    ]
+  },
+  {
+    "name": "ACY Securities",
+    "aliases": [
+      "ACY"
+    ],
+    "servers": [
+      "ACY-Live",
+      "ACY-Demo"
+    ]
+  },
+  {
+    "name": "Errante",
+    "servers": [
+      "Errante-Live",
+      "Errante-Demo"
+    ]
+  },
+  {
+    "name": "M4Markets",
+    "servers": [
+      "M4Markets-Live",
+      "M4Markets-Demo"
+    ]
+  },
+  {
+    "name": "Scope Markets",
+    "servers": [
+      "ScopeMarkets-Live",
+      "ScopeMarkets-Demo"
+    ]
+  },
+  {
+    "name": "CPT Markets",
+    "servers": [
+      "CPTMarkets-Live",
+      "CPTMarkets-Demo"
+    ]
+  },
+  {
+    "name": "FinPros",
+    "servers": [
+      "FinPros-Live",
+      "FinPros-Demo"
+    ]
+  },
+  {
+    "name": "Hantec Markets",
+    "aliases": [
+      "Hantec"
+    ],
+    "servers": [
+      "HantecMarkets-Live",
+      "HantecMarkets-Demo"
+    ]
+  },
+  {
+    "name": "Doo Prime",
+    "aliases": [
+      "DooPrime"
+    ],
+    "servers": [
+      "DooPrime-Live",
+      "DooPrime-Demo"
+    ]
+  },
+  {
+    "name": "BDSwiss",
+    "servers": [
+      "BDSwiss-Live",
+      "BDSwiss-Demo"
+    ]
+  },
+  {
+    "name": "FXPrimus",
+    "aliases": [
+      "FXPRIMUS"
+    ],
+    "servers": [
+      "FXPrimus-Live",
+      "FXPrimus-Demo"
+    ]
+  },
+  {
+    "name": "Weltrade",
+    "servers": [
+      "Weltrade-Live",
+      "Weltrade-Demo"
+    ]
+  },
+  {
+    "name": "AMarkets",
+    "servers": [
+      "AMarkets-Live",
+      "AMarkets-Demo"
+    ]
+  },
+  {
+    "name": "FreshForex",
+    "servers": [
+      "FreshForex-Live",
+      "FreshForex-Demo"
+    ]
+  },
+  {
+    "name": "Forex4you",
+    "servers": [
+      "Forex4you-Live",
+      "Forex4you-Demo"
+    ]
+  },
+  {
+    "name": "Grand Capital",
+    "servers": [
+      "GrandCapital-Live",
+      "GrandCapital-Demo"
+    ]
+  },
+  {
+    "name": "Gerchik & Co",
+    "aliases": [
+      "Gerchik"
+    ],
+    "servers": [
+      "Gerchik-Live",
+      "Gerchik-Demo"
+    ]
+  },
+  {
+    "name": "FxPro",
+    "servers": [
+      "FxPro-Live01",
+      "FxPro-Live02",
+      "FxPro-Demo01"
+    ]
+  },
+  {
+    "name": "City Index",
+    "servers": [
+      "CityIndex-Live",
+      "CityIndex-Demo"
+    ]
+  },
+  {
+    "name": "Trade Nation",
+    "servers": [
+      "TradeNation-Live",
+      "TradeNation-Demo"
+    ]
+  },
+  {
+    "name": "StarTrader",
+    "servers": [
+      "StarTrader-Live",
+      "StarTrader-Demo"
+    ]
+  },
+  {
+    "name": "INFINOX",
+    "servers": [
+      "INFINOX-Live",
+      "INFINOX-Demo"
+    ]
+  },
+  {
+    "name": "CXM Direct",
+    "servers": [
+      "CXM-Live",
+      "CXM-Demo"
+    ]
+  },
+  {
+    "name": "VPFX",
+    "servers": [
+      "VPFX-Live",
+      "VPFX-Demo"
+    ]
+  },
+  {
+    "name": "LandPrime",
+    "servers": [
+      "LandPrime-Live",
+      "LandPrime-Demo"
+    ]
+  },
+  {
+    "name": "Moneta Markets",
+    "servers": [
+      "MonetaMarkets-Live",
+      "MonetaMarkets-Demo"
+    ]
+  },
+  {
+    "name": "XS.com",
+    "aliases": [
+      "XS"
+    ],
+    "servers": [
+      "XS-Live",
+      "XS-Demo"
+    ]
+  },
+  {
+    "name": "ZFX",
+    "servers": [
+      "ZFX-Live",
+      "ZFX-Demo"
+    ]
+  },
+  {
+    "name": "DBG Markets",
+    "servers": [
+      "DBGMarkets-Live",
+      "DBGMarkets-Demo"
+    ]
+  },
+  {
+    "name": "Windsor Brokers",
+    "servers": [
+      "Windsor-Live",
+      "Windsor-Demo"
+    ]
+  },
+  {
+    "name": "Amana Capital",
+    "servers": [
+      "AmanaCapital-Live",
+      "AmanaCapital-Demo"
+    ]
+  },
+  {
+    "name": "ADSS",
+    "servers": [
+      "ADSS-Live",
+      "ADSS-Demo"
+    ]
+  },
+  {
+    "name": "Equiti",
+    "servers": [
+      "Equiti-Live",
+      "Equiti-Demo"
+    ]
+  },
+  {
+    "name": "Ox Securities",
+    "servers": [
+      "OxSecurities-Live",
+      "OxSecurities-Demo"
+    ]
+  },
+  {
+    "name": "Taurex",
+    "servers": [
+      "Taurex-Live",
+      "Taurex-Demo"
+    ]
+  },
+  {
+    "name": "TradeQuo",
+    "servers": [
+      "TradeQuo-Live",
+      "TradeQuo-Demo"
+    ]
+  },
+  {
+    "name": "GMI Edge",
+    "aliases": [
+      "GMI"
+    ],
+    "servers": [
+      "GMIEdge-Live",
+      "GMIEdge-Demo"
+    ]
+  },
+  {
+    "name": "Traders Trust",
+    "aliases": [
+      "TTCM"
+    ],
+    "servers": [
+      "TradersTrust-Live",
+      "TradersTrust-Demo"
+    ]
+  },
+  {
+    "name": "OneRoyal",
+    "servers": [
+      "OneRoyal-Live",
+      "OneRoyal-Demo"
+    ]
+  },
+  {
+    "name": "IronFX",
+    "servers": [
+      "IronFX-Live",
+      "IronFX-Demo"
+    ]
+  },
+  {
+    "name": "TeleTrade",
+    "servers": [
+      "TeleTrade-Live",
+      "TeleTrade-Demo"
+    ]
+  },
+  {
+    "name": "FIBO Group",
+    "servers": [
+      "FIBO-Live",
+      "FIBO-Demo"
+    ]
+  },
+  {
+    "name": "LQDFX",
+    "servers": [
+      "LQDFX-Live",
+      "LQDFX-Demo"
+    ]
+  },
+  {
+    "name": "Purple Trading",
+    "servers": [
+      "PurpleTrading-Live",
+      "PurpleTrading-Demo"
+    ]
+  },
+  {
+    "name": "CFI",
+    "aliases": [
+      "CFI Financial"
+    ],
+    "servers": [
+      "CFI-Live",
+      "CFI-Demo"
+    ]
+  },
+  {
+    "name": "easyMarkets",
+    "servers": [
+      "easyMarkets-Live",
+      "easyMarkets-Demo"
+    ]
+  }
+]

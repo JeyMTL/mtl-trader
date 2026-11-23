@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import SUPERVISOR_BROKERS from '../../../shared/mt5-brokers.json'
 import {
   MT5_BROKERS,
+  canonicalServerName,
   classifyServer,
   findMt5Broker,
   searchMt5Brokers,
@@ -21,19 +23,18 @@ describe('MT5 broker directory', () => {
     expect(new Set(names).size).toBe(names.length)
   })
 
-  it('offers both a live and a demo/trial server for every broker', () => {
-    // The picker is how a customer reaches a test account, so a broker with no
-    // demo suggestion sends them to the live server by default.
+  it('keeps the supervisor copy of the directory identical', () => {
+    // The Windows supervisor cannot import TypeScript, so it reads this JSON.
+    // If the two drift, an existing connection can be corrected in the app but
+    // still fail to log in on the sync host.
+    expect(SUPERVISOR_BROKERS).toEqual(MT5_BROKERS)
+  })
+
+  it('lists at least one server for every broker', () => {
+    // Prop firms may publish only one server, or only live servers; the form
+    // still accepts anything typed, so one accurate suggestion is enough.
     for (const broker of MT5_BROKERS) {
-      expect(broker.servers.length).toBeGreaterThanOrEqual(2)
-      expect(
-        broker.servers.some((server) => /demo|trial|test/i.test(server)),
-        `${broker.name} has no demo/trial server`
-      )
-      expect(
-        broker.servers.some((server) => !/demo|trial|test/i.test(server)),
-        `${broker.name} has no live server`
-      )
+      expect(broker.servers.length).toBeGreaterThanOrEqual(1)
     }
   })
 
@@ -86,6 +87,33 @@ describe('MT5 server suggestions', () => {
 
   it('surfaces an Exness demo server before a live one', () => {
     expect(serverSuggestions('Exness')[0]).toBe('Exness-MT5Trial8')
+  })
+
+  it('offers FundedNext servers with the space the terminal uses', () => {
+    expect(serverSuggestions('FundedNext')).toEqual([
+      'FundedNext-Server',
+      'FundedNext-Server 2',
+      'FundedNext-Server 3',
+      'FundedNext-Server 4',
+    ])
+  })
+
+  it('canonicalizes a known server despite missing spaces or case', () => {
+    expect(canonicalServerName('FundedNext', 'fundednext-server3')).toBe(
+      'FundedNext-Server 3'
+    )
+    expect(canonicalServerName('Funding Pips', 'fundingpips-sim1')).toBe(
+      'FundingPips-SIM1'
+    )
+  })
+
+  it('leaves an unknown server untouched', () => {
+    expect(canonicalServerName('Some Local Broker', 'Any-Server 1')).toBe(
+      'Any-Server 1'
+    )
+    expect(canonicalServerName('FundedNext', 'FundedNext-Unknown')).toBe(
+      'FundedNext-Unknown'
+    )
   })
 
   it('stays empty for a broker outside the directory', () => {
