@@ -22,7 +22,7 @@ export default function RefundPolicyPage() {
 
       <h2>1. Try before you pay</h2>
       <p>
-        Every new account starts with a 7-day free trial and no payment details are required. Use the trial to
+        Every new account starts with a 3-day free trial and no payment details are required. Use the trial to
         confirm the journal fits how you trade — that is the intended way to evaluate the product.
       </p>
 

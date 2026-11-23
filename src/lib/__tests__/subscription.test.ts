@@ -210,14 +210,14 @@ describe('column value builders', () => {
     })
   })
 
-  it('trialFields starts a fresh 7-day unlimited trial', () => {
+  it('trialFields starts a fresh 3-day unlimited trial', () => {
     const fields = trialFields(NOW)
     expect(fields.subscription_status).toBe('trial')
     expect(fields.max_trades).toBe(UNLIMITED)
     expect(fields.current_period_end).toBeNull()
     const days = (new Date(fields.trial_ends_at).getTime() - NOW.getTime()) / (24 * 60 * 60 * 1000)
     expect(days).toBe(TRIAL_DAYS)
-    expect(TRIAL_DAYS).toBe(7)
+    expect(TRIAL_DAYS).toBe(3)
   })
 })
 

@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     }
 
     // The database trigger creates the profile with its own trial length. Until
-    // `20261128_seven_day_trial.sql` is applied it still writes 14 days, so an
+    // `20261129_three_day_trial.sql` is applied it still writes 7 days, so an
     // account created by this request is aligned with TRIAL_DAYS here. A trial
     // that already started keeps the days it was given; only a row created in
     // the last few minutes is touched.
