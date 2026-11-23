@@ -22,6 +22,7 @@ import {
 import { ChartSettingsDialog } from '@/components/chart-settings-panel'
 import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
 import { alignCompare } from '@/lib/chart-compare'
+import { livePollMs, mergeCandleTail, parseChartInterval } from '@/lib/market-candles'
 import { sessionWindows } from '@/lib/market-sessions'
 import { publicErrorMessage } from '@/lib/errors'
 import {
@@ -599,6 +600,67 @@ export function ChartWorkspace({
       cancelled = true
     }
   }, [compareSymbol, interval])
+
+  // -------------------------------------------------------------- live tail
+  /**
+   * Keeps the newest candles moving.
+   *
+   * The desk used to load candles once per symbol and then sit still, so a
+   * one-minute chart could be minutes behind the broker until the trader
+   * switched timeframes. The tail is refetched while the tab is visible, merged
+   * by open time so history does not jump under the pointer, and left alone
+   * during replay: replay is a historical window and must not walk forward.
+   */
+  useEffect(() => {
+    if (replayCut !== null) return
+    const intervalKey = parseChartInterval(interval) ?? '1m'
+    const compare = compareSymbol
+    let cancelled = false
+
+    async function tick() {
+      // A hidden tab has nobody looking at it; focus catches up immediately.
+      if (document.visibilityState !== 'visible') return
+      try {
+        const response = await fetch(
+          `/api/market/candles?symbol=${encodeURIComponent(chartSymbol(symbol))}&interval=${interval}`,
+          { cache: 'no-store' }
+        )
+        if (!response.ok) return
+        const body = await response.json()
+        const next: Candle[] = Array.isArray(body?.candles) ? body.candles : []
+        if (cancelled || next.length === 0) return
+        setCandles((current) => mergeCandleTail(current, next))
+      } catch {
+        // Keep the last good chart; the next tick retries.
+      }
+
+      if (!compare) return
+      try {
+        const response = await fetch(
+          `/api/market/candles?symbol=${encodeURIComponent(compare)}&interval=${interval}`,
+          { cache: 'no-store' }
+        )
+        if (!response.ok) return
+        const body = await response.json()
+        const next: Candle[] = Array.isArray(body?.candles) ? body.candles : []
+        if (cancelled || next.length === 0) return
+        setCompareCandles((current) => mergeCandleTail(current, next))
+      } catch {
+        // A failed overlay refresh keeps the last overlay.
+      }
+    }
+
+    const timer = window.setInterval(() => void tick(), livePollMs(intervalKey))
+    const onWake = () => void tick()
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('focus', onWake)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('focus', onWake)
+    }
+  }, [symbol, interval, compareSymbol, replayCut])
 
   const symbolDrawings = useMemo(
     () => drawings.filter((row) => row.symbol === chartSymbol(symbol)),

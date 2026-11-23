@@ -5,7 +5,9 @@ import {
   aggregateCandles,
   candlesForWindow,
   isVendorOutage,
+  livePollMs,
   liveTtlMs,
+  mergeCandleTail,
   normalizeOandaCandles,
   normalizeSymbol,
   oandaDate,
@@ -61,9 +63,35 @@ describe('candle intervals', () => {
 
   it('keeps the live cache inside half a bar', () => {
     expect(liveTtlMs('5s')).toBe(2500)
-    expect(liveTtlMs('30s')).toBe(15000)
-    // Bounded: a daily chart is not refetched every few minutes for nothing.
-    expect(liveTtlMs('1d')).toBe(20000)
+    // Bounded at ten seconds, so a slow bar is not ten seconds stale for nothing.
+    expect(liveTtlMs('30s')).toBe(10000)
+    expect(liveTtlMs('1d')).toBe(10000)
+  })
+
+  it('polls faster than the cache on short bars and slower on long ones', () => {
+    expect(livePollMs('5s')).toBe(2500)
+    expect(livePollMs('15s')).toBe(7500)
+    expect(livePollMs('1m')).toBe(10000)
+    expect(livePollMs('5m')).toBe(10000)
+    expect(livePollMs('15m')).toBe(20000)
+    expect(livePollMs('1h')).toBe(20000)
+    expect(livePollMs('4h')).toBe(30000)
+    expect(livePollMs('1d')).toBe(60000)
+  })
+
+  it('merges a polled tail by open time and keeps older history', () => {
+    const bar = (t: number, c: number) => ({ t, o: c, h: c, l: c, c, v: 1 })
+    const existing = [bar(0, 1), bar(60_000, 2), bar(120_000, 3)]
+    // The tail overlaps the last bar and adds a new one.
+    const incoming = [bar(120_000, 9), bar(180_000, 4)]
+    expect(mergeCandleTail(existing, incoming)).toEqual([
+      bar(0, 1),
+      bar(60_000, 2),
+      bar(120_000, 9),
+      bar(180_000, 4),
+    ])
+    // An empty poll never erases a chart.
+    expect(mergeCandleTail(existing, [])).toBe(existing)
   })
 
   it('counts the bars a window needs and refuses past the vendor cap', () => {

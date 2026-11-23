@@ -27,7 +27,7 @@ export type ChartIntervalKey =
 export type CandleSource = 'oanda'
 
 /** How long a live series may be reused; the last candle keeps moving. */
-export const LIVE_TTL_MS = 20_000
+export const LIVE_TTL_MS = 10_000
 
 export interface Candle {
   /** Candle open time, epoch milliseconds. */
@@ -99,10 +99,45 @@ export const MAX_CANDLES_PER_REQUEST = 5000
  *
  * Half a bar, so the newest candle is never more than half-formed when it is
  * drawn — a 20-second rule on a 5-second chart would show a bar three bars old
- * and call it live. Bounded so a daily chart is not refetched constantly.
+ * and call it live. Bounded to ten seconds so a one-minute or hourly chart is
+ * never ten seconds behind the broker for no reason.
  */
 export function liveTtlMs(interval: ChartIntervalKey): number {
   return Math.max(1_500, Math.min(LIVE_TTL_MS, CANDLE_INTERVALS[interval].ms / 2))
+}
+
+/**
+ * How often a live chart should ask again.
+ *
+ * Slightly faster than the server's cache for sub-minute sizes so the moving
+ * bar is seen within a fraction of its own length, and slower for the long
+ * sizes, where a new tick barely changes the shape of the candle and a request
+ * every few seconds would only spend the vendor's quota.
+ */
+export function livePollMs(interval: ChartIntervalKey): number {
+  const bar = CANDLE_INTERVALS[interval].ms
+  if (bar >= 86_400_000) return 60_000
+  if (bar >= 14_400_000) return 30_000
+  if (bar >= 900_000) return 20_000
+  if (bar >= 60_000) return 10_000
+  return Math.max(2_000, Math.round(bar / 2))
+}
+
+/**
+ * Replaces the overlapping tail of a live series by open time.
+ *
+ * A poll returns the newest `count` bars, so it overlaps the old series and
+ * drops the oldest bars off the front. Merging, rather than replacing, keeps the
+ * history the trader has scrolled back to and lets the newest candle change
+ * without the rest of the chart shifting under the pointer.
+ */
+export function mergeCandleTail(existing: Candle[], incoming: Candle[]): Candle[] {
+  if (incoming.length === 0) return existing
+  if (existing.length === 0) return incoming
+  const byTime = new Map<number, Candle>()
+  for (const candle of existing) byTime.set(candle.t, candle)
+  for (const candle of incoming) byTime.set(candle.t, candle)
+  return [...byTime.values()].sort((a, b) => a.t - b.t)
 }
 
 /**

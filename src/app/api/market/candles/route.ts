@@ -168,11 +168,11 @@ export async function GET(req: Request) {
     }
   }
 
-  // A chart on the live tail polls about four times a minute at the finest
-  // size — around 900 an hour — so the ceiling has to clear a single chart's own
-  // cadence and still stop a script. Size switches are cheap: they are served
-  // from the series cache.
-  const limit = await rateLimit(`market:${user.id}`, 1200, 60 * 60 * 1000)
+  // The desk polls the live tail: every ten seconds on a minute chart, every
+  // 2.5 seconds on a five-second one, and the compare overlay doubles that. The
+  // ceiling clears two charts at the finest size (~2,900 an hour) and still
+  // stops a script. Size switches are cheap: they come from the series cache.
+  const limit = await rateLimit(`market:${user.id}`, 3600, 60 * 60 * 1000)
   if (!limit.ok) {
     return NextResponse.json(
       { error: 'Too many chart requests. Try again shortly.' },

@@ -100,7 +100,8 @@ class ChartPickerScreen extends StatefulWidget {
   State<ChartPickerScreen> createState() => _ChartPickerScreenState();
 }
 
-class _ChartPickerScreenState extends State<ChartPickerScreen> {
+class _ChartPickerScreenState extends State<ChartPickerScreen>
+    with WidgetsBindingObserver {
   final _market = MarketDataService();
 
   ChartInterval _interval = ChartInterval.fiveMinutes;
@@ -289,6 +290,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _syncState = widget.debugSyncState ?? ChartSyncState.idle;
     _entry = widget.entry;
     _exit = widget.exit;
@@ -544,6 +546,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     _playTimer?.cancel();
     _cloudSyncTimer?.cancel();
@@ -559,10 +562,23 @@ class _ChartPickerScreenState extends State<ChartPickerScreen> {
   /// Polls while the chart shows the live tail.
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
+    // `force` skips the client-side candle cache. Without it the cache lives
+    // for half a bar while the timer fires every third of a bar, so every other
+    // poll returned the series that was already on screen and a one-minute
+    // chart only moved once a minute.
     _refreshTimer = Timer.periodic(
       _refreshPeriod,
-      (_) => _load(silent: true),
+      (_) => _load(silent: true, force: true),
     );
+  }
+
+  /// A phone that was asleep has a timer that did not fire; refresh the live
+  /// tail as soon as the trader is looking again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (_windowFrom != null) return;
+    unawaited(_load(silent: true, force: true));
   }
 
   /// How often the live tail is refetched.
