@@ -402,7 +402,7 @@ function normalizeTarget(raw: unknown): RuleTarget {
 export function normalizeRuleSpec(raw: unknown): RuleSpec {
   const parsed = typeof raw === 'string' ? parseSpecJson(raw) : raw
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error('The compiled strategy was not an object. Try describing it again.')
+    throw new Error('The compiled rules were not an object. Try describing them again.')
   }
   const input = parsed as Record<string, unknown>
 
@@ -464,11 +464,11 @@ export function normalizeRuleSpec(raw: unknown): RuleSpec {
 
 function parseSpecJson(text: string): unknown {
   const json = extractJsonObject(text)
-  if (!json) throw new Error('The compiled strategy did not come back as JSON. Try again.')
+  if (!json) throw new Error('The compiled rules did not come back as JSON. Try again.')
   try {
     return JSON.parse(json) as unknown
   } catch {
-    throw new Error('The compiled strategy contained invalid JSON. Try again.')
+    throw new Error('The compiled rules contained invalid JSON. Try again.')
   }
 }
 

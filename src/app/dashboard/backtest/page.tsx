@@ -360,7 +360,7 @@ function BacktestWorkbench() {
           Backtest
         </h1>
         <p className="mt-1 text-gray-400">
-          Replay a rule-based strategy over your own MT5 bar data, with costs and the
+          Replay your own rules over your own MT5 bar data, with costs and the
           fill assumptions printed on the result.
         </p>
       </div>
@@ -446,7 +446,7 @@ function BacktestWorkbench() {
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="mb-4 text-sm font-semibold text-white">2. Strategy</h2>
+            <h2 className="mb-4 text-sm font-semibold text-white">2. Rules</h2>
 
             {compiled ? (
               <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
@@ -522,7 +522,7 @@ function BacktestWorkbench() {
                   disabled={Boolean(compiled)}
                   title={
                     compiled
-                      ? 'Set when the rules were compiled. Replace the strategy to change it.'
+                      ? 'Set when the rules were compiled. Replace the rules to change them.'
                       : undefined
                   }
                   className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-white placeholder-gray-500 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"

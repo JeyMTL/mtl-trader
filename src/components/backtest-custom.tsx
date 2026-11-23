@@ -323,7 +323,7 @@ export default function BacktestCustom({
         meta?: { images?: number; skippedImages?: number; model?: string }
       }
       if (!response.ok || !data.spec) {
-        setError(data.error || 'Could not compile that strategy.')
+        setError(data.error || 'Could not compile those rules.')
         return
       }
       setResult({
@@ -348,7 +348,7 @@ export default function BacktestCustom({
       <div className="rounded-xl border border-border bg-surface p-5">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
           <Wand2 className="h-4 w-4 text-primary" />
-          Write the strategy you want tested
+          Write the rules you want tested
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-gray-500">
           Plain English is enough. Say what has to unfold before entry, on which timeframes,

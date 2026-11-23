@@ -356,7 +356,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
         padding: const EdgeInsets.fromLTRB(14, 6, 14, 32),
         children: [
           Text(
-            'Replay a rule-based strategy over your own MT5 bar data, with '
+            'Replay your own rules over your own MT5 bar data, with '
             'costs and the fill assumptions printed on the result.',
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.5),
           ),
@@ -549,7 +549,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('2. Strategy'),
+          _cardTitle('2. Rules'),
           const SizedBox(height: 10),
           _fieldLabel('Run name'),
           TextField(
@@ -696,7 +696,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
                   ? null
                   : () => setState(() => _compiled = null),
               icon: const Icon(Icons.library_books_outlined, size: 15),
-              label: const Text('Use a library strategy instead'),
+              label: const Text('Use a built-in rule set instead'),
             ),
           ],
         ],
