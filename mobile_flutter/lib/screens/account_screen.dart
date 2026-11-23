@@ -13,6 +13,7 @@ import '../services/journal_api.dart';
 import '../ui/language_picker.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../ui/zone_clock.dart';
 import 'alerts_screen.dart';
 import 'rules_screen.dart';
 import 'subscription_screen.dart';
@@ -100,6 +101,11 @@ class _AccountScreenState extends State<AccountScreen> {
 
   late Future<Map<String, dynamic>> _future;
 
+  /// The account's reporting timezone; the app bar clock and the reminder
+  /// picker both speak it. Mirrored into state because the app bar is built
+  /// outside the profile FutureBuilder.
+  String _zoneId = 'UTC';
+
   String _lockMode = 'off';
   double _lossLimit = 0;
   int _maxTrades = 0;
@@ -109,6 +115,13 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     _future = widget.api.profile();
+    _future.then((profile) {
+      if (!mounted) return;
+      final zone = asString(profile['timezone']);
+      if (zone != null && zone != _zoneId) setState(() => _zoneId = zone);
+    }).catchError((_) {
+      // The clock keeps the last known zone; the body reports the failure.
+    });
     _loadDailyStop();
   }
 
@@ -394,18 +407,22 @@ class _AccountScreenState extends State<AccountScreen> {
           if (alerts.journalEnabled)
             InkWell(
               onTap: () async {
+                // The picker edits the time in the account's zone; the alert
+                // service stores the UTC instant it names.
+                final current = alerts.reminderAtIn(_zoneId);
                 final picked = await showTimePicker(
                   context: context,
                   initialTime: TimeOfDay(
-                    hour: alerts.reminderAt.hour,
-                    minute: alerts.reminderAt.minute,
+                    hour: current.hour,
+                    minute: current.minute,
                   ),
                   helpText: _l10n.alertsReminderAt,
                 );
                 if (picked == null) return;
                 await alerts.setJournal(
                   true,
-                  at: TimeOfDayValue(picked.hour, picked.minute),
+                  atInZone: TimeOfDayValue(picked.hour, picked.minute),
+                  zoneId: _zoneId,
                 );
                 if (mounted) setState(() {});
               },
@@ -426,7 +443,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                     ),
                     Text(
-                      alerts.reminderAt.label,
+                      alerts.reminderAtIn(_zoneId).label,
                       style: tabular.copyWith(
                         color: AppColors.text,
                         fontSize: 12,
@@ -499,7 +516,10 @@ class _AccountScreenState extends State<AccountScreen> {
     final next = widget.api.profile();
     setState(() => _future = next);
     try {
-      await next;
+      final profile = await next;
+      if (!mounted) return;
+      final zone = asString(profile['timezone']);
+      if (zone != null && zone != _zoneId) setState(() => _zoneId = zone);
     } catch (_) {
       // The empty profile still renders the signed-in email.
     }
@@ -749,13 +769,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_l10n.account),
-        actions: [
-          IconButton(
-            onPressed: _refresh,
-            tooltip: _l10n.refresh,
-            icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
-          ),
-        ],
+        actions: [ZoneClock(zoneId: _zoneId)],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _future,

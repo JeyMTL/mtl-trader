@@ -1,4 +1,8 @@
-import 'package:timezone/data/latest_10y.dart' as tzdata;
+// The full database, not `latest` or `latest_10y`: those trimmed sets drop
+// zones such as Europe/Stockholm that the account tab offers, and a zone
+// missing here silently fell back to the device clock. alerts.dart loads the
+// same dataset, so both see one consistent list of locations.
+import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 /// The clock the chart's time axis speaks.
@@ -87,6 +91,22 @@ class ChartZone {
     if (isDevice) return utcTime.toLocal();
     ensureReady();
     return tz.TZDateTime.from(utcTime, tz.getLocation(id));
+  }
+
+  /// The UTC instant for a wall-clock time on the calendar day [day] falls on
+  /// in this zone.
+  ///
+  /// This is the inverse of [wall]: a time picked in the trader's zone is
+  /// stored as the UTC instant it names, so changing the zone later moves the
+  /// display instead of silently moving the alarm.
+  DateTime instantAt(DateTime day, int hour, int minute) {
+    if (isDevice) {
+      return DateTime(day.year, day.month, day.day, hour, minute).toUtc();
+    }
+    ensureReady();
+    final location = isUtc ? tz.UTC : tz.getLocation(id);
+    return tz.TZDateTime(location, day.year, day.month, day.day, hour, minute)
+        .toUtc();
   }
 
   /// `UTC+2` / `UTC-4` for the instant, which is what the chart corner shows.

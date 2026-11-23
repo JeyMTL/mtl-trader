@@ -7,8 +7,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
+// `latest` and `latest_10y` are trimmed sets that drop zones such as
+// Europe/Stockholm; the account tab offers those, so load the full database.
+import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+
+import '../core/chart_zone.dart';
 
 /// What an alert was about.
 enum AlertKind { dailyStop, levelTouch, journalReminder }
@@ -99,6 +103,11 @@ class Alerts {
   static const String _dailyStopKey = 'alerts.dailyStop';
   static const String _levelsKey = 'alerts.levels';
   static const String _journalKey = 'alerts.journal';
+  /// The reminder is stored as minutes past UTC midnight, not as a local
+  /// wall-clock time: the alarm is one instant a day, and the account's
+  /// timezone only decides how that instant is printed or edited.
+  static const String _utcMinuteKey = 'alerts.journalUtcMinute';
+  // Legacy local-time keys, read once to migrate an existing reminder.
   static const String _hourKey = 'alerts.journalHour';
   static const String _minuteKey = 'alerts.journalMinute';
 
@@ -124,7 +133,27 @@ class Alerts {
   bool dailyStopEnabled = true;
   bool levelsEnabled = true;
   bool journalEnabled = true;
-  TimeOfDayValue reminderAt = const TimeOfDayValue(18, 0);
+  int reminderUtcMinute = 18 * 60;
+
+  /// The reminder as a wall-clock time in [zoneId] — what the picker shows and
+  /// edits. A reminder set at 02:00 UTC reads 21:00 in New York, and the alarm
+  /// itself still fires at 02:00 UTC.
+  TimeOfDayValue reminderAtIn(String zoneId) {
+    final zone = ChartZone.byId(zoneId);
+    final today = zone.wall(DateTime.now().toUtc());
+    final instant = DateTime.utc(today.year, today.month, today.day)
+        .add(Duration(minutes: reminderUtcMinute));
+    final wall = zone.wall(instant);
+    return TimeOfDayValue(wall.hour, wall.minute);
+  }
+
+  /// Converts a time picked in [zoneId] into the UTC minute it is stored as.
+  int utcMinuteFor(String zoneId, TimeOfDayValue wall) {
+    final zone = ChartZone.byId(zoneId);
+    final today = zone.wall(DateTime.now().toUtc());
+    final instant = zone.instantAt(today, wall.hour, wall.minute);
+    return instant.hour * 60 + instant.minute;
+  }
 
   Future<void> init() async {
     if (_ready) return;
@@ -201,10 +230,19 @@ class Alerts {
     dailyStopEnabled = prefs.getBool(_dailyStopKey) ?? true;
     levelsEnabled = prefs.getBool(_levelsKey) ?? true;
     journalEnabled = prefs.getBool(_journalKey) ?? true;
-    reminderAt = TimeOfDayValue(
-      prefs.getInt(_hourKey) ?? 18,
-      prefs.getInt(_minuteKey) ?? 0,
-    );
+    final stored = prefs.getInt(_utcMinuteKey);
+    if (stored != null) {
+      reminderUtcMinute = stored.clamp(0, 24 * 60 - 1);
+    } else if (prefs.getInt(_hourKey) != null || prefs.getInt(_minuteKey) != null) {
+      // Migration: the old keys held a wall-clock time in the phone's zone.
+      // Keep the same instant by converting it to UTC once.
+      final wall = TimeOfDayValue(
+        (prefs.getInt(_hourKey) ?? 18).clamp(0, 23),
+        (prefs.getInt(_minuteKey) ?? 0).clamp(0, 59),
+      );
+      reminderUtcMinute = utcMinuteFor('', wall);
+      await prefs.setInt(_utcMinuteKey, reminderUtcMinute);
+    }
   }
 
   /// Asks for permission once, at the point the trader turns an alert on — not
@@ -261,13 +299,19 @@ class Alerts {
     if (value) await ensurePermission();
   }
 
-  Future<void> setJournal(bool value, {TimeOfDayValue? at}) async {
+  /// [atInZone] is the wall-clock time the picker showed, in [zoneId]. It is
+  /// converted to UTC before it is stored, so a later timezone change moves the
+  /// reading rather than the alarm.
+  Future<void> setJournal(
+    bool value, {
+    TimeOfDayValue? atInZone,
+    String zoneId = '',
+  }) async {
     journalEnabled = value;
-    if (at != null) reminderAt = at;
+    if (atInZone != null) reminderUtcMinute = utcMinuteFor(zoneId, atInZone);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_journalKey, value);
-    await prefs.setInt(_hourKey, reminderAt.hour);
-    await prefs.setInt(_minuteKey, reminderAt.minute);
+    await prefs.setInt(_utcMinuteKey, reminderUtcMinute);
     if (value) await ensurePermission();
     await _scheduleReminder();
   }
@@ -277,16 +321,13 @@ class Alerts {
   Future<void> _scheduleReminder() async {
     await _plugin.cancel(id: _reminderId);
     if (!journalEnabled) return;
-    final now = tz.TZDateTime.now(_zone);
-    var next = tz.TZDateTime(
-      _zone,
-      now.year,
-      now.month,
-      now.day,
-      reminderAt.hour,
-      reminderAt.minute,
-    );
-    if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
+    // The reminder is a UTC instant, so it is computed in UTC and only then
+    // expressed in the phone's zone for the scheduler.
+    final now = DateTime.now().toUtc();
+    var nextUtc = DateTime.utc(now.year, now.month, now.day)
+        .add(Duration(minutes: reminderUtcMinute));
+    if (!nextUtc.isAfter(now)) nextUtc = nextUtc.add(const Duration(days: 1));
+    final next = tz.TZDateTime.from(nextUtc, _zone);
     try {
       await _plugin.zonedSchedule(
         id: _reminderId,
