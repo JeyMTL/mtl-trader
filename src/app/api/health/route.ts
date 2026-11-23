@@ -109,13 +109,6 @@ export async function GET() {
       // included because a key minted for another package is just as useless
       // and looks identical from the outside.
       googlePlay: googlePlayStatus(),
-      // Same rule as `paddle`: presence only. Without RESEND_API_KEY the
-      // notifications cron answers 503 and sends nothing, and `sender:
-      // "fallback"` means EMAIL_FROM is unset, so Resend's onboarding address
-      // delivers to the account owner only and every customer is silently
-      // skipped. That failure leaves no row in `notification_sends`, so this is
-      // the one place it can be seen before someone asks why no email arrived.
-      email: emailStatus(),
       // Like `features`, reported but not part of `status`: a pending migration
       // is a known, fixable state, and paging every fifteen minutes until
       // someone pastes SQL would train the alert away. `missing` names the file.
@@ -131,24 +124,6 @@ export async function GET() {
       headers: { 'Cache-Control': 'no-store' },
     }
   )
-}
-
-/**
- * Email config, read the way the notifications cron and `sendEmail` read it.
- *
- * `configured` mirrors the cron's own gate. `sender` distinguishes a verified
- * domain from the fallback: Resend's `onboarding@resend.dev` is accepted only
- * for the Resend account owner's address, so a deployment without EMAIL_FROM
- * looks configured while every customer send is refused.
- */
-function emailStatus() {
-  const apiKey = Boolean((process.env.RESEND_API_KEY || '').trim())
-  const from = Boolean((process.env.EMAIL_FROM || '').trim())
-  return {
-    configured: apiKey,
-    sender: from ? 'custom' : 'fallback',
-    replyTo: Boolean((process.env.EMAIL_REPLY_TO || '').trim()),
-  }
 }
 
 /**

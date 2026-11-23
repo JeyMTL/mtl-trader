@@ -22,7 +22,6 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Row-Scoped Security** - Row Level Security plus a session-refreshing proxy that guards `/dashboard` before it renders
 - **Payment Reconciliation** - A scheduled job replays captured PayPal payments through the same idempotent apply path, recovering payments whose webhook never arrived (it never downgrades an existing plan)
 - **Rate Limiting** - Per-user limits on AI reviews, tag suggestions, sync agents, exports and payment requests, enforced with shared Postgres counters (not per-lambda memory)
-- **Email Summaries** - Optional daily/weekly/monthly P&L summaries plus weekday journal reminders, sent through Resend, driven by the notification preferences in Settings and a scheduled cron
 - **Native-Style Phone Shell** - In the web app at narrow viewports the dashboard becomes a bottom-tab layout: fixed app bar, 5-tab bar with a centre compose button, a More sheet, safe-area spacing, card lists instead of tables, and swipe between calendar months
 - **Flutter Mobile App** - `mobile_flutter/` is a native Flutter client with a deliberately flat design: desk KPIs and charts, the journal, photo/voice-note capture, the time edge report and account settings, all against the same Supabase project
 - **Dark Blue Theme** - Professional trading interface
@@ -35,7 +34,6 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades.
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase Auth
 - **Payments:** Paddle card subscriptions (auto-renewing), and bank transfer with unique references and admin approval. PayPal checkout is closed; its webhook only serves existing subscribers
-- **Email:** Resend (transactional summaries; optional in production, no-ops when unconfigured)
 - **Charts:** Recharts
 - **CSV Parsing:** PapaParse + SheetJS (xlsx)
 - **Tests:** Vitest
@@ -93,21 +91,15 @@ In Supabase, open `Authentication` → `Providers` → `Email` and enable **Conf
 
 Password recovery posts to `/auth/forgot`, and the emailed link lands on `/auth/reset`. Add both `http://localhost:3000/auth/reset` and `https://your-domain/auth/reset` to the Supabase **Redirect URLs** allowlist, or the recovery link will be rejected.
 
-### 6. Configure email summaries (optional)
-1. Create a free account at https://resend.com and verify the domain you want to send from
-2. Set `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `MTL Ledger <reports@yourdomain.com>`)
-
-With neither set the app still runs: summary sends and the notifications cron simply no-op. For Supabase Auth emails, point Supabase's SMTP settings at Resend so verification mail is not rate-limited or spam-filtered.
-
-### 7. Configure bank transfer details (optional)
+### 6. Configure bank transfer details (optional)
 Set `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, and `BANK_BRANCH` so the payment page shows real details. The values are served by `/api/bank-details` and never hardcoded in the client.
 
-### 8. Deploy to Vercel
+### 7. Deploy to Vercel
 ```bash
 npx vercel
 ```
 
-The crons in `vercel.json` (`/api/admin/reconcile` daily and `/api/cron/notifications`) require `CRON_SECRET` to be set in Vercel's environment variables and enable themselves automatically once deployed. The daily reconcile run does three things: replays captured PayPal payments, expires subscriptions whose 30-day period has ended, and sweeps stale rate-limit rows. Without it, a one-time payment would keep behaving like a lifetime grant.
+The cron in `vercel.json` (`/api/admin/reconcile`, daily) requires `CRON_SECRET` to be set in Vercel's environment variables and enables itself automatically once deployed. The daily reconcile run does three things: replays captured PayPal payments, expires subscriptions whose 30-day period has ended, and sweeps stale rate-limit rows. Without it, a one-time payment would keep behaving like a lifetime grant.
 
 ## Testing
 
@@ -116,18 +108,11 @@ npm test          # run once
 npm run test:watch
 ```
 
-Coverage includes the trade-import parser (CSV, SpreadsheetML XML, signed costs, MT5 section boundaries), P&L/point-value math, the plan/trial/quota rules, the billing-period lifecycle (renewal stacking, expiry, cancellation, revocation), the timezone-aware notification windows/journal-reminder logic, the notifications cron route itself (batched users, send ledger, per-user failure isolation), the payment webhook (captures, refunds with and without order metadata, replays), account deletion, and the AI review pipeline (edge stats, note retrieval, structured-output validation, caching, providers, outcomes, auto-tagging).
+Coverage includes the trade-import parser (CSV, SpreadsheetML XML, signed costs, MT5 section boundaries), P&L/point-value math, the plan/trial/quota rules, the billing-period lifecycle (renewal stacking, expiry, cancellation, revocation), the payment webhook (captures, refunds with and without order metadata, replays), account deletion, and the AI review pipeline (edge stats, note retrieval, structured-output validation, caching, providers, outcomes, auto-tagging).
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and a production build on every push and pull request, so the suite is enforced rather than optional.
 
 See `docs/AI.md` for the AI review architecture, endpoints, and provider setup.
-
-To check notifications against real credentials (config audit, a Resend test send, or invoking the deployed cron):
-```bash
-node --env-file=.env.local scripts/check-notifications.mjs
-node --env-file=.env.local scripts/check-notifications.mjs --send you@example.com
-node --env-file=.env.local scripts/check-notifications.mjs --run
-```
 
 To audit payments and verify them live (PayPal credential check, or invoking the reconcile cron):
 ```bash
@@ -162,9 +147,7 @@ MT5 autosync is included from Basic, because it is the one thing a trader cannot
 | `PADDLE_PRICE_BASIC` / `PADDLE_PRICE_PRO` | Monthly price ids; a plan without one is not sold |
 | `ERROR_REPORT_URL` | Optional JSON webhook that receives unhandled request errors; logs are structured either way |
 | `PAYPAL_API_BASE` | Optional override of the PayPal REST base URL (defaults to production `https://api-m.paypal.com`; set to the sandbox URL for testing) |
-| `CRON_SECRET` | Bearer secret Vercel Cron sends to `/api/admin/reconcile` and `/api/cron/notifications` |
-| `RESEND_API_KEY` | Resend API key. When unset, email sending is a no-op (the app never fails because email is missing) |
-| `EMAIL_FROM` | From address for summary emails, e.g. `MTL Ledger <reports@yourdomain.com>` (must be a Resend-verified domain) |
+| `CRON_SECRET` | Bearer secret Vercel Cron sends to `/api/admin/reconcile` |
 | `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, `BANK_BRANCH` | Bank transfer details shown on the payment page. When unset, the page shows a "contact support" message instead |
 
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Optional alternative AI provider |
@@ -197,12 +180,12 @@ src/
 │   └── api/                  # auth, checkout, paypal/capture, webhooks/paypal,
 │                             # payment-requests, plans, subscription, sync (rotate),
 │                             # admin (payments/users/reconcile), ai, bank-details,
-│                             # account (delete/export), trial, cron/notifications
+│                             # account (delete/export), trial
 ├── components/               # Reusable UI, including the server-rendered dashboard views
 ├── instrumentation.ts        # Request error reporting (structured logs + optional webhook)
 ├── proxy.ts                  # Next 16 proxy: session refresh + /dashboard auth guard
 ├── lib/                      # plans, subscription rules, import parser, auth helpers, utils,
-│                             # payments, email, summaries, bank, auth-guards, rate-limit, log,
+│                             # payments, bank, auth-guards, rate-limit, log,
 │                             # supabase (browser, cookie sessions), supabase-server (RSC)
 └── types/                    # TypeScript types
 

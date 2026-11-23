@@ -59,7 +59,7 @@ export const PLANS: SubscriptionPlan[] = [
       'Compare a second instrument on the web chart',
       'MT5 auto sync, plus XML, CSV and XLSX import',
       'Playbook, prop-firm rules and the daily-stop lock',
-      'CSV and full account export, with email summaries',
+      'CSV and full account export',
       '15 AI reviews a month',
     ],
     popular: true,

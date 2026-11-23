@@ -3,7 +3,7 @@ import { hasValidBearer } from '@/lib/auth-guards'
 import { getBankDetails, isBankConfigured } from '@/lib/bank'
 
 function reqWith(authorization?: string) {
-  return new Request('http://localhost/api/cron/notifications', {
+  return new Request('http://localhost/api/admin/reconcile', {
     headers: authorization ? { authorization } : {},
   })
 }

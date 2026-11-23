@@ -29,13 +29,7 @@ interface UserProfile {
   avatar_url: string
   timezone: string
   currency: string
-  notifications_email: boolean
-  notifications_daily: boolean
-  notifications_weekly: boolean
-  notifications_marketing: boolean
-  notifications_journal_reminders: boolean
   notifications_monthly_overview: boolean
-  notifications_monthly_email: boolean
 }
 
 export default function SettingsPage() {
@@ -73,13 +67,7 @@ export default function SettingsPage() {
     avatar_url: '',
     timezone: 'UTC',
     currency: 'USD',
-    notifications_email: true,
-    notifications_daily: true,
-    notifications_weekly: false,
-    notifications_marketing: false,
-    notifications_journal_reminders: true,
     notifications_monthly_overview: true,
-    notifications_monthly_email: true,
   })
   const [profileLoading, setProfileLoading] = useState(true)
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' })
@@ -113,13 +101,7 @@ export default function SettingsPage() {
         email: userData.email || user.email || '',
         timezone: userData.timezone || 'UTC',
         currency: userData.currency || 'USD',
-        notifications_email: userData.notifications_email ?? true,
-        notifications_daily: userData.notifications_daily ?? true,
-        notifications_weekly: userData.notifications_weekly ?? false,
-        notifications_marketing: userData.notifications_marketing ?? false,
-        notifications_journal_reminders: userData.notifications_journal_reminders ?? true,
         notifications_monthly_overview: userData.notifications_monthly_overview ?? true,
-        notifications_monthly_email: userData.notifications_monthly_email ?? true,
         // Stored on the auth record: no schema change, and it survives a
         // profile row being recreated by the signup route.
         avatar_url: (user.user_metadata?.avatar_url as string | undefined) || '',
@@ -228,13 +210,7 @@ export default function SettingsPage() {
     const { error } = await supabase
       .from('users')
       .update({
-        notifications_email: profile.notifications_email,
-        notifications_daily: profile.notifications_daily,
-        notifications_weekly: profile.notifications_weekly,
-        notifications_marketing: profile.notifications_marketing,
-        notifications_journal_reminders: profile.notifications_journal_reminders,
         notifications_monthly_overview: profile.notifications_monthly_overview,
-        notifications_monthly_email: profile.notifications_monthly_email,
       })
       .eq('id', userId)
     setSavingNotifications(false)
@@ -855,16 +831,14 @@ export default function SettingsPage() {
           {activeTab === 'notifications' && (
             <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
               <h2 className="text-lg font-semibold text-white">Notifications</h2>
+              <p className="text-sm text-gray-400">
+                Trade alerts are delivered by the mobile app. Open the app, then Account → Alerts to
+                turn them on or send a test.
+              </p>
               
               <div className="space-y-4">
                 {[
-                  { key: 'notifications_email' as const, label: 'Email notifications', description: 'Receive email updates about your trades' },
-                  { key: 'notifications_daily' as const, label: 'Daily summary', description: 'Get a daily summary of your trading performance' },
-                  { key: 'notifications_weekly' as const, label: 'Weekly report', description: 'Receive a weekly performance report' },
-                  { key: 'notifications_journal_reminders' as const, label: 'Working-day journal reminders', description: 'Email me a nudge to record my trades on weekdays' },
                   { key: 'notifications_monthly_overview' as const, label: 'Monthly trade overview', description: 'Show my monthly performance overview on the dashboard' },
-                  { key: 'notifications_monthly_email' as const, label: 'Monthly overview email', description: 'Email me a performance overview at the start of each month' },
-                  { key: 'notifications_marketing' as const, label: 'Marketing emails', description: 'Receive tips and product updates' },
                 ].map((item) => (
                   <div key={item.key} className="flex items-center justify-between py-3 border-b border-border last:border-0">
                     <div>

@@ -51,7 +51,7 @@ The Assignee acknowledges:
 
 - The Software is an **early-stage MVP**, sold "as is".
 - Several integrations require the Assignee's own credentials and setup
-  (`RESEND_API_KEY`, `EMAIL_FROM`, `PAYPAL_WEBHOOK_ID`, `BANK_*`).
+  (`PAYPAL_WEBHOOK_ID`, `BANK_*`).
 - The Assignor has removed personal financial data from the repository and its
   history. The Assignee should verify this via `git log --stat`.
 - No guarantee of fitness for a particular purpose, uptime, or revenue.
@@ -93,7 +93,7 @@ Complete in order at closing:
    Assignee's Supabase project.
 7. **Set environment variables** using `.env.example` as the checklist.
 8. **Smoke-test:** `npm run build`, `npm test`,
-   `scripts/check-payments.mjs --verify`, `scripts/check-notifications.mjs`.
+   `scripts/check-payments.mjs --verify`.
 9. **Remove seller access** and confirm the Assignee can deploy independently.
 
 ## Appendix B — Known limitations to disclose
@@ -101,7 +101,7 @@ Complete in order at closing:
 - Mobile wrapper (Capacitor) is a shell; push notifications are not configured
   (`google-services.json` absent).
 - Bank-transfer activation still requires manual admin approval.
-- Notification emails and webhook reconciliation are inert until the related
-  environment variables are set.
+- Webhook reconciliation is inert until the related environment variables are
+  set.
 - `@next/swc-win32-x64-msvc` fails on some Windows machines and falls back to
   WASM; the build still succeeds.

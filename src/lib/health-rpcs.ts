@@ -93,12 +93,6 @@ export const RPC_PROBES: readonly RpcProbe[] = [
     usedBy: 'account deletion',
     args: { p_user_id: NIL_UUID },
   },
-  {
-    rpc: 'notification_trades',
-    migration: CORE,
-    usedBy: 'daily and weekly email summaries',
-    args: { p_user_id: NIL_UUID, p_since: '2026-01-01T00:00:00.000Z' },
-  },
 ]
 
 export type RpcStatus = 'ready' | 'missing' | 'unknown'

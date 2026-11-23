@@ -10,7 +10,7 @@ import {
   normalizeLockMode,
   type DayState,
 } from '@/lib/daily-stop'
-import { zonedDayBounds } from '@/lib/notification-schedule'
+import { zonedDayBounds } from '@/lib/timezone'
 import { loadDayTrades } from '@/lib/day-trades'
 
 /**

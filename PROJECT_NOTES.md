@@ -31,9 +31,7 @@ A SaaS trading journal web app for tracking and analyzing MT5 trades. Built with
 - **Email Verification** - Supabase-confirmed email is required for dashboard and bearer-authenticated API access
 - **Monthly Trade Quota** - Postgres trigger (`enforce_trade_quota`) blocks inserts beyond the plan's monthly limit; historical imports don't count against it
 - **Import Reliability** - Trades are stamped with `import_id` so deleting an import removes exactly those trades; MT5 tickets are captured for sync/import dedupe
-- **Email Summaries** - `/api/cron/notifications` sends daily/weekly (Monday)/monthly (1st) performance summaries via Resend to users whose notification preferences are on. No-ops when `RESEND_API_KEY` is unset; skips empty windows. Window math and due-checks live in `src/lib/notification-schedule.ts` (unit tested)
-- **Journal Reminders** - The same cron emails opted-in users a weekday nudge when nothing has been journaled yet that day. Summary windows and working days are computed in each user's `timezone` (short labels like `PST` map to DST-aware IANA zones; junk falls back to UTC). The `notifications_monthly_overview` toggle only controls the dashboard card; the monthly email has its own `notifications_monthly_email` preference
-- **Manual Notification Check** - `node --env-file=.env.local scripts/check-notifications.mjs` audits config; `--send <to>` sends a Resend test email and `--run` calls the deployed cron and prints its result
+- **Mobile Alerts** - Trade, price and journal alerts are delivered by the Flutter app as device-side notifications (Account → Alerts), with the Android small icon shipped as a drawable. Nothing on the web sends email
 - **Manual Payment Check** - `scripts/check-payments.mjs` audits payment env vars (folds in the old `check-paypal.mjs`); `--verify` validates the PayPal credentials against the API and `--reconcile` calls the reconcile cron and prints its result
 - **AI Journal Review** - `/api/ai/review` returns a structured, grounded review: deterministic edge stats (`src/lib/ai/edge-stats.ts`) are narrated by the model, over the trader's own notes via TF-IDF retrieval. Reviews persist to `ai_reviews`, cache for 24h, guard against tiny samples, and support Gemini/Anthropic/OpenAI-compatible gateways, chart images, and token streaming. `/api/ai/autotag` suggests tags with no model call. Inert without an AI key (returns 503). See `docs/AI.md`; fine-tuning is intentionally not implemented
 - **Bank Details API** - `/api/bank-details` serves bank transfer details from `BANK_*` env vars so they are no longer hardcoded in the client
@@ -76,17 +74,6 @@ PAYPAL_CLIENT_SECRET=xxx
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 4. The app uses the production PayPal endpoint (`api-m.paypal.com`); set `PAYPAL_API_BASE=https://api-m.sandbox.paypal.com` for testing
-
-## Email / Resend Setup (optional)
-1. Create an account at https://resend.com and verify a sending domain
-2. Add to `.env.local`:
-```
-RESEND_API_KEY=re_xxx
-EMAIL_FROM=MTL Ledger <reports@yourdomain.com>
-CRON_SECRET=<random-string>
-```
-3. Without these the app still runs; summary sends and the notifications cron are skipped
-4. Optionally configure Supabase Auth to send through Resend SMTP so verification emails aren't rate-limited
 
 ## Google Sign-In Setup (optional)
 
@@ -149,11 +136,10 @@ Set `BANK_NAME`, `BANK_ACCOUNT_NAME`, `BANK_ACCOUNT_NUMBER`, and `BANK_BRANCH` i
 - `@next/swc-win32-x64-msvc` not a valid Win32 app (uses WASM fallback, works fine)
 - Supabase anon key in `.env.local` may be placeholder - verify it's real
 - PayPal keys need to be configured for payments to work
-- `.env.example` now uses placeholders only and documents all PayPal/Resend/cron/bank vars (Stripe entries removed)
+- `.env.example` now uses placeholders only and documents all PayPal/cron/bank vars (Stripe entries removed)
 - PayPal upgrades are applied by the success-page capture call and, as a fallback, by the signature-verified webhook at `/api/webhooks/paypal`. Set `PAYPAL_WEBHOOK_ID` and register the webhook in the PayPal dashboard, otherwise the fallback is disabled
 - Bank-transfer upgrades still require admin approval until a bank transaction API or webhook is connected
-- Email summaries require `RESEND_API_KEY` + a Resend-verified domain; without them sends are no-ops (by design, never an error)
-- The notifications cron and reconciliation cron both require `CRON_SECRET`; Vercel sets it via the project's env vars
+- The reconciliation cron requires `CRON_SECRET`; Vercel sets it via the project's env vars
 
 ## Pending / Nice to Have
 - Trade notes/tags inline editing
@@ -185,7 +171,6 @@ src/app/
   api/admin/reconcile/route.ts # Replay captured-but-unapplied payments (admin or cron)
   api/bank-details/route.ts   # Bank details (from BANK_* env vars)
   api/market/candles/route.ts # Market-data proxy for the Flutter chart
-  api/cron/notifications/route.ts # Daily/weekly/monthly summary emails (cron)
   api/plans/route.ts          # Plans API
 src/components/
   journal-media.tsx           # Photo picker, voice recorder, audio upload, previews

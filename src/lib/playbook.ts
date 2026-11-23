@@ -10,7 +10,7 @@
  */
 
 import { normalizeDailyStop, normalizeLockMode, type LockMode } from './daily-stop'
-import { normalizeTimeZone } from './notification-schedule'
+import { normalizeTimeZone } from './timezone'
 
 export const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
 export const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const

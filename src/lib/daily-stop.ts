@@ -13,7 +13,7 @@
  * here is wired into order execution anyway.
  */
 
-import { normalizeTimeZone, zonedDayBounds } from './notification-schedule'
+import { normalizeTimeZone, zonedDayBounds } from './timezone'
 
 export interface DailyStopRules {
   /** Loss budget for the day, in account currency. 0 disables the rule. */
