@@ -85,9 +85,9 @@ vi.mock('@/lib/email', () => ({
 const NO_HEADERS = {}
 const AUTH_HEADERS = { authorization: 'Bearer test-secret' }
 
-async function runCron(headers: Record<string, string> = {}) {
+async function runCron(headers: Record<string, string> = {}, query = '') {
   const { GET } = await import('@/app/api/cron/notifications/route')
-  const res = await GET(new Request('http://localhost/api/cron/notifications', { headers }))
+  const res = await GET(new Request(`http://localhost/api/cron/notifications${query}`, { headers }))
   const body = (await res.json()) as Record<string, number | boolean>
   return { res, body }
 }
@@ -156,7 +156,8 @@ describe('notifications cron', () => {
     expect(body.skipped).toBe(1)
   })
 
-  it('sends a journal reminder on a weekday when nothing was journaled today', async () => {
+  it('sends a journal reminder on a weekday evening when nothing was journaled today', async () => {
+    vi.setSystemTime(new Date('2026-06-02T18:00:00.000Z')) // Tuesday, 18:00 UTC
     state.users = [user({ notifications_journal_reminders: true })]
 
     const { body } = await runCron(AUTH_HEADERS)
@@ -164,15 +165,25 @@ describe('notifications cron', () => {
     expect(state.sent[0].subject.toLowerCase()).toContain('journal')
   })
 
+  it('holds the journal reminder until the user local evening', async () => {
+    // 07:00 UTC is 2am in New York, which is the bug this gate exists for.
+    state.users = [user({ notifications_journal_reminders: true, timezone: 'America/New_York' })]
+
+    const { body } = await runCron(AUTH_HEADERS)
+    expect(body.emailsSent).toBe(0)
+  })
+
   it('does not send a journal reminder once a trade exists today', async () => {
+    vi.setSystemTime(new Date('2026-06-02T18:00:00.000Z'))
     state.users = [user({ notifications_journal_reminders: true })]
-    state.trades = [{ pnl: 5, close_time: '2026-06-02T01:00:00.000Z' }]
+    state.trades = [{ pnl: 5, close_time: '2026-06-02T17:00:00.000Z' }]
 
     const { body } = await runCron(AUTH_HEADERS)
     expect(body.emailsSent).toBe(0)
   })
 
   it('never sends the same email twice when the cron is re-run', async () => {
+    vi.setSystemTime(new Date('2026-06-02T18:00:00.000Z'))
     state.users = [user({ notifications_journal_reminders: true })]
 
     const first = await runCron(AUTH_HEADERS)
@@ -181,6 +192,21 @@ describe('notifications cron', () => {
     expect(first.body.emailsSent).toBe(1)
     expect(second.body.emailsSent).toBe(0)
     expect(state.sent).toHaveLength(1)
+  })
+
+  it('can be forced to run one job outside its usual hour', async () => {
+    state.users = [user({ notifications_journal_reminders: true, notifications_daily: true })]
+    state.trades = [{ pnl: 100, close_time: '2026-06-01T10:00:00.000Z' }]
+
+    const summary = await runCron(AUTH_HEADERS, '?job=summary')
+    expect(summary.body.emailsSent).toBe(1)
+    expect(state.sent[0].subject).toContain('Your daily summary')
+
+    state.sends.clear()
+    state.sent = []
+    const journal = await runCron(AUTH_HEADERS, '?job=journal')
+    expect(journal.body.emailsSent).toBe(1)
+    expect(state.sent[0].subject.toLowerCase()).toContain('journal')
   })
 
   it('sends the weekly report only on Mondays', async () => {
@@ -208,9 +234,10 @@ describe('notifications cron', () => {
     expect(state.sent[0].subject).toContain('Your monthly overview')
   })
 
-  it('honors the user timezone when deciding the working day', async () => {
-    // Saturday 02:00 UTC is still Friday 22:00 in New York.
-    vi.setSystemTime(new Date('2026-06-06T02:00:00.000Z'))
+  it('honors the user timezone when deciding the working day and hour', async () => {
+    // Tuesday 00:00 UTC is Monday 19:00 in New York: a weekday evening there,
+    // while the UTC day has already moved on to Tuesday.
+    vi.setSystemTime(new Date('2026-01-06T00:00:00.000Z'))
     state.users = [user({ notifications_journal_reminders: true, timezone: 'America/New_York' })]
 
     const { body } = await runCron(AUTH_HEADERS)
@@ -257,6 +284,7 @@ describe('notifications cron', () => {
   })
 
   it('isolates a failing user from the rest of the run', async () => {
+    vi.setSystemTime(new Date('2026-06-02T18:00:00.000Z'))
     state.users = [
       user({ id: 'bad-user', email: 'bad@example.com', notifications_journal_reminders: true }),
       user({ id: 'good-user', email: 'good@example.com', notifications_journal_reminders: true }),

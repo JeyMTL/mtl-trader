@@ -11,6 +11,7 @@ import {
 } from '@/lib/summaries'
 import {
   dueSummaryWindows,
+  isJournalReminderHour,
   shouldSendJournalReminder,
   trialReminder,
   zonedDayKey,
@@ -25,8 +26,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *   - daily summary    → every day, for the previous calendar day
  *   - weekly report    → on Mondays, for the previous 7 days
  *   - monthly overview → on the 1st, for the previous calendar month
- *   - journal reminder → weekdays, when nothing has been journaled yet today
+ *   - journal reminder → weekdays, in the user's own evening (18:00–20:00 local),
+ *                        when nothing has been journaled yet today
  *   - trial ending     → within 3 days of the end, then once when it passes
+ *
+ * The cron runs hourly so the journal reminder can follow each user's clock.
+ * The digests and the trial notice still go out on the 07:00 UTC pass only, so
+ * their timing is unchanged; the send ledger makes the extra passes harmless.
  *
  * The trial notice is an account email, not a digest: it goes to every trial
  * account with an address, whatever the digest toggles say, because it is the
@@ -49,6 +55,8 @@ export const maxDuration = 300
 const PAGE_SIZE = 200
 const CONCURRENCY = 5
 const TIME_BUDGET_MS = 240_000
+/** The UTC hour the daily/weekly/monthly digests and trial notices go out in. */
+const SUMMARY_HOUR_UTC = 7
 
 interface UserPrefs {
   id: string
@@ -64,6 +72,15 @@ interface UserPrefs {
   subscription_status: string | null
   subscription_tier: string | null
   trial_ends_at: string | null
+}
+
+interface RunOptions {
+  /** Digests and the trial notice: the 07:00 UTC pass, or a manual `?job=summary`. */
+  summaries: boolean
+  /** Journal reminders: every pass, gated per user on their local evening. */
+  journal: boolean
+  /** A manual `?job=journal` run ignores the local-evening gate. */
+  force: boolean
 }
 
 interface SummaryRun {
@@ -118,6 +135,16 @@ async function sendClaimed(
 
   const outcome = await sendEmail(message)
   if (!outcome.sent) {
+    // A rejected send is the one failure a re-run cannot see: the claim is
+    // released, so the ledger stays empty and the run only reports `skipped`.
+    // Logging the provider's reason is what turns "nobody gets emails" into a
+    // verified-sender or bad-key sentence.
+    logEvent('warn', 'cron.notifications.send_failed', {
+      user_id: userId,
+      kind,
+      window_key: windowKey,
+      reason: outcome.reason || 'unknown',
+    })
     await releaseClaim(supabase, userId, kind, windowKey)
     return false
   }
@@ -128,19 +155,26 @@ async function processUser(
   supabase: SupabaseClient,
   user: UserPrefs,
   now: Date,
-  result: SummaryRun
+  result: SummaryRun,
+  options: RunOptions
 ): Promise<void> {
   if (!user.email) {
     result.skipped++
     return
   }
 
-  const trial = trialReminder(user, now)
+  const trial = options.summaries ? trialReminder(user, now) : null
   // The digests are opt-in, the trial notice is not: an account email should not
   // depend on a marketing toggle, and it is sent even with digests switched off.
   const digestsOn = Boolean(user.notifications_email)
-  const due = digestsOn ? dueSummaryWindows(user, now, user.timezone) : []
-  const journalDue = digestsOn && Boolean(user.notifications_journal_reminders)
+  const due = options.summaries && digestsOn ? dueSummaryWindows(user, now, user.timezone) : []
+  // Checked before the trade read so an hourly pass only queries the journal of
+  // users who are actually in their reminder window.
+  const journalDue =
+    options.journal &&
+    digestsOn &&
+    Boolean(user.notifications_journal_reminders) &&
+    (options.force || isJournalReminderHour(now, user.timezone))
   const needsTrades = due.length > 0 || journalDue
 
   if (!needsTrades && !trial) {
@@ -165,7 +199,7 @@ async function processUser(
   }
 
   if (journalDue) {
-    if (shouldSendJournalReminder(user, tradeList, now, user.timezone)) {
+    if (shouldSendJournalReminder(user, tradeList, now, user.timezone, options.force)) {
       const { subject, html } = renderJournalReminderEmail({
         name: user.full_name,
         appUrl: process.env.NEXT_PUBLIC_APP_URL,
@@ -240,6 +274,26 @@ export async function GET(req: Request) {
   const now = new Date()
   const deadline = Date.now() + TIME_BUDGET_MS
   const supabase = getAdminClient()
+
+  // Every hourly pass handles journal reminders; the digests keep their single
+  // daily pass. `?job=summary|journal` forces one side, which is what makes a
+  // manual run useful at any hour of the day.
+  const job = (() => {
+    try {
+      return new URL(req.url).searchParams.get('job')
+    } catch {
+      return null
+    }
+  })()
+  const forced = job === 'summary' || job === 'journal' || job === 'all'
+  const options: RunOptions = {
+    summaries:
+      job === 'summary' ||
+      job === 'all' ||
+      (job === null && now.getUTCHours() === SUMMARY_HOUR_UTC),
+    journal: job !== 'summary',
+    force: forced,
+  }
   const result: SummaryRun = {
     candidates: 0,
     emailsSent: 0,
@@ -279,7 +333,7 @@ export async function GET(req: Request) {
 
         const chunk = (users as UserPrefs[]).slice(index, index + CONCURRENCY)
         const outcomes = await Promise.allSettled(
-          chunk.map((user) => processUser(supabase, user, now, result))
+          chunk.map((user) => processUser(supabase, user, now, result, options))
         )
 
         for (const outcome of outcomes) {
@@ -293,7 +347,11 @@ export async function GET(req: Request) {
       if (result.hasMore || users.length < PAGE_SIZE) break
     }
 
-    logEvent('info', 'cron.notifications.complete', { ...result })
+    logEvent('info', 'cron.notifications.complete', {
+      ...result,
+      summaries: options.summaries,
+      journal: options.journal,
+    })
     return NextResponse.json({ success: true, ...result })
   } catch (error: unknown) {
     return apiError('cron.notifications', error, 500, 'Could not run the notification job.')

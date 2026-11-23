@@ -3,6 +3,7 @@ import {
   buildWindows,
   dueSummaryWindows,
   hasJournaledOn,
+  isJournalReminderHour,
   isWorkingDay,
   shouldSendJournalReminder,
   normalizeTimeZone,
@@ -14,6 +15,9 @@ import {
 const MONDAY = new Date('2026-06-01T07:00:00.000Z') // a Monday, and the 1st
 const TUESDAY = new Date('2026-06-02T07:00:00.000Z')
 const SATURDAY = new Date('2026-06-06T07:00:00.000Z')
+// The journal reminder only goes out in the trader's local evening.
+const TUESDAY_EVENING = new Date('2026-06-02T18:00:00.000Z')
+const SATURDAY_EVENING = new Date('2026-06-06T18:00:00.000Z')
 
 describe('buildWindows', () => {
   it('anchors the daily window to the previous UTC day', () => {
@@ -87,21 +91,42 @@ describe('hasJournaledOn', () => {
   })
 })
 
+describe('isJournalReminderHour', () => {
+  it('is true only in the local 18:00–20:00 window', () => {
+    expect(isJournalReminderHour(new Date('2026-06-02T07:00:00.000Z'))).toBe(false)
+    expect(isJournalReminderHour(new Date('2026-06-02T17:59:00.000Z'))).toBe(false)
+    expect(isJournalReminderHour(TUESDAY_EVENING)).toBe(true)
+    expect(isJournalReminderHour(new Date('2026-06-02T19:59:00.000Z'))).toBe(true)
+    expect(isJournalReminderHour(new Date('2026-06-02T20:00:00.000Z'))).toBe(false)
+  })
+
+  it('follows the user\u2019s clock, not UTC', () => {
+    // 22:00 UTC is 18:00 in New York, and 00:00 in Berlin the next day.
+    const instant = new Date('2026-06-02T22:00:00.000Z')
+    expect(isJournalReminderHour(instant, 'America/New_York')).toBe(true)
+    expect(isJournalReminderHour(instant, 'Europe/Berlin')).toBe(false)
+  })
+})
+
 describe('shouldSendJournalReminder', () => {
   const on = { notifications_journal_reminders: true }
 
-  it('sends on a weekday with no journal entry yet', () => {
-    expect(shouldSendJournalReminder(on, [], TUESDAY)).toBe(true)
+  it('sends on a weekday evening with no journal entry yet', () => {
+    expect(shouldSendJournalReminder(on, [], TUESDAY_EVENING)).toBe(true)
+  })
+
+  it('does not send outside the evening window', () => {
+    expect(shouldSendJournalReminder(on, [], TUESDAY)).toBe(false)
   })
 
   it('does not send once something is journaled today', () => {
     const trades = [{ pnl: 1, close_time: '2026-06-02T09:30:00.000Z' }]
-    expect(shouldSendJournalReminder(on, trades, TUESDAY)).toBe(false)
+    expect(shouldSendJournalReminder(on, trades, TUESDAY_EVENING)).toBe(false)
   })
 
   it('does not send when opted out or at the weekend', () => {
-    expect(shouldSendJournalReminder({ notifications_journal_reminders: false }, [], TUESDAY)).toBe(false)
-    expect(shouldSendJournalReminder(on, [], SATURDAY)).toBe(false)
+    expect(shouldSendJournalReminder({ notifications_journal_reminders: false }, [], TUESDAY_EVENING)).toBe(false)
+    expect(shouldSendJournalReminder(on, [], SATURDAY_EVENING)).toBe(false)
   })
 })
 

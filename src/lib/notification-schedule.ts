@@ -212,6 +212,23 @@ export function isWorkingDay(date: Date, timeZone: string | null = 'UTC'): boole
   return weekday >= 1 && weekday <= 5
 }
 
+/**
+ * When the journal reminder goes out, in the trader's own evening.
+ *
+ * The cron runs hourly, but a fixed UTC hour is not an evening everywhere: 07:00
+ * UTC is 2am in New York and 3pm in Tokyo. The reminder is therefore gated on
+ * the local hour here, and the two-hour span gives a second hourly run a chance
+ * if the first one is missed.
+ */
+export const JOURNAL_REMINDER_START_HOUR = 18
+export const JOURNAL_REMINDER_END_HOUR = 20
+
+/** Whether `date` falls in the local evening window for journal reminders. */
+export function isJournalReminderHour(date: Date, timeZone: string | null = 'UTC'): boolean {
+  const { hour } = localParts(date, normalizeTimeZone(timeZone))
+  return hour >= JOURNAL_REMINDER_START_HOUR && hour < JOURNAL_REMINDER_END_HOUR
+}
+
 /** `YYYY-MM-DD` in UTC. */
 export function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10)
@@ -267,16 +284,21 @@ export function hasJournaledOn(trades: TradeLike[], date: Date, timeZone: string
 
 /**
  * Whether to send this user a working-day journal reminder on `now`: they opted
- * in, it is a weekday in their timezone, and nothing has been journaled yet today.
+ * in, it is a weekday in their timezone, it is their local evening, and nothing
+ * has been journaled yet today. The hour check keeps the hourly cron from
+ * emailing someone at 2am or mid-morning.
  */
 export function shouldSendJournalReminder(
   prefs: DashboardPreferences,
   trades: TradeLike[],
   now: Date,
-  timeZone: string | null = 'UTC'
+  timeZone: string | null = 'UTC',
+  /** A manual `?job=journal` run asks for it now, whatever the local clock says. */
+  ignoreHour = false
 ): boolean {
   if (!prefs.notifications_journal_reminders) return false
   const tz = normalizeTimeZone(timeZone)
   if (!isWorkingDay(now, tz)) return false
+  if (!ignoreHour && !isJournalReminderHour(now, tz)) return false
   return !hasJournaledOn(trades, now, tz)
 }

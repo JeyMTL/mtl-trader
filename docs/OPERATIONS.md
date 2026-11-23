@@ -64,6 +64,20 @@ change `status`: the app is fine and the missing piece is infrastructure.
 Aggregates only, never a broker, server or account number, because the endpoint
 is public.
 
+### Email notifications
+
+```json
+"email": { "configured": true, "sender": "custom", "replyTo": true }
+```
+
+Presence only. `configured: false` means `RESEND_API_KEY` did not reach this
+deployment, so the notifications cron answers 503 and sends nothing. `sender:
+"fallback"` means `EMAIL_FROM` is unset and Resend's `onboarding@resend.dev` is
+being used, which only delivers to the Resend account owner — every customer
+send is refused. Both failures leave **no** row in `notification_sends`, because
+a rejected send releases its claim, so this block is how they are seen before a
+customer asks why no email arrived. Reported, not part of `status`.
+
 ## Uptime monitoring
 
 `.github/workflows/uptime.yml` runs every 15 minutes:
@@ -106,10 +120,24 @@ its database therefore fails visibly instead of quietly serving errors.
 ## Crons
 
 `vercel.json` schedules two jobs: billing reconciliation (03:00) and
-notification delivery (07:00). A cron that stops running does **not** fail the
-uptime probe — it only proves the app is reachable. The reconciliation cron is
+notifications (hourly). The notifications route runs every hour so the journal
+reminder can follow each user's clock: it only sends in that user's local
+evening (18:00–20:00), never at the 07:00 UTC hour the job used to fire in —
+which was 2am in New York. The daily/weekly/monthly digests and the trial notice
+still go out on the 07:00 UTC pass only, and the send ledger makes the other
+passes harmless. `?job=summary` or `?job=journal` forces one half for a manual
+run at any hour.
+
+Hourly crons need a Vercel plan that allows them; on a plan limited to daily
+crons the journal reminder will not fire and only the digest pass will run. A
+cron that stops running does **not** fail the uptime probe — it only proves the
+app is reachable.The reconciliation cron is
 idempotent, so the safe response to a suspected missed run is triggering it
 manually from the Vercel dashboard and checking the logs for the period.
+
+Sends that Resend rejects are logged as `cron.notifications.send_failed` with the
+provider's reason, so Vercel logs name the cause (unverified domain, bad key)
+instead of only reporting them as `skipped`.
 
 ## Dependency security
 
@@ -171,6 +199,13 @@ pack can be fixed without a store release.
 - At startup the app fetches `${apiBaseUrl}/locales/manifest.json`, keeps
   installed packs in `SharedPreferences`, and resolves a string as installed
   pack → English. `flutter gen-l10n` is only used for English.
+
+When new English messages are added, every pack must be filled before
+`test/l10n_test.dart` goes green again. `node --env-file=.env.local
+scripts/translate-packs.mjs` translates just the missing keys with the same
+Gemini provider the AI review uses, validates placeholders, and writes each pack
+as it finishes (so it is resumable). Machine translations should be reviewed by
+a speaker before a language is advertised as translated.
 
 Adding a language:
 

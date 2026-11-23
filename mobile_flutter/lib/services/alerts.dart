@@ -138,7 +138,11 @@ class Alerts {
       }
       tz.setLocalLocation(_zone);
 
-      const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+      // A drawable resource name, not "@mipmap/ic_launcher": the plugin
+      // resolves this with getIdentifier(name, "drawable", package), so the
+      // launcher icon is not found, initialize() fails with `invalid_icon`, and
+      // every notification is silently dropped. See res/drawable/ic_stat_ledger.xml.
+      const android = AndroidInitializationSettings('ic_stat_ledger');
       const ios = DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
@@ -153,9 +157,12 @@ class Alerts {
       // A reminder scheduled before the app was updated or the phone rebooted
       // still has to exist, so it is (re)scheduled on every start.
       unawaited(_scheduleReminder());
-    } catch (_) {
+    } catch (error, stack) {
       // Notifications are a convenience: a phone that refuses them must not
-      // take the journal down with it.
+      // take the journal down with it. Logged rather than swallowed silently,
+      // because a failed initialize() is exactly what "alerts never fire" looks
+      // like from the outside.
+      debugPrint('Alerts.init failed: $error\n$stack');
     }
   }
 
@@ -200,26 +207,44 @@ class Alerts {
     );
   }
 
-  /// Asks Android 13+ for permission once, at the point the trader turns an
-  /// alert on — not at launch, where a prompt with no context gets denied.
+  /// Asks for permission once, at the point the trader turns an alert on — not
+  /// at launch, where a prompt with no context gets denied.
+  ///
+  /// Both platforms are handled here. Treating "no Android implementation" as
+  /// "no permission" means every alert on iPhone is recorded as muted and never
+  /// shown, because the caller checks this before showing anything.
   Future<bool> ensurePermission() async {
     await init();
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    if (android == null) return false;
-    var granted = await android.areNotificationsEnabled() ?? false;
-    if (granted) return true;
+    if (android != null) {
+      final granted = await android.areNotificationsEnabled() ?? false;
+      if (granted) return true;
+      if (_permissionAsked) return false;
+      _permissionAsked = true;
+      return await android.requestNotificationsPermission() ?? false;
+    }
+
+    final ios = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    if (ios == null) return false;
+    final current = await ios.checkPermissions();
+    if (current?.isEnabled ?? false) return true;
     if (_permissionAsked) return false;
     _permissionAsked = true;
-    granted = await android.requestNotificationsPermission() ?? false;
-    return granted;
+    return await ios.requestPermissions(alert: true, badge: true, sound: true) ??
+        false;
   }
 
   Future<bool> permissionGranted() async {
     await init();
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    return await android?.areNotificationsEnabled() ?? false;
+    if (android != null) return await android.areNotificationsEnabled() ?? false;
+    final ios = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    final current = await ios?.checkPermissions();
+    return current?.isEnabled ?? false;
   }
 
   Future<void> setDailyStop(bool value) async {
@@ -250,9 +275,6 @@ class Alerts {
   /// The one alert that has to fire with the app closed, hence a scheduled
   /// notification rather than a timer.
   Future<void> _scheduleReminder() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (android == null) return;
     await _plugin.cancel(id: _reminderId);
     if (!journalEnabled) return;
     final now = tz.TZDateTime.now(_zone);
@@ -277,6 +299,11 @@ class Alerts {
             'Journal reminder',
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -432,6 +459,11 @@ class Alerts {
             importance: Importance.high,
             priority: Priority.high,
             category: AndroidNotificationCategory.status,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
           ),
         ),
       );
