@@ -1,13 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Lock, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
 import { GoogleSignInButton } from '@/components/google-signin-button'
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -49,12 +50,10 @@ export default function LoginPage() {
   }
 
   // Coming from the dashboard's "unverified" exit: show the resend box straight
-  // away instead of making the trader hunt for it.
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('verify') === '1') {
-      setError('This account has not confirmed its email address yet.')
-    }
-  }, [])
+  // away instead of making the trader hunt for it. Read as a render value rather
+  // than set from an effect: the effect form trips set-state-in-effect, and this
+  // has no state to sync.
+  const verify = useSearchParams().get('verify') === '1'
 
   const resendVerification = async () => {
     if (!email) {
@@ -84,6 +83,11 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="bg-surface border border-border rounded-2xl p-8 space-y-6 shadow-2xl shadow-primary/5">
+          {verify && (
+            <div className="bg-danger/10 border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">
+              This account has not confirmed its email address yet.
+            </div>
+          )}
           {error && (
             <div className="bg-danger/10 border border-danger/30 text-danger px-4 py-3 rounded-lg text-sm">
               {error}
@@ -185,5 +189,15 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+/// `useSearchParams` suspends, so the form needs a boundary: without one the
+/// whole route opts out of static rendering at build time.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

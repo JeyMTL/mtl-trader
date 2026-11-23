@@ -58,9 +58,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned, not `channel: stable`: a floating SDK silently changes the
+      # analyzer between pushes, and this job is meant to prove the code, not
+      # whatever stable shipped overnight. Bump it deliberately with the project.
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.4'
           cache: true
 
       - name: Install dependencies
