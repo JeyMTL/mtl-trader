@@ -40,7 +40,6 @@ export default function SettingsPage() {
   // flash "Saved!" whenever either one was stored.
   const [saved, setSaved] = useState<'profile' | 'notifications' | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
-  const [savingAvatar, setSavingAvatar] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [savingNotifications, setSavingNotifications] = useState(false)
   const [deposits, setDeposits] = useState<Deposit[]>([])
@@ -152,20 +151,6 @@ export default function SettingsPage() {
     }
     setSaved('profile')
     setTimeout(() => setSaved(null), 2000)
-  }
-
-  const handleSaveAvatar = async () => {
-    setSavingAvatar(true)
-    const value = profile.avatar_url.trim()
-    const { error } = await supabase.auth.updateUser({
-      data: { avatar_url: value || null },
-    })
-    setSavingAvatar(false)
-    if (error) {
-      toast(publicErrorMessage(error, 'Could not save that picture. Please try again.'), { tone: 'error' })
-      return
-    }
-    toast(value ? 'Profile picture updated' : 'Profile picture removed')
   }
 
   const handleAvatarFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -463,21 +448,6 @@ export default function SettingsPage() {
                   <div className="min-w-0 flex-1">
                     <label className="block text-sm font-medium text-gray-300 mb-2">Profile picture</label>
                     <div className="flex flex-col gap-2 sm:flex-row">
-                      <input
-                        type="url"
-                        value={profile.avatar_url}
-                        onChange={(e) => setProfile(p => ({ ...p, avatar_url: e.target.value }))}
-                        placeholder="https://example.com/me.jpg"
-                        className="w-full bg-background border border-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSaveAvatar}
-                        disabled={savingAvatar}
-                        className="shrink-0 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {savingAvatar ? 'Saving…' : 'Save'}
-                      </button>
                       <label
                         className={`shrink-0 cursor-pointer rounded-lg border border-border px-4 py-2 text-center text-white transition-colors hover:border-primary ${
                           uploadingAvatar ? 'pointer-events-none opacity-50' : ''
@@ -494,7 +464,7 @@ export default function SettingsPage() {
                       </label>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Upload a photo (2 MB max) or paste a link. Left empty it uses the picture attached to your email, then your initials.
+                      Upload a photo (2 MB max). Left empty it uses the picture attached to your email, then your initials.
                     </p>
                   </div>
                 </div>
