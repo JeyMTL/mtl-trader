@@ -7,12 +7,32 @@
 import type { Confidence, EdgeStats, ReviewFinding, ReviewResult, SimilarSetup } from './types'
 
 export const MAX_FINDINGS = 5
+
+/**
+ * Whether a review asks the model for a third list of "what to do next".
+ *
+ * Off: the model is never asked for it, so it does not appear in new reviews.
+ * The parser below still reads an `actions` array if one arrives, and stored
+ * reviews keep theirs — this switch only controls the request, not the data.
+ * Set to `true` to bring the list back exactly as it was; the web panel and the
+ * Flutter coach already render whatever they are given.
+ *
+ * The pre-switch implementation is kept on the `backup/ai-review-actions`
+ * branch if the flag ever needs to be removed rather than flipped.
+ */
+export const REVIEW_ACTIONS_ENABLED = false
 export const DISCLAIMER = 'Generated from your own journal statistics.'
 
 export const REVIEW_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['headline', 'confidence', 'strengths', 'risks', 'actions'],
+  required: [
+    'headline',
+    'confidence',
+    'strengths',
+    'risks',
+    ...(REVIEW_ACTIONS_ENABLED ? (['actions'] as const) : []),
+  ],
   properties: {
     headline: { type: 'string', description: 'One-sentence summary grounded in the stats.' },
     confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
@@ -31,7 +51,9 @@ export const REVIEW_JSON_SCHEMA = {
       },
     },
     risks: { type: 'array', maxItems: MAX_FINDINGS, items: { $ref: '#/properties/strengths/items' } },
-    actions: { type: 'array', maxItems: MAX_FINDINGS, items: { $ref: '#/properties/strengths/items' } },
+    ...(REVIEW_ACTIONS_ENABLED
+      ? { actions: { type: 'array', maxItems: MAX_FINDINGS, items: { $ref: '#/properties/strengths/items' } } }
+      : {}),
   },
 } as const
 
@@ -134,12 +156,14 @@ export function insufficientDataReview(stats: EdgeStats): ReviewResult {
         evidence: `${stats.trades}/${stats.minSample} trades`,
       },
     ],
-    actions: [
-      {
-        title: 'Keep recording',
-        detail: 'Log every trade with a short note so patterns and outcomes can be compared later.',
-      },
-    ],
+    actions: REVIEW_ACTIONS_ENABLED
+      ? [
+          {
+            title: 'Keep recording',
+            detail: 'Log every trade with a short note so patterns and outcomes can be compared later.',
+          },
+        ]
+      : [],
     similarSetups: [],
     disclaimer: DISCLAIMER,
   }

@@ -2,10 +2,13 @@ import { describe, it, expect } from 'vitest'
 import {
   DISCLAIMER,
   MAX_FINDINGS,
+  REVIEW_ACTIONS_ENABLED,
+  REVIEW_JSON_SCHEMA,
   extractJsonObject,
   insufficientDataReview,
   normalizeReview,
 } from '@/lib/ai/schema'
+import { buildSystemPrompt } from '@/lib/ai/prompt'
 import type { EdgeStats } from '@/lib/ai/types'
 
 function stats(overrides: Partial<EdgeStats> = {}): EdgeStats {
@@ -49,6 +52,16 @@ describe('extractJsonObject', () => {
 
   it('returns null when there is no object', () => {
     expect(extractJsonObject('no json here')).toBeNull()
+  })
+})
+
+describe('REVIEW_ACTIONS_ENABLED', () => {
+  it('asks the model for the actions list only while the switch is on', () => {
+    expect((REVIEW_JSON_SCHEMA.required as readonly string[]).includes('actions')).toBe(
+      REVIEW_ACTIONS_ENABLED
+    )
+    expect('actions' in REVIEW_JSON_SCHEMA.properties).toBe(REVIEW_ACTIONS_ENABLED)
+    expect(buildSystemPrompt(false).includes('"actions"')).toBe(REVIEW_ACTIONS_ENABLED)
   })
 })
 
@@ -123,6 +136,6 @@ describe('insufficientDataReview', () => {
     const review = insufficientDataReview(stats({ trades: 3, insufficient: true }))
     expect(review.confidence).toBe('low')
     expect(review.risks[0].title).toMatch(/sample/i)
-    expect(review.actions).toHaveLength(1)
+    expect(review.actions).toHaveLength(REVIEW_ACTIONS_ENABLED ? 1 : 0)
   })
 })

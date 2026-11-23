@@ -5,7 +5,7 @@
  */
 
 import { tradePnl, tradeTime } from './edge-stats'
-import { MAX_FINDINGS } from './schema'
+import { MAX_FINDINGS, REVIEW_ACTIONS_ENABLED } from './schema'
 import type {
   CoachInsight,
   EdgeStats,
@@ -83,7 +83,7 @@ export function buildSystemPrompt(hasImage: boolean): string {
       confidence: 'low | medium | high',
       strengths: [{ title: '...', detail: '...', evidence: 'metric: value' }],
       risks: [{ title: '...', detail: '...', evidence: 'metric: value' }],
-      actions: [{ title: '...', detail: '...' }],
+      ...(REVIEW_ACTIONS_ENABLED ? { actions: [{ title: '...', detail: '...' }] } : {}),
     }),
     `Include at most ${MAX_FINDINGS} items per list. Keep each detail under 240 characters.`,
   ]
