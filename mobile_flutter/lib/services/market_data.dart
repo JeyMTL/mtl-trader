@@ -238,6 +238,7 @@ class MarketDataService {
     bool force = false,
     DateTime? from,
     DateTime? to,
+    bool tail = false,
   }) async {
     // Clamp before the cache key is built, so a cached series and the request
     // that produced it describe the same window.
@@ -271,6 +272,8 @@ class MarketDataService {
         'ticker': instrument.yahoo,
         if (hasWindow) 'from': '$fromMs',
         if (hasWindow) 'to': '$toMs',
+        // Three newest bars only: small enough to ask for every second.
+        if (tail) 'tail': '1',
       },
     );
 

@@ -14,6 +14,7 @@ import {
   oandaInstrument,
   parseChartInterval,
   parseWindow,
+  tailPollMs,
 } from '@/lib/market-candles'
 
 describe('vendor outages', () => {
@@ -77,6 +78,15 @@ describe('candle intervals', () => {
     expect(livePollMs('1h')).toBe(20000)
     expect(livePollMs('4h')).toBe(30000)
     expect(livePollMs('1d')).toBe(60000)
+  })
+
+  it('asks for the moving bars about once a second on intraday sizes', () => {
+    expect(tailPollMs('5s')).toBe(1000)
+    expect(tailPollMs('1m')).toBe(1000)
+    expect(tailPollMs('5m')).toBe(1000)
+    expect(tailPollMs('15m')).toBe(2000)
+    expect(tailPollMs('1h')).toBe(2000)
+    expect(tailPollMs('1d')).toBe(5000)
   })
 
   it('merges a polled tail by open time and keeps older history', () => {

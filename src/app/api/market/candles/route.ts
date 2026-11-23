@@ -76,14 +76,20 @@ async function fetchOanda(
   config: OandaConfig,
   symbol: string,
   interval: ChartIntervalKey,
-  window: CandleWindow | null
+  window: CandleWindow | null,
+  tail = false
 ): Promise<CandleSeries | null> {
   const instrument = oandaInstrument(symbol)
   if (!instrument) return null
   const spec = CANDLE_INTERVALS[interval]
   // A re-bucketed size needs its own count of vendor bars: 45 seconds is three
   // 15-second bars, so asking for 720 of them would return a third of the chart.
-  const wanted = spec.aggregate ? spec.count * spec.aggregate : spec.count
+  // A tail request only needs the moving bars, not the whole series.
+  const wanted = tail
+    ? (spec.aggregate ?? 1) * 3
+    : spec.aggregate
+      ? spec.count * spec.aggregate
+      : spec.count
   const bounds = window
     ? `&from=${encodeURIComponent(oandaDate(window.from))}` +
       `&to=${encodeURIComponent(oandaDate(window.to))}`
@@ -146,13 +152,17 @@ export async function GET(req: Request) {
   if (!interval) {
     return apiWarn('market.candles.interval', 'Unknown candle interval')
   }
+  // `tail=1` is the live loop's request: the three newest bars, nothing else,
+  // served from a one-second cache so the moving candle updates without
+  // resending the whole series on every tick.
+  const tail = searchParams.get('tail') === '1'
 
   // A half-sent window is a client bug, not "serve the latest": say so instead
   // of silently answering with the wrong slice of history.
   const fromRaw = searchParams.get('from')
   const toRaw = searchParams.get('to')
   let window: CandleWindow | null = null
-  if (fromRaw || toRaw) {
+  if (!tail && (fromRaw || toRaw)) {
     window = parseWindow(fromRaw, toRaw)
     if (!window) {
       return apiWarn(
@@ -172,7 +182,8 @@ export async function GET(req: Request) {
   // 2.5 seconds on a five-second one, and the compare overlay doubles that. The
   // ceiling clears two charts at the finest size (~2,900 an hour) and still
   // stops a script. Size switches are cheap: they come from the series cache.
-  const limit = await rateLimit(`market:${user.id}`, 3600, 60 * 60 * 1000)
+  // A live tail now asks once a second, and a compare overlay doubles that.
+  const limit = await rateLimit(`market:${user.id}`, 12_000, 60 * 60 * 1000)
   if (!limit.ok) {
     return NextResponse.json(
       { error: 'Too many chart requests. Try again shortly.' },
@@ -184,11 +195,12 @@ export async function GET(req: Request) {
   }
 
   const windowKey = window ? `${window.from}-${window.to}` : 'latest'
-  const key = `${symbol}|${interval}|${windowKey}`
+  const key = `${symbol}|${interval}|${tail ? 'tail' : windowKey}`
   const cached = seriesCache.get(key)
   // A historical window never changes, so it can be kept far longer than the
-  // live tail that keeps moving.
-  const ttl = window ? 30 * 60 * 1000 : cached ? liveTtlMs(interval) : 0
+  // live tail that keeps moving. The tail cache is a quarter of the client's
+  // one-second cadence, which coalesces simultaneous charts without adding lag.
+  const ttl = tail ? 1_000 : window ? 30 * 60 * 1000 : cached ? liveTtlMs(interval) : 0
   if (cached && Date.now() - cached.at < ttl) {
     return NextResponse.json(cached.series)
   }
@@ -211,7 +223,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const series = await fetchOanda(config, symbol, interval, window)
+    const series = await fetchOanda(config, symbol, interval, window, tail)
 
     if (!series) {
       return NextResponse.json(

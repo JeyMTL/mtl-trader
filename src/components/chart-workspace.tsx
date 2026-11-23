@@ -22,7 +22,7 @@ import {
 import { ChartSettingsDialog } from '@/components/chart-settings-panel'
 import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
 import { alignCompare } from '@/lib/chart-compare'
-import { livePollMs, mergeCandleTail, parseChartInterval } from '@/lib/market-candles'
+import { mergeCandleTail, parseChartInterval, tailPollMs } from '@/lib/market-candles'
 import { sessionWindows } from '@/lib/market-sessions'
 import { publicErrorMessage } from '@/lib/errors'
 import {
@@ -622,7 +622,7 @@ export function ChartWorkspace({
       if (document.visibilityState !== 'visible') return
       try {
         const response = await fetch(
-          `/api/market/candles?symbol=${encodeURIComponent(chartSymbol(symbol))}&interval=${interval}`,
+          `/api/market/candles?symbol=${encodeURIComponent(chartSymbol(symbol))}&interval=${interval}&tail=1`,
           { cache: 'no-store' }
         )
         if (!response.ok) return
@@ -637,7 +637,7 @@ export function ChartWorkspace({
       if (!compare) return
       try {
         const response = await fetch(
-          `/api/market/candles?symbol=${encodeURIComponent(compare)}&interval=${interval}`,
+          `/api/market/candles?symbol=${encodeURIComponent(compare)}&interval=${interval}&tail=1`,
           { cache: 'no-store' }
         )
         if (!response.ok) return
@@ -650,7 +650,7 @@ export function ChartWorkspace({
       }
     }
 
-    const timer = window.setInterval(() => void tick(), livePollMs(intervalKey))
+    const timer = window.setInterval(() => void tick(), tailPollMs(intervalKey))
     const onWake = () => void tick()
     document.addEventListener('visibilitychange', onWake)
     window.addEventListener('focus', onWake)

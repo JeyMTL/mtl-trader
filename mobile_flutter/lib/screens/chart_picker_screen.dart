@@ -566,10 +566,42 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     // for half a bar while the timer fires every third of a bar, so every other
     // poll returned the series that was already on screen and a one-minute
     // chart only moved once a minute.
-    _refreshTimer = Timer.periodic(
-      _refreshPeriod,
-      (_) => _load(silent: true, force: true),
-    );
+    _refreshTimer = Timer.periodic(_refreshPeriod, (_) => _loadTail());
+  }
+
+  /// Fetches only the moving bars and merges them into what is on screen.
+  ///
+  /// The full series is loaded once; after that the newest candle is kept in
+  /// step with the feed about once a second, which is as close to MT5's moving
+  /// bar as a polling client gets. A past window is never polled.
+  Future<void> _loadTail() async {
+    if (_windowFrom != null) return;
+    try {
+      final tail = await _market.candles(
+        widget.instrument,
+        _interval,
+        force: true,
+        tail: true,
+      );
+      if (!mounted || tail.isEmpty) return;
+      final byTime = {
+        for (final candle in _candles) candle.time.millisecondsSinceEpoch: candle,
+      };
+      for (final candle in tail) {
+        byTime[candle.time.millisecondsSinceEpoch] = candle;
+      }
+      final merged = byTime.values.toList()
+        ..sort((a, b) => a.time.compareTo(b.time));
+      final previousClose = _candles.isEmpty ? null : _candles.last.close;
+      setState(() {
+        _candles = merged;
+        _staleAt = null;
+        _updated = DateTime.now();
+      });
+      _checkLevelTouches(previousClose, merged);
+    } catch (_) {
+      // A missed tail keeps the last good chart; the next tick retries.
+    }
   }
 
   /// A phone that was asleep has a timer that did not fire; refresh the live
@@ -581,15 +613,16 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     unawaited(_load(silent: true, force: true));
   }
 
-  /// How often the live tail is refetched.
+  /// How often the moving bars are refetched.
   ///
-  /// A third of a bar: soon enough that the newest candle keeps moving, late
-  /// enough that a 5-second chart does not turn into a request every second.
-  /// Floored at four seconds and capped at a minute, which is what the old fixed
-  /// minute became for hourly and daily charts.
+  /// Every second up to five minutes, which is what makes the newest candle
+  /// move like a terminal instead of jumping once a bar. Longer sizes gain
+  /// nothing from that cadence, so they slow down rather than spend requests.
   Duration get _refreshPeriod {
-    final third = (_interval.size.inMilliseconds / 3).round();
-    return Duration(milliseconds: third.clamp(4000, 60000));
+    final bar = _interval.size.inMilliseconds;
+    if (bar >= 14400000) return const Duration(seconds: 5);
+    if (bar >= 900000) return const Duration(seconds: 2);
+    return const Duration(seconds: 1);
   }
 
   /// A past window never changes, so it is fetched once and not polled.

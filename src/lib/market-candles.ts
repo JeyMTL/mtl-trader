@@ -124,6 +124,21 @@ export function livePollMs(interval: ChartIntervalKey): number {
 }
 
 /**
+ * How often to ask for just the moving bars.
+ *
+ * The tail endpoint sends three candles instead of the whole series, so it can
+ * be asked once a second without moving the chart's weight over the wire. Long
+ * sizes gain nothing from a second-by-second close, so they slow down.
+ */
+export function tailPollMs(interval: ChartIntervalKey): number {
+  const bar = CANDLE_INTERVALS[interval].ms
+  if (bar >= 86_400_000) return 5_000
+  if (bar >= 14_400_000) return 5_000
+  if (bar >= 900_000) return 2_000
+  return 1_000
+}
+
+/**
  * Replaces the overlapping tail of a live series by open time.
  *
  * A poll returns the newest `count` bars, so it overlaps the old series and
