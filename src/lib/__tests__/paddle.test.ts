@@ -11,6 +11,7 @@ import {
   parseTransactionEvent,
   planForPriceId,
   priceIdFor,
+  probePaddleCheckout,
   sellablePlanIds,
 } from '@/lib/paddle'
 
@@ -180,6 +181,86 @@ describe('checkout', () => {
     await expect(
       createCheckoutTransaction({ planId: 'pro', priceId: 'pri_x', userId: 'u1' }, fetchImpl)
     ).rejects.toThrow(/price does not exist/)
+  })
+})
+
+describe('checkout health probe', () => {
+  it('creates a draft transaction and cancels it', async () => {
+    const fetchImpl = vi.fn(async (url: string) =>
+      url.endsWith('/transactions')
+        ? jsonResponse({ data: { id: 'txn_probe' } }, 201)
+        : jsonResponse({ data: { status: 'canceled' } })
+    )
+
+    const result = await probePaddleCheckout(
+      { priceId: 'pri_basic', reference: 'health-test' },
+      fetchImpl
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      created: true,
+      discarded: true,
+      transactionId: 'txn_probe',
+      detail: null,
+    })
+
+    const [createUrl, createInit] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect(createUrl).toBe('https://sandbox-api.paddle.com/transactions')
+    expect(createInit.method).toBe('POST')
+    const created = JSON.parse(String(createInit.body))
+    expect(created.items).toEqual([{ price_id: 'pri_basic', quantity: 1 }])
+    expect(created.custom_data).toEqual({ healthCheck: true, reference: 'health-test' })
+    // A probe must never look like a real order to the webhook.
+    expect(created.custom_data.userId).toBeUndefined()
+
+    const [cancelUrl, cancelInit] = fetchImpl.mock.calls[1] as unknown as [string, RequestInit]
+    expect(cancelUrl).toBe('https://sandbox-api.paddle.com/transactions/txn_probe')
+    expect(cancelInit.method).toBe('PATCH')
+    expect(JSON.parse(String(cancelInit.body))).toEqual({ status: 'canceled' })
+  })
+
+  it('reports a failed creation without leaking a transaction id', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ error: { detail: 'price does not exist' } }, 403)
+    )
+
+    const result = await probePaddleCheckout({ priceId: 'pri_other_account' }, fetchImpl)
+
+    expect(result).toMatchObject({
+      ok: false,
+      created: false,
+      discarded: false,
+      transactionId: null,
+    })
+    expect(result.detail).toContain('price does not exist')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a transaction Paddle created but could not cancel', async () => {
+    const fetchImpl = vi.fn(async (url: string) =>
+      url.endsWith('/transactions')
+        ? jsonResponse({ data: { id: 'txn_probe' } }, 201)
+        : jsonResponse({ error: { detail: 'cannot cancel this transaction' } }, 500)
+    )
+
+    const result = await probePaddleCheckout({ priceId: 'pri_basic' }, fetchImpl)
+
+    expect(result).toMatchObject({
+      ok: false,
+      created: true,
+      discarded: false,
+      transactionId: 'txn_probe',
+    })
+    expect(result.detail).toContain('cannot cancel')
+  })
+
+  it('fails when Paddle returns no transaction id', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ data: {} }, 201))
+    const result = await probePaddleCheckout({ priceId: 'pri_basic' }, fetchImpl)
+
+    expect(result).toMatchObject({ ok: false, created: false, transactionId: null })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -365,7 +365,32 @@ Expected: `keyEnvironment: "live"`, `api: "production"`, all four `prices` true,
 and `annualReusesMonthlyPrice: []`. Anything else is a half-swap: fix the
 variable, redeploy, re-read.
 
-### 4. One real sale, then one refund
+### 4. Checkout health check (creates and discards a transaction)
+
+Presence checks cannot tell a live key from a live key for a *different*
+catalogue. This probe creates one draft transaction with the first configured
+monthly price and cancels it in the same request, so an API key pointed at the
+wrong account, base URL or price reports `failed` before a customer sees the
+button:
+
+```bash
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  https://mtlledger.com/api/health/paddle-checkout
+```
+
+A `200` with `status: "ok"` requires both the create and the cancel to succeed.
+Anything else is a `503`, and `transactionCreated` / `discarded` say which half
+failed; when `discarded` is false, `transactionId` names the transaction to
+cancel in Paddle. The API key needs **Transactions: write**. No card is charged
+and no customer is touched.
+
+Run it after changing a Paddle key, base URL or price id, and once per deploy.
+Do **not** add it to the 15-minute uptime poll: every call leaves a canceled
+transaction in Paddle's records. It also cannot prove the client-side token
+belongs to the same seller — Paddle validates that only when Paddle.js opens a
+checkout, so keep the simulation or one-real-sale step below for that.
+
+### 5. One real sale, then one refund
 
 Buy Basic yearly with a real card. Then check:
 

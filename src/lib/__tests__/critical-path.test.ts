@@ -24,6 +24,7 @@ const state = vi.hoisted(() => ({
   applied: [] as Row[],
   seenEvents: new Set<string>(),
   writes: [] as Row[],
+  failSubscriptionWrite: false,
 }))
 
 interface FakeBuilder {
@@ -34,7 +35,7 @@ interface FakeBuilder {
   limit: () => FakeBuilder
   maybeSingle: () => Promise<{ data: null; error: null }>
   single: () => Promise<{ data: null; error: null }>
-  upsert: (row: Row) => Promise<{ data: null; error: null }>
+  upsert: (row: Row) => Promise<{ data: null; error: { message: string } | null }>
   insert: (row: Row) => Promise<{ data: null; error: null }>
   update: (row: Row) => { eq: () => Promise<{ data: null; error: null }> }
   delete: () => { eq: () => Promise<{ data: null; error: null }> }
@@ -58,6 +59,9 @@ function fakeClient() {
     api.single = async () => ({ data: null, error: null })
     api.upsert = async (row: Row) => {
       state.writes.push({ table: 'users', op: 'upsert', row })
+      if (state.failSubscriptionWrite) {
+        return { data: null, error: { message: 'database unavailable' } }
+      }
       if (row && typeof row === 'object') state.users.set(String(row.id), row)
       return { data: null, error: null }
     }
@@ -184,6 +188,7 @@ beforeEach(() => {
   state.applied = []
   state.seenEvents = new Set()
   state.writes = []
+  state.failSubscriptionWrite = false
 
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service'
@@ -298,6 +303,22 @@ describe('critical path', () => {
 
     expect(state.applied).toHaveLength(2)
     expect(new Set(state.applied.map((call) => call.p_provider_event_id)).size).toBe(1)
+  })
+
+  it('asks Paddle to retry when the subscription cannot be recorded', async () => {
+    await signup()
+
+    state.failSubscriptionWrite = true
+    const first = await pay(paddleEvent('pro', 'month', 'evt-record-retry'))
+    expect(first.status).toBe(500)
+
+    // The retry re-enters through the duplicate branch and records the
+    // subscription then, so one transient write failure does not lose the
+    // mapping cancel needs.
+    state.failSubscriptionWrite = false
+    const second = await pay(paddleEvent('pro', 'month', 'evt-record-retry'))
+    expect(second.status).toBe(200)
+    expect(await second.json()).toMatchObject({ received: true, reason: 'duplicate' })
   })
 
   it('ignores a payment that completes without a resolvable account', async () => {

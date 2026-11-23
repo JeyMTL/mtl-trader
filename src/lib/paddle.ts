@@ -219,6 +219,110 @@ export async function createCheckoutTransaction(
   return { url, transactionId: typeof data.id === 'string' ? data.id : '' }
 }
 
+export interface PaddleCheckoutProbe {
+  ok: boolean
+  created: boolean
+  discarded: boolean
+  transactionId: string | null
+  detail: string | null
+}
+
+function probeError(error: unknown): string {
+  // `paddleRequest` includes the status and Paddle's detail, never the key or
+  // request headers. Keep it short enough to fit in a health response.
+  const message = error instanceof Error ? error.message : 'Paddle request failed.'
+  return message.slice(0, 300)
+}
+
+/**
+ * Creates a draft transaction for `priceId` and cancels it immediately.
+ *
+ * This is the one check that proves the *configured price id* belongs to the
+ * account the API key authenticates as. A price copied from another Paddle
+ * account, an API key paired with the wrong base URL, or a key without
+ * Transactions write all fail here — before a customer sees a button that
+ * cannot complete.
+ *
+ * It does not open a checkout, so it cannot prove the client-side token belongs
+ * to the same seller. That failure looks like a valid live transaction followed
+ * by `Transaction checkout creation is blocked for this vendor` inside
+ * Paddle.js; only a checkout (or Paddle's simulation tool) exercises it. The
+ * probe is deliberately kept off the public health poll for the same reason it
+ * is useful: every call leaves a canceled transaction in Paddle's records.
+ */
+export async function probePaddleCheckout(
+  params: { priceId: string; reference?: string },
+  fetchImpl: FetchLike = fetch
+): Promise<PaddleCheckoutProbe> {
+  let data: { id?: string }
+  try {
+    data = await paddleRequest<{ id?: string }>(
+      '/transactions',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          items: [{ price_id: params.priceId, quantity: 1 }],
+          // No `userId`: a draft transaction must never look like a real order
+          // to the webhook, and this probe is never paid for.
+          custom_data: {
+            healthCheck: true,
+            reference: params.reference ?? 'checkout-health',
+          },
+        }),
+      },
+      fetchImpl
+    )
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      created: false,
+      discarded: false,
+      transactionId: null,
+      detail: probeError(error),
+    }
+  }
+
+  const transactionId = typeof data?.id === 'string' && data.id ? data.id : null
+  if (!transactionId) {
+    return {
+      ok: false,
+      created: false,
+      discarded: false,
+      transactionId: null,
+      detail: 'Paddle returned no transaction id for the probe.',
+    }
+  }
+
+  try {
+    // Canceling takes only `status`; Paddle rejects a PATCH that also changes
+    // any other field. A canceled transaction does not count as revenue.
+    const canceled = await paddleRequest<{ status?: string }>(
+      `/transactions/${encodeURIComponent(transactionId)}`,
+      { method: 'PATCH', body: JSON.stringify({ status: 'canceled' }) },
+      fetchImpl
+    )
+    if (canceled?.status !== 'canceled') {
+      return {
+        ok: false,
+        created: true,
+        discarded: false,
+        transactionId,
+        detail: `Paddle left the probe transaction in status ${canceled?.status ?? 'unknown'}.`,
+      }
+    }
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      created: true,
+      discarded: false,
+      transactionId,
+      detail: probeError(error),
+    }
+  }
+
+  return { ok: true, created: true, discarded: true, transactionId, detail: null }
+}
+
 // ----------------------------------------------------------------- webhooks
 
 export interface ParsedSignature {

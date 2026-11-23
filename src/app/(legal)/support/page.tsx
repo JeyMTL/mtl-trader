@@ -45,8 +45,12 @@ const FAQ = [
     a: 'On the web an alert is a line on the chart: it fires visibly and can be hidden once fired, but it does not message you while the tab is closed. On Android the same price levels become local push notifications — allow notifications, then use Send test alert in Alerts to check that the phone receives one.',
   },
   {
+    q: 'What is the Pro strategy compiler?',
+    a: 'Pro turns a plain-English description, a voice note or a screenshot into runnable rules. You read and correct the generated rules before anything runs; the compiler is part of the Pro backtesting workbench.',
+  },
+  {
     q: 'What does the backtester do, and what is market replay?',
-    a: 'Both are Pro. The backtester runs saved tests and can suggest rules from your own trades. The compiler turns a plain-English description, a voice note or a screenshot into runnable rules that you read and correct before anything runs. Market replay steps the chart candle by candle so you can rehearse a session with the levels you would have had.',
+    a: 'Both are Pro. The backtester runs saved tests and can suggest rules from your own trades. Market replay steps the chart candle by candle so you can rehearse a session with the levels you would have had.',
   },
   {
     q: 'How does the prop-firm tracker work?',

@@ -214,7 +214,16 @@ async function recordSubscription(params: {
     { onConflict: 'user_id,provider' }
   )
   if (error) {
-    console.error('Could not record the Paddle subscription:', error.message)
+    // Do not acknowledge the event: Paddle retries a non-2xx delivery, and the
+    // retry hits the `duplicate` branch above, where this upsert runs again.
+    // Swallowing the error would leave a paid account with no subscription
+    // mapping, so a later `subscription.canceled` could never find it.
+    logEvent('error', 'paddle.webhook.subscription_record_failed', {
+      userId: params.userId,
+      subscriptionId: params.subscriptionId,
+      error,
+    })
+    throw new Error('Could not record the Paddle subscription')
   }
 }
 
