@@ -52,8 +52,23 @@ jobs:
 
       # No `?job=` parameter: the route sends journal reminders only inside the
       # user's local evening, and digests only on its 07:00 UTC pass.
+      #
+      # 503 means the deployment is reachable but has no email credentials. That
+      # is reported by /api/health and fixed by setting RESEND_API_KEY and
+      # EMAIL_FROM, so it is a warning here rather than a red job every hour. A
+      # 401 still fails: that is a secret mismatch, which would otherwise look
+      # identical to "nothing to send".
       - name: Invoke the notifications cron
         run: |
-          curl -fsS --max-time 120 \
+          status=$(curl -sS -o /tmp/cron.json -w '%{http_code}' --max-time 120 \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "$TARGET/api/cron/notifications"
+            "$TARGET/api/cron/notifications")
+          echo "HTTP $status"
+          cat /tmp/cron.json 2>/dev/null || true
+          if [ "$status" = "200" ]; then exit 0; fi
+          if [ "$status" = "503" ]; then
+            echo "::warning title=Email is not configured::Set RESEND_API_KEY and EMAIL_FROM in Vercel; nothing was sent."
+            exit 0
+          fi
+          echo "::error title=Notifications cron failed::HTTP $status"
+          exit 1
