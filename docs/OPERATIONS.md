@@ -239,6 +239,85 @@ supervisor on our own Windows hosts logs in and streams closed trades to
   resumable, UTC timestamps) or the MQL5 expert advisor in `mt5/`, which pushes
   on `OnTradeTransaction` instead of polling.
 
+### Upgrading the supervisor on the Windows host
+
+The supervisor is not part of the Next.js deploy: pushing to `main` changes the
+app, not `C:\MTLSync`. Ship it as a two-file zip, because only RDP (3389) is
+open on the host — SSH, WinRM and SMB are closed, so there is no `scp` and no
+remote PowerShell path.
+
+Build the zip where the repo is checked out, and keep the hashes it prints:
+
+```powershell
+Compress-Archive -Path supervisor\mt5_supervisor.py, shared\mt5-brokers.json `
+  -DestinationPath mtlsync-update.zip -Force
+Get-FileHash mtlsync-update.zip -Algorithm SHA256
+```
+
+Connect with **Local Resources → More… → Drives** ticked, so the zip can be
+pulled out of the redirected disk inside the session. Then, on the host:
+
+```powershell
+Copy-Item "\\tsclient\D\<path>\mtlsync-update.zip" C:\MTLSync\
+Get-FileHash C:\MTLSync\mtlsync-update.zip -Algorithm SHA256   # must match the build
+
+Stop-ScheduledTask -TaskName "MTL Ledger Sync Supervisor" -ErrorAction SilentlyContinue
+Get-ScheduledTask -TaskName "MTL Ledger Sync Supervisor" | Select-Object State
+Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+Copy-Item C:\MTLSync\mt5_supervisor.py C:\MTLSync\mt5_supervisor.py.bak -Force
+
+Expand-Archive -Path C:\MTLSync\mtlsync-update.zip -DestinationPath C:\MTLSync -Force
+(Get-Content C:\MTLSync\mt5_supervisor.py).Count
+(Get-Content C:\MTLSync\mt5-brokers.json -Raw | ConvertFrom-Json).Count   # = brokers in shared/
+
+cd C:\MTLSync
+python mt5_supervisor.py --once
+```
+
+`-Force` only overwrites the two files the zip carries, so `.env` and
+`.terminal-cache.json` survive. A hash mismatch means the RDP copy truncated the
+zip — copy it again rather than extracting.
+
+A good `--once` prints `MTL Ledger supervisor - polling for connections` with
+no `[warn] mt5-brokers.json is missing beside the supervisor` line, then one
+line per claimed row. That line echoes the server **as stored**, so a row saved
+as `FundedNext-Server3` still prints that way — the correction happens at login,
+not in the column. Prove the directory loaded with a one-liner:
+
+```powershell
+python -c "import mt5_supervisor as s; print(s.canonical_server_name('FundedNext', 'FundedNext-Server3'))"
+# FundedNext-Server 3
+```
+
+A login failure is the other place to look: its message names the canonical
+server and lists each terminal it tried with the reason it gave up.
+`--once` writes `failed` to any row it could not log in to, so the next cycle
+retries it — that is expected, not data loss.
+
+An `IPC timeout` is the terminal, not the server name. Clear the remembered
+terminal and stale sessions, install the terminal the broker actually supplies,
+open it once, close it, then rerun `--once`. The supervisor scans `Program
+Files`, `Program Files (x86)` and `%LOCALAPPDATA%\Programs` for nested
+`terminal64.exe`, and `MT5_PATHS` in `.env` covers anywhere else.
+
+```powershell
+Remove-Item C:\MTLSync\.terminal-cache.json -ErrorAction SilentlyContinue
+Get-Process terminal64 | Stop-Process -Force
+python mt5_supervisor.py --once
+```
+
+Once every row logs in, hand it back to the scheduler:
+
+```powershell
+Start-ScheduledTask -TaskName "MTL Ledger Sync Supervisor"
+Get-ScheduledTask -TaskName "MTL Ledger Sync Supervisor" | Select-Object State
+```
+
+The task trigger is **AtLogOn**, so **disconnect** the RDP window when finished —
+signing out ends the console session and takes the supervisor with it
+(`0xC000013A` in the task history). Confirm on the dashboard that the row turns
+`connected`; the supervisor shows nothing in the UI until a login succeeds.
+
 ## Vercel projects
 
 Two projects were building this repo on every push, which doubled build minutes
