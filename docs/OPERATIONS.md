@@ -119,19 +119,25 @@ its database therefore fails visibly instead of quietly serving errors.
 
 ## Crons
 
-`vercel.json` schedules two jobs: billing reconciliation (03:00) and
-notifications (hourly). The notifications route runs every hour so the journal
-reminder can follow each user's clock: it only sends in that user's local
-evening (18:00–20:00), never at the 07:00 UTC hour the job used to fire in —
-which was 2am in New York. The daily/weekly/monthly digests and the trial notice
-still go out on the 07:00 UTC pass only, and the send ledger makes the other
-passes harmless. `?job=summary` or `?job=journal` forces one half for a manual
-run at any hour.
+`vercel.json` schedules two jobs: billing reconciliation (03:00) and the daily
+notification pass (07:00). Vercel Cron on the Hobby plan may only run a job once
+a day, and one fixed UTC instant cannot be an evening everywhere — 07:00 UTC is
+2am in New York — so the hourly journal-reminder pass lives in
+`.github/workflows/notifications.yml` instead.
 
-Hourly crons need a Vercel plan that allows them; on a plan limited to daily
-crons the journal reminder will not fire and only the digest pass will run. A
-cron that stops running does **not** fail the uptime probe — it only proves the
-app is reachable.The reconciliation cron is
+The route decides who is due on every pass: digests and the trial notice only on
+the 07:00 UTC pass, and journal reminders only in the user's local 18:00–20:00
+window on a weekday with nothing journaled yet. The send ledger makes the extra
+passes harmless, and the Vercel daily run is what delivers digests if scheduled
+Actions are delayed or disabled. `?job=summary` or `?job=journal` forces one half
+for a manual run at any hour.
+
+**Setup:** add the same value as Vercel's `CRON_SECRET` as a repository secret
+under Settings → Secrets and variables → Actions → Secrets. Without it the
+Notifications workflow fails on its first step, which is deliberate: a silent
+jobs list is how an hourly job that never ran goes unnoticed. A cron that stops
+running does **not** fail the uptime probe — it only proves the app is
+reachable.The reconciliation cron is
 idempotent, so the safe response to a suspected missed run is triggering it
 manually from the Vercel dashboard and checking the logs for the period.
 

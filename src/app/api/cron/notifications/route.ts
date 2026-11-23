@@ -20,8 +20,9 @@ import { apiError, logEvent } from '@/lib/log'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Sends the notification emails users opted into. Triggered by Vercel Cron with
- * `Authorization: Bearer $CRON_SECRET`.
+ * Sends the notification emails users opted into. Triggered with
+ * `Authorization: Bearer $CRON_SECRET` by the Vercel cron (the daily 07:00 UTC
+ * pass) and by `.github/workflows/notifications.yml` (hourly, for the reminder).
  *
  *   - daily summary    → every day, for the previous calendar day
  *   - weekly report    → on Mondays, for the previous 7 days
@@ -30,9 +31,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *                        when nothing has been journaled yet today
  *   - trial ending     → within 3 days of the end, then once when it passes
  *
- * The cron runs hourly so the journal reminder can follow each user's clock.
- * The digests and the trial notice still go out on the 07:00 UTC pass only, so
- * their timing is unchanged; the send ledger makes the extra passes harmless.
+ * The hourly pass runs outside Vercel (Hobby allows only daily crons) so the
+ * journal reminder can follow each user's clock. The digests and the trial
+ * notice still go out on the 07:00 UTC pass only, so their timing is unchanged;
+ * the send ledger makes the extra passes harmless.
  *
  * The trial notice is an account email, not a digest: it goes to every trial
  * account with an address, whatever the digest toggles say, because it is the

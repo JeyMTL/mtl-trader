@@ -1,0 +1,59 @@
+name: Notifications
+
+# Delivers the journal reminder in each user's own evening.
+#
+# Vercel Cron on the Hobby plan may only run a job once a day, which is a fixed
+# UTC instant — 07:00 UTC is 2am in New York — so the hourly pass lives here.
+# The route itself decides who is due: it only sends in the user's local
+# 18:00–20:00 window, and only on weekdays with nothing journaled yet. Calling it
+# every hour is safe because every send is claimed in `notification_sends`.
+#
+# The Vercel cron still runs the daily 07:00 UTC pass, so digests and trial
+# notices go out even if scheduled Actions are delayed or disabled.
+#
+# Setup: add the same value as Vercel's CRON_SECRET as a repository secret
+# (Settings → Secrets and variables → Actions → Secrets). PRODUCTION_URL is an
+# optional repository *variable*, shared with the uptime workflow.
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+  # Runs when this workflow changes, so a broken edit is caught immediately
+  # instead of an hour later.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/notifications.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notifications
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      TARGET: ${{ vars.PRODUCTION_URL || 'https://mtlledger.com' }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+    steps:
+      - name: Check the secret is configured
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error title=CRON_SECRET missing::Add Vercel's CRON_SECRET as an Actions repository secret."
+            exit 1
+          fi
+
+      # No `?job=` parameter: the route sends journal reminders only inside the
+      # user's local evening, and digests only on its 07:00 UTC pass.
+      - name: Invoke the notifications cron
+        run: |
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$TARGET/api/cron/notifications"
