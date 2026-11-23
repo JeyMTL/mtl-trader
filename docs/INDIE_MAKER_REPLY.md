@@ -31,9 +31,8 @@ A working SaaS foundation, not a template:
 - PayPal checkout + signature-verified webhook + idempotent payment reconciliation (a `payment_events` table makes capture, webhook, and the daily cron safe to run in any order — a dropped webhook doesn't lose a payment)
 - Bank-transfer flow with unique per-user references and an admin approval panel
 - AI journal review pipeline (Gemini / Anthropic / OpenAI-compatible gateways) with grounded edge statistics, caching, and structured-output validation
-- Timezone-aware daily/weekly/monthly P&L email summaries plus weekday journal reminders (Resend + Vercel cron)
 - MT5 auto-sync agent and a CSV / .xlsx / SpreadsheetML import parser
-- 15 test files covering the import parser, P&L math, plan/quota rules, the notifications cron, and the AI pipeline
+- 15 test files covering the import parser, P&L math, plan/quota rules, and the AI pipeline
 - Capacitor mobile shell for Android/iOS
 
 That's a rebrand-and-launch foundation for someone already in the trading niche, which is a different thing from an empty boilerplate.

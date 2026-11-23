@@ -23,7 +23,6 @@ Mark each that applies and transfer it on the closing date:
 - [ ] Vercel project and deployment configuration
 - [ ] Supabase project (organization, database, auth configuration, RLS policies)
 - [ ] PayPal business/REST app (client ID/secret, webhook subscription)
-- [ ] Resend account and verified sending domain, if transferred
 - [ ] Mobile build assets and Capacitor configuration
 - [ ] Design/brand assets and the `docs/` materials
 
@@ -41,7 +40,7 @@ Purchase price: **USD $[amount]**, payable as: [terms].
 ## 6. Third-party components
 
 The Software depends on third-party software and services, including Next.js,
-React, Supabase, PayPal, Resend, and Capacitor, each governed by its own license
+React, Supabase, PayPal, and Capacitor, each governed by its own license
 or terms. These are **not** transferred by this agreement; the Assignee is
 responsible for their own accounts and compliance.
 
@@ -84,9 +83,9 @@ Complete in order at closing:
 2. **Verify data purge.** `git log --all --stat -- trade_data.json trades.xlsx
    public/trades_clean.csv` returns nothing.
 3. **Rotate every secret.** The seller's `CRON_SECRET`, PayPal keys, Supabase
-   service-role key, and Resend key must be revoked/rotated before transfer.
+   service-role key must be revoked/rotated before transfer.
 4. **Transfer ownership** of the repo, Vercel project, Supabase project, DNS,
-   PayPal app, and Resend account.
+   and PayPal app.
 5. **Re-issue credentials** to the Assignee; never hand over the seller's
    existing live secrets.
 6. **Apply migrations** in `supabase/migrations/` in filename order on the

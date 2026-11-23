@@ -21,7 +21,7 @@ unserious for a pre-revenue MVP. Raise it after you add traction.
 - **Backend:** Supabase (Postgres, Auth, RLS policies, SQL triggers)
 - **Hosting:** Vercel-ready (cron jobs configured in `vercel.json`)
 - **Payments:** PayPal subscriptions + bank-transfer flow with admin approval
-- **Email:** Resend — daily/weekly/monthly summaries + weekday journal reminders
+- **Alerts:** Mobile app notifications (device-side, no email pipeline)
 - **Mobile:** Capacitor wrapper (Android + iOS projects present)
 - **Tests:** 86 automated tests (Vitest), all passing
 - **Quality:** `tsc` clean, ESLint clean, production build OK
@@ -71,7 +71,7 @@ What's built and working:
 • Supabase auth + row-level security; email-verified accounts
 • PayPal subscriptions (Basic / Pro) + bank-transfer flow with admin approval
 • Plan/trial quotas enforced in the database (SQL trigger), not just the UI
-• Optional email summaries + weekday journal reminders (Resend)
+• Mobile trade alerts (device-side notifications)
 • MT5 auto-sync workflow via an agent token
 • Capacitor mobile wrapper (Android + iOS projects included)
 • Admin dashboard for reviewing payments
@@ -80,13 +80,13 @@ What's built and working:
 What it needs from a buyer:
 • Supabase project (migrations included, apply in filename order)
 • PayPal REST app + webhook ID
-• Optional: Resend key for emails, BANK_* for bank-transfer display
+• BANK_* for bank-transfer display
 • Deploy to Vercel (cron config included)
 
 Included: full source, git history, README/docs, an IP-transfer template, and
-two scripts to verify the payment/email integrations.
+a script to verify the payment integration.
 
-Stack: Next.js, React, TypeScript, Tailwind, Supabase, Vercel, PayPal, Resend,
+Stack: Next.js, React, TypeScript, Tailwind, Supabase, Vercel, PayPal,
 Capacitor. Happy to walk a serious buyer through the repo.
 ```
 
@@ -141,11 +141,11 @@ It's a genuinely functional MVP, not a mockup:
 • MT5 import (CSV/XLSX/XML) + dashboard, analytics, calendar
 • Supabase auth/RLS + subscription + trial + DB-enforced quotas
 • PayPal subscriptions and a bank-transfer approval flow
-• Email summaries + journal reminders (optional)
+• Mobile trade alerts (device-side notifications)
 • Capacitor Android/iOS wrapper
 • 86 passing tests, clean build
 
-Buyer needs their own Supabase + PayPal (+ optional Resend) accounts. Comes
+Buyer needs their own Supabase + PayPal accounts. Comes
 with docs, migrations, an IP-transfer template, and check scripts. Open to
 offers and happy to answer questions.
 ```
@@ -165,7 +165,7 @@ offers and happy to answer questions.
 Spent a few months building MTL Ledger, a trading journal + analytics SaaS
 (Next.js, Supabase, PayPal). It's finished enough to run: trade import,
 dashboard/analytics/calendar, subscriptions with trial + quotas enforced in
-Postgres, admin payment approval, optional email summaries, and a Capacitor
+Postgres, admin payment approval, and a Capacitor
 mobile wrapper. 86 tests pass.
 
 I never launched or got users, and I don't have the budget to market it, so I'm
@@ -200,7 +200,7 @@ Selling a complete, tested MVP codebase for a trading journal/analytics SaaS.
 • Next.js 16 + React 19 + TypeScript + Tailwind 4
 • Supabase auth + RLS + SQL triggers for plan quotas
 • PayPal subscriptions + bank-transfer approval flow
-• Admin dashboard, optional Resend email summaries
+• Admin dashboard
 • Capacitor Android/iOS wrapper
 • 86 passing tests; build/typecheck/lint clean
 
@@ -261,11 +261,11 @@ Includes:
 • PayPal subscription checkout + bank-transfer approval flow
 • Idempotent payment application + reconciliation job
 • Dashboard, analytics, calendar, import (CSV/XLSX/XML)
-• Notification emails (Resend) + cron setup
+• Payment reconciliation cron setup
 • Capacitor Android/iOS wrapper
 • Vitest test suite, README, migrations
 
-Requirements: your own Supabase + PayPal (and optional Resend) accounts.
+Requirements: your own Supabase + PayPal accounts.
 ```
 
 > Note licensing: a template sale lets multiple buyers use the code. If you
@@ -281,7 +281,7 @@ Requirements: your own Supabase + PayPal (and optional Resend) accounts.
 Hi [Name] — I saw [you build trading/fintech apps]. I'm selling the source of a
 working trading-journal SaaS MVP (Next.js + Supabase + PayPal): import,
 dashboard/analytics, subscriptions with trial + DB-enforced quotas, admin
-payment approval, optional email summaries, mobile wrapper, 86 tests. No users —
+payment approval, mobile wrapper, 86 tests. No users —
 selling the codebase/asset. Asking ~$[PRICE] OBO.
 
 Would a walkthrough be useful? Happy to send a demo link and repo map.
@@ -294,7 +294,7 @@ Would a walkthrough be useful? Happy to send a demo link and repo map.
 - **"Any users or revenue?"** → "None. This is a pre-revenue codebase sale." Never imply otherwise.
 - **"Why selling?"** → "No capital/time for go-to-market."
 - **"Can I see it live?"** → Have a hosted demo ready (Vercel) with sample data.
-- **"What will I have to build/configure?"** → Supabase project + migrations, PayPal app + webhook ID, optional Resend/bank config.
+- **"What will I have to build/configure?"** → Supabase project + migrations, PayPal app + webhook ID, bank config.
 - **"Any legal/compliance issues?"** → Trading/finance niche; the buyer should handle their own compliance. The project is a journal/analytics tool and does not place trades or give financial advice.
 - **"Is the code original?"** → Yes, original code; third-party libraries under their own licenses are not transferred.
 - **"Did you remove personal data?"** → Yes — personal broker exports were removed from the repository and its history.
@@ -305,7 +305,7 @@ Would a walkthrough be useful? Happy to send a demo link and repo map.
 
 - Pre-revenue, **no users**.
 - Early-stage **MVP**, sold **as-is**, no warranty of fitness or revenue.
-- Requires the buyer's own **Supabase, PayPal** (and optionally **Resend/bank**) setup.
+- Requires the buyer's own **Supabase, PayPal** and optional **BANK_*** setup.
 - **Mobile wrapper is a shell** — push notifications are not configured.
 - **Bank-transfer activation is manual** (admin approval).
 - **Email notifications and webhook reconciliation are inert** until the related
@@ -321,4 +321,4 @@ Would a walkthrough be useful? Happy to send a demo link and repo map.
 - A live demo + 5–10 real users justifies $3,000–$5,000.
 - Bundle a 60-minute onboarding call as a value-add (costs you nothing) to close.
 - Never transfer live credentials. Rotate `CRON_SECRET`, PayPal keys, Supabase
-  service-role key, and Resend key before handoff.
+  service-role key before handoff.

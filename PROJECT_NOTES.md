@@ -184,8 +184,6 @@ src/lib/
   market-candles.ts            # Provider chain, symbol mapping + candle normalisation
   rate-limit.ts               # Shared (Postgres-backed) per-user rate limiter
   payments.ts                 # PayPal helpers + idempotent applyPaidOrder
-  email.ts                    # Resend wrapper (no-ops when unconfigured)
-  summaries.ts                # Summary math + HTML email rendering
   auth-guards.ts              # Timing-safe bearer/cron secret checks
   bank.ts                     # Bank details from env
   utils.ts                    # formatCurrency, formatPercent, formatDuration, calculatePnL, getPointValue
