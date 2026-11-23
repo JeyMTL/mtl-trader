@@ -52,14 +52,14 @@ const features = [
     icon: Zap,
     title: 'AI journal summary',
     description:
-      'A written summary of your own fills: how your results broke down by setup, session and day. Fifteen summaries a month on Basic, forty on Pro.',
+      'A written summary of the trades you have already logged: how your results broke down by setup, session and day, and what your own notes repeat. It describes your record — it does not rate you or suggest a trade. Fifteen summaries a month on Basic, forty on Pro.',
     tile: 'icon-tile-violet',
   },
   {
     icon: FlaskConical,
     title: 'Backtest and replay',
     description:
-      'Pro steps a session candle by candle, keeps saved backtests, and runs rules you define yourself against past sessions.',
+      'Pro replays past sessions a candle at a time and tests the entry and exit rules you wrote yourself, reporting win rate, profit factor and drawdown for those rules. A simulation on saved history: nothing connects to a broker and no order is placed.',
     tile: 'icon-tile-amber',
   },
   {
@@ -284,8 +284,8 @@ export default function HomePage() {
             &copy; 2026 MTL Ledger. All rights reserved.
           </p>
           <p className="max-w-md text-center text-xs text-gray-500 sm:text-left">
-            MTL Ledger is a record-keeping and analytics tool. It does not provide financial advice,
-            trading signals or trade recommendations.
+            MTL Ledger records and analyses trades you have already made. It is not a broker, it
+            does not place orders, and every trade you take is your own.
           </p>
           <nav className="flex flex-wrap items-center justify-center gap-4 text-xs">
             <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>

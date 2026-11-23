@@ -481,7 +481,7 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
             <p className="text-xs text-gray-500">{aiReview.disclaimer}</p>
           </div>
         )}
-        <p className="text-xs text-gray-500 mt-4">AI feedback is educational and is not financial advice.</p>
+        <p className="text-xs text-gray-500 mt-4">These summaries describe your own trades. They do not tell you what to trade.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-6">

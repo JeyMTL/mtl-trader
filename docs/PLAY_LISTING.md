@@ -27,16 +27,16 @@ WHAT YOU SEE
 • Dashboard — equity curve, balance, win rate, profit factor, expectancy and maximum drawdown, updated as you log.
 • P&L calendar — a month heatmap of profit and loss, so streaks, revenge days and dead weeks are visible at a glance.
 • Analytics — results by hour and session, so you can tell a real edge from a lucky run.
-• AI trade review — your own notes and your own statistics are sent to an AI model, which writes back the mistakes you keep repeating. Optional, and you can ignore it.
+• AI journal summary — your own notes and statistics are sent to an AI model, which writes back a summary of what your results show: where the numbers came from, what looks strong and what looks risky. It reads your journal and describes it; it does not rate you or suggest a trade. Optional, and you can ignore it.
 • Daily stop — set a loss limit and the journal refuses new entries once you reach it. On Android you can also let it cover MetaTrader 5 on your phone for the rest of the day; that optional part uses Android's Accessibility service only to notice when MetaTrader 5 is in front (it never reads screen content) and to draw the cover over it, is switched on in Android Settings, and can be turned off there at any time.
 • Journal — chart screenshots and voice notes kept with each trade.
-• Backtester — replay past setups and see how a change to your rules would have played out.
+• Backtester — test entry and exit rules you wrote yourself against saved past sessions, with win rate, profit factor and drawdown for those rules. It is a simulation on stored history: nothing connects to a broker and no order is placed.
 
 Read at a glance between sessions: dark interface, gold accents, monospaced numbers, charts that fit a phone.
 
 PLANS
 
-A 7-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar and analytics, time edge, the chart desk with levels shared between phone and web, MT5 sync, prop-firm rules, photos and voice notes, and 15 AI journal summaries a month; Pro raises that to 40 and adds the backtester with saved runs, market replay, API access and priority support. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
+A 7-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar and analytics, time edge, the chart desk with levels shared between phone and web, MT5 sync, prop-firm rules, photos and voice notes, and 15 AI journal summaries a month; Pro raises that to 40 and adds the backtester with saved runs, the rules builder that turns a description of your own conditions into editable test rules, market replay, API access and priority support. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
 
 Subscriptions bought in this app are sold and billed by Google Play, and you can manage or cancel them any time from your Play account.
 

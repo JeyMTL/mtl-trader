@@ -28,9 +28,10 @@ export default function TermsPage() {
         analysis tool only.
       </p>
       <p>
-        <strong>MTL Ledger does not provide financial, investment, trading or tax advice.</strong> Nothing in the
-        service — including automated reviews, statistics or labels — is a recommendation to buy or sell any
-        instrument. You are solely responsible for your trading decisions and their outcomes.
+        <strong>MTL Ledger is not a broker.</strong> It does not hold funds, route orders, or connect to your
+        account to trade. Nothing in the service — including the automated summaries, statistics or labels —
+        tells you what to buy or sell. The orders you place, and their outcomes, are yours alone. For tax or
+        legal questions, speak to a qualified professional where you live.
       </p>
 
       <h2>2. Accounts</h2>

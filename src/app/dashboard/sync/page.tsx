@@ -107,7 +107,7 @@ export default function SyncPage() {
         <p className="text-gray-400 mt-1">
           {MT5_HOSTED_SYNC_ENABLED
             ? 'Connect your MT5 account once and every closed trade lands here — from a phone, no PC needed'
-            : 'Sync closed trades from your own MT5 terminal, and let the same EA enforce the hard daily stop.'}
+            : 'Sync closed trades from your own MT5 terminal, and let the same EA enforce the daily stop.'}
         </p>
       </div>
 
@@ -117,12 +117,15 @@ export default function SyncPage() {
         <h2 className="text-lg font-semibold text-white">Daily stop guard — soft and hard</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-400">
           Set a daily loss limit in Rules and the MT5 guard carries it into your terminal.
-          A <strong className="text-gray-300">soft lock</strong> freezes MT5 and keeps the
-          journal open, so you can lift it only by writing down why. A{' '}
-          <strong className="text-gray-300">hard lock</strong> freezes MT5 and locks the
-          journal completely until the next trading day, with no in-app release. The guard
-          refuses programmatic orders and removes pending ones; a manual market-order click
-          can still fill before it is seen.
+          Both modes act the same way in MT5. A{' '}
+          <strong className="text-gray-300">soft lock</strong> keeps the journal open, so you
+          can lift it only by writing down why. A{' '}
+          <strong className="text-gray-300">hard lock</strong> also closes the journal until
+          the next trading day. While locked, the guard deletes resting orders and closes any
+          position opened after the limit was hit. It cannot block a manual market-order click
+          — that fills before the terminal reports it — and it only stops another expert
+          advisor that checks it first. If the journal cannot be reached for five minutes,
+          the lock releases so an outage cannot trap you in a position.
         </p>
         <Link
           href="/dashboard/playbook"
@@ -149,7 +152,7 @@ export default function SyncPage() {
           <div>
             <h2 className="text-lg font-semibold text-white">MT5 Expert Advisor</h2>
             <p className="text-sm text-gray-400">
-              Syncs closed trades and enforces the hard daily stop. Recommended on desktop.
+              Syncs closed trades and enforces the daily stop. Recommended on desktop.
             </p>
           </div>
         </div>
@@ -174,9 +177,10 @@ export default function SyncPage() {
             user id and the token below into the EA inputs, then turn AutoTrading on.
           </li>
           <li>
-            <span className="font-medium text-white">4. Enforce</span> — a hard lock
-            deletes pending orders and closes a new fill until the reset. A manual
-            market order still fills before the EA can see it.
+            <span className="font-medium text-white">4. Enforce</span> — a lock deletes
+            resting orders and closes a fill opened after the limit. A manual market order
+            still fills before the EA can see it, and the lock releases if the journal is
+            unreachable for five minutes.
           </li>
         </ol>
       </div>

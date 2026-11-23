@@ -34,7 +34,7 @@ const FAQ = [
   },
   {
     q: 'What is the difference between a soft lock and a hard lock?',
-    a: 'Both are set in Rules with your daily loss limit. A soft lock freezes MT5 and keeps the journal open, and can be lifted only by writing down a reason that is stored with the day. A hard lock freezes MT5 and locks the journal completely until the next trading day, with no release. The MT5 guard that syncs your trades enforces it in the terminal: it refuses programmatic orders and deletes pending ones, though a manual market order can still fill before it is seen.',
+    a: 'Both are set in Rules with your daily loss limit. In MT5 the two behave the same: while locked, the guard deletes resting orders and closes any position opened after the limit was hit. The difference is the journal. A soft lock leaves it open, and can be lifted only by writing down a reason that is stored with the day. A hard lock closes the journal until the next trading day. Two limits are worth knowing: the guard cannot block a manual market-order click, which fills before the terminal reports it, and it only stops another expert advisor that checks it first. If the journal cannot be reached for five minutes, the lock releases, so an outage can never leave you unable to close a position.',
   },
   {
     q: 'What is in the chart desk?',
@@ -45,12 +45,16 @@ const FAQ = [
     a: 'On the web an alert is a line on the chart: it fires visibly and can be hidden once fired, but it does not message you while the tab is closed. On Android the same price levels become local push notifications — allow notifications, then use Send test alert in Alerts to check that the phone receives one.',
   },
   {
+    q: 'What does the AI summary include?',
+    a: 'A written summary of the trades already in your journal: a headline, what looks strong, what looks risky, and the numbers each point rests on. It reads your own record and describes it. It does not score you, forecast a market, or recommend a trade. Basic includes fifteen summaries a month and Pro forty.',
+  },
+  {
     q: 'What is the Pro rules builder?',
-    a: 'Pro turns a description of your own entry and exit conditions, typed, spoken or taken from a screenshot, into editable backtest rules. You read and correct every rule before a test runs, and the result is a report on past sessions, not a live trade instruction.',
+    a: 'It is a transcription tool for rules you already use. You describe your entry and exit conditions — typed, spoken, or read from a screenshot — and it turns that description into editable rules you can correct line by line. The rules are only ever tested against saved historical candles: nothing is sent to a broker and no order is placed.',
   },
   {
     q: 'What does the backtester do, and what is market replay?',
-    a: 'Both are Pro. The backtester runs saved tests against past sessions and reports how those rules would have performed. Market replay steps the chart candle by candle so you can walk through a session with the levels you would have had.',
+    a: 'Both are Pro. The backtester replays saved historical sessions against the rules you wrote and reports how those rules would have performed — win rate, profit factor, expectancy, drawdown and the trades it would have taken. Market replay steps the chart candle by candle so you can walk a session with only the levels you would have had at the time. Neither is connected to a live account, and neither places an order.',
   },
   {
     q: 'How does the prop-firm tracker work?',
@@ -58,7 +62,7 @@ const FAQ = [
   },
   {
     q: 'What are the two ways to sync MT5?',
-    a: 'Hosted sync asks for your broker, server, account number and the investor (read-only) password once, then our supervisor connects for you. The other way is your own terminal: install the guard EA and paste the sync token from the sync page into its inputs. Hosted sync stores the investor password encrypted so it can reconnect; your trading password is never asked for, and Disconnect deletes the stored password. The guard also enforces the daily stop.',
+    a: 'Hosted sync asks for your broker, server, account number and the investor (read-only) password once, then our supervisor connects for you. The other way is your own terminal: install the guard EA and paste the sync token from the sync page into its inputs. Hosted sync stores the investor password encrypted so it can reconnect; your trading password is never asked for, and Disconnect deletes the stored password. The guard also enforces the daily stop set in Rules.',
   },
   {
     q: 'Which languages does the app support, and does it work offline?',

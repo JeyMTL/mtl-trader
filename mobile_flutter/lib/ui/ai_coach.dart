@@ -251,7 +251,7 @@ class _AiCoachCardState extends State<AiCoachCard> {
             _findings('Actions', _review!.actions, AppColors.primary),
             const SizedBox(height: 6),
             Text(
-              'AI feedback is educational and is not financial advice.',
+              'A description of your own trades. It does not tell you what to trade.',
               style: TextStyle(
                   color: AppColors.faint, fontSize: kMinLabelSize, height: 1.4),
             ),
