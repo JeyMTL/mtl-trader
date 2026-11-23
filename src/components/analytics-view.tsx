@@ -53,7 +53,6 @@ interface AiReview {
   sampleSize: number
   strengths: Finding[]
   risks: Finding[]
-  actions: Finding[]
   similarSetups: SimilarSetup[]
   disclaimer: string
 }
@@ -461,7 +460,6 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
             )}
             {renderFindings('Strengths', aiReview.strengths, 'text-success')}
             {renderFindings('Risks', aiReview.risks, 'text-warning')}
-            {renderFindings('Actions', aiReview.actions, 'text-primary')}
             {aiReview.similarSetups.length > 0 && (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">From your notes</p>

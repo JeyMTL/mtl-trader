@@ -62,7 +62,7 @@ const FAQ = [
   },
   {
     q: 'What are the two ways to sync MT5?',
-    a: 'Hosted sync asks for your broker, server, account number and the investor (read-only) password once, then our supervisor connects for you. The other way is your own terminal: install the guard EA and paste the sync token from the sync page into its inputs. Hosted sync stores the investor password encrypted so it can reconnect; your trading password is never asked for, and Disconnect deletes the stored password. The guard also enforces the daily stop set in Rules.',
+    a: 'Right now there is one way: your own terminal. Install the guard EA, paste the sync token from the sync page into its inputs, and allow this site under Tools → Options → Expert Advisors → “Allow WebRequest for listed URL”. The guard syncs closed trades and enforces the daily stop set in Rules. The phone-only connection (where you hand over an investor password and our supervisor connects for you) is not open yet, because it needs a host we do not run — a phone cannot run an expert advisor.',
   },
   {
     q: 'Which languages does the app support, and does it work offline?',

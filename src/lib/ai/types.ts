@@ -121,7 +121,6 @@ export interface ReviewResult {
   sampleSize: number
   strengths: ReviewFinding[]
   risks: ReviewFinding[]
-  actions: ReviewFinding[]
   similarSetups: SimilarSetup[]
   disclaimer: string
 }

@@ -98,23 +98,6 @@ Returns the caller's 20 most recent saved reviews.
 
 Body `{ "note": "…" }` → `{ "tags": ["breakout", "patient"] }`. No model call.
 
-### `POST /api/backtest/suggest`
-
-Not a review: it converts one journal entry into runnable backtest parameters.
-Body `{ "tradeId": "uuid" }` → the closest strategy id, clamped parameters, a
-short reasoning and a confidence. `GET` on the same path lists the recent trades
-it can read, with their note and screenshot counts.
-
-- Notes are trimmed to 1,500 characters; at most two screenshots are attached.
-- Images over 4 MB, or in a format the vision provider rejects (HEIC), are
-  skipped and counted in `meta.skippedImages` — never sent as an unreadable part.
-- The reply is normalized by `src/lib/backtest/suggest.ts`, which rejects an
-  unknown strategy and clamps every parameter with the engine's own
-  `normalizeParams`, so a hallucinated value cannot reach a run.
-- Rate limit: 5 requests / 10 minutes per user. Provider unconfigured → 503.
-- The note and the image are never logged; only the symbol, the chosen strategy
-  and how many screenshots were sent.
-
 ### `POST /api/backtest/transcribe`
 
 Turns a voice note into text for the custom strategy compiler.

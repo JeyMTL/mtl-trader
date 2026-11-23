@@ -99,32 +99,6 @@ page under **Performance by Strategy** (`strategy_stats`, migration
 `20261107_strategy_stats.sql`), matched on the exact trimmed text — "SMA cross"
 and "sma cross" are two rows, and blank labels group as *Untagged*.
 
-## Suggesting the rules from a trade
-
-The form has a **Suggest rules from a trade** panel. Pick a journal entry and
-`POST /api/backtest/suggest` reads that one trade's notes and up to two of its
-screenshots, and returns the closest strategy from the menu with parameters
-already clamped into their allowed ranges.
-
-This is the honest use of a screenshot: the model reads the chart's structure —
-trend or range, rejection, candle size — and translates the trader's own words
-into rules. It does not replay the image. The suggestion is a starting point to
-run, not a result to trust; the out-of-sample window is where you find out.
-
-What the model cannot do:
-
-- Name a strategy that does not exist — an unknown id is rejected, not simulated.
-- Leave a parameter outside its range — every value is clamped by
-  `normalizeParams`, and missing ones take the declared default.
-- Pretend to have seen a photo it could not read — images over 4 MB, or in a
-  format the provider rejects (HEIC), are skipped and counted, never sent as a
-  broken part.
-
-The panel refuses an entry with neither notes nor a screenshot, because the model
-would be guessing from the symbol alone. Limits: 5 suggestions per 10 minutes per
-user, and the provider must be configured (`GEMINI_API_KEY` or
-`ANTHROPIC_API_KEY`); without it the panel says so instead of failing silently.
-
 ## Writing a strategy in your own words
 
 The workbench has a **Write the strategy you want tested** panel for setups the

@@ -14,9 +14,10 @@
 export const MT5_SYNC_ENABLED = true
 
 /**
- * Hosted sync needs a supervisor to claim the connection. It is enabled for
- * the phone-as-client / PC-as-supervisor setup; keep it in step with whether a
- * supervisor is actually running, or the first connection queues a row nobody
- * claims. See `docs/PLAY_LAUNCH_STATUS.md`.
+ * Hosted sync needs a supervisor to claim the connection. Off until that
+ * supervisor runs on a funded host: right now it only runs on one desktop, so a
+ * connection made from a phone would queue as `pending` and never be claimed.
+ * The desktop EA path is independent and stays on. See
+ * `docs/PLAY_LAUNCH_STATUS.md`.
  */
-export const MT5_HOSTED_SYNC_ENABLED = true
+export const MT5_HOSTED_SYNC_ENABLED = false

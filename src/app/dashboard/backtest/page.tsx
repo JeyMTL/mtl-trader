@@ -16,7 +16,6 @@ import {
 import { authedFetch } from '@/lib/api'
 import { useToast } from '@/components/toast'
 import BacktestJournal from '@/components/backtest-journal'
-import BacktestSuggest, { type AppliedSuggestion } from '@/components/backtest-suggest'
 import BacktestCustom, { type CompiledBacktest } from '@/components/backtest-custom'
 import { STRATEGIES, matchStrategyByLabel } from '@/lib/backtest/strategies'
 import type { Benchmark } from '@/lib/backtest/benchmark'
@@ -215,30 +214,6 @@ function BacktestWorkbench() {
     setCompiled(null)
     setStrategyId(id)
     setParams(defaultsFor(id))
-  }
-
-  /**
-   * Fills the form from a suggestion. The server already clamped every value, so
-   * this only re-derives the full parameter set — a strategy added later cannot
-   * be left with a missing input just because the model did not return it.
-   */
-  const applySuggestion = (suggestion: AppliedSuggestion) => {
-    const target = STRATEGIES.find((entry) => entry.id === suggestion.strategyId)
-    if (!target) return
-    const next: Record<string, number> = {}
-    for (const spec of target.params) {
-      const value = suggestion.params[spec.key]
-      next[spec.key] = Number.isFinite(value) ? value : spec.defaultValue
-    }
-    setCompiled(null)
-    setTab('library')
-    setStrategyId(target.id)
-    setParams(next)
-    if (suggestion.symbol) setSymbol(suggestion.symbol)
-    if (suggestion.timeframe) setTimeframe(suggestion.timeframe)
-    toast(`Filled ${target.name} from the journal entry. Check the rules, then run.`, {
-      tone: 'success',
-    })
   }
 
   const pickFile = async (file: File | undefined) => {
@@ -448,7 +423,7 @@ function BacktestWorkbench() {
           <section className="rounded-xl border border-border bg-surface p-5">
             <h2 className="mb-4 text-sm font-semibold text-white">2. Rules</h2>
 
-            {compiled ? (
+            {compiled && (
               <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -484,8 +459,6 @@ function BacktestWorkbench() {
                   ))}
                 </ul>
               </div>
-            ) : (
-              <BacktestSuggest onApply={applySuggestion} />
             )}
 
             <label className="mb-2 block text-sm font-medium text-gray-400" htmlFor="run-name">

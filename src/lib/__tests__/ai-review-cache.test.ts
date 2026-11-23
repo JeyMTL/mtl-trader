@@ -15,7 +15,6 @@ const VALID_REVIEW = JSON.stringify({
   confidence: 'medium',
   strengths: [{ title: 'Positive expectancy', detail: 'The journal has an edge.', evidence: 'expectancy: 20' }],
   risks: [],
-  actions: [],
 })
 
 vi.mock('@/lib/server-auth', () => ({

@@ -1,11 +1,11 @@
 /// Features that are built but not on sale yet.
 ///
-/// MT5 sync is on: the desktop EA runs in the trader's own terminal, and the
-/// sync screen is where the EA token lives — the same token the hard lock uses.
-/// The hosted supervisor is optional and still costs money per account, so that
-/// part is only offered when it is funded. Setting this back to `false` hides the
-/// entry points with no other change.
+/// MT5 sync on the phone is the hosted path: the app hands over the investor
+/// password and a supervisor connects from our host. That supervisor is not
+/// running yet, so the screen is hidden until it is — a connection made today
+/// would queue as `pending` forever. Desktop customers use the EA in their own
+/// terminal instead, on the website.
 ///
-/// Mirrors `MT5_SYNC_ENABLED` in `src/lib/features.ts` so the app and the web
-/// dashboard show the same thing on the same day.
-const bool kMt5SyncEnabled = true;
+/// Mirrors `MT5_HOSTED_SYNC_ENABLED` in `src/lib/features.ts` so the app and the
+/// web dashboard show the same thing on the same day.
+const bool kMt5SyncEnabled = false;

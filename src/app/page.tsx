@@ -141,8 +141,8 @@ export default function HomePage() {
             Track. Analyze. <span className="text-gradient">Improve.</span>
           </h1>
           <p className="fade-up-2 text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
-            The professional trading journal that helps you see your own patterns,
-            catch repeated mistakes, and keep your process consistent.
+            A journal that records the trades you take, measures how they performed,
+            and keeps the whole history in one place.
           </p>
           <div className="fade-up-3 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/auth/signup" className="btn-gradient glow-primary text-white px-8 py-4 rounded-xl text-lg font-semibold flex items-center justify-center gap-2">

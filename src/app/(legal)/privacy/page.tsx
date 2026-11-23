@@ -40,9 +40,8 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Sync configuration</strong> — the broker name, server and account login you enter for MetaTrader
-          sync, the encrypted investor (read-only) password when you use hosted sync, plus a hashed sync token.
-          Hosted sync never asks for your trading password, and disconnecting deletes the stored password. The token
-          is what the desktop agent uses to authenticate.
+          sync, plus a sync token. The token is what the desktop agent uses to authenticate, and rotating it stops
+          the old one working.
         </li>
         <li>
           <strong>AI reviews</strong> — the summaries and trade details you submit for review, and the generated
@@ -60,7 +59,7 @@ export default function PrivacyPage() {
         <li>To provide the journal: storing trades and computing statistics (performance of a contract).</li>
         <li>To authenticate you, verify email addresses and reset passwords (contract and security).</li>
         <li>To take payments, activate plans and prevent duplicate charges (contract and legal obligations).</li>
-        <li>To send the transactional email you expect: verification, recovery, weekly and monthly summaries (contract; marketing email only with consent).</li>
+        <li>To send the transactional email you expect: verification and password recovery (contract; marketing email only with consent).</li>
         <li>To generate an AI review when you ask for one (consent, withdrawn by not requesting reviews).</li>
         <li>To detect abuse, enforce quotas and rate limits, and keep the service available (legitimate interests).</li>
       </ul>
@@ -71,7 +70,6 @@ export default function PrivacyPage() {
         <li><strong>Vercel</strong> — application hosting and scheduled jobs.</li>
         <li><strong>Paddle</strong> — card subscription checkout, billing and payment capture.</li>
         <li><strong>PayPal</strong> — renewal of subscriptions started before card checkout.</li>
-        <li><strong>Resend</strong> — transactional and summary email delivery.</li>
         <li><strong>An AI provider</strong> (Google Gemini, or Anthropic where configured) — receives the trade summary you submit for a review. Reviews are not used by us to train models.</li>
       </ul>
       <p>
