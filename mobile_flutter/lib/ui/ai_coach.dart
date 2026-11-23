@@ -248,6 +248,7 @@ class _AiCoachCardState extends State<AiCoachCard> {
             ],
             _findings('Strengths', _review!.strengths, AppColors.success),
             _findings('Risks', _review!.risks, AppColors.danger),
+            _findings('Actions', _review!.actions, AppColors.primary),
             const SizedBox(height: 6),
             Text(
               'A description of your own trades. It does not tell you what to trade.',

@@ -83,6 +83,7 @@ export function buildSystemPrompt(hasImage: boolean): string {
       confidence: 'low | medium | high',
       strengths: [{ title: '...', detail: '...', evidence: 'metric: value' }],
       risks: [{ title: '...', detail: '...', evidence: 'metric: value' }],
+      actions: [{ title: '...', detail: '...' }],
     }),
     `Include at most ${MAX_FINDINGS} items per list. Keep each detail under 240 characters.`,
   ]

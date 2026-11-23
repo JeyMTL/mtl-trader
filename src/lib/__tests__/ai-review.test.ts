@@ -20,6 +20,7 @@ const VALID = JSON.stringify({
   confidence: 'medium',
   strengths: [{ title: 'Positive expectancy', detail: 'Overall expectancy is positive.', evidence: 'expectancy: 33' }],
   risks: [{ title: 'Losses cluster', detail: 'Losses are concentrated in a few days.' }],
+  actions: [{ title: 'Review Fridays', detail: 'Tag trades by day and compare.' }],
 })
 
 describe('generateReview', () => {

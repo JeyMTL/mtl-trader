@@ -51,6 +51,7 @@ class AiReviewResult {
     required this.sampleSize,
     required this.strengths,
     required this.risks,
+    required this.actions,
     required this.insights,
   });
 
@@ -59,6 +60,7 @@ class AiReviewResult {
   final int sampleSize;
   final List<AiFinding> strengths;
   final List<AiFinding> risks;
+  final List<AiFinding> actions;
   final List<CoachInsight> insights;
 
   bool get isEmpty => headline.isEmpty;
@@ -83,6 +85,7 @@ class AiReviewResult {
       sampleSize: (map['sampleSize'] as num?)?.toInt() ?? 0,
       strengths: _findings(map['strengths']),
       risks: _findings(map['risks']),
+      actions: _findings(map['actions']),
       insights: rawInsights is List
           ? rawInsights
               .whereType<Map>()

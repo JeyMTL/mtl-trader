@@ -12,7 +12,7 @@ export const DISCLAIMER = 'Generated from your own journal statistics.'
 export const REVIEW_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['headline', 'confidence', 'strengths', 'risks'],
+  required: ['headline', 'confidence', 'strengths', 'risks', 'actions'],
   properties: {
     headline: { type: 'string', description: 'One-sentence summary grounded in the stats.' },
     confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
@@ -31,6 +31,7 @@ export const REVIEW_JSON_SCHEMA = {
       },
     },
     risks: { type: 'array', maxItems: MAX_FINDINGS, items: { $ref: '#/properties/strengths/items' } },
+    actions: { type: 'array', maxItems: MAX_FINDINGS, items: { $ref: '#/properties/strengths/items' } },
   },
 } as const
 
@@ -110,6 +111,7 @@ export function normalizeReview(
     sampleSize: stats.trades,
     strengths: toFindings(parsed.strengths),
     risks: toFindings(parsed.risks),
+    actions: toFindings(parsed.actions),
     // The matched setups come from the account's own notes, never from the
     // model: a fabricated "similar setup" would present invented history as
     // the trader's own.
@@ -130,6 +132,12 @@ export function insufficientDataReview(stats: EdgeStats): ReviewResult {
         title: 'Sample too small',
         detail: `A meaningful review usually needs at least ${stats.minSample} trades. Keep journaling and no dramatic conclusions should be drawn yet.`,
         evidence: `${stats.trades}/${stats.minSample} trades`,
+      },
+    ],
+    actions: [
+      {
+        title: 'Keep recording',
+        detail: 'Log every trade with a short note so patterns and outcomes can be compared later.',
       },
     ],
     similarSetups: [],

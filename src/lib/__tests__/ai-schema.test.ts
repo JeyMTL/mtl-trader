@@ -61,13 +61,14 @@ describe('normalizeReview', () => {
         confidence: 'high',
         strengths: many,
         risks: [],
+        actions: [{ title: 'Journal more', detail: 'Add notes to every trade.' }],
       }),
       stats()
     )
     expect(review.headline).toContain('Solid edge')
     expect(review.confidence).toBe('high')
     expect(review.strengths).toHaveLength(MAX_FINDINGS)
-    expect(review.risks).toEqual([])
+    expect(review.actions[0].title).toBe('Journal more')
     expect(review.sampleSize).toBe(25)
     expect(review.disclaimer).toBe(DISCLAIMER)
   })
@@ -89,7 +90,7 @@ describe('normalizeReview', () => {
 
   it('forces low confidence when the sample is insufficient', () => {
     const review = normalizeReview(
-      JSON.stringify({ headline: 'x', confidence: 'high', strengths: [], risks: [] }),
+      JSON.stringify({ headline: 'x', confidence: 'high', strengths: [], risks: [], actions: [] }),
       stats({ insufficient: true })
     )
     expect(review.confidence).toBe('low')
@@ -101,6 +102,7 @@ describe('normalizeReview', () => {
         headline: 'x',
         strengths: [],
         risks: [],
+        actions: [],
         similarSetups: [{ note: 'invented setup', outcome: 999, when: null, score: 1 }],
       }),
       stats(),
@@ -121,6 +123,6 @@ describe('insufficientDataReview', () => {
     const review = insufficientDataReview(stats({ trades: 3, insufficient: true }))
     expect(review.confidence).toBe('low')
     expect(review.risks[0].title).toMatch(/sample/i)
-    expect(review.strengths).toEqual([])
+    expect(review.actions).toHaveLength(1)
   })
 })
