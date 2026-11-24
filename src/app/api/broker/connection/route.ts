@@ -165,6 +165,12 @@ export async function POST(req: Request) {
           status: 'pending',
           last_attempt_at: now,
           last_error: null,
+          // And it clears the cursor, so the next sync reads the full year
+          // again. Reconnecting is the only way a customer can recover from a
+          // first sync that ran before the terminal had downloaded its history;
+          // keeping the cursor made that advice do nothing at all. Duplicates
+          // are ignored by `/api/sync`, so re-reading costs a few rows, not data.
+          last_sync_at: null,
           updated_at: now,
         },
         { onConflict: 'user_id' }
