@@ -8,7 +8,18 @@ class StubResizeObserver {
   disconnect() {}
 }
 
-import { LevelPicker, levelDecimals } from '@/components/level-picker'
+import { INTERVAL_KEYS, LevelPicker, levelDecimals } from '@/components/level-picker'
+import { parseChartInterval } from '@/lib/market-candles'
+
+describe('level picker intervals', () => {
+  it('sends a key the candles route accepts for every size it offers', () => {
+    // The picker used to send its own labels (`M15`), and the route answered
+    // "Unknown candle interval" — a blank chart that blamed the symbol.
+    for (const key of Object.values(INTERVAL_KEYS)) {
+      expect(parseChartInterval(key)).toBe(key)
+    }
+  })
+})
 
 type MockResponse = { ok: boolean; json: () => Promise<unknown> }
 
@@ -41,7 +52,7 @@ describe('LevelPicker', () => {
     // The route peels the broker suffix; the header keeps the trader's symbol
     // because that is the one they recognise.
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/market/candles?symbol=XAUUSDM&interval=M15'),
+      expect.stringContaining('/api/market/candles?symbol=XAUUSDM&interval=15m'),
       expect.anything()
     )
   })

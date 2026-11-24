@@ -157,7 +157,7 @@ describe('TradeForm', () => {
     )
     // The broker suffix is the route's problem to resolve, not the form's.
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/market/candles?symbol=XAUUSDM&interval=M15'),
+      expect.stringContaining('/api/market/candles?symbol=XAUUSDM&interval=15m'),
       expect.anything()
     )
   })

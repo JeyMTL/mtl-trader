@@ -48,6 +48,19 @@ const MARKERS: { key: Marker; label: string }[] = [
 const INTERVALS = ['M5', 'M15', 'H1', 'H4'] as const
 type Interval = (typeof INTERVALS)[number]
 
+/**
+ * The picker shows MT5's names for candle sizes; `/api/market/candles` takes its
+ * own keys. Sending the label (`M15`) is answered with "Unknown candle interval"
+ * and the trader sees an empty chart that blames the symbol, which is why this
+ * mapping is explicit rather than a format shared by accident.
+ */
+export const INTERVAL_KEYS: Record<Interval, string> = {
+  M5: '5m',
+  M15: '15m',
+  H1: '1h',
+  H4: '4h',
+}
+
 /** Price decimals that suit the magnitude: 5 for EUR/USD, 3 for gold, 2 for indices. */
 export function levelDecimals(price: number): number {
   const magnitude = Math.abs(price)
@@ -88,7 +101,7 @@ export function LevelPicker({ symbol, side, initial, onApply, onClose }: LevelPi
     const load = async () => {
       try {
         const response = await fetch(
-          `/api/market/candles?symbol=${encodeURIComponent(feedSymbol)}&interval=${interval}`,
+          `/api/market/candles?symbol=${encodeURIComponent(feedSymbol)}&interval=${INTERVAL_KEYS[interval]}`,
           { cache: 'no-store' }
         )
         const body = (await response.json()) as { candles?: Candle[]; error?: string }
