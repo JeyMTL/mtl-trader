@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
+import { cancelPaddleSubscription } from '@/lib/paddle'
 import { apiError, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
 
@@ -14,6 +15,13 @@ import { readJsonBody } from '@/lib/request'
  *
  * Requires the caller to echo their own email, which stops a stray request (or an
  * XSS payload) from destroying the account on its own.
+ *
+ * A card subscription is cancelled before anything is deleted. Paddle bills on
+ * its own schedule and knows nothing about this account, so deleting the row
+ * while the agreement renewed would charge a card for a product the customer can
+ * no longer sign in to. If that cancellation cannot be confirmed, the deletion is
+ * refused: leaving someone subscribed is recoverable, taking their money with no
+ * account to show for it is not.
  */
 export async function POST(req: Request) {
   try {
@@ -43,6 +51,74 @@ export async function POST(req: Request) {
     }
 
     const supabase = getAdminClient()
+
+    // Cancel any live card agreement first. Google Play renewals are not
+    // reachable from here — Google owns that agreement and only the customer can
+    // stop it — so the page points Play subscribers at the Play Store instead.
+    const { data: cardSubscriptions, error: cardLookupError } = await supabase
+      .from('billing_subscriptions')
+      .select('provider, status, remote_plan_id')
+      .eq('user_id', user.id)
+      .in('provider', ['paddle', 'paypal'])
+
+    if (cardLookupError) {
+      return apiError(
+        'account.delete.billing_lookup',
+        cardLookupError,
+        503,
+        'Could not check whether a card subscription is still billing. Please try again.'
+      )
+    }
+
+    for (const subscription of cardSubscriptions ?? []) {
+      if (subscription.status !== 'active') continue
+
+      // A subscription started under the old PayPal checkout renews at PayPal,
+      // and nothing here can stop it. Deleting the account would leave it
+      // charging with no login attached, so ask for support instead.
+      if (subscription.provider === 'paypal') {
+        return NextResponse.json(
+          {
+            error:
+              'This account still has a subscription renewing through PayPal. Email support@mtlledger.com to stop it first — nothing was deleted.',
+            code: 'cancel_via_support',
+          },
+          { status: 409 }
+        )
+      }
+
+      const remoteId = subscription.remote_plan_id
+      if (typeof remoteId !== 'string' || !remoteId) {
+        return NextResponse.json(
+          {
+            error:
+              'Your card subscription has no billing reference to cancel. Contact support and we will stop it before deleting the account.',
+            code: 'cancel_unavailable',
+          },
+          { status: 502 }
+        )
+      }
+      try {
+        const cancelled = await cancelPaddleSubscription(remoteId)
+        if (!cancelled) {
+          return NextResponse.json(
+            {
+              error:
+                'Card billing is not configured on this server, so the subscription was not stopped. Nothing was deleted — contact support before assuming billing has ended.',
+              code: 'cancel_unavailable',
+            },
+            { status: 502 }
+          )
+        }
+      } catch (error: unknown) {
+        return apiError(
+          'account.delete.billing_cancel',
+          error,
+          502,
+          'Could not cancel your card subscription, so nothing was deleted. Please try again.'
+        )
+      }
+    }
 
     // Storage objects do not cascade with the database rows. Remove the
     // journal's photos and voice notes while the attachment paths still exist.

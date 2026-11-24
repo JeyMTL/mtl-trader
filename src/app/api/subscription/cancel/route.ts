@@ -104,7 +104,7 @@ export async function POST(req: Request) {
       .from('billing_subscriptions')
       .select('provider, status, remote_plan_id')
       .eq('user_id', authUser.id)
-      .eq('provider', 'paddle')
+      .in('provider', ['paddle', 'paypal'])
 
     // Same rule as Google: a failed lookup cannot prove there is no live card
     // agreement, so it must not fall through to a local cancellation.
@@ -119,6 +119,21 @@ export async function POST(req: Request) {
 
     for (const subscription of cardSubscriptions ?? []) {
       if (subscription.status !== 'active') continue
+
+      // Subscriptions opened under the old PayPal checkout still renew there.
+      // There is no PayPal cancel call in this app, so claiming success would
+      // leave the customer believing the next charge had been stopped.
+      if (subscription.provider === 'paypal') {
+        return NextResponse.json(
+          {
+            error:
+              'This subscription renews through PayPal, which this page cannot stop. Email support@mtlledger.com and we will cancel it and confirm in writing.',
+            code: 'cancel_via_support',
+          },
+          { status: 409 }
+        )
+      }
+
       const remoteId = subscription.remote_plan_id
       if (typeof remoteId !== 'string' || !remoteId) {
         return NextResponse.json(

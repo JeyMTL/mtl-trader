@@ -27,7 +27,7 @@ The value is in the integrated foundation, not a customer base or proven revenue
 - Next.js, React, and TypeScript web application
 - Supabase/PostgreSQL schema, migrations, and row-level security policies
 - Trade import and analytics features
-- PayPal and bank-transfer payment workflows
+- Paddle card checkout, webhooks and plan application (plus Google Play billing in the app)
 - Capacitor mobile wrapper and native project structure
 - Optional MT5 sync agent
 - Environment-variable template and setup documentation

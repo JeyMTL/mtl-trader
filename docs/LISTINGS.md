@@ -20,7 +20,7 @@ unserious for a pre-revenue MVP. Raise it after you add traction.
 - **Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4
 - **Backend:** Supabase (Postgres, Auth, RLS policies, SQL triggers)
 - **Hosting:** Vercel-ready (cron jobs configured in `vercel.json`)
-- **Payments:** PayPal subscriptions + bank-transfer flow with admin approval
+- **Payments:** Card subscriptions through Paddle + Google Play billing
 - **Alerts:** Mobile app notifications (device-side, no email pipeline)
 - **Mobile:** Capacitor wrapper (Android + iOS projects present)
 - **Tests:** 86 automated tests (Vitest), all passing
@@ -35,7 +35,7 @@ unserious for a pre-revenue MVP. Raise it after you add traction.
 
 Short (pick one):
 
-1. "Trading-journal SaaS MVP — Next.js + Supabase, PayPal billing, admin flows, 86 passing tests."
+1. "Trading-journal SaaS MVP — Next.js + Supabase, Paddle billing, DB-enforced quotas, 86 passing tests."
 2. "Pre-revenue trading analytics starter: import MT5 trades, full dashboard, subscription + quota logic."
 3. "A real SaaS codebase, not a tutorial — auth, payments, DB-enforced limits, mobile wrapper."
 
@@ -44,8 +44,7 @@ Pitch paragraph:
 > MTL Ledger is a working early-stage MVP for a trading journal and analytics
 > product. Traders import MT5-era trade history (CSV/XLSX/XML), then review P&L,
 > equity curves, a trading calendar, and performance analytics. It includes
-> Supabase auth with row-level security, PayPal subscriptions plus a
-> bank-transfer approval flow, database-enforced plan quotas, optional email
+> Supabase auth with row-level security, Paddle card subscriptions plus Google Play billing, database-enforced plan quotas, optional email
 > summaries, and a Capacitor mobile shell. No users or revenue yet — it is a
 > ready-to-continue foundation, not a finished business.
 
@@ -69,24 +68,22 @@ What's built and working:
 • Trade import for MT5-style CSV, XLSX and XML (parser is unit tested)
 • Dashboard, analytics, equity curve, trading calendar, monthly overview
 • Supabase auth + row-level security; email-verified accounts
-• PayPal subscriptions (Basic / Pro) + bank-transfer flow with admin approval
+• Card subscriptions through Paddle (Basic / Pro) + Google Play billing
 • Plan/trial quotas enforced in the database (SQL trigger), not just the UI
 • Mobile trade alerts (device-side notifications)
 • MT5 auto-sync workflow via an agent token
 • Capacitor mobile wrapper (Android + iOS projects included)
-• Admin dashboard for reviewing payments
 • 86 automated tests, clean type-check and lint, production build passes
 
 What it needs from a buyer:
 • Supabase project (migrations included, apply in filename order)
-• PayPal REST app + webhook ID
-• BANK_* for bank-transfer display
+• Paddle account + API key and webhook secret
 • Deploy to Vercel (cron config included)
 
 Included: full source, git history, README/docs, an IP-transfer template, and
 a script to verify the payment integration.
 
-Stack: Next.js, React, TypeScript, Tailwind, Supabase, Vercel, PayPal,
+Stack: Next.js, React, TypeScript, Tailwind, Supabase, Vercel, Paddle,
 Capacitor. Happy to walk a serious buyer through the repo.
 ```
 
@@ -96,7 +93,7 @@ Capacitor. Happy to walk a serious buyer through the repo.
 
 ## Section 3 — Microns.io listing
 
-**Title:** Trading journal & analytics SaaS MVP — Next.js + Supabase + PayPal
+**Title:** Trading journal & analytics SaaS MVP — Next.js + Supabase + Paddle
 
 **Asking price:** $1,950
 
@@ -107,7 +104,7 @@ Capacitor. Happy to walk a serious buyer through the repo.
 ```
 A pre-revenue MVP of a trading journal and analytics platform. Real business
 logic already implemented: Supabase auth + RLS, server-validated payments
-(PayPal + bank transfer with admin approval), idempotent payment application
+(Paddle card + Google Play), idempotent payment application
 and reconciliation, DB-enforced plan quotas, and timezone-aware notification
 emails. 86 tests pass; build/typecheck/lint are clean.
 
@@ -140,12 +137,12 @@ I'm selling it as-is.
 It's a genuinely functional MVP, not a mockup:
 • MT5 import (CSV/XLSX/XML) + dashboard, analytics, calendar
 • Supabase auth/RLS + subscription + trial + DB-enforced quotas
-• PayPal subscriptions and a bank-transfer approval flow
+• Paddle card subscriptions and Google Play billing
 • Mobile trade alerts (device-side notifications)
 • Capacitor Android/iOS wrapper
 • 86 passing tests, clean build
 
-Buyer needs their own Supabase + PayPal accounts. Comes
+Buyer needs their own Supabase + Paddle accounts. Comes
 with docs, migrations, an IP-transfer template, and check scripts. Open to
 offers and happy to answer questions.
 ```
@@ -163,7 +160,7 @@ offers and happy to answer questions.
 
 ```
 Spent a few months building MTL Ledger, a trading journal + analytics SaaS
-(Next.js, Supabase, PayPal). It's finished enough to run: trade import,
+(Next.js, Supabase, Paddle). It's finished enough to run: trade import,
 dashboard/analytics/calendar, subscriptions with trial + quotas enforced in
 Postgres, admin payment approval, and a Capacitor
 mobile wrapper. 86 tests pass.
@@ -181,7 +178,7 @@ If you've bought/sold pre-revenue MVPs, I'd also love advice on how to price it.
 
 ```
 Context: I have a working MVP for a trading journal SaaS (Next.js + Supabase +
-PayPal). Real logic: auth, RLS, subscription/trial/quota enforcement in the DB,
+Paddle). Real logic: auth, RLS, subscription/trial/quota enforcement in the DB,
 payments with idempotent application + reconciliation, admin approval, and
 notification emails. 86 tests, clean build. Zero users, zero revenue.
 
@@ -199,8 +196,7 @@ Selling a complete, tested MVP codebase for a trading journal/analytics SaaS.
 
 • Next.js 16 + React 19 + TypeScript + Tailwind 4
 • Supabase auth + RLS + SQL triggers for plan quotas
-• PayPal subscriptions + bank-transfer approval flow
-• Admin dashboard
+• Paddle card subscriptions + Google Play billing
 • Capacitor Android/iOS wrapper
 • 86 passing tests; build/typecheck/lint clean
 
@@ -215,7 +211,7 @@ integration check scripts. ~$[PRICE] or best offer. DM for a repo walkthrough.
 ### Indie Hackers (post in "Products" or "Selling")
 
 ```
-Built MTL Ledger — a trading journal + analytics SaaS (Next.js/Supabase/PayPal).
+Built MTL Ledger — a trading journal + analytics SaaS (Next.js/Supabase/Paddle).
 Pre-revenue, no users; selling it as a codebase because I don't have the runway
 to grow it. 86 tests, clean build, subscription + DB-enforced quotas, admin
 payment flow, mobile wrapper. Asking ~$[PRICE] OBO. Happy to walk through the
@@ -227,7 +223,7 @@ repo. Also open to advice from anyone who's sold a pre-revenue MVP.
 ```
 I built a trading-journal SaaS MVP and never launched it.
 
-Next.js + Supabase + PayPal. Subscriptions, trial + DB-enforced quotas,
+Next.js + Supabase + Paddle. Subscriptions, trial + DB-enforced quotas,
 admin payment approval, 86 passing tests, mobile wrapper.
 
 No users, no revenue. Selling it as a codebase, ~$[PRICE] OBO.
@@ -238,7 +234,7 @@ DM for a walkthrough. 🧵
 
 ```
 Ask HN: what's the realistic price for a pre-revenue MVP codebase?
-I have a working trading-journal SaaS (Next.js/Supabase, PayPal billing,
+I have a working trading-journal SaaS (Next.js/Supabase, Paddle billing,
 DB-enforced quotas, 86 tests) but no users. Selling as an asset. Any data
 points on price and best venues would help.
 ```
@@ -250,7 +246,7 @@ points on price and best venues would help.
 Sell as a **boilerplate/template** (many buyers, lower price each) on
 Sell My Code, Codester, or CodeCanyon. Non-exclusive listing is fine.
 
-**Title:** Trading Journal SaaS Starter — Next.js + Supabase + PayPal (TypeScript)
+**Title:** Trading Journal SaaS Starter — Next.js + Supabase + Paddle (TypeScript)
 
 ```
 A production-style Next.js boilerplate for a trading/fintech SaaS. Clone it and
@@ -258,14 +254,14 @@ have auth, billing, admin, and analytics flows ready to customize.
 
 Includes:
 • Supabase auth + row-level security + SQL triggers (plan quotas)
-• PayPal subscription checkout + bank-transfer approval flow
+• Paddle card subscription checkout + Google Play billing
 • Idempotent payment application + reconciliation job
 • Dashboard, analytics, calendar, import (CSV/XLSX/XML)
 • Payment reconciliation cron setup
 • Capacitor Android/iOS wrapper
 • Vitest test suite, README, migrations
 
-Requirements: your own Supabase + PayPal accounts.
+Requirements: your own Supabase + Paddle accounts.
 ```
 
 > Note licensing: a template sale lets multiple buyers use the code. If you
@@ -279,7 +275,7 @@ Requirements: your own Supabase + PayPal accounts.
 
 ```
 Hi [Name] — I saw [you build trading/fintech apps]. I'm selling the source of a
-working trading-journal SaaS MVP (Next.js + Supabase + PayPal): import,
+working trading-journal SaaS MVP (Next.js + Supabase + Paddle): import,
 dashboard/analytics, subscriptions with trial + DB-enforced quotas, admin
 payment approval, mobile wrapper, 86 tests. No users —
 selling the codebase/asset. Asking ~$[PRICE] OBO.
@@ -294,7 +290,7 @@ Would a walkthrough be useful? Happy to send a demo link and repo map.
 - **"Any users or revenue?"** → "None. This is a pre-revenue codebase sale." Never imply otherwise.
 - **"Why selling?"** → "No capital/time for go-to-market."
 - **"Can I see it live?"** → Have a hosted demo ready (Vercel) with sample data.
-- **"What will I have to build/configure?"** → Supabase project + migrations, PayPal app + webhook ID, bank config.
+- **"What will I have to build/configure?"** → Supabase project + migrations, Paddle API key + webhook secret.
 - **"Any legal/compliance issues?"** → Trading/finance niche; the buyer should handle their own compliance. The project is a journal/analytics tool and does not place trades or give financial advice.
 - **"Is the code original?"** → Yes, original code; third-party libraries under their own licenses are not transferred.
 - **"Did you remove personal data?"** → Yes — personal broker exports were removed from the repository and its history.
@@ -305,7 +301,7 @@ Would a walkthrough be useful? Happy to send a demo link and repo map.
 
 - Pre-revenue, **no users**.
 - Early-stage **MVP**, sold **as-is**, no warranty of fitness or revenue.
-- Requires the buyer's own **Supabase, PayPal** and optional **BANK_*** setup.
+- Requires the buyer's own **Supabase, Paddle** setup.
 - **Mobile wrapper is a shell** — push notifications are not configured.
 - **Bank-transfer activation is manual** (admin approval).
 - **Email notifications and webhook reconciliation are inert** until the related
@@ -320,5 +316,5 @@ Would a walkthrough be useful? Happy to send a demo link and repo map.
 - Anchor at $1,950, accept $1,200–$1,800 for a clean quick sale.
 - A live demo + 5–10 real users justifies $3,000–$5,000.
 - Bundle a 60-minute onboarding call as a value-add (costs you nothing) to close.
-- Never transfer live credentials. Rotate `CRON_SECRET`, PayPal keys, Supabase
+- Never transfer live credentials. Rotate `CRON_SECRET`, Paddle keys, Supabase
   service-role key before handoff.

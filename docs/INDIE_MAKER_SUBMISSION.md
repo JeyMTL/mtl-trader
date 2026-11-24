@@ -58,7 +58,7 @@ How it earns:
 Automated subscription billing turns an unlimited 3-day free trial into a low-cost tier or a higher tier that adds the backtester and market replay; trade volume is unlimited on both, so paying never means logging fewer trades than the trial allowed. Trials, entitlements, and plan upgrades are enforced server-side, and payments are applied idempotently so a dropped payment webhook never loses a sale.
 
 Under the hood:
-A modern TypeScript web app on a hosted Postgres database, a database-level quota trigger, signature-verified payment webhooks, an admin approval flow for bank transfers, and timezone-aware email performance summaries. Includes a mobile wrapper and a test suite covering the import parser, billing rules, and notification scheduling.
+A modern TypeScript web app on a hosted Postgres database, a database-level quota trigger, signature-verified payment webhooks, card checkout through Paddle and Google Play billing, and timezone-aware email performance summaries. Includes a mobile wrapper and a test suite covering the import parser, billing rules, and notification scheduling.
 ```
 
 **Key features** (one per box, 3–5)

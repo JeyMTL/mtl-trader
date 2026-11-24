@@ -81,13 +81,23 @@ export default function DeleteAccountPage() {
         </li>
       </ul>
 
-      <h2>Cancelling a subscription first</h2>
+      <h2>Subscriptions</h2>
       <p>
-        Deleting your account does not automatically cancel a card subscription — the payment
-        provider bills independently of the app. Cancel from{' '}
-        <Link href="/dashboard/settings">Settings</Link> before you delete, or the card keeps
-        renewing with no account to apply it to. If that happens, email us and we will cancel it and
-        refund any charge taken after the deletion.
+        A card subscription bought through the website is cancelled when you delete your account: the
+        billing agreement is stopped first, and if that cannot be confirmed the deletion is refused so
+        a card is never charged for a deleted account. Nothing is deleted until the cancellation has gone
+        through.
+      </p>
+      <p>
+        A subscription sold by <strong>Google Play</strong> is different — Google owns that agreement, and no
+        app can cancel it. Cancel it in Google Play &rarr; Payments &amp; subscriptions before deleting, or it
+        keeps renewing against a Play account that no longer has an MTL Ledger login. If you have already
+        deleted and want that charge refunded, email us.
+      </p>
+      <p>
+        A subscription started under our earlier <strong>PayPal</strong> checkout also renews outside this app.
+        The deletion form refuses while one is still billing and asks you to email support, so it cannot be
+        removed with the charge still running.
       </p>
 
       <h2>Questions</h2>

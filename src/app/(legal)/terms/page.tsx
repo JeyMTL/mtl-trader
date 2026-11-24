@@ -61,8 +61,11 @@ export default function TermsPage() {
           <Link href="/pricing">pricing page</Link>.</li>
         <li>On the website, payment is taken by card through Paddle, our merchant of record.
           In the Android app, subscriptions are sold and billed by Google Play.</li>
-        <li>Subscriptions renew automatically until cancelled. Website subscriptions can be cancelled from
-          Settings; Google Play subscriptions must be cancelled in Google Play &rarr; Subscriptions. Cancelling
+        <li>Subscriptions started under our earlier PayPal checkout keep renewing through PayPal until
+          they are stopped. They are not moved to card billing, and support cancels them on request.</li>
+        <li>Subscriptions renew automatically until cancelled. Card subscriptions can be cancelled from
+          Settings, which also stops the renewal at Paddle; PayPal subscriptions are cancelled by support;
+          Google Play subscriptions must be cancelled in Google Play &rarr; Subscriptions. Cancelling
           in the app or uninstalling it does not cancel a Google Play subscription. After cancellation, access
           continues until the end of the period you have paid for.</li>
         <li>Refunds for website purchases are covered by our <Link href="/refunds">Refund Policy</Link>.

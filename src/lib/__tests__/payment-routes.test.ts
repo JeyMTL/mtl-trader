@@ -12,6 +12,9 @@ const state = vi.hoisted(() => ({
   applyResult: 'applied',
   deleteAccountResult: 'deleted',
   authDeleteError: null as { message: string } | null,
+  billingRows: [] as Row[],
+  cancelledSubscriptions: [] as string[],
+  paddleCancelResult: true,
   verified: 'SUCCESS',
   authUser: { id: 'u1', email: 'trader@example.com', email_confirmed_at: '2026-01-01T00:00:00Z' } as Row | null,
 }))
@@ -34,6 +37,16 @@ vi.mock('@/lib/server-auth', () => {
       return { data: null, error: { message: `Unexpected rpc: ${name}` } }
     },
     from: (table: string) => {
+      if (table === 'billing_subscriptions') {
+        const billing = {
+          select: () => billing,
+          eq: () => billing,
+          in: () => billing,
+          then: (resolve: (value: { data: Row[]; error: null }) => unknown) =>
+            resolve({ data: state.billingRows, error: null }),
+        }
+        return billing
+      }
       if (table !== 'payment_events') throw new Error(`Unexpected table: ${table}`)
       const chain = {
         select: () => chain,
@@ -61,6 +74,17 @@ vi.mock('@/lib/server-auth', () => {
 vi.mock('@/lib/payments', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   return { ...actual, getPayPalAccessToken: async () => 'test-token' }
+})
+
+vi.mock('@/lib/paddle', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>
+  return {
+    ...actual,
+    cancelPaddleSubscription: async (id: string) => {
+      state.cancelledSubscriptions.push(id)
+      return state.paddleCancelResult
+    },
+  }
 })
 
 const WEBHOOK_HEADERS = {
@@ -96,6 +120,9 @@ beforeEach(() => {
   state.applyResult = 'applied'
   state.deleteAccountResult = 'deleted'
   state.authDeleteError = null
+  state.billingRows = []
+  state.cancelledSubscriptions = []
+  state.paddleCancelResult = true
   state.verified = 'SUCCESS'
   state.authUser = { id: 'u1', email: 'trader@example.com', email_confirmed_at: '2026-01-01T00:00:00Z' }
 
@@ -257,5 +284,40 @@ describe('account deletion', () => {
     expect(res.status).toBe(500)
     // Data removal already happened; the response must not claim success.
     expect(state.deleteAccountCalls).toEqual(['u1'])
+  })
+
+  it('cancels a live card subscription before deleting anything', async () => {
+    state.billingRows = [
+      { provider: 'paddle', status: 'active', remote_plan_id: 'sub_123' },
+    ]
+
+    const res = await deleteAccount({ confirmEmail: 'trader@example.com' })
+    expect(res.status).toBe(200)
+    expect(state.cancelledSubscriptions).toEqual(['sub_123'])
+    expect(state.deleteAccountCalls).toEqual(['u1'])
+  })
+
+  it('refuses to delete when the card subscription cannot be stopped', async () => {
+    state.billingRows = [
+      { provider: 'paddle', status: 'active', remote_plan_id: 'sub_123' },
+    ]
+    state.paddleCancelResult = false
+
+    const res = await deleteAccount({ confirmEmail: 'trader@example.com' })
+    expect(res.status).toBe(502)
+    // Nothing may be deleted while the card keeps renewing.
+    expect(state.deleteAccountCalls).toEqual([])
+    expect(state.deleteCalls).toEqual([])
+  })
+
+  it('refuses to delete an account whose PayPal subscription still renews', async () => {
+    state.billingRows = [
+      { provider: 'paypal', status: 'active', remote_plan_id: 'I-BPP' },
+    ]
+
+    const res = await deleteAccount({ confirmEmail: 'trader@example.com' })
+    expect(res.status).toBe(409)
+    expect(state.deleteAccountCalls).toEqual([])
+    expect(state.cancelledSubscriptions).toEqual([])
   })
 })

@@ -50,7 +50,7 @@ The Assignee acknowledges:
 
 - The Software is an **early-stage MVP**, sold "as is".
 - Several integrations require the Assignee's own credentials and setup
-  (`PAYPAL_WEBHOOK_ID`, `BANK_*`).
+  (`PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_*`).
 - The Assignor has removed personal financial data from the repository and its
   history. The Assignee should verify this via `git log --stat`.
 - No guarantee of fitness for a particular purpose, uptime, or revenue.
