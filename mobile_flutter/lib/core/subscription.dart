@@ -148,24 +148,22 @@ class SubscriptionInfo {
     }
   }
 
-  /// The heading a lapsed account sees. The point is not to be subtle: access
-  /// has stopped, and renewing is the only way to keep using the journal.
+  /// The heading a lapsed account sees. It is not a lockout: the free tier
+  /// keeps going with 30 trades a month, so the wording says what changed rather
+  /// than telling the trader the journal has stopped.
   String get endedTitle {
     if (state == SubscriptionState.cancelled) {
-      return 'Your subscription was cancelled';
+      return 'Your paid plan has ended';
     }
     if (lapsedPaidPlan) return 'Your subscription has ended';
     if (status == 'trial') return 'Your free trial has ended';
-    return 'Your subscription has ended';
+    return 'Your plan has ended';
   }
 
   String get endedBody {
-    if (lapsedPaidPlan) {
-      return 'Buy a subscription to keep recording trades, viewing analytics and '
-          'opening the chart. Your journal is safe — nothing was deleted.';
-    }
-    return 'Buy a subscription to keep recording trades, viewing analytics and '
-        'opening the chart.';
+    return 'You are on the Free plan: 30 trades a month, with your journal, '
+        'charts and the prop-firm simulator. Nothing was deleted. Subscribe for '
+        'unlimited trades and the Pro tools.';
   }
 
   /// The label on the recovery button.

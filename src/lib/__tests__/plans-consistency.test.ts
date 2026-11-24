@@ -36,14 +36,16 @@ describe('plan catalogue', () => {
     expect(PLANS.filter((p) => p.annual_price).map((p) => p.id).sort()).toEqual(['basic', 'pro'])
   })
 
-  it('uses -1 only for the unlimited plans', () => {
-    // Volume is not a differentiator: every plan, paid or not, is unlimited. A
-    // cap on Basic is the one thing that made paying worse than the trial.
+  it('uses -1 for the paid plans and a real monthly cap for Free', () => {
+    // Volume is not what separates the paid tiers: a cap on Basic is the one
+    // thing that made paying worse than the trial. Free is deliberately capped
+    // at 30 a month, because it is a standing tier now rather than a read-only
+    // tombstone.
     expect(PLANS.filter((plan) => plan.max_trades === -1).map((plan) => plan.id).sort()).toEqual([
       'basic',
-      'free',
       'pro',
     ])
+    expect(PLANS.find((plan) => plan.id === 'free')?.max_trades).toBe(30)
     for (const plan of PLANS.filter((p) => p.max_trades !== -1)) {
       expect(plan.max_trades).toBeGreaterThan(0)
     }

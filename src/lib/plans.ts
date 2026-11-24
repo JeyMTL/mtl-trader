@@ -31,12 +31,17 @@ export const PLANS: SubscriptionPlan[] = [
     id: 'free',
     name: 'Free',
     price: 0,
-    max_trades: -1,
+    // The free tier is a real tier: 30 trades a month, every month, with the
+    // prop-firm simulator. It is the tier a lapsed trial or paid period falls
+    // back to, so it cannot be a read-only tombstone.
+    max_trades: 30,
     features: [
-      '3-day free trial: every Pro tool, unlimited trades',
-      'No card needed to start',
-      'After the trial, your journal stays readable',
-      'Photos and voice notes stay attached and viewable',
+      '3-day trial: every Pro tool, unlimited trades',
+      '30 trades a month after the trial',
+      'Prop-firm simulator: daily loss, drawdown, target and consistency rules',
+      'Journal with photos, voice notes, tags, setups and mistakes',
+      'Chart desk with levels pinned off the chart, 30s and 45s candles',
+      'Time edge and setup matrix on your own trades',
       'Import your full MT5 history at any time',
     ],
   },

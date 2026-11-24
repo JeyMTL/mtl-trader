@@ -126,7 +126,7 @@ export default function DashboardLayout({
           email: authUser.email ?? null,
           subscription_tier: 'free',
           subscription_status: 'expired',
-          max_trades: 0,
+          max_trades: 30,
           trial_ends_at: null,
           current_period_end: null,
           cancel_at_period_end: false,
@@ -363,10 +363,12 @@ export default function DashboardLayout({
                 {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
                  user.status === 'trial'
                    ? trial?.expired
-                     ? 'Trial ended — your journal stays readable'
+                     ? 'Trial ended — 30 trades a month on Free'
                      : `${trialLabel}, unlimited trades`
                    :
-                 'Read-only — journal safe'}
+                 user.maxTrades === 0
+                   ? 'Read-only — journal safe'
+                   : `${tradesRemaining} of ${user.maxTrades} trades left this month`}
               </div>
               {!proTools && (
                 <Link href="/pricing" className="mt-2 block text-xs font-semibold text-primary hover:underline">

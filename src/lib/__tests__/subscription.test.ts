@@ -28,7 +28,8 @@ const iso = (d: Date) => d.toISOString()
 
 describe('maxTradesForPlan', () => {
   it('maps each plan id to its allowance', () => {
-    expect(maxTradesForPlan('free')).toBe(UNLIMITED)
+    // The free tier is a real tier: 30 a month, with the prop-firm simulator.
+    expect(maxTradesForPlan('free')).toBe(30)
     // Unlimited on Basic too: a cap there made paying worse than the trial.
     expect(maxTradesForPlan('basic')).toBe(UNLIMITED)
     expect(maxTradesForPlan('pro')).toBe(UNLIMITED)
@@ -87,8 +88,8 @@ describe('effectiveMaxTrades', () => {
     expect(effectiveMaxTrades({ subscription_status: 'trial', trial_ends_at: trialEndsAtFrom(NOW), max_trades: 10 }, NOW)).toBe(UNLIMITED)
   })
 
-  it('gives no allowance to an expired trial even if max_trades is set', () => {
-    expect(effectiveMaxTrades({ subscription_status: 'trial', trial_ends_at: '2026-01-01T00:00:00Z', max_trades: 50 }, NOW)).toBe(0)
+  it('falls back to the free allowance once a trial has expired', () => {
+    expect(effectiveMaxTrades({ subscription_status: 'trial', trial_ends_at: '2026-01-01T00:00:00Z', max_trades: 50 }, NOW)).toBe(30)
   })
 
   it('uses the stored max inside a paid period', () => {
@@ -100,22 +101,22 @@ describe('effectiveMaxTrades', () => {
     }, NOW)).toBe(50)
   })
 
-  it('drops to zero when the paid period has lapsed', () => {
+  it('drops to the free allowance when the paid period has lapsed', () => {
     expect(effectiveMaxTrades({
       subscription_status: 'active',
       subscription_tier: 'pro',
       max_trades: UNLIMITED,
       current_period_end: iso(day(-1)),
-    }, NOW)).toBe(0)
+    }, NOW)).toBe(30)
   })
 
-  it('defaults a missing max to zero', () => {
+  it('treats a missing max inside a paid period as unlimited, like the trigger', () => {
     expect(effectiveMaxTrades({
       subscription_status: 'active',
       subscription_tier: 'basic',
       max_trades: null,
       current_period_end: iso(day(3)),
-    }, NOW)).toBe(0)
+    }, NOW)).toBe(UNLIMITED)
   })
 })
 
@@ -136,13 +137,19 @@ describe('monthlyRemaining', () => {
     expect(monthlyRemaining(account, 80, NOW)).toBe(0)
   })
 
-  it('is zero once access has lapsed', () => {
+  it('is the free allowance once access has lapsed', () => {
     expect(monthlyRemaining({
       subscription_status: 'active',
       subscription_tier: 'pro',
       max_trades: UNLIMITED,
       current_period_end: iso(day(-2)),
-    }, 0, NOW)).toBe(0)
+    }, 0, NOW)).toBe(30)
+    expect(monthlyRemaining({
+      subscription_status: 'active',
+      subscription_tier: 'pro',
+      max_trades: UNLIMITED,
+      current_period_end: iso(day(-2)),
+    }, 12, NOW)).toBe(18)
   })
 })
 
@@ -193,19 +200,19 @@ describe('column value builders', () => {
     expect(cancelAtPeriodEndFields()).toEqual({ cancel_at_period_end: true })
   })
 
-  it('expiry and revocation remove access', () => {
+  it('expiry and revocation fall back to the free allowance', () => {
     expect(expiredFields()).toEqual({
       subscription_tier: 'free',
       subscription_status: 'expired',
-      max_trades: 0,
-      trades_remaining: 0,
+      max_trades: 30,
+      trades_remaining: 30,
       cancel_at_period_end: false,
     })
     expect(revokedFields()).toEqual({
       subscription_tier: 'free',
       subscription_status: 'cancelled',
-      max_trades: 0,
-      trades_remaining: 0,
+      max_trades: 30,
+      trades_remaining: 30,
       cancel_at_period_end: false,
     })
   })

@@ -499,13 +499,9 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
         // The trigger speaks in SQL. A refused save must say what happened to the
         // journal, not just what the constraint was called.
         const message = insertError.message
-        if (/Free trial ended/i.test(message)) {
+        if (/Monthly trade limit/i.test(message)) {
           setError(
-            'Your 3-day trial has ended. Nothing was deleted — your journal is still here and readable. Choose a plan to add new trades.'
-          )
-        } else if (/Monthly trade limit/i.test(message)) {
-          setError(
-            'You have reached this month’s trade limit. Your journal is untouched — upgrade for a higher limit, or log this trade next month.'
+            'You have reached this month’s trade limit. Free includes 30 trades a month — your journal is untouched, and the allowance resets on the 1st. Upgrade for unlimited trades.'
           )
         } else {
           setError(message)

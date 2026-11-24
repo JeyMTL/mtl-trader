@@ -69,13 +69,19 @@ export function daysLeftInPeriod(account: AccountState, now: Date = new Date()):
 /**
  * The allowance actually in force for an account: an active trial is unlimited,
  * an active paid period uses the stored `max_trades` (a users trigger pins that
- * to -1 for every paid tier, so volume is never what a plan withholds), anything
- * else has none. This mirrors the `enforce_trade_quota` trigger.
+ * to -1 for every paid tier, so volume is never what a plan withholds), and
+ * everything else falls back to the free tier's monthly allowance. This mirrors
+ * the `enforce_trade_quota` trigger.
+ *
+ * The free tier is a real tier now, not a read-only tombstone: a trader whose
+ * trial or paid period ended keeps logging up to `maxTradesForPlan('free')`
+ * trades a month, and keeps the prop-firm simulator, instead of hitting a wall
+ * that leaves the product with nothing to judge.
  */
 export function effectiveMaxTrades(account: AccountState, now: Date = new Date()): number {
   if (isTrialActive(account, now)) return UNLIMITED
-  if (isSubscriptionActive(account, now)) return account.max_trades ?? 0
-  return 0
+  if (isSubscriptionActive(account, now)) return account.max_trades ?? UNLIMITED
+  return maxTradesForPlan('free')
 }
 
 /** ISO timestamp for a fresh trial ending `TRIAL_DAYS` from `now`. */
@@ -148,8 +154,10 @@ export function trialFields(now: Date = new Date()) {
   return {
     subscription_tier: 'free',
     subscription_status: 'trial',
-    max_trades: maxTradesForPlan('free'),
-    trades_remaining: maxTradesForPlan('free'),
+    // A running trial is unlimited; the free tier's cap only starts when the
+    // trial ends, which is what `effectiveMaxTrades` and the trigger apply.
+    max_trades: UNLIMITED,
+    trades_remaining: UNLIMITED,
     trial_ends_at: trialEndsAtFrom(now),
     current_period_start: null,
     current_period_end: null,
@@ -191,24 +199,37 @@ export function cancelAtPeriodEndFields() {
   return { cancel_at_period_end: true }
 }
 
-/** Column values for an account whose paid period has lapsed (used by tests/admin). */
+/**
+ * Column values for an account whose paid period has lapsed (used by tests/admin).
+ *
+ * A lapsed account is a free account, so it keeps the free tier's monthly
+ * allowance instead of being set to zero.
+ */
 export function expiredFields() {
+  const free = maxTradesForPlan('free')
   return {
     subscription_tier: 'free',
     subscription_status: 'expired' as const,
-    max_trades: 0,
-    trades_remaining: 0,
+    max_trades: free,
+    trades_remaining: free,
     cancel_at_period_end: false,
   }
 }
 
-/** Column values for an immediate revocation (refund, chargeback, abuse). */
+/**
+ * Column values for an immediate revocation (refund, chargeback, abuse).
+ *
+ * Revoking ends the paid plan, not the account: the tier drops back to free and
+ * its allowance with it, so a refunded customer is treated exactly like any
+ * other free account rather than locked out of the journal they wrote.
+ */
 export function revokedFields() {
+  const free = maxTradesForPlan('free')
   return {
     subscription_tier: 'free',
     subscription_status: 'cancelled' as const,
-    max_trades: 0,
-    trades_remaining: 0,
+    max_trades: free,
+    trades_remaining: free,
     cancel_at_period_end: false,
   }
 }

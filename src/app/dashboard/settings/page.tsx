@@ -686,10 +686,10 @@ export default function SettingsPage() {
                     </h3>
                     <p className="text-sm text-gray-400">
                       {userPlan.liveState === 'trial'
-                        ? `Unlimited trades for ${TRIAL_DAYS} days, then choose a paid plan`
+                        ? `Unlimited trades for ${TRIAL_DAYS} days, then 30 a month on Free`
                         : userPlan.liveState === 'active'
                           ? 'Unlimited trades'
-                          : 'The journal is read-only until you buy a subscription'}
+                          : 'Free plan — 30 trades a month, with your journal and the prop-firm simulator'}
                     </p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${

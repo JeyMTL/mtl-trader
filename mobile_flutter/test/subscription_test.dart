@@ -99,7 +99,7 @@ void main() {
     );
     expect(info.state, SubscriptionState.cancelled);
     expect(info.ended, isTrue);
-    expect(info.endedTitle, 'Your subscription was cancelled');
+    expect(info.endedTitle, 'Your paid plan has ended');
     expect(info.planLabel, 'Free');
     expect(info.statusLabel, 'Cancelled — subscription ended');
   });
