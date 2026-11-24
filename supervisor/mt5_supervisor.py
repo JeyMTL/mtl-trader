@@ -32,6 +32,8 @@ Environment:
     CYCLE_SECONDS         (default 15 - how often a new connection is claimed)
     REFRESH_SECONDS       (default 60 - how often a connected account is re-read)
     FAILED_RETRY_SECONDS  (default 600 - cooldown before a failed login is retried)
+    HISTORY_WAIT_SECONDS  (default 90 - how long a first sync waits for the
+                           terminal to finish downloading history)
     WATCH_SECONDS         (default 2 - poll interval while watching the single
                            connected account; 0 disables the watch mode)
 
@@ -91,6 +93,18 @@ TIMEOUT = 30
 # connection that never recovers. Wait longer before giving up.
 INIT_TIMEOUT_MS = 120_000
 
+# A fresh login answers "no deals" for a moment while the terminal downloads
+# history in the background. Reading that as an empty account and advancing the
+# cursor past it lost real trades permanently, so the first sync waits for the
+# download before it decides anything.
+HISTORY_WAIT_SECONDS = float(os.environ.get("HISTORY_WAIT_SECONDS", "90"))
+
+# Deal and tick times arrive in the *broker's* clock, not UTC: FundedNext is
+# UTC+2 in winter, most brokers are +2 or +3, and the EA already subtracts
+# `TimeTradeServer() - TimeGMT()`. Python has no such call, so the offset is
+# measured from live ticks and remembered per server.
+SERVER_OFFSET_CACHE = Path(__file__).with_name(".server-offset.json")
+
 REST_HEADERS = {
     "apikey": SERVICE_KEY,
     "Authorization": f"Bearer {SERVICE_KEY}",
@@ -116,7 +130,11 @@ def check_config():
     ]
     if missing:
         fail("missing environment: " + ", ".join(missing))
-    if len(base64.b64decode(CREDENTIAL_KEY)) != 32:
+    try:
+        key_bytes = len(base64.b64decode(CREDENTIAL_KEY))
+    except (ValueError, TypeError):
+        fail("SYNC_CREDENTIAL_KEY is not valid base64")
+    if key_bytes != 32:
         fail("SYNC_CREDENTIAL_KEY must decode to 32 bytes")
     # A path mangled by shell quoting (a stray \t is a tab, not a backslash and
     # a t) still "looks" right in the file. Catch it here, because the failure
@@ -220,12 +238,19 @@ def mark(user_id, status, error=None, synced_at=None):
     # failure, which used to land on top of that and leave a row saying
     # "Connection failed" for an account whose password no longer exists, and
     # whose error pointed at the terminal rather than at the disconnect.
-    requests.patch(
+    response = requests.patch(
         f"{SUPABASE_URL}/rest/v1/broker_connections?user_id=eq.{user_id}&status=neq.disconnected",
         headers={**REST_HEADERS, "Prefer": "return=minimal"},
         data=json.dumps(body),
         timeout=TIMEOUT,
     )
+    # A rejected write used to be invisible: the row stayed on `connecting` and
+    # the app showed that forever, with nothing in the log to explain it.
+    if response.status_code >= 300:
+        print(
+            f"[warn] could not set {user_id[:8]}… to {status} "
+            f"({response.status_code}): {response.text[:160]}"
+        )
 
 
 def symbol_digits(symbol):
@@ -240,9 +265,15 @@ def symbol_digits(symbol):
     return 8
 
 
-def build_trade(position_id):
+def build_trade(position_id, offset=0):
     """
     One fully closed position, or None.
+
+    `offset` is the broker's clock ahead of UTC in seconds (see
+    `server_offset`). Deal times are server time and the journal stores UTC, so
+    every timestamp here is shifted back before it is sent; without that a trade
+    closed at 15:00 server lands in the journal as 15:00 UTC, two or three hours
+    early, and the calendar, the session stats and the day lock all read it wrong.
 
     A position is included only when its closing volume covers its opening
     volume. The API ignores a duplicate `position_id`, so pushing a scale-out as
@@ -264,7 +295,8 @@ def build_trade(position_id):
 
     first_open = min(opens, key=lambda d: d.time)
     last_close = max(closes, key=lambda d: d.time)
-    closed_at = datetime.fromtimestamp(last_close.time, timezone.utc)
+    opened_at = datetime.fromtimestamp(first_open.time - offset, timezone.utc)
+    closed_at = datetime.fromtimestamp(last_close.time - offset, timezone.utc)
 
     lot = round(min(opened_volume, closed_volume), 2)
     if lot <= 0:
@@ -304,12 +336,12 @@ def build_trade(position_id):
         "pnl": round(sum(d.profit + d.commission + d.swap for d in group), 2),
         "commission": round(sum(d.commission for d in group), 2),
         "swap": round(sum(d.swap for d in group), 2),
-        "open_time": datetime.fromtimestamp(first_open.time, timezone.utc).isoformat(),
+        "open_time": opened_at.isoformat(),
         "close_time": closed_at.isoformat(),
     }
 
 
-def position_trades(since):
+def position_trades(since, offset=0):
     """
     Closed positions changed since `since`, in the shape /api/sync expects.
 
@@ -332,7 +364,7 @@ def position_trades(since):
 
     trades = []
     for position_id in closing_ids:
-        trade = build_trade(position_id)
+        trade = build_trade(position_id, offset)
         if not trade:
             continue
         if since is not None and datetime.fromisoformat(trade["close_time"]) < since:
@@ -355,6 +387,108 @@ def push(user_id, trades):
         if response.status_code not in (200, 202):
             raise RuntimeError(f"ingest rejected ({response.status_code}): {response.text[:160]}")
     return len(trades)
+
+
+def notify(user_id, title, body):
+    """Wake the customer's phone about a connection they cannot see failing.
+
+    A phone-only customer has no terminal to look at, so a row that flips to
+    `failed` on this host is invisible until they next open the app. Best effort
+    by design: a missing notification must never turn into a failed sync.
+    """
+    try:
+        requests.post(
+            f"{APP_URL}/api/push/send",
+            headers={
+                "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps({"userId": user_id, "title": title, "body": body}),
+            timeout=10,
+        )
+    except requests.RequestException:
+        pass
+
+
+def history_total(start, wait_seconds, pause=2.0):
+    """
+    How many deals the terminal holds in [start, now], waiting for a download.
+
+    `history_deals_total` asks the server, so immediately after a fresh login it
+    answers 0 while the terminal is still fetching that account's history and the
+    real number arrives a second or two later. Treating that 0 as "this account
+    has no trades" advanced `last_sync_at` past the window, and the 15-minute
+    cursor never looked back far enough again: the trades were lost for good.
+    Returns -1 if the terminal cannot answer, which says nothing about the
+    account and must not be read as a zero.
+    """
+    deadline = time.monotonic() + max(0.0, wait_seconds)
+    while True:
+        total = mt5.history_deals_total(start, datetime.now(timezone.utc))
+        if total > 0 or total < 0:
+            return total
+        if time.monotonic() >= deadline:
+            return total
+        time.sleep(pause)
+
+
+def load_offset_cache():
+    try:
+        decoded = json.loads(SERVER_OFFSET_CACHE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return decoded if isinstance(decoded, dict) else {}
+
+
+def measure_server_offset(pause=3.0):
+    """
+    Seconds the broker's clock runs ahead of UTC, or None if unknowable.
+
+    The offset is the difference between a tick's timestamp and this machine's
+    clock. A frozen tick (weekend, market closed, symbol not in Market Watch)
+    is indistinguishable from a real offset, so two ticks are taken three seconds
+    apart: only a clock that moves with ours is evidence. Rounded to a quarter
+    hour because broker offsets are always whole quarter hours.
+    """
+    for symbol in ("EURUSD", "XAUUSD", "GBPUSD"):
+        try:
+            first = mt5.symbol_info_tick(symbol)
+            if first is None:
+                continue
+            time.sleep(pause)
+            second = mt5.symbol_info_tick(symbol)
+        except Exception:  # noqa: BLE001 - calibration is best effort
+            return None
+        if second is None:
+            continue
+        if 1 <= second.time - first.time <= 30:
+            return int(round((second.time - time.time()) / 900.0) * 900)
+    return None
+
+
+def server_offset(row):
+    """The broker offset for this account, measured at most once a day."""
+    server = canonical_server_name(row.get("broker_name"), row["server"])
+    cache = load_offset_cache()
+    entry = cache.get(server)
+    if not isinstance(entry, dict):
+        entry = None
+    today = datetime.now(timezone.utc).date().isoformat()
+    if entry and entry.get("at") == today and isinstance(entry.get("offset"), int):
+        return entry["offset"]
+
+    measured = measure_server_offset()
+    if measured is None:
+        # Reuse the last good value: a weekend measurement would be a lie, and
+        # guessing UTC would shift every trade by a couple of hours.
+        return int(entry["offset"]) if entry and isinstance(entry.get("offset"), int) else 0
+
+    cache[server] = {"offset": measured, "at": today}
+    try:
+        SERVER_OFFSET_CACHE.write_text(json.dumps(cache, indent=2), encoding="utf-8")
+    except OSError:
+        pass  # a read-only host just recalibrates on the next run
+    return measured
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +594,21 @@ _SKIP_INSTALL_DIRS = {
     "windows defender",
     "windowsapps",
 }
+
+
+def is_retired_install(name):
+    """A terminal the MT5 updater renamed rather than deleted.
+
+    An update moves the old install to `MetaTrader 5.old6324` and leaves it
+    runnable. Logging in there logs the customer into a terminal that will never
+    update and lives outside the install the customer manages, and it turns one
+    broken attempt into two in the message they are shown.
+    """
+    lowered = name.lower()
+    return any(
+        marker in lowered
+        for marker in (".old", "-backup", "_backup", " backup", "-copy", " copy")
+    )
 _terminal_scan = {"roots": (), "at": 0.0, "paths": []}
 
 
@@ -498,7 +647,10 @@ def discover_terminals(force=False):
                 dirs[:] = []
             else:
                 dirs[:] = sorted(
-                    name for name in dirs if name.lower() not in _SKIP_INSTALL_DIRS
+                    name
+                    for name in dirs
+                    if name.lower() not in _SKIP_INSTALL_DIRS
+                    and not is_retired_install(name)
                 )
             if "terminal64.exe" not in files:
                 continue
@@ -635,24 +787,26 @@ def sync_one(row):
     mark(user_id, "connecting")
     try:
         open_session(row)
+        offset = server_offset(row)
         since = None
         if row.get("last_sync_at"):
             since = datetime.fromisoformat(row["last_sync_at"].replace("Z", "+00:00")) - OVERLAP
         else:
-            # First sync after connecting. The terminal has just logged in and
-            # may still be downloading history; a zero read here would advance
-            # `last_sync_at` past real trades and the 15-minute cursor would
-            # never look back far enough to find them.
-            deadline = time.monotonic() + 10
-            while time.monotonic() < deadline:
-                probe = mt5.history_deals_get(
-                    datetime.now(timezone.utc) - timedelta(days=7),
-                    datetime.now(timezone.utc),
+            # First sync after connecting: read the whole year, and only once the
+            # terminal has actually downloaded it. A zero here used to be taken
+            # as "this account never traded", which advanced the cursor and lost
+            # every trade the terminal was still fetching.
+            lookback = datetime.now(timezone.utc) - timedelta(days=365)
+            found = history_total(lookback, HISTORY_WAIT_SECONDS)
+            if found < 0:
+                raise RuntimeError(f"terminal could not read history: {mt5.last_error()}")
+            if found == 0:
+                print(
+                    f"  {user_id[:8]}… no deals in the last 365 days after waiting "
+                    f"{HISTORY_WAIT_SECONDS:.0f}s; marking it synced. "
+                    "Press Reconnect if trades are missing."
                 )
-                if probe:
-                    break
-                time.sleep(1)
-        trades = position_trades(since)
+        trades = position_trades(since, offset)
         synced = push(user_id, trades) if trades else 0
         mark(user_id, "connected", error="", synced_at=datetime.now(timezone.utc).isoformat())
         print(f"  {user_id[:8]}… {row['server']} -> {synced} position(s)")
@@ -746,6 +900,7 @@ def watch(row):
     user_id = row["user_id"]
     try:
         open_session(row)
+        offset = server_offset(row)
         now = datetime.now(timezone.utc)
         since = None
         if row.get("last_sync_at"):
@@ -757,7 +912,7 @@ def watch(row):
         # the window as seen. Partially closed positions are deliberately left
         # out: they are not a finished trade, and they must be retried when the
         # rest of the position closes.
-        trades = position_trades(since)
+        trades = position_trades(since, offset)
         if trades:
             push(user_id, trades)
             mark(user_id, "connected", error="", synced_at=now.isoformat())
@@ -765,7 +920,7 @@ def watch(row):
 
         seen = {trade["position_id"] for trade in trades}
         seen.update(
-            trade["position_id"] for trade in position_trades(now - WATCH_WINDOW)
+            trade["position_id"] for trade in position_trades(now - WATCH_WINDOW, offset)
         )
         print(
             f"  watching {user_id[:8]}… {row['server']} "
@@ -785,7 +940,7 @@ def watch(row):
 
             fresh = []
             for position_id in candidates:
-                trade = build_trade(position_id)
+                trade = build_trade(position_id, offset)
                 if not trade:
                     continue  # partial close; retry on the next tick
                 fresh.append(trade)
@@ -847,6 +1002,15 @@ def main():
                     mark(row["user_id"], "failed", error=error)
                 except Exception:  # noqa: BLE001
                     pass
+                # One notification per breakdown, not one every ten minutes: a
+                # row that is already `failed` is being retried, not news.
+                if row.get("status") != "failed":
+                    notify(
+                        row["user_id"],
+                        "MT5 sync stopped",
+                        f"{row.get('server') or 'Your broker'} could not be read. "
+                        "Open the app to reconnect.",
+                    )
 
         if args.once:
             break
@@ -862,6 +1026,12 @@ def main():
                         mark(watched["user_id"], "failed", error=error)
                     except Exception:  # noqa: BLE001
                         pass
+                    notify(
+                        watched["user_id"],
+                        "MT5 sync stopped",
+                        f"{watched.get('server') or 'Your broker'} could not be read. "
+                        "Open the app to reconnect.",
+                    )
                 continue
 
         time.sleep(CYCLE_SECONDS)

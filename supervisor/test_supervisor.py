@@ -13,6 +13,7 @@ import sys
 import tempfile
 import types
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Imported by the supervisor at module import time.
@@ -302,6 +303,170 @@ class SymbolDigitsTests(unittest.TestCase):
         noisy = 3595.7380000000003
         self.assertEqual(round(noisy, 2), 3595.74)
         self.assertEqual(round(3587.8869999999997, 3), 3587.887)
+
+
+class Deal:
+    """The handful of fields `build_trade` reads from a deal."""
+
+    def __init__(self, position_id, entry, volume, price, when, ticket=1):
+        self.position_id = position_id
+        self.entry = entry
+        self.volume = volume
+        self.price = price
+        self.time = when
+        self.ticket = ticket
+        self.symbol = "EURUSD"
+        self.type = 0
+        self.profit = 0.0
+        self.commission = 0.0
+        self.swap = 0.0
+
+
+class TradeTimeTests(unittest.TestCase):
+    """Deal times are the broker's clock; the journal stores UTC."""
+
+    def setUp(self):
+        self.saved = sup.mt5
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        sup.mt5 = self.saved
+
+    def fake_mt5(self, opened, closed):
+        deals = [opened, closed]
+        return types.SimpleNamespace(
+            history_deals_get=lambda position=None: deals,
+            history_orders_get=lambda position=None: (),
+            symbol_info=lambda symbol: types.SimpleNamespace(digits=5),
+        )
+
+    def test_deal_times_are_moved_from_the_broker_clock_onto_utc(self):
+        server_noon = int(datetime(2026, 11, 20, 14, 0, tzinfo=timezone.utc).timestamp())
+        opened = Deal(7, 0, 0.10, 1.10000, server_noon)
+        closed = Deal(7, 1, 0.10, 1.10100, server_noon + 600, ticket=2)
+        sup.mt5 = self.fake_mt5(opened, closed)
+
+        trade = sup.build_trade(7, offset=7200)
+
+        self.assertEqual(trade["open_time"], "2026-11-20T12:00:00+00:00")
+        self.assertEqual(trade["close_time"], "2026-11-20T12:10:00+00:00")
+
+    def test_an_unknown_offset_leaves_the_time_alone(self):
+        server_noon = int(datetime(2026, 11, 20, 14, 0, tzinfo=timezone.utc).timestamp())
+        opened = Deal(7, 0, 0.10, 1.10000, server_noon)
+        closed = Deal(7, 1, 0.10, 1.10100, server_noon + 600, ticket=2)
+        sup.mt5 = self.fake_mt5(opened, closed)
+
+        trade = sup.build_trade(7)
+
+        self.assertEqual(trade["open_time"], "2026-11-20T14:00:00+00:00")
+
+
+class ServerOffsetTests(unittest.TestCase):
+    def setUp(self):
+        self.saved = sup.mt5
+        self.saved_cache = sup.SERVER_OFFSET_CACHE
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        sup.SERVER_OFFSET_CACHE = Path(self.tmp.name) / "offset.json"
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        sup.mt5 = self.saved
+        sup.SERVER_OFFSET_CACHE = self.saved_cache
+
+    def tick(self, when):
+        return types.SimpleNamespace(time=when, bid=1.0, ask=1.0)
+
+    def test_a_live_tick_measures_the_broker_clock(self):
+        now = int(sup.time.time())
+        answers = iter([self.tick(now + 7200), self.tick(now + 7203)])
+        sup.mt5 = types.SimpleNamespace(symbol_info_tick=lambda symbol: next(answers, None))
+
+        self.assertEqual(sup.measure_server_offset(pause=0), 7200)
+
+    def test_a_frozen_tick_is_not_an_offset(self):
+        frozen = self.tick(int(sup.time.time()) + 7200)
+        sup.mt5 = types.SimpleNamespace(symbol_info_tick=lambda symbol: frozen)
+
+        self.assertIsNone(sup.measure_server_offset(pause=0))
+
+    def test_the_offset_is_measured_once_and_then_reused(self):
+        now = int(sup.time.time())
+        answers = iter([self.tick(now + 10800), self.tick(now + 10803)])
+        sup.mt5 = types.SimpleNamespace(symbol_info_tick=lambda symbol: next(answers, None))
+        row = {"broker_name": "fundednext", "server": "FundedNext-Server 3"}
+
+        self.assertEqual(sup.server_offset(row), 10800)
+
+        # A measure that would answer differently must not be consulted again
+        # today: calibrating on every sync would put three seconds of sleep in
+        # front of every login.
+        sup.mt5 = types.SimpleNamespace(symbol_info_tick=lambda symbol: None)
+        self.assertEqual(sup.server_offset(row), 10800)
+
+
+class FirstSyncHistoryTests(unittest.TestCase):
+    def setUp(self):
+        self.saved = sup.mt5
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        sup.mt5 = self.saved
+
+    def test_a_download_in_flight_is_waited_out(self):
+        answers = iter([0, 0, 7])
+        sup.mt5 = types.SimpleNamespace(
+            history_deals_total=lambda start, end: next(answers, 0)
+        )
+
+        total = sup.history_total(
+            datetime.now(timezone.utc), wait_seconds=30, pause=0
+        )
+
+        self.assertEqual(total, 7)
+
+    def test_an_unreadable_history_is_not_reported_as_empty(self):
+        sup.mt5 = types.SimpleNamespace(
+            history_deals_total=lambda start, end: -1
+        )
+
+        total = sup.history_total(
+            datetime.now(timezone.utc), wait_seconds=30, pause=0
+        )
+
+        self.assertEqual(total, -1)
+
+
+class RetiredInstallTests(unittest.TestCase):
+    def test_the_folder_the_updater_renamed_is_recognised(self):
+        self.assertTrue(sup.is_retired_install("MetaTrader 5.old6324"))
+        self.assertTrue(sup.is_retired_install("MetaTrader 5 - Backup"))
+        self.assertFalse(sup.is_retired_install("MetaTrader 5"))
+        self.assertFalse(sup.is_retired_install("MetaTrader 5 (Oldfield)"))
+
+    def test_discovery_skips_a_retired_install(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        good = make_terminal(Path(tmp.name) / "MetaTrader 5")
+        make_terminal(Path(tmp.name) / "MetaTrader 5.old6324")
+
+        saved = {name: os.environ.get(name) for name in (
+            "ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"
+        )}
+        self.addCleanup(
+            lambda: [
+                os.environ.__setitem__(name, value)
+                if value is not None
+                else os.environ.pop(name, None)
+                for name, value in saved.items()
+            ]
+        )
+        os.environ["ProgramFiles"] = tmp.name
+        os.environ["ProgramFiles(x86)"] = ""
+        os.environ["LOCALAPPDATA"] = ""
+
+        self.assertEqual(sup.discover_terminals(force=True), [good])
 
 
 if __name__ == "__main__":

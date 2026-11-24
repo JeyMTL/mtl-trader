@@ -109,6 +109,8 @@ __pycache__/
 # Which terminal last worked for each broker, written by the supervisor on the
 # host that runs it. Machine-local, so it is never committed.
 supervisor/.terminal-cache.json
+# Broker clock offset (server time minus UTC), measured from live ticks.
+supervisor/.server-offset.json
 
 # MT5 compiler output
 mt5/compile.log
