@@ -884,5 +884,244 @@ class SessionReminderTickTests(unittest.TestCase):
         sup._last_session_check = 0.0
 
 
+class AlgoTradingConfigTests(unittest.TestCase):
+    """The one MT5 setting a headless host cannot click."""
+
+    def config(self, text):
+        folder = Path(tempfile.mkdtemp())
+        path = folder / "common.ini"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_adds_the_section_when_the_file_has_none(self):
+        path = self.config("[Common]\nLogin=486046720\n")
+
+        self.assertFalse(sup.ensure_algo_trading(path))  # False == changed
+
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("[Experts]", text)
+        self.assertIn("AllowLiveTrading=1", text)
+        self.assertIn("Enabled=1", text)
+        self.assertIn("Login=486046720", text)
+
+    def test_corrects_a_disabled_value_without_touching_neighbours(self):
+        path = self.config("[Experts]\nEnabled=0\nAllowDllImport=0\n[Objects]\nX=1\n")
+
+        self.assertFalse(sup.ensure_algo_trading(path))
+
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("Enabled=1", text)
+        self.assertNotIn("Enabled=0", text)
+        self.assertIn("AllowDllImport=0", text)
+        self.assertIn("[Objects]", text)
+
+    def test_is_a_no_op_when_the_terminal_already_allows_trading(self):
+        path = self.config("[Experts]\nAllowLiveTrading=1\nEnabled=1\n")
+
+        self.assertTrue(sup.ensure_algo_trading(path))
+
+    def test_does_not_invent_a_config_that_is_not_there(self):
+        path = Path(tempfile.mkdtemp()) / "common.ini"
+
+        self.assertTrue(sup.ensure_algo_trading(path))
+        self.assertFalse(path.exists())
+
+    def test_a_terminal_with_its_own_config_folder_is_portable(self):
+        folder = Path(tempfile.mkdtemp())
+        (folder / "config").mkdir()
+        (folder / "config" / "common.ini").write_text("", encoding="utf-8")
+
+        self.assertTrue(sup.looks_portable(str(folder / "terminal64.exe")))
+        self.assertFalse(sup.looks_portable(str(Path(tempfile.mkdtemp()) / "terminal64.exe")))
+        self.assertFalse(sup.looks_portable(""))
+
+    def test_finds_the_config_of_a_portable_terminal_only(self):
+        folder = Path(tempfile.mkdtemp())
+        (folder / "config").mkdir()
+        config = folder / "config" / "common.ini"
+        config.write_text("[Experts]\n", encoding="utf-8")
+
+        self.assertEqual(sup.terminal_config_path(str(folder / "terminal64.exe"), True), config)
+        # A normal install keeps its config under %APPDATA% for a hash only the
+        # terminal knows; guessing there would edit the wrong profile.
+        self.assertIsNone(sup.terminal_config_path(str(folder / "terminal64.exe"), False))
+
+
+class AlgoTradingWarningTests(unittest.TestCase):
+    """A host that cannot trade must say so rather than cancel nothing forever."""
+
+    def setUp(self):
+        self.terminal = types.SimpleNamespace(trade_allowed=True)
+        self.account = types.SimpleNamespace(login=486046720, trade_allowed=True)
+        self.addCleanup(setattr, sup, "_algo_warned", sup._algo_warned)
+        sup._algo_warned = set()
+        self.stub("terminal_info", lambda: self.terminal)
+        self.stub("account_info", lambda: self.account)
+
+    def stub(self, name, value):
+        """The MT5 module only grows these attributes on a machine with a terminal,
+        so remember whether the name existed before stubbing it."""
+        had = hasattr(sup.mt5, name)
+        saved = getattr(sup.mt5, name, None)
+        setattr(sup.mt5, name, value)
+        self.addCleanup(
+            lambda: setattr(sup.mt5, name, saved) if had else delattr(sup.mt5, name)
+        )
+
+    def said(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            sup.warn_if_no_algo_trading(r"C:\MT5-Fleet\slot-01\terminal64.exe")
+        return out.getvalue()
+
+    def test_silent_when_the_host_can_trade(self):
+        self.assertEqual(self.said(), "")
+
+    def test_names_the_terminal_setting_once(self):
+        self.terminal = types.SimpleNamespace(trade_allowed=False)
+
+        first = self.said()
+        self.assertIn("Algo Trading", first)
+        self.assertEqual(self.said(), "")  # repeated every 15s otherwise
+
+    def test_names_a_read_only_account(self):
+        self.account = types.SimpleNamespace(login=486046720, trade_allowed=False)
+
+        first = self.said()
+        self.assertIn("read-only", first)
+        self.assertIn("486046720", first)
+        self.assertEqual(self.said(), "")
+
+
+class AgentTokenLookupTests(unittest.TestCase):
+    """The EA token sits on `users`; the connection row does not carry it."""
+
+    def setUp(self):
+        self.addCleanup(setattr, sup, "_agent_tokens", sup._agent_tokens)
+        self.addCleanup(setattr, sup.requests, "get", sup.requests.get)
+        sup._agent_tokens = {}
+        self.calls = []
+
+    def test_reads_the_token_once_and_remembers_it(self):
+        def get(url, **kwargs):
+            self.calls.append((url, kwargs.get("params")))
+            return FakeResponse(200, [{"agent_token": "tok-1"}])
+
+        sup.requests.get = get
+
+        self.assertEqual(sup.agent_token_for("u-1"), "tok-1")
+        self.assertEqual(sup.agent_token_for("u-1"), "tok-1")
+        self.assertEqual(len(self.calls), 1)  # asked every 30s otherwise
+        self.assertTrue(self.calls[0][0].endswith("/rest/v1/users"))
+        self.assertEqual(self.calls[0][1], {"select": "agent_token", "id": "eq.u-1"})
+
+    def test_a_failed_lookup_is_retried_rather_than_cached(self):
+        sup.requests.get = lambda url, **kwargs: FakeResponse(401, {"message": "no"})
+
+        self.assertEqual(sup.agent_token_for("u-2"), "")
+        self.assertEqual(sup.agent_token_for("u-2"), "")
+        self.assertNotIn("u-2", sup._agent_tokens)
+
+
+class FakeResponse:
+    def __init__(self, status, body):
+        self.status_code = status
+        self._body = body
+
+    def json(self):
+        return self._body
+
+
+class SoftLockTests(unittest.TestCase):
+    """The half of the guard EA a supervisor-synced account would be missing."""
+
+    def setUp(self):
+        self.cancelled = []
+        self.asked = []
+        self.lock_body = {"locked": True, "mode": "soft", "reason": "Daily loss budget reached."}
+        self.lock_status = 200
+        self.orders = []
+        self.addCleanup(setattr, sup.requests, "get", sup.requests.get)
+        self.addCleanup(setattr, sup, "ENFORCE_LOCK", sup.ENFORCE_LOCK)
+        self.addCleanup(setattr, sup, "_lock_checked_at", sup._lock_checked_at)
+        saved_orders = getattr(sup.mt5, "orders_get", None)
+        saved_send = getattr(sup.mt5, "order_send", None)
+        self.addCleanup(lambda: setattr(sup.mt5, "orders_get", saved_orders))
+        self.addCleanup(lambda: setattr(sup.mt5, "order_send", saved_send))
+
+        sup.ENFORCE_LOCK = True
+        sup._lock_checked_at = {}
+        sup.requests.get = lambda url, **kwargs: (
+            self.asked.append((url, kwargs.get("params"))),
+            FakeResponse(self.lock_status, self.lock_body),
+        )[1]
+        sup.mt5.orders_get = lambda *args, **kwargs: self.orders
+        sup.mt5.order_send = lambda request: (
+            self.cancelled.append(request),
+            types.SimpleNamespace(retcode=sup.TRADE_RETCODE_DONE),
+        )[1]
+
+    def row(self, **over):
+        return {"user_id": "u-lock", "agent_token": "token-1", **over}
+
+    def order(self, ticket, kind):
+        return types.SimpleNamespace(ticket=ticket, type=kind)
+
+    def test_cancels_resting_orders_once_the_day_is_over(self):
+        self.orders = [self.order(11, 2), self.order(12, 4), self.order(13, 0)]
+
+        self.assertEqual(sup.enforce_lock(self.row()), 2)
+
+        self.assertEqual([c["order"] for c in self.cancelled], [11, 12])
+        self.assertTrue(all(c["action"] == sup.TRADE_ACTION_REMOVE for c in self.cancelled))
+
+    def test_never_closes_an_open_position(self):
+        # A market order is a position, not a resting order: the supervisor is
+        # not allowed to close one, whatever the lock says.
+        self.orders = [self.order(21, 0), self.order(22, 1)]
+
+        self.assertEqual(sup.enforce_lock(self.row()), 0)
+        self.assertEqual(self.cancelled, [])
+
+    def test_inside_the_limits_touches_nothing(self):
+        self.lock_body = {"locked": False, "mode": "soft", "reason": "Inside the limits."}
+        self.orders = [self.order(31, 2)]
+
+        self.assertEqual(sup.enforce_lock(self.row()), 0)
+        self.assertEqual(self.cancelled, [])
+
+    def test_a_server_error_cancels_nothing(self):
+        # Fail open, like the EA: an outage must not strand an account.
+        self.lock_status = 500
+        self.orders = [self.order(41, 2)]
+
+        self.assertEqual(sup.enforce_lock(self.row()), 0)
+        self.assertEqual(self.cancelled, [])
+
+    def test_asks_at_most_once_per_interval(self):
+        sup.enforce_lock(self.row())
+        sup.enforce_lock(self.row())
+
+        self.assertEqual(len(self.asked), 1)
+        self.assertTrue(self.asked[0][0].endswith("/api/ea/lock"))
+        self.assertEqual(self.asked[0][1], {"userId": "u-lock"})
+
+    def test_an_account_with_no_agent_token_is_left_alone(self):
+        row = {"user_id": "u-lock"}
+        self.addCleanup(setattr, sup, "agent_token_for", sup.agent_token_for)
+        sup.agent_token_for = lambda user_id: ""
+
+        self.assertEqual(sup.enforce_lock(row), 0)
+        self.assertEqual(self.asked, [])
+
+    def test_enforcement_can_be_switched_off(self):
+        sup.ENFORCE_LOCK = False
+        self.orders = [self.order(51, 2)]
+
+        self.assertEqual(sup.enforce_lock(self.row()), 0)
+        self.assertEqual(self.asked, [])
+        self.assertEqual(self.cancelled, [])
+
+
 if __name__ == "__main__":
     unittest.main()

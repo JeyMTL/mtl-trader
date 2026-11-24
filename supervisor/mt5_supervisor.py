@@ -125,6 +125,13 @@ _capacity_warned_at = 0.0
 # watch falls back to the normal rotation.
 WATCH_SECONDS = float(os.environ.get("WATCH_SECONDS", "2"))
 WATCH_WINDOW = timedelta(minutes=30)
+# The daily stop, as this host can enforce it. The server decides whether the day
+# is locked (`/api/ea/lock`, the same answer the guard EA gets); this process can
+# only do what a client-side program can do, which is remove resting orders. It
+# deliberately never closes an open position: that costs the trader the spread
+# and the slippage, and a sync daemon is the wrong place to make that call.
+ENFORCE_LOCK = os.environ.get("ENFORCE_LOCK", "1").lower() not in ("0", "false", "no")
+LOCK_POLL_SECONDS = int(os.environ.get("LOCK_POLL_SECONDS", "30"))
 # How long a failed connection waits before the supervisor tries it again.
 FAILED_RETRY_SECONDS = int(os.environ.get("FAILED_RETRY_SECONDS", "600"))
 OVERLAP = timedelta(minutes=15)
@@ -548,6 +555,130 @@ def session_reminders():
         pass
 
 
+# MT5 order types that rest on the book rather than fill a position: BUY_LIMIT,
+# SELL_LIMIT, BUY_STOP, SELL_STOP, BUY_STOP_LIMIT, SELL_STOP_LIMIT. The numeric
+# values come from the MQL5 enum, which is why they are not looked up on `mt5`:
+# a test that stubs the module should not have to reimplement the constants.
+PENDING_ORDER_TYPES = frozenset({2, 3, 4, 5, 6, 7})
+TRADE_ACTION_REMOVE = 8
+TRADE_RETCODE_DONE = 10009
+
+_lock_checked_at = {}
+
+
+def pending_tickets(orders):
+    """Tickets of the resting orders a lock is allowed to cancel."""
+    return [
+        int(order.ticket)
+        for order in orders or []
+        if getattr(order, "type", None) in PENDING_ORDER_TYPES
+    ]
+
+
+_agent_tokens = {}
+
+
+def agent_token_for(user_id):
+    """The account's EA token, which lives on `users`, not on the connection.
+
+    Cached because the watchdog asks for a lock every 30s per account and the
+    token only changes when the customer connects a terminal again.
+    """
+    if user_id in _agent_tokens:
+        return _agent_tokens[user_id]
+    try:
+        response = requests.get(
+            f"{SUPABASE_URL}/rest/v1/users",
+            params={"select": "agent_token", "id": f"eq.{user_id}"},
+            headers=REST_HEADERS,
+            timeout=TIMEOUT,
+        )
+        if response.status_code != 200:
+            return ""  # an outage is not an answer; the next poll tries again
+        rows = response.json()
+    except (requests.RequestException, ValueError):
+        return ""
+    token = (rows[0].get("agent_token") or "") if rows else ""
+    if token:
+        # Only a real token is worth remembering: caching empty would hide the
+        # customer connecting a terminal a minute later.
+        _agent_tokens[user_id] = token
+    return token
+
+
+def lock_state(row):
+    """Today's lock, exactly as the server answers the guard EA.
+
+    `None` means "could not tell", and every caller treats that as unlocked. An
+    outage must never leave a trader unable to close a position, which is the
+    same fail-open the EA takes.
+    """
+    token = row.get("agent_token") or agent_token_for(row["user_id"])
+    if not token:
+        # No EA token means the customer never connected a terminal by hand; the
+        # supervisor cannot pretend to be one.
+        return None
+    try:
+        response = requests.get(
+            f"{APP_URL}/api/ea/lock",
+            params={"userId": row["user_id"]},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=TIMEOUT,
+        )
+    except requests.RequestException:
+        return None
+    if response.status_code != 200:
+        return None
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+def enforce_lock(row):
+    """Cancel resting orders while the daily stop holds.
+
+    The half of the guard EA that a supervisor-synced account would otherwise be
+    missing: the trades arrive here, the server decides the day is over, and
+    nobody on the terminal is listening. This runs from the watch loop, so it
+    only acts while a session is actually open, and at most once per
+    `LOCK_POLL_SECONDS` per account.
+
+    Returns the number of orders cancelled.
+    """
+    if not ENFORCE_LOCK:
+        return 0
+    user_id = row["user_id"]
+    now = time.monotonic()
+    if now < _lock_checked_at.get(user_id, 0.0):
+        return 0
+    _lock_checked_at[user_id] = now + LOCK_POLL_SECONDS
+
+    state = lock_state(row)
+    if not state or not state.get("locked"):
+        return 0
+
+    try:
+        tickets = pending_tickets(mt5.orders_get() or [])
+    except Exception:  # noqa: BLE001 - a refusal here must not stop the watch
+        return 0
+
+    cancelled = 0
+    for ticket in tickets:
+        try:
+            result = mt5.order_send({"action": TRADE_ACTION_REMOVE, "order": ticket})
+        except Exception:  # noqa: BLE001
+            continue
+        if getattr(result, "retcode", None) == TRADE_RETCODE_DONE:
+            cancelled += 1
+    if tickets:
+        reason = state.get("reason") or "daily stop active"
+        print(
+            f"  {user_id[:8]}… {reason} - cancelled {cancelled}/{len(tickets)} pending order(s)"
+        )
+    return cancelled
+
+
 def history_total(start, wait_seconds, pause=2.0):
     """
     How many deals the terminal holds in [start, now], waiting for a download.
@@ -877,7 +1008,113 @@ def terminal_order(row):
     return order
 
 
+# The two keys MT5 reads from `<terminal>/config/common.ini` before it will let a
+# program send an order. `AllowLiveTrading` is the Expert Advisors tab setting and
+# `Enabled` is the toolbar Algo Trading button; without both, `order_send` answers
+# 10027 (TRADE_RETCODE_CLIENT_DISABLES_AT) and nothing can be cancelled or closed.
+ALGO_TRADING_KEYS = (("AllowLiveTrading", "1"), ("Enabled", "1"))
+
+
+def terminal_config_path(path, portable):
+    """Where this terminal keeps `common.ini`, or None when it is not ours to edit.
+
+    A portable terminal (every fleet slot) keeps its config beside the exe. A
+    normal install keeps it under `%APPDATA%/MetaQuotes/Terminal/<hash>`, whose
+    hash is only knowable after the terminal has started once, so that case
+    is left alone rather than guessed at.
+    """
+    if not path:
+        return None
+    folder = Path(path).parent
+    candidates = [folder / "config" / "common.ini"]
+    if not portable:
+        return None
+    for candidate in candidates:
+        if candidate.parent.is_dir():
+            return candidate
+    return None
+
+
+def looks_portable(path):
+    """A terminal directory with its own `config` folder is a portable install.
+
+    The fleet slots are, and so is a `MT5_PATH` someone points at one: starting
+    those non-portable reads `%APPDATA%` instead and silently loses the settings
+    written beside the exe.
+    """
+    return bool(path) and (Path(path).parent / "config" / "common.ini").exists()
+
+
+def ensure_algo_trading(config_path):
+    """Turn programmatic trading on in a terminal's config, before it starts.
+
+    This is the one MT5 setting a headless host cannot click, and without it the
+    daily-stop enforcement and anything the guard EA does are dead on arrival.
+    The file is rewritten by hand rather than with `configparser` because MT5's
+    ini is not strict and must survive untouched: only the two keys inside
+    `[Experts]` are added or corrected.
+
+    Returns True when the file already said what we need, False when it was
+    changed (so the caller restarts rather than attaching to a stale process).
+    """
+    if config_path is None:
+        return True
+    config_path = Path(config_path)
+    if not config_path.exists():
+        return True
+    lines = config_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+
+    wanted = dict(ALGO_TRADING_KEYS)
+    out = []
+    in_experts = False
+    seen_experts = False
+    changed = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if in_experts:
+                # Close the section by adding whatever it was missing.
+                for key, value in ALGO_TRADING_KEYS:
+                    if key in wanted:
+                        out.append(f"{key}={value}")
+                        wanted.pop(key)
+                        changed = True
+            in_experts = stripped == "[Experts]"
+            seen_experts = seen_experts or in_experts
+            out.append(line)
+            continue
+        if in_experts:
+            key = stripped.split("=", 1)[0]
+            if key in wanted:
+                if stripped == f"{key}={wanted[key]}":
+                    wanted.pop(key)
+                else:
+                    out.append(f"{key}={wanted[key]}")
+                    wanted.pop(key)
+                    changed = True
+                continue
+        out.append(line)
+
+    if in_experts:
+        for key, value in ALGO_TRADING_KEYS:
+            if key in wanted:
+                out.append(f"{key}={value}")
+                wanted.pop(key)
+                changed = True
+    if not seen_experts:
+        out += ["", "[Experts]"] + [f"{key}={value}" for key, value in ALGO_TRADING_KEYS]
+        changed = True
+
+    if changed:
+        config_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    return not changed
+
+
 def initialize_terminal(session, path, portable=None):
+    # Written before the terminal starts: once it is running, it owns the file and
+    # rewrites it on exit, so a late edit is lost.
+    if path is not None:
+        ensure_algo_trading(terminal_config_path(path, MT5_PORTABLE if portable is None else portable))
     if path is None:
         return mt5.initialize(timeout=INIT_TIMEOUT_MS, **session)
     return mt5.initialize(
@@ -915,12 +1152,13 @@ def open_session(row, terminal=None):
     for path in candidates:
         # A fleet terminal is always portable: its accounts, history and config
         # belong to that slot and must not leak into %APPDATA% or another slot.
-        portable = True if terminal else None
+        portable = True if terminal or looks_portable(path) else None
         for _ in range(2):  # one retry: a stale terminal often clears on shutdown
             initialized = initialize_terminal(session, path, portable)
             if initialized:
                 info = mt5.account_info()
                 if info is not None and int(info.login) == login:
+                    warn_if_no_algo_trading(path)
                     remember_terminal(key, path or "")
                     return
                 attempts.append(
@@ -947,6 +1185,53 @@ def open_session(row, terminal=None):
         "once by hand, log in, and close it."
     )
 
+
+
+_algo_warned = set()
+
+
+def warn_if_no_algo_trading(path):
+    """Say it once per terminal when orders are impossible, instead of silently
+    cancelling nothing every 30 seconds when a lock is due."""
+    try:
+        info = mt5.terminal_info()
+    except Exception:  # noqa: BLE001
+        return
+    if info is None:
+        return
+    where = path or "default install"
+
+    if not getattr(info, "trade_allowed", False):
+        if where not in _algo_warned:
+            _algo_warned.add(where)
+            print(
+                f"[warn] {where} does not allow programmatic orders, so the daily "
+                "stop cannot cancel anything on this terminal. Enable Algo Trading "
+                "in Tools > Options > Expert Advisors (the supervisor writes it into "
+                "a portable terminal's config, but an install under %APPDATA% has "
+                "to be set by hand)."
+            )
+        return
+
+    # The terminal is fine but the *account* is read-only: an investor password
+    # logs in, syncs and read exactly like the master one, and only refuses when an
+    # order is attempted (10017 Trade disabled). Saving the warning separately
+    # means the two are reported independently.
+    key = f"{where}:account"
+    if key in _algo_warned:
+        return
+    try:
+        account = mt5.account_info()
+    except Exception:  # noqa: BLE001
+        return
+    if account is None or getattr(account, "trade_allowed", True):
+        return
+    _algo_warned.add(key)
+    print(
+        f"[warn] account {getattr(account, 'login', '?')} is read-only (investor "
+        "password), so the daily stop cannot cancel anything on it either. Save the "
+        "account's master password to let the lock act."
+    )
 
 
 def terminal_session_lost():
@@ -1143,6 +1428,9 @@ def watch(row, terminal=None, contended=True, should_yield=None):
         seen.update(
             trade["position_id"] for trade in position_trades(now - WATCH_WINDOW, offset)
         )
+        # The pass above may have just pushed the trade that ends the day, so the
+        # lock is checked before the loop starts waiting, not after.
+        enforce_lock(row)
         print(
             f"  watching {user_id[:8]}… {row['server']} "
             f"(close latency ~{WATCH_SECONDS:.0f}s)"
@@ -1151,6 +1439,7 @@ def watch(row, terminal=None, contended=True, should_yield=None):
         last_claim = time.monotonic()
         while True:
             time.sleep(WATCH_SECONDS)
+            enforce_lock(row)
             tick = datetime.now(timezone.utc)
             recent = mt5.history_deals_get(tick - WATCH_WINDOW, tick) or []
             candidates = {

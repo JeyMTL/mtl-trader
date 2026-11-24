@@ -81,7 +81,7 @@ at the trader's local midnight.
 | `Sync rejected (HTTP 403)` | Email unverified, or the plan has no sync feature. |
 | `Sync rejected (HTTP 429)` | Rate limit (240 sync requests/hour/account). The cursor retries. |
 | Nothing after attach | Check the Experts tab; the EA prints the first failure with its reason. |
-| Lock never activates | `lock_mode` must be `hard`, a limit must be set, and the EA must be running with AutoTrading allowed. |
+| Lock never activates | A daily loss limit (or an entry cap) must be set and `lock_mode` must be `soft` or `hard` — both freeze the terminal, only `hard` also locks the journal. The EA must be attached with Algo Trading allowed, since MT5 refuses `order_send` without it. |
 
 Run the EA on one chart only. Two instances push duplicates (the server absorbs
 them) and both can close the same fill (harmless, but noisy).

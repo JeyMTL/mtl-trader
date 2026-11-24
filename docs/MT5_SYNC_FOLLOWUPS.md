@@ -151,6 +151,14 @@ phone sync only works while your own PC is on.
   "MT5 sync stopped" (reconnect). The lapse notice is sent once and re-arms
   only after a sync succeeds, so a 10-minute retry loop cannot spam a customer
   whose plan stayed ended.
+- The daily stop can only *act* where MT5 allows orders. The supervisor writes
+  `[Experts] AllowLiveTrading/Enabled` into a portable terminal's `common.ini`
+  before starting it, so fleet slots need no click, but two things it cannot
+  fix are reported once in the log instead of failing quietly: an install under
+  `%APPDATA%` (its config lives in a hash directory), and an account saved with
+  its **investor password** — that logs in, syncs and reads like the master one
+  and answers `10017 Trade disabled` on the first order. Sync is read-only, so
+  such an account still journals and alerts; it just cannot be frozen.
 - `mobile_flutter/lib/screens/trade_form_screen.dart` still refuses
   broker-suffixed symbols such as `EURUSDM` when pinning from a chart.
 - 4 vCPU / 8 GB covers roughly 6–8 accounts that stay logged in; 20–30
