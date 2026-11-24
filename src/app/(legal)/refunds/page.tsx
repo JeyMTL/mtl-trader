@@ -16,7 +16,7 @@ export default function RefundPolicyPage() {
       <p className="mt-2 text-xs text-gray-500">Last updated {UPDATED}</p>
 
       <p className="mt-6">
-        This policy applies to subscriptions sold by <strong>MTL Ledger</strong> through our card subscription, bank transfer or Google Play. It does not limit any
+        This policy applies to subscriptions sold by <strong>MTL Ledger</strong> through our card subscription or Google Play. It does not limit any
         statutory rights you have as a consumer in your country of residence.
       </p>
 
@@ -53,10 +53,9 @@ export default function RefundPolicyPage() {
 
       <h2>5. How to request a refund</h2>
       <p>
-        Email <strong>support@mtlledger.com</strong> from the address on your account with the card transaction ID or
-        bank reference and the date of payment. We reply within two business days. Approved refunds are returned
-        by the original payment method: card payments usually within 5 business days, bank transfers within 10
-        business days of receiving the return details.
+        Email <strong>support@mtlledger.com</strong> from the address on your account with the card transaction ID
+        and the date of payment. We reply within two business days. Approved refunds are returned to the original
+        payment method, usually within 5 business days.
       </p>
       <p>
         For a subscription bought in the Android app, request the refund through Google Play (Play Store &rarr;

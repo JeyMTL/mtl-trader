@@ -373,50 +373,6 @@ export type Database = {
           },
         ]
       }
-      payment_requests: {
-        Row: {
-          amount: number
-          created_at: string | null
-          id: string
-          plan_id: string
-          reference: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          id?: string
-          plan_id: string
-          reference: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          id?: string
-          plan_id?: string
-          reference?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_requests_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       prop_rules: {
         Row: {
           account_size: number
@@ -807,10 +763,6 @@ export type Database = {
       }
       prop_status: { Args: { p_user_id: string }; Returns: Json }
       prune_telemetry: { Args: { p_keep_days?: number }; Returns: number }
-      review_bank_payment_request: {
-        Args: { p_action: string; p_request_id: string; p_reviewer_id: string }
-        Returns: string
-      }
       revoke_paid_order: {
         Args: {
           p_amount: number

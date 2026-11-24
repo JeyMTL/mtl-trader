@@ -9,7 +9,7 @@ import { useToast } from '@/components/toast'
 import { Avatar } from '@/components/avatar'
 import { deleteAvatarByUrl, uploadAvatar, validateAvatarFile } from '@/lib/avatar-upload'
 import { PLANS } from '@/lib/plans'
-import { subscriptionState, type SubscriptionState } from '@/lib/subscription'
+import { subscriptionState, TRIAL_DAYS, type SubscriptionState } from '@/lib/subscription'
 import { publicErrorMessage } from '@/lib/errors'
 
 const BASIC_PRICE = PLANS.find(p => p.id === 'basic')?.price ?? 0
@@ -677,7 +677,7 @@ export default function SettingsPage() {
                   <div>
                     <h3 className="font-semibold text-white">
                       {userPlan.liveState === 'trial'
-                        ? '7-Day Free Trial'
+                        ? `${TRIAL_DAYS}-Day Free Trial`
                         : userPlan.tier === 'pro'
                           ? 'Pro Plan'
                           : userPlan.tier === 'basic'
@@ -686,7 +686,7 @@ export default function SettingsPage() {
                     </h3>
                     <p className="text-sm text-gray-400">
                       {userPlan.liveState === 'trial'
-                        ? 'Unlimited trades for 3 days, then choose a paid plan'
+                        ? `Unlimited trades for ${TRIAL_DAYS} days, then choose a paid plan`
                         : userPlan.liveState === 'active'
                           ? 'Unlimited trades'
                           : 'The journal is read-only until you buy a subscription'}
@@ -759,13 +759,6 @@ export default function SettingsPage() {
                        userPlan.tier === 'basic' && !userPlan.cancelAtPeriodEnd ? 'Current Plan' :
                        userPlan.tier === 'basic' ? 'Resume with card' : 'Subscribe with card'}
                     </button>
-                    <button
-                      onClick={() => window.location.href = '/dashboard/payment?plan=basic'}
-                      disabled={userPlan.tier === 'basic'}
-                      className="w-full py-2 border border-border rounded-lg text-gray-400 hover:text-white hover:border-primary transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                    >
-                      Bank Transfer
-                    </button>
                   </div>
                 </div>
                 <div className={`bg-surface-light border rounded-xl p-4 ${
@@ -784,13 +777,6 @@ export default function SettingsPage() {
                       {checkoutLoading === 'pro' ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> :
                        userPlan.tier === 'pro' && !userPlan.cancelAtPeriodEnd ? 'Current Plan' :
                        userPlan.tier === 'pro' ? 'Resume with card' : 'Subscribe with card'}
-                    </button>
-                    <button
-                      onClick={() => window.location.href = '/dashboard/payment?plan=pro'}
-                      disabled={userPlan.tier === 'pro'}
-                      className="w-full py-2 border border-border rounded-lg text-gray-400 hover:text-white hover:border-primary transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                    >
-                      Bank Transfer
                     </button>
                   </div>
                 </div>

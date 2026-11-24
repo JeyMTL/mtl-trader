@@ -82,12 +82,6 @@ export const RPC_PROBES: readonly RpcProbe[] = [
     args: { p_user_id: NIL_UUID, p_provider: 'probe', p_provider_event_id: 'probe', p_plan_id: 'probe', p_amount: 0 },
   },
   {
-    rpc: 'review_bank_payment_request',
-    migration: '20260916_harden_payment_requests.sql',
-    usedBy: 'admin approve and reject of bank transfers',
-    args: { p_request_id: NIL_UUID, p_reviewer_id: NIL_UUID, p_action: 'approve' },
-  },
-  {
     rpc: 'delete_account_data',
     migration: CORE,
     usedBy: 'account deletion',

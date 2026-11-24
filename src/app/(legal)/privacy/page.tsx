@@ -34,9 +34,8 @@ export default function PrivacyPage() {
           <strong>Cash records</strong> — deposits and withdrawals you record yourself, with descriptions.
         </li>
         <li>
-          <strong>Subscription data</strong> — plan, trial dates, period end, payment status, order and
-          capture identifiers, and the reference of any bank transfer. We never see or store your card or bank
-          credentials.
+          <strong>Subscription data</strong> — plan, trial dates, period end, payment status, and the order and
+          capture identifiers our payment providers give us. We never see or store your card or bank details.
         </li>
         <li>
           <strong>Sync configuration</strong> — the broker name, server and account login you enter for MetaTrader
@@ -81,7 +80,10 @@ export default function PrivacyPage() {
       <ul>
         <li>We do not sell your personal data.</li>
         <li>We do not use your trades to advertise to you.</li>
-        <li>We do not connect to your broker or place trades on your behalf.</li>
+        <li>We never open a trade for you. Sync reads your closed trades through an agent that runs on
+          your own computer. If you switch on the daily stop, that agent can cancel resting orders for the
+          rest of the day — and the guard EA, if you attach it, can close anything filled after the stop —
+          but neither ever opens a position.</li>
       </ul>
 
       <h2>5. Retention</h2>
@@ -125,7 +127,7 @@ export default function PrivacyPage() {
 
       <h2>10. Contact</h2>
       <p>
-        Data controller: <strong>[legal entity]</strong>, <strong>[registered address]</strong>.
+        Data controller: <strong>MTL Ledger</strong>, <strong>Copperbelt, Zambia</strong>.
         Email: <strong>support@mtlledger.com</strong>. See also our <Link href="/terms">Terms of Service</Link> and{' '}
         <Link href="/refunds">Refund Policy</Link>.
       </p>

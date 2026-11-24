@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+
+import { TRIAL_DAYS } from '@/lib/subscription'
 import {
   BarChart3,
   TrendingUp,
@@ -170,7 +172,7 @@ export default function HomePage() {
             <p className="mt-3 text-sm text-danger">{authError}</p>
           )}
           <p className="fade-up-3 text-gray-500 mt-5 text-sm">
-            No credit card required • Unlimited access for 3 days • Web and Android
+            No credit card required • Unlimited access for {TRIAL_DAYS} days • Web and Android
           </p>
         </div>
       </section>

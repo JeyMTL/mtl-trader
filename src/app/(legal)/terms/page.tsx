@@ -59,14 +59,12 @@ export default function TermsPage() {
         <li>New accounts receive a 3-day free trial. No payment is taken during the trial.</li>
         <li>Paid plans are billed monthly or annually in advance, at the prices shown in the app or on the{' '}
           <Link href="/pricing">pricing page</Link>.</li>
-        <li>On the website, payment is taken by card or bank transfer. In the Android app,
-          subscriptions are sold and billed by Google Play.</li>
+        <li>On the website, payment is taken by card through Paddle, our merchant of record.
+          In the Android app, subscriptions are sold and billed by Google Play.</li>
         <li>Subscriptions renew automatically until cancelled. Website subscriptions can be cancelled from
           Settings; Google Play subscriptions must be cancelled in Google Play &rarr; Subscriptions. Cancelling
           in the app or uninstalling it does not cancel a Google Play subscription. After cancellation, access
           continues until the end of the period you have paid for.</li>
-        <li>Bank transfers are activated once the transfer has been verified. References must match the amount
-          and reference shown at checkout.</li>
         <li>Refunds for website purchases are covered by our <Link href="/refunds">Refund Policy</Link>.
           Refunds for Google Play purchases are handled under Google Play&apos;s refund policy and any statutory
           rights you have.</li>

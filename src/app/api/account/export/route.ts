@@ -26,17 +26,16 @@ export async function GET(req: Request) {
     const supabase = getAdminClient()
     const userId = user.id
 
-    const [profile, trades, deposits, paymentRequests, paymentEvents, reviews, journalMedia] = await Promise.all([
+    const [profile, trades, deposits, paymentEvents, reviews, journalMedia] = await Promise.all([
       supabase.from('users').select('*').eq('id', userId).maybeSingle(),
       supabase.from('trades').select('*').eq('user_id', userId).order('close_time', { ascending: true }),
       supabase.from('deposits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
-      supabase.from('payment_requests').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
       supabase.from('payment_events').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
       supabase.from('ai_reviews').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
       supabase.from('trade_attachments').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
     ])
 
-    const failure = [profile, trades, deposits, paymentRequests, paymentEvents, reviews, journalMedia]
+    const failure = [profile, trades, deposits, paymentEvents, reviews, journalMedia]
       .find((result) => result.error)
     if (failure?.error) {
       return apiError('account.export', failure.error, 500, 'Could not prepare your export.')
@@ -62,7 +61,6 @@ export async function GET(req: Request) {
       },
       trades: trades.data ?? [],
       deposits: deposits.data ?? [],
-      paymentRequests: paymentRequests.data ?? [],
       paymentEvents: paymentEvents.data ?? [],
       aiReviews: reviews.data ?? [],
       // Attachment metadata, including the private storage path. The files

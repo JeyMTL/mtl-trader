@@ -10,7 +10,7 @@
 ///
 /// The split is value-ordered: Basic is the whole journalling and chart desk
 /// (including the levels shared with the web), Pro is the advanced analysis
-/// workflow — backtester, replay, the large review allowance and API access.
+/// workflow — backtester, replay and the large review allowance.
 /// Keep these lines in step by hand with the web lists in `src/lib/plans.ts`.
 class MobilePlan {
   const MobilePlan({
@@ -61,7 +61,8 @@ const List<MobilePlan> mobilePlans = [
       'Drawings, layouts and templates that sync across phone and web',
       'The same journal on phone and web for one email',
       'Compare a second instrument on the web chart',
-      'MT5 auto sync, plus XML, CSV and XLSX import',
+      'MT5 auto sync, from the hosted agent or your own terminal with a sync token',
+      'XML, CSV and XLSX import',
       'Playbook, prop-firm rules and the daily-stop lock',
       'CSV and full account export',
       '15 AI journal summaries a month, written from your own logged trades',
@@ -79,7 +80,6 @@ const List<MobilePlan> mobilePlans = [
       'Write your own entry and exit rules, then test them on past sessions',
       'Market replay that steps candle by candle through a session',
       '40 AI journal summaries a month, written from your own logged trades',
-      'API access and a sync token per account',
       'Priority support',
     ],
   ),

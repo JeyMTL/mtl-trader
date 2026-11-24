@@ -11,7 +11,6 @@ import {
   LogOut,
   Upload,
   Plus,
-  Shield,
   Calendar,
   RefreshCw,
   MoreHorizontal,
@@ -32,6 +31,7 @@ import {
   formatTrialRemaining,
   subscriptionState,
   trialRemaining,
+  TRIAL_DAYS,
 } from '@/lib/subscription'
 import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
@@ -303,7 +303,6 @@ export default function DashboardLayout({
     '/dashboard/calendar': 'Calendar',
     '/dashboard/settings': 'Settings',
     '/dashboard/payment': 'Payment',
-    '/dashboard/admin': 'Admin',
     '/dashboard/playbook': 'Rules',
     '/dashboard/chart': 'Chart',
   }
@@ -346,20 +345,6 @@ export default function DashboardLayout({
               </Link>
             )
           })}
-          {user?.isAdmin && (
-            <Link
-              href="/dashboard/admin"
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                pathname === '/dashboard/admin'
-                  ? 'nav-active'
-                  : 'text-gray-400 hover:text-white hover:bg-surface-light'
-              )}
-            >
-              <Shield className="w-5 h-5" />
-              Admin
-            </Link>
-          )}
         </nav>
 
         <div className="p-3 border-t border-border">
@@ -371,7 +356,7 @@ export default function DashboardLayout({
                   : isBasic
                     ? 'Basic Plan'
                     : user.status === 'trial'
-                      ? '7-Day Free Trial'
+                      ? `${TRIAL_DAYS}-Day Free Trial`
                       : 'Free plan'}
               </div>
               <div className="text-sm text-white font-medium">
@@ -610,17 +595,6 @@ export default function DashboardLayout({
                   <ChevronRight className="h-4 w-4 text-gray-500" />
                 </Link>
               ))}
-              {user?.isAdmin && (
-                <Link
-                  href="/dashboard/admin"
-                  onClick={() => setSheetOpen(false)}
-                  className="flex items-center gap-3 border-t border-border px-4 py-3.5 text-sm font-medium text-white active:bg-surface"
-                >
-                  <Shield className="h-5 w-5 text-gray-400" />
-                  <span className="flex-1">Admin</span>
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
-                </Link>
-              )}
             </div>
 
             <button

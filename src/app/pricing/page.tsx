@@ -46,7 +46,7 @@ export default function PricingPage() {
           annual: Array.isArray(data.annual) ? data.annual : [],
         })
       } catch {
-        // Leave the card option hidden; bank transfer still works.
+        // Leave the card option hidden rather than offering a checkout that fails.
       }
     })()
     return () => {
@@ -91,10 +91,6 @@ export default function PricingPage() {
       toast('Could not start the card checkout. Check your connection and try again.', { tone: 'error' })
     }
     setCardLoading(null)
-  }
-
-  const handleBankTransfer = (planId: string) => {
-    router.push('/dashboard/payment?plan=' + planId)
   }
 
   return (
@@ -213,16 +209,9 @@ export default function PricingPage() {
                         : 'Auto-renews monthly · cancel any time'}
                     </p>
                     )}
-                    {billing === 'month' ? (
-                      <button
-                        onClick={() => handleBankTransfer(plan.id)}
-                        className="w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 border border-border hover:border-primary text-gray-300 hover:text-white"
-                      >
-                        Bank Transfer
-                      </button>
-                    ) : (
-                      <p className="text-xs text-gray-500 text-center">
-                        Annual plans are card only.
+                    {!cardAvailable(plan.id, billing) && (
+                      <p className="text-xs text-warning text-center">
+                        Card payments are not available right now.
                       </p>
                     )}
                   </div>
@@ -232,9 +221,8 @@ export default function PricingPage() {
           </div>
 
           <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-gray-500">
-            A yearly payment buys 365 days; a bank transfer buys one 30-day period and is
-            approved manually. The same account opens in the browser and in the Android app,
-            which adds 30+ downloadable languages and push price alerts.
+            A yearly payment buys 365 days. The same account opens in the browser and in the
+            Android app, which adds 30+ downloadable languages and push price alerts.
             {cardStatus.enabled
               ? ' Card payments are processed by Paddle, renew automatically, and can be stopped from Settings at any time; access continues until the paid period ends.'
               : ''}
