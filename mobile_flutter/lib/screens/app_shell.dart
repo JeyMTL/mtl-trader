@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/format.dart';
+import '../core/journal_freshness.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/alerts.dart';
 import '../services/journal_api.dart';
@@ -137,7 +138,7 @@ class _AppShellState extends State<AppShell>
     if (userId == null) return null;
     return _api.raw
         .from('trades')
-        .select('id, symbol, pnl, created_at, position_id')
+        .select('id, symbol, pnl, created_at, position_id, open_time, close_time')
         .eq('user_id', userId)
         .not('position_id', 'is', null)
         .order('created_at', ascending: false)
@@ -214,6 +215,10 @@ class _AppShellState extends State<AppShell>
   }
 
   void _onJournaled(Map<String, dynamic> row) {
+    // A first sync backfills the whole history, and the banner would name
+    // whichever of those old rows arrived last instead of the trade the trader
+    // just closed.
+    if (!isJustJournaled(row)) return;
     final at = _parseTime(row['created_at']) ?? DateTime.now().toUtc();
     if (_lastSyncedAt != null && !at.isAfter(_lastSyncedAt!)) return;
     _lastSyncedAt = at;
