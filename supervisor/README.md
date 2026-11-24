@@ -95,6 +95,12 @@ The fields:
 | `MT5_PATH` | `C:\MT5-Sync\terminal64.exe` for the copy. |
 | `MT5_PORTABLE` | `1` for the copy. |
 | `MT5_PATHS` | Optional. More terminals, separated by commas or semicolons, tried when the first cannot log the account in. |
+| `SUPERVISOR_SHARDS` | Optional. How many supervisor hosts share this project's accounts. Default `1`. |
+| `SUPERVISOR_SHARD` | Optional. Which share this host serves, `0`-based. Default `0`. Must be below `SUPERVISOR_SHARDS`. |
+| `MAX_ACCOUNTS` | Optional. Most accounts this host works on per cycle. Default `0`, no cap. |
+| `FLEET_SIZE` | Optional. Terminals held open at once, one account each. Default `0`, the sequential mode. |
+| `MT5_FLEET_DIRS` | Needed when `FLEET_SIZE > 0`. One directory or `terminal64.exe` per slot, comma or semicolon separated. |
+| `FLEET_MIN_HOLD_SECONDS` | Optional. How long a slot keeps an account before it can hand it back to a waiting sign-in. Default `60`. |
 
 `load_dotenv` reads `supervisor/.env`; real environment variables still win, so
 a service manager can override any value.
@@ -121,6 +127,24 @@ scale per connected account, so raise `REFRESH_SECONDS` if the host is small.
 The first sync waits up to 10 seconds for the terminal to download history,
 because an empty read at that moment would advance the cursor past real trades.
 
+### More than one host
+
+The claim is a plain `GET`, so two supervisors on the same project both read
+every pending account and both sync it. Split the accounts instead of relying on
+the database to hand out exclusive work:
+
+| Host | `SUPERVISOR_SHARDS` | `SUPERVISOR_SHARD` |
+| --- | --- | --- |
+| first | `2` | `0` |
+| second | `2` | `1` |
+
+Ownership is `crc32(user_id) % SUPERVISOR_SHARDS`, so every host agrees without a
+schema change or an assignment table. Change both numbers on every host at once:
+mismatched values mean the same account is owned by two hosts and is synced
+twice. `MAX_ACCOUNTS` caps how many accounts one host works on per cycle, which
+keeps a small host inside its refresh budget; when it is hit the least recently
+synced accounts are served first, so the backlog rotates rather than starving.
+
 ### Immediate journaling
 
 With **exactly one** connected account, the supervisor stays logged in and polls
@@ -129,11 +153,57 @@ about 2–5 seconds, no EA required.
 
 One MT5 terminal has one session, so two accounts cannot both be watched. With
 two or more connections the supervisor falls back to the rotation above
-(`REFRESH_SECONDS`), which is the honest limit of one terminal. Set
-`WATCH_SECONDS=0` to disable the watch and always use the rotation.
+(`REFRESH_SECONDS`), which is the honest limit of one terminal — unless fleet
+mode below is on. Set `WATCH_SECONDS=0` to disable the watch and always use the
+rotation.
 
 While it is watching, that terminal stays logged into the connected account.
 Use the portable copy if you want your own trading terminal left alone.
+
+### Many accounts at once (fleet mode)
+
+`FLEET_SIZE` lifts the single-session limit: each slot owns a terminal directory
+and a worker process, and stays logged into its account for as long as that
+account is connected. Every account in the fleet is then journaled within
+`WATCH_SECONDS` of its close, instead of one at a time.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File supervisor/setup_fleet.ps1 -Count 30
+```
+
+The script copies a clean terminal into each slot under `C:\MT5-Fleet`, deletes
+the account, server list, history and profiles a used install would carry, and
+writes a `SyncOnly` profile with no chart and `MaxBars=5000`. Paste the printed
+`MT5_FLEET_DIRS` into `supervisor/.env` next to the matching `FLEET_SIZE`.
+
+Measured per slot on a chartless, logged-in terminal:
+
+| | Per slot | 30 slots |
+| --- | --- | --- |
+| Working set | ~140 MB | ~4.2 GB |
+| Private commit | ~45–60 MB | ~1.8 GB |
+| CPU, steady | ~2.5% of one core | ~0.75 of a core |
+| Disk | ~390 MB | ~12 GB |
+
+RAM is the limit: a 4 vCPU / 8 GB host carries about **30** terminals, and CPU
+and disk are nowhere near theirs. A slot holds its account while it watches, so
+when every slot is taken the newest sign-in has no terminal to go to; once a slot
+has watched for `FLEET_MIN_HOLD_SECONDS` and another account is waiting, it hands
+its account back to the rotation instead of parking the new one indefinitely.
+Three rules keep the sizing numbers true:
+
+* **Never open a chart** in a fleet instance. A charting profile measured 131 MB
+  and had downloaded 2.3 GB of history across eight brokers; a chartless one
+  writes no market data at all.
+* **One directory per slot, and portable.** Two copies cannot run from the same
+directory, and a non-portable copy shares `%APPDATA%` with every other slot and
+  with the trader's own terminal.
+* **A slot is not a shard.** `SUPERVISOR_SHARDS` splits accounts between hosts;
+  `FLEET_SIZE` runs several accounts on one host. Use one shard per host and set
+  `FLEET_SIZE` to what that host's RAM can hold.
+
+`--once` still runs a single sequential pass; it is a diagnostic, not a fleet
+run.
 
 ## 4. Phone pointing at this PC
 
@@ -183,3 +253,5 @@ that was open for hours (longer than the overlap) is still picked up.
 | `ingest rejected (HTTP 403)` | The account's plan has no sync feature, or its email is unverified. |
 | Connection stays `pending` | The supervisor is not running, or `APP_URL`/Supabase credentials are wrong. |
 | `decrypt failed` | `SYNC_CREDENTIAL_KEY` differs from the one the phone encrypted with. |
+| `terminal lost its session; logging back in` | The broker dropped the login while the account was being watched — weekends, a broker restart or a terminal update all do this. It logs back in with the stored investor password; if that fails it releases the terminal so the next cycle logs in cleanly. No action from the customer. |
+| `[fatal] FLEET_SIZE=n needs n terminals in MT5_FLEET_DIRS` | The fleet is larger than the slots that exist. Run `setup_fleet.ps1 -Count n` and update `MT5_FLEET_DIRS`. |

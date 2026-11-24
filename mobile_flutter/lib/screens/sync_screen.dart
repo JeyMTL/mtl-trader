@@ -23,7 +23,7 @@ class SyncScreen extends StatefulWidget {
   State<SyncScreen> createState() => _SyncScreenState();
 }
 
-class _SyncScreenState extends State<SyncScreen> {
+class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
   final TextEditingController _broker = TextEditingController();
   final TextEditingController _server = TextEditingController();
   final TextEditingController _login = TextEditingController();
@@ -45,12 +45,32 @@ class _SyncScreenState extends State<SyncScreen> {
   @override
   void initState() {
     super.initState();
+    // The two-minute cutoff below stops polling on purpose, so a screen left open
+    // while the app was backgrounded would otherwise sit on whatever it last
+    // heard. A session that came up meanwhile is invisible until the customer
+    // happens to pull to refresh.
+    WidgetsBinding.instance.addObserver(this);
     _load();
     _loadBrokers();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state != AppLifecycleState.resumed) return;
+    // Coming back is a fresh attempt, not a continuation of the old one: clear
+    // the stall so a slow connect gets its full two minutes again.
+    _poll?.cancel();
+    setState(() {
+      _pendingSince = null;
+      _stalled = false;
+    });
+    _load();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     _broker.dispose();
     _server.dispose();
