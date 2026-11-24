@@ -3,8 +3,19 @@ import {
   AI_REVIEW_QUOTA,
   aiReviewQuota,
   canUseFeature,
+  hasProTools,
+  isProTimeframe,
   type AccountState,
 } from '@/lib/subscription'
+
+const PRO_FEATURES = [
+  'ai_review',
+  'replay',
+  'backtest',
+  'fast_timeframes',
+  'push_alerts',
+  'hard_lock',
+] as const
 
 /** A paid account with 20 days left. */
 function paid(tier: 'basic' | 'pro'): AccountState {
@@ -47,23 +58,22 @@ const LAPSED_TRIAL: AccountState = {
 
 describe('canUseFeature', () => {
   it('lets a trial use every feature, including Pro-only ones', () => {
-    for (const feature of ['ai_review', 'replay', 'backtest', 'sync'] as const) {
+    for (const feature of [...PRO_FEATURES, 'sync'] as const) {
       expect(canUseFeature(TRIAL, feature)).toEqual({ allowed: true, reason: 'trial' })
     }
   })
 
   it('lets Pro use everything', () => {
-    for (const feature of ['ai_review', 'replay', 'backtest', 'sync'] as const) {
+    for (const feature of [...PRO_FEATURES, 'sync'] as const) {
       expect(canUseFeature(paid('pro'), feature).allowed, feature).toBe(true)
     }
   })
 
-  it('keeps sync and the AI review on Basic, withholding the analysis tools', () => {
-    expect(canUseFeature(paid('basic'), 'ai_review')).toEqual({ allowed: true, reason: 'ok' })
+  it('keeps sync on Basic, withholding every Pro tool', () => {
     // Autosync is the reason Basic is worth paying for; gating it at Pro left
     // Basic customers hand-entering every fill.
     expect(canUseFeature(paid('basic'), 'sync')).toEqual({ allowed: true, reason: 'ok' })
-    for (const feature of ['replay', 'backtest'] as const) {
+    for (const feature of PRO_FEATURES) {
       expect(canUseFeature(paid('basic'), feature), feature).toEqual({
         allowed: false,
         reason: 'pro_required',
@@ -95,8 +105,8 @@ describe('aiReviewQuota', () => {
     expect(aiReviewQuota(TRIAL)).toBe(AI_REVIEW_QUOTA.pro)
   })
 
-  it('gives Basic fifteen reviews a month and Pro forty', () => {
-    expect(aiReviewQuota(paid('basic'))).toBe(15)
+  it('gives Basic none and Pro forty, because the AI review is sold with Pro', () => {
+    expect(aiReviewQuota(paid('basic'))).toBe(0)
     expect(aiReviewQuota(paid('pro'))).toBe(40)
   })
 
@@ -108,5 +118,25 @@ describe('aiReviewQuota', () => {
   it('never returns a negative or unknown allowance', () => {
     expect(aiReviewQuota({ subscription_tier: 'mystery', subscription_status: 'active', current_period_end: new Date(Date.now() + 86_400_000).toISOString() })).toBe(0)
     for (const value of Object.values(AI_REVIEW_QUOTA)) expect(value).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('hasProTools', () => {
+  it('counts a live trial and an active Pro period, and nothing else', () => {
+    expect(hasProTools(TRIAL)).toBe(true)
+    expect(hasProTools(paid('pro'))).toBe(true)
+    expect(hasProTools(paid('basic'))).toBe(false)
+    expect(hasProTools(EXPIRED)).toBe(false)
+    expect(hasProTools(LAPSED_TRIAL)).toBe(false)
+    expect(hasProTools({})).toBe(false)
+  })
+})
+
+describe('isProTimeframe', () => {
+  it('withholds 5s, 10s and 15s only', () => {
+    for (const key of ['5s', '10s', '15s']) expect(isProTimeframe(key), key).toBe(true)
+    for (const key of ['30s', '45s', '1m', '5m', '1h', '1d']) {
+      expect(isProTimeframe(key), key).toBe(false)
+    }
   })
 })

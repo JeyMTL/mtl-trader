@@ -6,12 +6,14 @@ import { clientKey, rateLimit } from '@/lib/rate-limit'
 import {
   computeDayLock,
   computeDayState,
+  effectiveLockMode,
   normalizeDailyStop,
   normalizeLockMode,
   type DayState,
 } from '@/lib/daily-stop'
 import { zonedDayBounds } from '@/lib/timezone'
 import { loadDayTrades } from '@/lib/day-trades'
+import type { AccountState } from '@/lib/subscription'
 
 /**
  * The daily stop, as the MT5 guard EA sees it.
@@ -93,7 +95,11 @@ export async function GET(req: Request) {
     const admin = getAdminClient()
     const [playbookResult, profileResult] = await Promise.all([
       admin.from('playbooks').select(PLAYBOOK_COLUMNS).eq('user_id', userId).maybeSingle(),
-      admin.from('users').select('timezone').eq('id', userId).maybeSingle(),
+      admin
+        .from('users')
+        .select('timezone, subscription_tier, subscription_status, trial_ends_at, current_period_end, max_trades')
+        .eq('id', userId)
+        .maybeSingle(),
     ])
 
     if (isMissingSchema(playbookResult.error)) {
@@ -103,7 +109,12 @@ export async function GET(req: Request) {
       )
     }
 
-    const mode = normalizeLockMode(playbookResult.data?.lock_mode)
+    // The same answer `/api/day-state` gives the browser: hard is Pro, Basic
+    // enforces the soft freeze even when the stored row still says hard.
+    const mode = effectiveLockMode(
+      normalizeLockMode(playbookResult.data?.lock_mode),
+      (profileResult.data ?? {}) as AccountState
+    )
     if (mode === 'off') {
       return NextResponse.json(
         { locked: false, mode, missing: false },

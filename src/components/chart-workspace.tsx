@@ -23,6 +23,7 @@ import { ChartSettingsDialog } from '@/components/chart-settings-panel'
 import { AnalysisHubDialog, ChartLayoutsDialog } from '@/components/chart-desk-dialogs'
 import { alignCompare } from '@/lib/chart-compare'
 import { mergeCandleTail, parseChartInterval, tailPollMs } from '@/lib/market-candles'
+import { isProTimeframe } from '@/lib/subscription'
 import { sessionWindows } from '@/lib/market-sessions'
 import { publicErrorMessage } from '@/lib/errors'
 import {
@@ -157,13 +158,29 @@ interface View {
 export function ChartWorkspace({
   initialDrawings,
   defaultSymbol,
+  proTimeframes = false,
 }: {
   initialDrawings: ChartDrawingRow[]
   defaultSymbol: string
+  /**
+   * Whether the 5s, 10s and 15s candle sizes are open to this account (Pro or a
+   * live trial). Basic keeps 30s and 45s and everything from a minute up. The
+   * size is listed either way so the upgrade is visible where it is felt; a
+   * locked one explains itself instead of moving the chart silently.
+   */
+  proTimeframes?: boolean
 }) {
   const [symbol, setSymbolInput] = useState(defaultSymbol)
   const [symbolDraft, setSymbolDraft] = useState(defaultSymbol)
   const [interval, setIntervalKey] = useState<string>('1h')
+  const [lockedSize, setLockedSize] = useState<string | null>(null)
+
+  // A saved layout or desk preference can name a size this account cannot use
+  // any more. Falling back to 30s keeps the chart drawing rather than polling a
+  // feed the plan does not include.
+  useEffect(() => {
+    if (!proTimeframes && isProTimeframe(interval)) setIntervalKey('30s')
+  }, [proTimeframes, interval])
   const [candles, setCandles] = useState<Candle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1866,22 +1883,47 @@ export function ChartWorkspace({
           ))}
         </div>
         <div className="ml-auto flex min-w-0 max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-0.5">
-          {INTERVALS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setIntervalKey(item.key)}
-              className={`min-h-11 min-w-11 rounded-md px-2.5 py-1 text-[11px] font-semibold ${
-                interval === item.key
-                  ? 'bg-surface-light text-white'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+          {INTERVALS.map((item) => {
+            const locked = !proTimeframes && isProTimeframe(item.key)
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => (locked ? setLockedSize(item.label) : setIntervalKey(item.key))}
+                title={locked ? 'Pro candle size' : undefined}
+                className={`min-h-11 min-w-11 rounded-md px-2.5 py-1 text-[11px] font-semibold ${
+                  interval === item.key
+                    ? 'bg-surface-light text-white'
+                    : locked
+                      ? 'text-gray-600'
+                      : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {item.label}
+                {locked && <span className="ml-0.5 align-super text-[8px] text-primary">Pro</span>}
+              </button>
+            )
+          })}
         </div>
       </div>
+
+      {lockedSize && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-[11px] text-primary">
+          <span>
+            {lockedSize} candles are part of Pro. Basic charts run from 30s up.
+          </span>
+          <a href="/pricing" className="font-semibold underline">
+            Upgrade
+          </a>
+          <button
+            type="button"
+            onClick={() => setLockedSize(null)}
+            className="ml-auto text-primary/70 hover:text-primary"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-1.5">
         {TOOLS.map((item) => (

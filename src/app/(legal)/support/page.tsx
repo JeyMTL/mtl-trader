@@ -34,7 +34,7 @@ const FAQ = [
   },
   {
     q: 'What is the difference between a soft lock and a hard lock?',
-    a: 'Both are set in Rules with your daily loss limit. In MT5 the two behave the same: while locked, the guard deletes resting orders and closes any position opened after the limit was hit. The difference is the journal. A soft lock leaves it open, and can be lifted only by writing down a reason that is stored with the day. A hard lock closes the journal until the next trading day. Two limits are worth knowing: the guard cannot block a manual market-order click, which fills before the terminal reports it, and it only stops another expert advisor that checks it first. If the journal cannot be reached for five minutes, the lock releases, so an outage can never leave you unable to close a position.',
+    a: 'Both are set in Rules with your daily loss limit. In MT5 the two behave the same: while locked, the guard deletes resting orders and closes any position opened after the limit was hit. The difference is the journal. A soft lock, which every paid plan includes, leaves it open, and can be lifted only by writing down a reason that is stored with the day. A hard lock, sold with Pro, closes the journal until the next trading day. Two limits are worth knowing: the guard cannot block a manual market-order click, which fills before the terminal reports it, and it only stops another expert advisor that checks it first. If the journal cannot be reached for five minutes, the lock releases, so an outage can never leave you unable to close a position.',
   },
   {
     q: 'What is in the chart desk?',
@@ -46,7 +46,7 @@ const FAQ = [
   },
   {
     q: 'What does the AI summary include?',
-    a: 'A written summary of the trades already in your journal: a headline, what looks strong, what looks risky, and the numbers each point rests on. It reads your own record and describes it. It does not score you, forecast a market, or recommend a trade. Basic includes fifteen summaries a month and Pro forty.',
+    a: 'A written summary of the trades already in your journal: a headline, what looks strong, what looks risky, and the numbers each point rests on. It reads your own record and describes it. It does not score you, forecast a market, or recommend a trade. The AI summary is part of Pro, which includes forty a month; the free trial runs at the same allowance so you can judge it before paying.',
   },
   {
     q: 'What is the Pro rules builder?',

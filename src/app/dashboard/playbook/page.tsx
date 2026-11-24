@@ -13,7 +13,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import type { LockMode } from '@/lib/daily-stop'
+import { effectiveLockMode, normalizeLockMode, type LockMode } from '@/lib/daily-stop'
+import { hasProTools, type AccountState } from '@/lib/subscription'
 import { useToast } from '@/components/toast'
 import { publicErrorMessage } from '@/lib/errors'
 import {
@@ -76,6 +77,7 @@ export default function PlaybookPage() {
   const [playbook, setPlaybook] = useState<Playbook>({ ...EMPTY_PLAYBOOK })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [proTools, setProTools] = useState(false)
   const [now, setNow] = useState(() => new Date())
   const remindedKey = useRef('')
 
@@ -90,7 +92,11 @@ export default function PlaybookPage() {
 
         const [playbookResult, profileResult] = await Promise.all([
           supabase.from('playbooks').select('*').eq('user_id', user.id).maybeSingle(),
-          supabase.from('users').select('timezone').eq('id', user.id).maybeSingle(),
+          supabase
+            .from('users')
+            .select('timezone, subscription_tier, subscription_status, trial_ends_at, current_period_end, max_trades')
+            .eq('id', user.id)
+            .maybeSingle(),
         ])
 
         const stored =
@@ -98,6 +104,11 @@ export default function PlaybookPage() {
           Intl.DateTimeFormat().resolvedOptions().timeZone ||
           'UTC'
         setTimeZone(stored)
+        // Hard lock is Pro. The server already treats a hard row on Basic as
+        // soft, so the page must not show a wall the account does not get.
+        const account = (profileResult.data ?? {}) as AccountState
+        const pro = hasProTools(account)
+        setProTools(pro)
 
         if (playbookResult.error) {
           toast(
@@ -114,8 +125,9 @@ export default function PlaybookPage() {
               remindersEnabled: playbookResult.data.reminders_enabled,
               notes: playbookResult.data.notes,
               dailyLossLimit: playbookResult.data.daily_loss_limit,
-              maxTradesPerDay: playbookResult.data.max_trades_per_day,
-              lockMode: playbookResult.data.lock_mode,
+              maxTradesPerDay: playbookResult.data.max_trades_per_day,                lockMode: pro
+                  ? playbookResult.data.lock_mode
+                  : effectiveLockMode(normalizeLockMode(playbookResult.data.lock_mode), account),
             })
           )
         }
@@ -459,25 +471,35 @@ export default function PlaybookPage() {
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 {LOCK_CHOICES.map((choice) => {
                   const selected = playbook.lockMode === choice.value
+                  const locked = choice.value === 'hard' && !proTools
                   return (
                     <button
                       key={choice.value}
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        if (locked) {
+                          toast('Hard lock is part of Pro. Basic enforces the soft freeze.', {
+                            tone: 'info',
+                          })
+                          return
+                        }
                         setPlaybook((current) => ({ ...current, lockMode: choice.value }))
-                      }
+                      }}
                       className={`rounded-lg border p-3 text-left transition ${
                         selected
                           ? 'border-primary bg-primary/10'
-                          : 'border-border bg-background hover:border-gray-600'
+                          : locked
+                            ? 'border-border bg-background opacity-60'
+                            : 'border-border bg-background hover:border-gray-600'
                       }`}
                     >
                       <span
                         className={`block text-xs font-semibold ${
-                          selected ? 'text-primary' : 'text-gray-300'
+                          selected ? 'text-primary' : locked ? 'text-gray-400' : 'text-gray-300'
                         }`}
                       >
                         {choice.label}
+                        {locked && <span className="ml-1 text-[9px] font-bold text-primary">PRO</span>}
                       </span>
                       <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
                         {choice.blurb}

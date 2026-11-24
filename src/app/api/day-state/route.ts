@@ -6,6 +6,7 @@ import {
   computeDayLock,
   computeDayState,
   DEFAULT_DAILY_STOP,
+  effectiveLockMode,
   normalizeDailyStop,
   normalizeLockMode,
   type DailyStopDebrief,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/daily-stop'
 import { zonedDayBounds } from '@/lib/timezone'
 import { loadDayTrades } from '@/lib/day-trades'
+import type { AccountState } from '@/lib/subscription'
 
 /**
  * Today's daily-stop state, and the trader's answer to it.
@@ -60,7 +62,11 @@ async function load(userId: string, now: Date): Promise<Loaded> {
 
   const [playbookResult, profileResult] = await Promise.all([
     admin.from('playbooks').select(PLAYBOOK_COLUMNS).eq('user_id', userId).maybeSingle(),
-    admin.from('users').select('timezone').eq('id', userId).maybeSingle(),
+    admin
+      .from('users')
+      .select('timezone, subscription_tier, subscription_status, trial_ends_at, current_period_end, max_trades')
+      .eq('id', userId)
+      .maybeSingle(),
   ])
 
   const rules = normalizeDailyStop({
@@ -68,7 +74,12 @@ async function load(userId: string, now: Date): Promise<Loaded> {
     maxTrades: playbookResult.data?.max_trades_per_day ?? DEFAULT_DAILY_STOP.maxTrades,
     timeZone: profileResult.data?.timezone ?? DEFAULT_DAILY_STOP.timeZone,
   })
-  const lockMode = normalizeLockMode(playbookResult.data?.lock_mode)
+  // Hard is Pro. Basic keeps the soft freeze, so a row saved on Pro cannot keep
+  // walling the journal after the plan lapses.
+  const lockMode = effectiveLockMode(
+    normalizeLockMode(playbookResult.data?.lock_mode),
+    (profileResult.data ?? {}) as AccountState
+  )
   const bounds = zonedDayBounds(now, rules.timeZone)
 
   // The rows are keyed on the local day, which is only known after the profile

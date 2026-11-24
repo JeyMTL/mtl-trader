@@ -24,6 +24,15 @@ const List<ChartInterval> chartTimeFrames = <ChartInterval>[
   ChartInterval.oneDay,
 ];
 
+/// The candle sizes sold with Pro. Basic keeps 30s and 45s and every size from a
+/// minute up; the 5s/10s/15s sizes are what a scalper pays for, so they stay on
+/// the sheet with a Pro tag instead of disappearing from it.
+const Set<String> proTimeFrameKeys = {'5s', '10s', '15s'};
+
+/// Whether this candle size needs Pro.
+bool isProTimeFrame(ChartInterval interval) =>
+    proTimeFrameKeys.contains(interval.key);
+
 /// What the trader chose: the live tail, or an explicit window and candle size.
 ///
 /// The window is kept as a type because the loader still understands it, but
@@ -130,6 +139,7 @@ class _TimeFrameSheet extends StatelessWidget {
                       interval: entry,
                       selected: entry == interval,
                       refused: refused.contains(entry),
+                      pro: isProTimeFrame(entry),
                       onTap: refused.contains(entry)
                           ? null
                           : () => Navigator.of(context).pop(
@@ -154,11 +164,16 @@ class _TimeFrameRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.refused = false,
+    this.pro = false,
   });
 
   final ChartInterval interval;
   final bool selected;
   final bool refused;
+
+  /// Sold with Pro. The row still answers: the caller refuses and explains, so
+  /// the trader learns the price instead of finding a dead row.
+  final bool pro;
   final VoidCallback? onTap;
 
   @override
@@ -206,6 +221,24 @@ class _TimeFrameRow extends StatelessWidget {
                 ),
               ),
             ),
+            if (pro && !refused)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(28),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'PRO',
+                  style: TextStyle(
+                    color: AppColors.primaryLight,
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            if (pro && !refused) const SizedBox(width: 6),
             if (selected && !refused)
               Icon(Icons.check, size: 16, color: AppColors.primaryLight),
           ],

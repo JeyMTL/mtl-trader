@@ -127,6 +127,13 @@ class SubscriptionInfo {
     }
   }
 
+  /// Whether the Pro tools are open right now: a live trial, or an active paid
+  /// period on Pro. Mirrors `hasProTools` in `src/lib/subscription.ts`, so the
+  /// app and the server answer the same question the same way.
+  bool get proTools =>
+      state == SubscriptionState.trial ||
+      (state == SubscriptionState.active && tier == 'pro');
+
   /// The one-line status under a plan name.
   String get statusLabel {
     switch (state) {

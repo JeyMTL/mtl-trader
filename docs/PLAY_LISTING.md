@@ -36,7 +36,7 @@ Read at a glance between sessions: dark interface, gold accents, monospaced numb
 
 PLANS
 
-A 3-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar and analytics, time edge, the chart desk with levels shared between phone and web, MT5 sync, prop-firm rules, photos and voice notes, and 15 AI journal summaries a month; Pro raises that to 40 and adds the backtester with saved runs, the rules builder that turns a description of your own conditions into editable test rules, market replay, API access and priority support. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
+A 3-day trial unlocks everything, with no card required. After it ends, your journal and analytics stay readable, and a subscription reopens the desk. Basic adds the full calendar and analytics, time edge, the setup matrix, the chart desk with levels pinned straight off the chart, 30s and 45s candles, MT5 sync, the soft daily lock, prop-firm rules, photos and voice notes; Pro adds the hard lock, 40 AI journal summaries a month, the backtester with saved runs, the rules builder that turns a description of your own conditions into editable test rules, market replay, notifications and the 5s, 10s and 15s candles, plus priority support. Every plan logs unlimited trades — paying never means logging fewer trades than the trial allowed.
 
 Subscriptions bought in this app are sold and billed by Google Play, and you can manage or cancel them any time from your Play account.
 

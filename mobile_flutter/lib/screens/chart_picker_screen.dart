@@ -19,6 +19,7 @@ import '../core/chart_view.dart';
 import '../core/chart_zone.dart';
 import '../core/indicators.dart';
 import '../core/level_touch.dart';
+import '../core/subscription.dart';
 import '../core/trade_exit.dart' show ResolvedExit;
 import '../core/instruments.dart';
 import '../services/journal_api.dart';
@@ -2114,36 +2115,29 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     _enterReplay();
   }
 
+  /// Whether this account holds Pro right now, from the server's own billing
+  /// columns. A trial counts, and a stale `pro` label cannot outlive its period.
+  ///
+  /// The same source the replay and the Pro candle sizes read, so the two cannot
+  /// disagree about what the trader owns.
+  Future<bool> _hasProTools() async {
+    try {
+      final profile = await JournalApi().profile();
+      return SubscriptionInfo.fromProfile(profile).proTools;
+    } catch (_) {
+      // Offline, or a schema still missing the billing columns: answer no rather
+      // than pretending the feature is paid for.
+      return false;
+    }
+  }
+
   /// Replay is sold with Pro.
   ///
   /// This check is the upgrade prompt, not the enforcement: candles are served
   /// to every plan, and replay is a way of drawing on them. It lives here
   /// because entering replay is the only moment a trader discovers the feature.
-  /// A trial counts as Pro, and a stale `pro` label cannot outlive its period.
   Future<bool> _replayAllowed() async {
-    try {
-      final profile = await JournalApi().profile();
-      final status =
-          (profile['subscription_status'] as String? ?? '').toLowerCase();
-      final tier =
-          (profile['subscription_tier'] as String? ?? '').toLowerCase();
-      final now = DateTime.now();
-      final trialEnd =
-          DateTime.tryParse(profile['trial_ends_at'] as String? ?? '');
-      final periodEnd =
-          DateTime.tryParse(profile['current_period_end'] as String? ?? '');
-
-      final trialing =
-          status == 'trial' && trialEnd != null && trialEnd.isAfter(now);
-      final subscribed = status == 'active' &&
-          periodEnd != null &&
-          periodEnd.isAfter(now) &&
-          tier == 'pro';
-      if (trialing || subscribed) return true;
-    } catch (_) {
-      // Offline, or a schema still missing the billing columns: fall through to
-      // the prompt rather than pretending the feature is paid for.
-    }
+    if (await _hasProTools()) return true;
 
     if (!mounted) return false;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -5276,6 +5270,21 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       refused: _refusedIntervals,
     );
     if (choice == null || !mounted) return;
+    // 5s, 10s and 15s are sold with Pro. The picker lists them either way; the
+    // refusal happens here so the answer names the plan instead of switching to
+    // a size the feed would serve but the account has not paid for.
+    final picked = choice.interval;
+    if (picked != null && isProTimeFrame(picked) && !await _hasProTools()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '5s, 10s and 15s candles are a Pro feature. Basic charts run from 30s up.',
+          ),
+        ),
+      );
+      return;
+    }
     // The picker only returns the live tail, but the type still carries a
     // window: a caller that builds one keeps working instead of silently
     // ignoring its dates.
@@ -5287,7 +5296,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       );
       return;
     }
-    final picked = choice.interval;
     if (picked == null) return;
     await _setInterval(picked);
   }

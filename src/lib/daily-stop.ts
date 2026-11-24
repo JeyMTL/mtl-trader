@@ -13,6 +13,7 @@
  * here is wired into order execution anyway.
  */
 
+import { hasProTools, type AccountState } from './subscription'
 import { normalizeTimeZone, zonedDayBounds } from './timezone'
 
 export interface DailyStopRules {
@@ -142,6 +143,24 @@ export function normalizeDailyStop(input: {
 /** Anything unrecognised becomes `off`, so a bad row cannot lock an account. */
 export function normalizeLockMode(value: unknown): LockMode {
   return value === 'soft' || value === 'hard' ? value : 'off'
+}
+
+/**
+ * The lock a stored mode actually means for this account.
+ *
+ * Hard adds the journal wall, and that is sold with Pro; Basic enforces the soft
+ * freeze. A row saved while the account held Pro stops walling the journal the
+ * day the plan lapses, while the freeze — the part that keeps the day's loss
+ * budget — is unchanged. Both the day-state route and the EA read the answer
+ * from here, so the browser and the terminal cannot disagree about the mode.
+ */
+export function effectiveLockMode(
+  mode: LockMode,
+  account: AccountState,
+  now: Date = new Date()
+): LockMode {
+  if (mode === 'hard' && !hasProTools(account, now)) return 'soft'
+  return mode
 }
 
 /** The instant a trade belongs to: its close, falling back to its open/creation. */

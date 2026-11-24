@@ -236,6 +236,20 @@ export function planRank(planId: string | null | undefined): number {
 }
 
 /**
+ * Whether the account may open Pro tools right now: a running trial, or an
+ * active paid period on Pro.
+ *
+ * `canUseFeature` is the server gate; this is the same answer shaped for the
+ * client. The chart desk and the playbook use it to decide what to show without
+ * asking the server per render, and the server still refuses the write itself.
+ */
+export function hasProTools(account: AccountState, now: Date = new Date()): boolean {
+  if (isTrialActive(account, now)) return true
+  if (!isSubscriptionActive(account, now)) return false
+  return planRank(account.subscription_tier) >= planRank('pro')
+}
+
+/**
  * Whether a paid order for `planId` may be applied to `account`. Paid orders are
  * only ever applied by the server; this rejects unknown plans and refuses to
  * downgrade an account that is still inside a higher paid period (e.g. an old
@@ -273,19 +287,47 @@ export function isDuplicatePurchase(
 export type SubscriptionState = 'trial' | 'active' | 'cancelled' | 'expired'
 
 /** Features that can be withheld by plan. */
-export type PlanFeature = 'ai_review' | 'replay' | 'backtest' | 'sync'
+export type PlanFeature =
+  | 'ai_review'
+  | 'replay'
+  | 'backtest'
+  | 'sync'
+  | 'fast_timeframes'
+  | 'push_alerts'
+  | 'hard_lock'
 
 /**
  * The features only Pro may use.
  *
- * Everything needed to record and review your own trading stays available on
- * every plan: journalling, charts, analytics, import and export. Autosync is
- * deliberately *not* here any more: it is the one thing a trader cannot do by
- * hand, so it belongs at the entry price — gating it at Pro left Basic paying
- * for a nicer view of data they still had to type in. What remains is the
- * advanced analysis workflow, which is genuinely a step beyond journalling.
+ * The split is deliberately "record your own trading" against "sell the
+ * analysis": Basic carries the journal, the chart desk and the automation a
+ * trader needs to be accurate — autosync, the soft lock, level pinning, photos
+ * and voice notes, the time-edge and setup analytics, and 30s/45s candles.
+ * Pro adds what is beyond journalling: the analysis workbench (backtester,
+ * replay), the AI review, push notifications, the hard lock and the 5s/10s/15s
+ * candles. Autosync stays on Basic on purpose: it is the one thing a trader
+ * cannot do by hand, so gating it at the entry price is what makes Basic worth
+ * paying for.
  */
-const PRO_ONLY: readonly PlanFeature[] = ['replay', 'backtest']
+const PRO_ONLY: readonly PlanFeature[] = [
+  'ai_review',
+  'replay',
+  'backtest',
+  'fast_timeframes',
+  'push_alerts',
+  'hard_lock',
+]
+
+/**
+ * Second-level candle sizes sold with Pro. Basic keeps 30s and 45s, and every
+ * size from one minute up: the fast sizes are the ones a scalper pays for.
+ */
+export const PRO_TIMEFRAMES = ['5s', '10s', '15s'] as const
+
+/** Whether a candle size is one of the Pro-only seconds sizes. */
+export function isProTimeframe(key: string): boolean {
+  return (PRO_TIMEFRAMES as readonly string[]).includes(key)
+}
 
 export type FeatureRefusal = 'ok' | 'trial' | 'subscription_required' | 'pro_required'
 
@@ -320,11 +362,12 @@ export function canUseFeature(
 /**
  * Monthly AI review allowance. The trial is treated as Pro.
  *
- * Fifteen on Basic and forty on Pro: enough to review most trading days, while
- * keeping the model bill predictable. The trial runs at the Pro allowance so a
- * new account can judge the feature before paying for it.
+ * The AI review is sold with Pro, so Basic has no allowance and forty a month is
+ * what Pro buys; the trial runs at the Pro allowance so a new account can judge
+ * the feature before paying for it. `PRO_ONLY` is what actually refuses the
+ * route, this table is only how much of an allowed feature is left.
  */
-export const AI_REVIEW_QUOTA: Record<string, number> = { free: 0, basic: 15, pro: 40 }
+export const AI_REVIEW_QUOTA: Record<string, number> = { free: 0, basic: 0, pro: 40 }
 
 /** How many AI reviews the account may generate this month. */
 export function aiReviewQuota(account: AccountState, now: Date = new Date()): number {

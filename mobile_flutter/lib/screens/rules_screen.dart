@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/subscription.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/daily_stop_bus.dart';
 import '../services/session_reminders.dart';
@@ -46,6 +47,10 @@ class _RulesScreenState extends State<RulesScreen> {
   bool _remindersEnabled = true;
   String _lockMode = 'off';
 
+  /// Hard lock is Pro; the server treats a hard row on Basic as soft, so the
+  /// screen must not offer a wall the account will not get.
+  bool _proTools = false;
+
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -84,7 +89,16 @@ class _RulesScreenState extends State<RulesScreen> {
           .select()
           .eq('user_id', uid)
           .maybeSingle();
+      final profile = await Supabase.instance.client
+          .from('users')
+          .select(
+            'subscription_tier, subscription_status, trial_ends_at, current_period_end, max_trades',
+          )
+          .eq('id', uid)
+          .maybeSingle();
       if (!mounted) return;
+      final proTools =
+          SubscriptionInfo.fromProfile(profile ?? const {}).proTools;
 
       final rules = <TextEditingController>[];
       final rawRules = row?['rules'];
@@ -141,9 +155,10 @@ class _RulesScreenState extends State<RulesScreen> {
             ? (row!['reminder_minutes'] as num).toInt()
             : 60;
         _remindersEnabled = row?['reminders_enabled'] != false;
+        _proTools = proTools;
         _lockMode = switch (row?['lock_mode']) {
           'soft' => 'soft',
-          'hard' => 'hard',
+          'hard' => proTools ? 'hard' : 'soft',
           _ => 'off',
         };
         _lossLimit.text = limit is num && limit > 0
@@ -207,7 +222,8 @@ class _RulesScreenState extends State<RulesScreen> {
           'notes': _notes.text.trim(),
           'daily_loss_limit': lossLimit > 0 ? lossLimit : 0,
           'max_trades_per_day': maxTrades > 0 ? maxTrades : 0,
-          'lock_mode': _lockMode,
+          // A lapsed Pro account must not keep saving a mode it cannot enforce.
+          'lock_mode': _lockMode == 'hard' && !_proTools ? 'soft' : _lockMode,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         },
         onConflict: 'user_id',
@@ -485,7 +501,20 @@ class _RulesScreenState extends State<RulesScreen> {
             label: _l10n.lockHard,
             blurb: _l10n.rulesHardBlurb,
             selected: _lockMode == 'hard',
-            onTap: () => setState(() => _lockMode = 'hard'),
+            pro: !_proTools,
+            onTap: () {
+              if (!_proTools) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Hard lock is part of Pro. Basic enforces the soft freeze.',
+                    ),
+                  ),
+                );
+                return;
+              }
+              setState(() => _lockMode = 'hard');
+            },
           ),
         ],
       ),
@@ -698,11 +727,15 @@ class _LockOption extends StatelessWidget {
     required this.blurb,
     required this.selected,
     required this.onTap,
+    this.pro = false,
   });
 
   final String label;
   final String blurb;
   final bool selected;
+
+  /// Sold with Pro, so the row says so instead of quietly refusing.
+  final bool pro;
   final VoidCallback onTap;
 
   @override
@@ -729,13 +762,42 @@ class _LockOption extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? AppColors.primary : AppColors.text,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: selected
+                                ? AppColors.primary
+                                : pro
+                                    ? AppColors.muted
+                                    : AppColors.text,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (pro) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'PRO',
+                            style: TextStyle(
+                              color: AppColors.primaryLight,
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 1),
                   Text(

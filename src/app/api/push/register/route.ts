@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { apiError, apiWarn } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
+import { checkFeature } from '@/lib/plan-guard'
 
 /**
  * Registers a device for server-sent notifications.
@@ -12,6 +13,11 @@ import { readJsonBody } from '@/lib/request'
  *
  * The token is never returned and never logged: it is a capability to wake the
  * device, and a support screenshot is not the place for it.
+ *
+ * Notifications are sold with Pro, so registering a device is the gate. Refusing
+ * here rather than at send time keeps the token table honest: a Basic account
+ * has no device to wake, and the sweeps do not have to re-check a plan to find
+ * that out.
  */
 
 export const runtime = 'nodejs'
@@ -22,6 +28,11 @@ export async function POST(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const gate = await checkFeature(user.id, 'push_alerts')
+    if (!gate.allowed) {
+      return NextResponse.json({ error: gate.message, code: gate.reason }, { status: 402 })
+    }
 
     const parsed = await readJsonBody<Record<string, unknown>>(req, { maxBytes: 4 * 1024 })
     if (!parsed.ok) return parsed.response

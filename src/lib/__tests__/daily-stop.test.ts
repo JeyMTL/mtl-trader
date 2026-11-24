@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   computeDayLock,
   computeDayState,
+  effectiveLockMode,
   isAfterStopEntry,
   normalizeDailyStop,
   normalizeLockMode,
@@ -247,5 +248,31 @@ describe('normalizeDailyStop', () => {
       limit: 250.46,
       maxTrades: 100,
     })
+  })
+})
+
+describe('effectiveLockMode', () => {
+  const future = new Date(Date.now() + 20 * 86_400_000).toISOString()
+  const account = (tier: string, status = 'active') => ({
+    subscription_tier: tier,
+    subscription_status: status,
+    trial_ends_at: status === 'trial' ? future : null,
+    current_period_end: status === 'active' ? future : null,
+  })
+
+  it('downgrades hard to soft on Basic, and keeps soft as soft', () => {
+    expect(effectiveLockMode('hard', account('basic'))).toBe('soft')
+    expect(effectiveLockMode('soft', account('basic'))).toBe('soft')
+  })
+
+  it('leaves a Pro or trial account on the mode it chose', () => {
+    expect(effectiveLockMode('hard', account('pro'))).toBe('hard')
+    expect(effectiveLockMode('hard', account('free', 'trial'))).toBe('hard')
+  })
+
+  it('does not touch off, and treats a lapsed Pro period as Basic', () => {
+    expect(effectiveLockMode('off', account('pro'))).toBe('off')
+    const lapsed = { subscription_tier: 'pro', subscription_status: 'active', current_period_end: new Date(Date.now() - 60_000).toISOString() }
+    expect(effectiveLockMode('hard', lapsed)).toBe('soft')
   })
 })

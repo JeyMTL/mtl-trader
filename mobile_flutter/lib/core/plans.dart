@@ -1,16 +1,18 @@
 /// Paid plans offered in the app. Prices and limits mirror `src/lib/plans.ts`
 /// on the web so checkout, the database trigger and the app agree.
 ///
-/// Enforced differences: the AI review allowance and the backtester/replay gate.
-/// Trade volume is unlimited on every plan in force — capping Basic below the
-/// unlimited trial made paying worse than not paying. MT5 sync is sold on Basic
-/// now that the desktop EA carries it (`kMt5SyncEnabled`), and every line here
-/// describes something the plan can actually open: listing a feature a tier
-/// cannot reach is the one mistake the web catalogue guard cannot catch.
+/// Enforced differences: the hard lock, the AI review, the backtester/replay
+/// gate, push notifications and the 5s/10s/15s candles. Trade volume is
+/// unlimited on every plan in force — capping Basic below the unlimited trial
+/// made paying worse than not paying. MT5 sync and the soft lock are sold on
+/// Basic now that the desktop EA carries them (`kMt5SyncEnabled`), and every
+/// line here describes something the plan can actually open: listing a feature a
+/// tier cannot reach is the one mistake the web catalogue guard cannot catch.
 ///
 /// The split is value-ordered: Basic is the whole journalling and chart desk
-/// (including the levels shared with the web), Pro is the advanced analysis
-/// workflow — backtester, replay and the large review allowance.
+/// (levels pinned on the chart, photos, voice notes, time edge, setup matrix,
+/// 30s/45s candles), Pro is what goes beyond journalling — the hard lock, the AI
+/// review, the analysis workbench, notifications and the faster candles.
 /// Keep these lines in step by hand with the web lists in `src/lib/plans.ts`.
 class MobilePlan {
   const MobilePlan({
@@ -51,21 +53,16 @@ const List<MobilePlan> mobilePlans = [
     features: [
       'Unlimited trades and unlimited history',
       'Journal with photos, voice notes, tags, setups and mistakes',
-      'Dashboard: equity curve, P&L calendar, daily and monthly results',
-      'Session, symbol, tag and setup analytics, plus your time edge',
-      'Chart desk on phone and web, from seconds to daily candles',
-      'VWAP, session high/low levels and drawing tools',
-      'Pin entry, stop and target levels straight off the live chart',
-      'Price alert lines on the chart, with push alerts in the Android app',
-      'The Android app in 30+ languages, on the same account as the web',
-      'Drawings, layouts and templates that sync across phone and web',
-      'The same journal on phone and web for one email',
-      'Compare a second instrument on the web chart',
       'MT5 auto sync, from the hosted agent or your own terminal with a sync token',
-      'XML, CSV and XLSX import',
-      'Playbook, prop-firm rules and the daily-stop lock',
-      'CSV and full account export',
-      '15 AI journal summaries a month, written from your own logged trades',
+      'Daily stop with the soft lock: trading freezes, the journal stays open',
+      'Pin entry, stop and target levels straight off the live chart',
+      'Chart desk from 30s and 45s up to daily candles, with VWAP and session ranges',
+      'Time edge: the sessions and weekdays your results actually come from',
+      "Setup matrix: each setup's win rate and expectancy by session and symbol",
+      'Dashboard: equity curve, P&L calendar, daily and monthly results',
+      'Drawings, layouts and templates that sync across phone and web',
+      'XML, CSV and XLSX import, plus CSV and full account export',
+      'The Android app in 30+ languages, on the same account as the web',
     ],
   ),
   MobilePlan(
@@ -76,10 +73,13 @@ const List<MobilePlan> mobilePlans = [
     maxTrades: -1,
     features: [
       'Everything in Basic',
+      'Daily stop with the hard lock: trading freezes and the journal closes until the reset',
+      '40 AI journal reviews a month, written from your own logged trades',
       'Backtester with saved runs, simulating past sessions only',
       'Write your own entry and exit rules, then test them on past sessions',
       'Market replay that steps candle by candle through a session',
-      '40 AI journal summaries a month, written from your own logged trades',
+      'Notifications on your phone: prop-firm breaches and session reminders',
+      '5s, 10s and 15s candles, on top of the 30s and 45s on Basic',
       'Priority support',
     ],
   ),
