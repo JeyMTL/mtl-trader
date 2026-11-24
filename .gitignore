@@ -114,3 +114,11 @@ supervisor/.server-offset.json
 
 # MT5 compiler output
 mt5/compile.log
+
+# fleet runtime logs (per-slot worker output)
+supervisor/fleet-slot-*.log
+supervisor/fleet-run.log
+
+# Firebase: downloaded client config, and the FCM service-account key (a secret)
+mobile_flutter/android/app/google-services.json
+firebase-service-account.json

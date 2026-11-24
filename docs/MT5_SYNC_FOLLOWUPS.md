@@ -5,34 +5,75 @@ Last updated: 2026-11-24.
 Everything here is unfinished work, in the order it should be done. Nothing in
 this file is a wish: each line is a job that was identified but not carried out.
 
-## 1. Push notifications (do this first — it is the only blocker)
+## 1. Push notifications — works end to end (2026-11-24)
 
-The code is finished and tested, but no Firebase project exists yet, so no
-notification can actually be delivered.
+Proven on the device: the phone was sent a real notification while the app sat
+in the background, and the notification shade showed `MT5 sync stopped` from
+`pkg=com.mtltrader.app` on `fcm_fallback_notification_channel`. The send side
+returned `POST /api/push/send` → `{"sent":1,"failed":0,"skipped":false}`.
 
-- [ ] **Create the Firebase project.** `console.firebase.google.com` → Add
-      project → name it `MTL Ledger` → skip Analytics (not needed).
-- [ ] **Add the Android app.** Project settings → Add app → Android, package
-      `com.mtltrader.app`. Copy the five values into
-      `mobile_flutter/dart_defines.json`:
+- [x] **Create the Firebase project.** Done as `mtl-ledger`.
+- [x] **Add the Android app.** Done, package `com.mtltrader.app`. The five
+      values are in `mobile_flutter/dart_defines.json`:
       `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_SENDER_ID`,
       `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`.
       No `google-services.json` is needed — the app initialises Firebase from
       these values, which is why builds stay green with them empty.
-- [ ] **Create the service account.** Project settings → Service accounts →
-      Generate new private key. Paste the whole JSON as **one line** into
-      `FIREBASE_SERVICE_ACCOUNT`:
-      - in Vercel (production, so `/api/push/send` can sign FCM requests),
-      - in `supervisor/.env` only if the supervisor runs somewhere that reads it.
-- [ ] **Apply the migration** `supabase/migrations/20261130_push_tokens.sql`.
-      Until it exists, `/api/push/register` answers 500 and no device is stored.
-- [ ] **Rebuild and install:**
+- [x] **Create the service account**, set as `FIREBASE_SERVICE_ACCOUNT` in
+      `.env.local` (one line; the literal `\n` in the key is handled by
+      `push.ts`). A token mint against `oauth2.googleapis.com` succeeded, so the
+      key and the `firebase.messaging` scope are valid.
+- [x] **Vercel production has `FIREBASE_SERVICE_ACCOUNT`** (Secret, Production)
+      and was redeployed. `POST https://mtlledger.com/api/push/send` answers
+      `{"sent":1,"failed":0,"skipped":false}` and the device showed the
+      notification body that was sent. Nothing about push is outstanding.
+- [x] **Apply the migration** `supabase/migrations/20261130_push_tokens.sql`.
+      Done: `push_tokens` exists in the project (`token` primary key, `user_id`
+      indexed, RLS on with no policies) and holds 0 rows, which is correct — no
+      build carrying Firebase values has been installed yet. A probe of
+      `/api/push/register` is no longer blocked by a missing table.
+- [x] **Rebuilt and installed:**
       `flutter build apk --release --dart-define-from-file=dart_defines.json`
       then `adb install -r build/app/outputs/flutter-apk/app-release.apk`.
-- [ ] **Prove it end to end:** open the app once (permission prompt → Allow),
-      then stop the supervisor host (or rename `MT5_PATH` so logins fail) and
-      wait one cycle. The phone should show "MT5 sync stopped" with the app
-      closed.
+- [x] **Proved it end to end.** `push_tokens` holds the device, and it
+      re-registers on every launch and sign-in.
+
+### Trial ending and prop-breach pushes (added 2026-11-24)
+
+- [ ] **Apply `supabase/migrations/20261131_push_events.sql`.** This is the
+      dedupe table; until it exists the new triggers send nothing and log
+      `push_events.missing_table` (deliberately: without a record of what was
+      already said, a sweep is a duplicate generator).
+- [ ] **Deploy.** `vercel.json` gained a second cron,
+      `/api/cron/notify` at `0 9 * * *`, which only runs once deployed.
+- Trial ending: users with `subscription_status = 'trial'` whose
+  `trial_ends_at` falls inside the next 24 h get one push, keyed on the end
+  date, so re-running the cron sends nothing.
+- Prop breach: `/api/sync` calls `notifyPropBreach` after trades land (the
+  trader with a terminal attached has no app open), reading `prop_status` — the
+  same RPC the compliance card uses, so the push and the card cannot disagree.
+  Keyed `<status>:<day>`, so one push per rule per day, and a fresh breach
+  tomorrow is still news. The daily cron sweeps the same check as a backstop for
+  trades typed in by hand.
+
+Three silent bugs had to be fixed on the device first. None of them would have
+surfaced in a unit test — each was only visible in `adb logcat`:
+
+1. **`invalid_icon` from `Alerts.init`.** `ic_stat_ledger` sat in
+   `res/drawable/` but was missing from the built APK: the release resource
+   shrinker drops drawables that no layout, style or manifest references, and the
+   plugin resolves this one by name at runtime. Fixed with
+   `android/app/src/main/res/raw/keep.xml` (`tools:keep`). This was breaking
+   *every* local notification as well — the journal reminder and the daily stop.
+2. **`API disabled` from `messaging.register()`.** `firebase_messaging` 17 gets
+   its token through the Installations API, which stays off until
+   `<meta-data android:name="firebase_messaging_installation_id_enabled" android:value="true"/>`
+   is in the manifest. Without it no token is ever issued.
+3. **`FirebaseApp name [DEFAULT] already exists!`** `PushService.start()` runs
+   from both `initState` and the auth stream; the two raced inside
+   `initializeApp` and the loser marked push failed for the whole session. Fixed
+   by holding the setup future (`_setup`) so concurrent callers share one
+   initialisation, and by treating a duplicate app as success.
 
 ## 2. Ship what is already written
 
@@ -100,8 +141,16 @@ phone sync only works while your own PC is on.
 - Foreground pushes are not drawn as in-app banners; Android shows them when the
   app is backgrounded or closed.
 - iOS needs an Apple APNs key uploaded in Firebase before push works there.
-- Server-side push is wired only for "sync stopped". Trial ending, payment
-  failure and prop-rule breaches do not notify yet.
+- Server-side push covers three things: "sync stopped" (supervisor), "trial
+  ending" (daily cron) and prop-rule breaches (checked on every sync ingest, with
+  a daily sweep as backstop). A failed payment still does not notify — the
+  Paddle/PayPal webhooks already own that lifecycle, and a second sender there
+  would need the same once-only record the other three now use.
+- A lapsed subscription and a broken connection are told apart by the
+  supervisor: the first gets "MTL Ledger sync paused" (plan ended), the second
+  "MT5 sync stopped" (reconnect). The lapse notice is sent once and re-arms
+  only after a sync succeeds, so a 10-minute retry loop cannot spam a customer
+  whose plan stayed ended.
 - `mobile_flutter/lib/screens/trade_form_screen.dart` still refuses
   broker-suffixed symbols such as `EURUSDM` when pinning from a chart.
 - 4 vCPU / 8 GB covers roughly 6–8 accounts that stay logged in; 20–30
@@ -111,6 +160,13 @@ phone sync only works while your own PC is on.
   gitignored; do not copy them between hosts — they recalibrate automatically.
 
 ## Verified on 2026-11-24 (so it does not need re-checking)
+
+- **Push pipeline, whole path.** `POST /api/push/send` with the supervisor
+  token answers `200 {"sent":1,"failed":0,"skipped":false}` on the dev server,
+  and the device posts the notification with the app in the background. The
+  degraded path is also verified: with `FIREBASE_SERVICE_ACCOUNT` unset the same
+  call answers `{"sent":0,"failed":0,"skipped":true}` instead of throwing, so a
+  deployment without the key behaves exactly as it did before push existed.
 
 - Supervisor against the live FundedNext account: login in 3.6 s, a full year of
   history read, 3 previously missing trades backfilled with correct UTC times,

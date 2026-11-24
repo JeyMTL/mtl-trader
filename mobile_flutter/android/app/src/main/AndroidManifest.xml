@@ -80,6 +80,14 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- firebase_messaging 17 gets its registration token through the
+             Firebase Installations API rather than the old getToken(), and that
+             path is off until this flag is set. Without it every call to
+             `register()` throws `API disabled`, the token is never issued, and
+             no device can be sent a notification. -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

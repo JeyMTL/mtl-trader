@@ -6,6 +6,7 @@ import { hasValidBearer } from '@/lib/auth-guards'
 import { apiError, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
 import { checkFeature } from '@/lib/plan-guard'
+import { notifyPropBreach } from '@/lib/push-events'
 
 /**
  * Trade ingest for the desktop agent and the hosted sync supervisor.
@@ -326,6 +327,19 @@ export async function POST(req: Request) {
     }
 
     await touchConnection(userId, imported)
+
+    // A prop account that just broke a rule is the one thing worth waking a
+    // phone for: the trader is not looking at an app, that is the whole point of
+    // syncing from a terminal. Checked here rather than on a schedule because a
+    // daily sweep would arrive after the firm had already closed the account.
+    // A notification must never fail the sync, so this cannot throw out of here.
+    if (imported > 0) {
+      try {
+        await notifyPropBreach(userId)
+      } catch (error: unknown) {
+        logEvent('warn', 'sync.prop_breach', { userId, error })
+      }
+    }
 
     return NextResponse.json({
       imported,

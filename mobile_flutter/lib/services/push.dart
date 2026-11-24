@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/config.dart';
 import 'journal_api.dart';
@@ -23,7 +24,15 @@ import 'journal_api.dart';
 class PushService {
   PushService._();
 
-  static FirebaseMessaging? _messaging;
+  /// One setup for the whole process, shared by every caller.
+  ///
+  /// `start()` is called from the shell's `initState` and again from the auth
+  /// stream, which often fire in the same frame. A plain "initialise if not
+  /// initialised yet" left a window where both awaited `initializeApp`, and the
+  /// loser threw `FirebaseApp name [DEFAULT] already exists!` — which marked push
+  /// broken for the rest of the session. Holding the future itself makes the
+  /// concurrent calls await the same setup instead of racing for it.
+  static Future<FirebaseMessaging?>? _setup;
   static JournalApi? _api;
   static bool _failed = false;
 
@@ -41,20 +50,26 @@ class PushService {
     _api = api;
 
     try {
-      final messaging = _messaging ??= await _initialise();
+      final messaging = await (_setup ??= _initialise());
       if (messaging == null) return;
       // Registration emits on `onRegistered`, which `_initialise` is already
       // listening to; calling it again after a sign-in re-emits the token.
       await messaging.register();
-    } catch (_) {
+    } catch (error, stack) {
       // No Play services, a blocked project, a phone with no network: none of
-      // that is a reason for the journal to fail to open.
+      // that is a reason for the journal to fail to open. Logged rather than
+      // swallowed, because a silent failure here is indistinguishable from
+      // "the server never sent anything" when a notification does not arrive.
+      debugPrint('PushService.start failed: $error\n$stack');
       _failed = true;
     }
   }
 
   static Future<FirebaseMessaging?> _initialise() async {
-    if (Firebase.apps.isEmpty) {
+    // `apps.isEmpty` is not enough on its own: the default app can be created
+    // by another caller between the check and the call, so a duplicate is the
+    // expected outcome rather than an error.
+    try {
       await Firebase.initializeApp(
         options: FirebaseOptions(
           apiKey: AppConfig.firebaseApiKey,
@@ -66,6 +81,8 @@ class PushService {
               : AppConfig.firebaseStorageBucket,
         ),
       );
+    } on FirebaseException catch (error) {
+      if (error.code != 'duplicate-app') rethrow;
     }
 
     final messaging = FirebaseMessaging.instance;

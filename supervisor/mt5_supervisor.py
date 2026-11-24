@@ -9,10 +9,19 @@ to /api/sync.
 Design notes:
 
   * **One terminal, sequential sessions.** The MetaTrader5 package talks to a
-    local terminal over IPC, so running one terminal per customer would need one
-    Windows session each. Instead we log in, read, and move on: 40 accounts cost
-    a few seconds each per cycle and share a single terminal. That is what makes
-    the economics work.
+    local terminal over IPC, and a terminal has one session, so by default we
+    log in, read, and move on: 40 accounts cost a few seconds each per cycle and
+    share a single terminal. That is what makes the cheap tier work.
+  * **Or a fleet, when latency matters (FLEET_SIZE).** A close can only be
+    journaled in seconds if something is still logged in when it happens, and
+    one session cannot watch two accounts. With FLEET_SIZE=n, n accounts get
+    their own terminal directory and their own worker process, so n sessions
+    run at once. Measured cost per chartless terminal: ~140 MB working set and
+    ~2.5% of one core, so 4 vCPU / 8 GB carries about 30 of them.
+  * **One host owns a share, not everything.** Two hosts pointed at the same
+    project both see every pending row, because the claim is a plain GET and
+    PostgREST has no `for update skip locked`. Each host keeps only the accounts
+    whose hash it owns, so the work stays disjoint without a schema change.
   * **Read-only by construction.** Only the investor password is ever used, so a
     bug here cannot open, close or modify a trade.
   * **Claim before you work.** A connection is moved to `connecting` before the
@@ -31,6 +40,13 @@ Environment:
                            any terminal64.exe under Program Files is found anyway)
     CYCLE_SECONDS         (default 15 - how often a new connection is claimed)
     REFRESH_SECONDS       (default 60 - how often a connected account is re-read)
+    SUPERVISOR_SHARDS     (default 1 - how many hosts share the account list)
+    SUPERVISOR_SHARD      (default 0 - which share this host serves)
+    MAX_ACCOUNTS          (default 0 - most accounts worked per cycle; 0 = no cap)
+    FLEET_SIZE            (default 0 - terminals held open at once, one account
+                           each; 0 keeps the sequential single-terminal mode)
+    MT5_FLEET_DIRS        (needed when FLEET_SIZE > 0 - one directory or
+                           terminal64.exe per slot, comma or semicolon separated)
     FAILED_RETRY_SECONDS  (default 600 - cooldown before a failed login is retried)
     HISTORY_WAIT_SECONDS  (default 90 - how long a first sync waits for the
                            terminal to finish downloading history)
@@ -45,11 +61,14 @@ Run:
 import argparse
 import base64
 import json
+import multiprocessing as mp
 import os
+import queue
 import re
 import sys
 import time
 import unicodedata
+import zlib
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -75,6 +94,31 @@ MT5_PATH = os.environ.get("MT5_PATH", "")
 MT5_PORTABLE = os.environ.get("MT5_PORTABLE", "").strip().lower() in ("1", "true", "yes")
 CYCLE_SECONDS = int(os.environ.get("CYCLE_SECONDS", "15"))
 REFRESH_SECONDS = int(os.environ.get("REFRESH_SECONDS", "60"))
+# How many hosts share the account list, and which share this one serves. A
+# single host is the default and takes everything.
+SUPERVISOR_SHARDS = max(1, int(os.environ.get("SUPERVISOR_SHARDS", "1")))
+SUPERVISOR_SHARD = int(os.environ.get("SUPERVISOR_SHARD", "0"))
+# How many accounts one host will work on per cycle. This is a brake, not a load
+# balancer: it keeps a small host inside its refresh budget instead of quietly
+# stretching REFRESH_SECONDS for everyone. 0 means no cap.
+MAX_ACCOUNTS = max(0, int(os.environ.get("MAX_ACCOUNTS", "0")))
+# How many terminals stay open, one account each. 0 is the sequential mode: one
+# session, taken in turns. Above 0, each slot owns a terminal *directory* (two
+# copies cannot run from one directory) and a process (the package keeps one IPC
+# connection per process), so accounts are watched at the same time instead of
+# waiting for a turn. MT5_FLEET_DIRS lists those directories, one per slot.
+FLEET_SIZE = max(0, int(os.environ.get("FLEET_SIZE", "0")))
+MT5_FLEET_DIRS = os.environ.get("MT5_FLEET_DIRS", "")
+# A slot keeps its account while watching, so with every slot taken a new
+# sign-in would wait forever. Once a slot has watched for this long and another
+# account is waiting for a terminal, it hands its account back to the rotation.
+# Long enough that a busy account is not interrupted, short enough that a
+# spare account gets a turn within a cycle or two.
+FLEET_MIN_HOLD_SECONDS = float(os.environ.get("FLEET_MIN_HOLD_SECONDS", "60"))
+# The claim sorts by least recently synced, so a capped host rotates through a
+# backlog instead of serving the same few accounts forever.
+CAPACITY_WARN_SECONDS = 300
+_capacity_warned_at = 0.0
 # With exactly one connected account, the supervisor can stay logged in and
 # poll history, which is the only way to journal a close in seconds without an
 # EA on the terminal. Two accounts cannot share one terminal session, so the
@@ -136,6 +180,13 @@ def check_config():
         fail("SYNC_CREDENTIAL_KEY is not valid base64")
     if key_bytes != 32:
         fail("SYNC_CREDENTIAL_KEY must decode to 32 bytes")
+    # A shard outside the range would serve nobody, silently, and every account
+    # it should have owned would go stale.
+    if not 0 <= SUPERVISOR_SHARD < SUPERVISOR_SHARDS:
+        fail(
+            f"SUPERVISOR_SHARD must be 0..{SUPERVISOR_SHARDS - 1} when "
+            f"SUPERVISOR_SHARDS={SUPERVISOR_SHARDS}, got {SUPERVISOR_SHARD}"
+        )
     # A path mangled by shell quoting (a stray \t is a tab, not a backslash and
     # a t) still "looks" right in the file. Catch it here, because the failure
     # otherwise surfaces as "Process create failed" from MT5 and reads like a
@@ -145,6 +196,17 @@ def check_config():
             f"MT5_PATH is not a file: {MT5_PATH!r}. Leave the value unquoted in "
             ".env, e.g. MT5_PATH=C:\\Program Files\\MetaTrader 5\\terminal64.exe"
         )
+    # A fleet slot with no terminal of its own silently does nothing, and the
+    # account assigned to it is never read - fail loudly instead.
+    if FLEET_SIZE:
+        available = fleet_terminals()
+        if len(available) < FLEET_SIZE:
+            fail(
+                f"FLEET_SIZE={FLEET_SIZE} needs {FLEET_SIZE} terminals in "
+                f"MT5_FLEET_DIRS, found {len(available)}. Run "
+                f"supervisor/setup_fleet.ps1 -Count {FLEET_SIZE} and paste its "
+                "output into .env"
+            )
     if not BROKER_DIRECTORY:
         print(
             "[warn] mt5-brokers.json is missing beside the supervisor; known "
@@ -184,9 +246,45 @@ def prioritize_connections(rows):
     )
 
 
+def shard_of(user_id):
+    """Which share of the accounts owns this connection.
+
+    crc32 rather than hash(): string hashing is salted per process, so two hosts
+    would disagree about who owns an account and both would take it.
+    """
+    return zlib.crc32(str(user_id).encode("utf-8")) % SUPERVISOR_SHARDS
+
+
+def owns(user_id):
+    return SUPERVISOR_SHARDS == 1 or shard_of(user_id) == SUPERVISOR_SHARD
+
+
+def owned_by_this_host(rows):
+    """Drop other hosts' accounts, then stay inside this host's budget.
+
+    `rows` arrives least urgent first by status, then least recently synced, so
+    truncating to MAX_ACCOUNTS rotates a backlog rather than pinning the same
+    accounts every cycle.
+    """
+    global _capacity_warned_at
+    if SUPERVISOR_SHARDS > 1:
+        rows = [row for row in rows if shard_of(row["user_id"]) == SUPERVISOR_SHARD]
+    if MAX_ACCOUNTS and len(rows) > MAX_ACCOUNTS:
+        now = time.monotonic()
+        if now - _capacity_warned_at >= CAPACITY_WARN_SECONDS:
+            _capacity_warned_at = now
+            print(
+                f"[capacity] {len(rows)} accounts need this host, serving "
+                f"{MAX_ACCOUNTS} per cycle: raise MAX_ACCOUNTS, "
+                "REFRESH_SECONDS, or add a host"
+            )
+        rows = rows[:MAX_ACCOUNTS]
+    return rows
+
+
 def claim():
     """
-    Rows needing work: never attempted, or connected but stale.
+    Rows needing work this host owns: never attempted, or connected but stale.
 
     `connecting` rows are re-claimed because a supervisor that crashed mid-login
     would otherwise leave them stuck forever.
@@ -211,7 +309,10 @@ def claim():
             f"and(status.eq.connected,or(last_sync_at.is.null,last_sync_at.lt.{stale})))"
         ),
         "credential_cipher": "neq.",
-        "limit": "10",
+        # Enough rows to fill a cycle after the split, so two hosts do not
+        # starve each other by each reading ten rows the other one owns. A fleet
+        # needs one row per slot or the extra terminals would never be filled.
+        "limit": str(max(10, FLEET_SIZE) * SUPERVISOR_SHARDS),
     }
     response = requests.get(
         f"{SUPABASE_URL}/rest/v1/broker_connections",
@@ -222,10 +323,14 @@ def claim():
     if response.status_code != 200:
         print(f"[warn] claim failed ({response.status_code}): {response.text[:200]}")
         return []
-    return prioritize_connections(response.json())
+    return owned_by_this_host(prioritize_connections(response.json()))
 
 
 def mark(user_id, status, error=None, synced_at=None):
+    # Syncing again is the only proof the plan is back, so it also re-arms the
+    # "paused" notice for the next time the subscription does lapse.
+    if status == "connected":
+        forget_lapse(user_id)
     body = {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}
     if error is not None:
         # A provider message is useful to the customer; a stack trace is not.
@@ -662,6 +767,25 @@ def discover_terminals(force=False):
     return found
 
 
+def fleet_terminals():
+    """One terminal64.exe per fleet slot, in the order MT5_FLEET_DIRS lists them.
+
+    An entry may be a directory or a terminal64.exe, so the same value works
+    whether it was copied from Explorer or from setup_fleet.ps1. Order decides
+    which slot owns which terminal, and a slot keeps its terminal, so a warm
+    terminal stays warm across restarts.
+    """
+    terminals = []
+    for raw in re.split(r"[;,]", MT5_FLEET_DIRS):
+        entry = raw.strip().strip('"')
+        if not entry:
+            continue
+        path = os.path.join(entry, "terminal64.exe") if os.path.isdir(entry) else entry
+        if os.path.isfile(path) and path not in terminals:
+            terminals.append(path)
+    return terminals
+
+
 def configured_terminals():
     """Every terminal we may try, without duplicates, configured ones first."""
     paths = []
@@ -720,21 +844,27 @@ def terminal_order(row):
     return order
 
 
-def initialize_terminal(session, path):
+def initialize_terminal(session, path, portable=None):
     if path is None:
         return mt5.initialize(timeout=INIT_TIMEOUT_MS, **session)
     return mt5.initialize(
-        path, portable=MT5_PORTABLE, timeout=INIT_TIMEOUT_MS, **session
+        path,
+        portable=MT5_PORTABLE if portable is None else portable,
+        timeout=INIT_TIMEOUT_MS,
+        **session,
     )
 
 
-def open_session(row):
+def open_session(row, terminal=None):
     """Attach to MT5 and log in, trying every installed terminal until one can.
 
     Raises with a message the customer can act on, listing what was tried. A
     terminal that comes up but is logged into a *different* account is rejected
     too: on a host that serves several customers that terminal would stream the
     wrong account's trades into this journal.
+
+    `terminal` pins the attempt to one terminal64.exe, which is what a fleet
+    slot does: that directory is this account's terminal and nothing else's.
     """
     password = decrypt_credential(row["credential_cipher"])
 
@@ -748,9 +878,13 @@ def open_session(row):
     key = terminal_key(row)
 
     attempts = []
-    for path in terminal_order(row) or [None]:
+    candidates = [terminal] if terminal else (terminal_order(row) or [None])
+    for path in candidates:
+        # A fleet terminal is always portable: its accounts, history and config
+        # belong to that slot and must not leak into %APPDATA% or another slot.
+        portable = True if terminal else None
         for _ in range(2):  # one retry: a stale terminal often clears on shutdown
-            initialized = initialize_terminal(session, path)
+            initialized = initialize_terminal(session, path, portable)
             if initialized:
                 info = mt5.account_info()
                 if info is not None and int(info.login) == login:
@@ -782,40 +916,93 @@ def open_session(row):
 
 
 
-def sync_one(row):
+def terminal_session_lost():
+    """Whether the terminal we are attached to has dropped its broker session.
+
+    A watching terminal reads an empty deal history both when nothing closed and
+    when the session is gone, so without this check a dropped login looks like a
+    quiet account: the row stays `connected` and nothing is journaled. Weekends,
+    broker restarts and terminal updates all drop the session.
+    """
+    try:
+        info = mt5.terminal_info()
+    except Exception:  # noqa: BLE001 - a dead IPC pipe is a lost session too
+        return True
+    if info is None:
+        return True
+    return getattr(info, "connected", True) is False
+
+
+def relogin(row):
+    """Log the attached terminal back in, without restarting it.
+
+    Re-logging in place keeps the slot warm: a full re-login through
+    `open_session` costs a terminal start and a mode switch, while this costs one
+    auth round trip.
+    """
+    try:
+        password = decrypt_credential(row["credential_cipher"])
+    except Exception:  # noqa: BLE001 - a bad blob needs a new connect from the app
+        return False
+    server = canonical_server_name(row.get("broker_name"), row["server"])
+    try:
+        return bool(
+            mt5.login(int(row["account_login"]), password=password, server=server)
+        )
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def read_closed(row):
+    """Read this account's closed positions since the cursor, push, and mark.
+
+    Assumes a session is already open, so a fleet worker can read without
+    closing the terminal it is about to watch through.
+    """
+    user_id = row["user_id"]
+    offset = server_offset(row)
+    since = None
+    if row.get("last_sync_at"):
+        since = datetime.fromisoformat(row["last_sync_at"].replace("Z", "+00:00")) - OVERLAP
+    else:
+        # First sync after connecting: read the whole year, and only once the
+        # terminal has actually downloaded it. A zero here used to be taken
+        # as "this account never traded", which advanced the cursor and lost
+        # every trade the terminal was still fetching.
+        lookback = datetime.now(timezone.utc) - timedelta(days=365)
+        found = history_total(lookback, HISTORY_WAIT_SECONDS)
+        if found < 0:
+            raise RuntimeError(f"terminal could not read history: {mt5.last_error()}")
+        if found == 0:
+            print(
+                f"  {user_id[:8]}… no deals in the last 365 days after waiting "
+                f"{HISTORY_WAIT_SECONDS:.0f}s; marking it synced. "
+                "Press Reconnect if trades are missing."
+            )
+    trades = position_trades(since, offset)
+    synced = push(user_id, trades) if trades else 0
+    mark(user_id, "connected", error="", synced_at=datetime.now(timezone.utc).isoformat())
+    print(f"  {user_id[:8]}… {row['server']} -> {synced} position(s)")
+    return synced
+
+
+def sync_one(row, terminal=None):
+    """Log in, read what changed, and hand the terminal back."""
     user_id = row["user_id"]
     mark(user_id, "connecting")
     try:
-        open_session(row)
-        offset = server_offset(row)
-        since = None
-        if row.get("last_sync_at"):
-            since = datetime.fromisoformat(row["last_sync_at"].replace("Z", "+00:00")) - OVERLAP
-        else:
-            # First sync after connecting: read the whole year, and only once the
-            # terminal has actually downloaded it. A zero here used to be taken
-            # as "this account never traded", which advanced the cursor and lost
-            # every trade the terminal was still fetching.
-            lookback = datetime.now(timezone.utc) - timedelta(days=365)
-            found = history_total(lookback, HISTORY_WAIT_SECONDS)
-            if found < 0:
-                raise RuntimeError(f"terminal could not read history: {mt5.last_error()}")
-            if found == 0:
-                print(
-                    f"  {user_id[:8]}… no deals in the last 365 days after waiting "
-                    f"{HISTORY_WAIT_SECONDS:.0f}s; marking it synced. "
-                    "Press Reconnect if trades are missing."
-                )
-        trades = position_trades(since, offset)
-        synced = push(user_id, trades) if trades else 0
-        mark(user_id, "connected", error="", synced_at=datetime.now(timezone.utc).isoformat())
-        print(f"  {user_id[:8]}… {row['server']} -> {synced} position(s)")
+        open_session(row, terminal)
+        return read_closed(row)
     finally:
         mt5.shutdown()
 
 
 def single_connected():
-    """The one connected account, if there is exactly one."""
+    """The one connected account this host owns, if there is exactly one.
+
+    Counted only over owned rows: another host's connected account must not
+    switch our watch mode off, and must never be watched from here.
+    """
     try:
         response = requests.get(
             f"{SUPABASE_URL}/rest/v1/broker_connections",
@@ -829,7 +1016,7 @@ def single_connected():
                 # A disconnected row has its credential wiped; holding the
                 # terminal open on one only delays the next real login.
                 "credential_cipher": "neq.",
-                "limit": "2",
+                "limit": "50",
             },
             timeout=TIMEOUT,
         )
@@ -837,7 +1024,7 @@ def single_connected():
         return None
     if response.status_code != 200:
         return None
-    rows = response.json()
+    rows = [row for row in response.json() if owns(row["user_id"])]
     return rows[0] if len(rows) == 1 else None
 
 
@@ -889,17 +1076,18 @@ def must_release(user_id, state, claimed):
     )
 
 
-def watch(row):
+def watch(row, terminal=None, contended=True, should_yield=None):
     """
     Stay logged in and journal a close within `WATCH_SECONDS`.
 
-    Only valid with exactly one connected account: one terminal has one session,
-    so two accounts cannot both be watched. Returns when another connection
-    needs the terminal; the caller falls back to the rotation.
+    `contended` is the sequential mode's problem: one terminal, one session, so
+    the watch must hand the terminal back when another account is waiting. A
+    fleet slot owns its terminal outright and passes False, so it only stops
+    when this account is no longer connected.
     """
     user_id = row["user_id"]
     try:
-        open_session(row)
+        open_session(row, terminal)
         offset = server_offset(row)
         now = datetime.now(timezone.utc)
         since = None
@@ -962,20 +1150,245 @@ def watch(row):
                 # reconnected, while this session was open. Both show up as a
                 # status that is no longer `connected`, and both have to let go
                 # of the terminal: it has one session, and the new login needs it.
+                # A dropped login has to be noticed here: the row still says
+                # `connected`, so the app would otherwise show a live account
+                # that silently journals nothing.
+                if terminal_session_lost():
+                    print(f"  {user_id[:8]}… terminal lost its session; logging back in")
+                    if not relogin(row):
+                        print(
+                            f"  {user_id[:8]}… could not log back in; releasing "
+                            "the terminal for a clean start"
+                        )
+                        return
                 state = connection_state(user_id)
-                try:
-                    claimed = claim()
-                except requests.RequestException:
-                    claimed = []
-                if must_release(user_id, state, claimed):
+                if contended:
+                    try:
+                        claimed = claim()
+                    except requests.RequestException:
+                        claimed = []
+                    release = must_release(user_id, state, claimed)
+                    reason = " or work is waiting"
+                else:
+                    release = state is None or state.get("status") != "connected"
+                    reason = ""
+                if release:
                     current_status = (state or {}).get("status")
                     print(
-                        f"  {user_id[:8]}… connection is {current_status or 'gone'} "
-                        "or work is waiting; releasing the terminal"
+                        f"  {user_id[:8]}… connection is {current_status or 'gone'}"
+                        f"{reason}; releasing the terminal"
+                    )
+                    return
+                # Fleet only: an account with no terminal to go to. This one is
+                # only "first" by luck of the queue, so let it take a turn.
+                if should_yield is not None and should_yield():
+                    print(
+                        f"  {user_id[:8]}… another account is waiting; "
+                        "yielding the terminal"
                     )
                     return
     finally:
         mt5.shutdown()
+
+
+# What `/api/sync` answers when the subscription no longer covers syncing, as
+# opposed to the terminal or the broker failing. The status is in the raised
+# message ("ingest rejected (402): …") and so is the machine-readable code.
+LAPSE_MARKERS = ("(402)", "upgrade_required")
+
+
+_lapse_notified = set()
+
+
+def forget_lapse(user_id):
+    """Re-arm the "paused" notice after a sync that worked."""
+    _lapse_notified.discard(user_id)
+
+
+def is_lapse(error):
+    """Whether a failure is the plan, not the connection.
+
+    The two need different words. A lapsed account is a terminal that logged in
+    perfectly and was then refused at the door: sending that customer to
+    "reconnect" points them at a screen that cannot help them, and reads as if
+    their broker password were wrong.
+    """
+    text = str(error)
+    return any(marker in text for marker in LAPSE_MARKERS)
+
+
+def report_failure(row, error):
+    """Mark the account failed and tell the customer once per breakdown."""
+    user_id = row["user_id"]
+    print(f"  {user_id[:8]}… failed: {error}")
+    try:
+        mark(user_id, "failed", error=error)
+    except Exception:  # noqa: BLE001 - the log above already carries the cause
+        pass
+    # One notification per breakdown, not one every cycle: a row that is already
+    # `failed` is being retried, not news.
+    if row.get("status") == "failed":
+        return
+    if is_lapse(error):
+        # A lapse is retried like any other failure, but unlike a dead terminal
+        # it does not fix itself, so every retry would push the same sentence
+        # again. Told once; cleared by `mark()` the moment a sync succeeds.
+        if user_id in _lapse_notified:
+            return
+        _lapse_notified.add(user_id)
+        notify(
+            user_id,
+            "MTL Ledger sync paused",
+            "Your plan has ended, so no new trades are being imported. "
+            "Open the app to renew - sync resumes on its own.",
+        )
+        return
+    notify(
+        user_id,
+        "MT5 sync stopped",
+        f"{row.get('server') or 'Your broker'} could not be read. "
+        "Open the app to reconnect.",
+    )
+
+
+def fleet_worker(slot, terminal, jobs, results, waiting=None, log_path=None):
+    """One terminal, one account at a time, in its own process.
+
+    A process rather than a thread because the MetaTrader5 package keeps one IPC
+    connection per process: two threads would share a single terminal, which is
+    the thing the fleet exists to avoid. The queues are the only state this slot
+    shares with the supervisor.
+
+    `log_path` gets this slot's own log. A child's stdout does not reliably reach
+    the parent's console: under `| Tee-Object` or a service wrapper the slot's
+    prints are dropped, which leaves a silent fleet and nothing to read when an
+    account stalls. One file per slot always works.
+    """
+    if log_path:
+        handle = open(log_path, "a", encoding="utf-8", buffering=1)
+        sys.stdout = handle
+        sys.stderr = handle
+    while True:
+        job = jobs.get()
+        if job is None:
+            mt5.shutdown()
+            return
+        _, row = job
+        error = ""
+        started = time.monotonic()
+        print(
+            f"[slot {slot}] {row['user_id'][:8]}… {row.get('server') or '?'} "
+            f"({row.get('account_login') or '?'}) start",
+            flush=True,
+        )
+
+        def should_yield():
+            """True once holding this account is keeping another one waiting."""
+            if waiting is None or waiting.value <= 0:
+                return False
+            return time.monotonic() - started >= FLEET_MIN_HOLD_SECONDS
+
+        try:
+            sync_one(row, terminal)
+            if WATCH_SECONDS > 0:
+                watch(row, terminal, contended=False, should_yield=should_yield)
+        except Exception as exc:  # noqa: BLE001 - the supervisor reports it
+            error = str(exc) or type(exc).__name__
+        finally:
+            mt5.shutdown()
+        print(
+            f"[slot {slot}] {row['user_id'][:8]}… done"
+            f"{': ' + error if error else ''}",
+            flush=True,
+        )
+        results.put({"slot": slot, "row": row, "error": error})
+
+
+def run_fleet():
+    """Hand each account this host owns to a terminal of its own.
+
+    A slot holds its account for as long as it stays connected, so the fleet's
+    real capacity is FLEET_SIZE accounts at the same time. The slot returns to
+    the pool when its account disconnects, goes stale for a refresh's worth of
+    time, or fails; the account is re-claimed on a later cycle like any other.
+    """
+    terminals = fleet_terminals()[:FLEET_SIZE]
+    jobs, results = mp.Queue(), mp.Queue()
+    # How many accounts are waiting for a terminal right now. Shared, because it
+    # is the slots that have to decide to give one back.
+    waiting = mp.Value("i", 0)
+
+    def spawn(slot):
+        process = mp.Process(
+            target=fleet_worker,
+            args=(
+                slot,
+                terminals[slot],
+                jobs,
+                results,
+                waiting,
+                str(Path(__file__).with_name(f"fleet-slot-{slot}.log")),
+            ),
+            name=f"mt5-slot-{slot}",
+            daemon=True,
+        )
+        process.start()
+        return process
+
+    workers = [spawn(slot) for slot in range(FLEET_SIZE)]
+    print(f"fleet: {FLEET_SIZE} terminal(s) held open, one account each")
+
+    free = list(range(FLEET_SIZE))
+    busy = {}
+    try:
+        while True:
+            while True:
+                try:
+                    done = results.get_nowait()
+                except queue.Empty:
+                    break
+                busy.pop(done["slot"], None)
+                if done["slot"] not in free:
+                    free.append(done["slot"])
+                if done["error"]:
+                    report_failure(done["row"], done["error"])
+
+            # A slot that died mid-account never reports, and without this its
+            # account would be stuck `connecting` and its terminal unused for as
+            # long as the supervisor runs.
+            for slot, process in enumerate(workers):
+                if slot in busy and not process.is_alive():
+                    print(f"[warn] slot {slot} died mid-account; restarting it")
+                    busy.pop(slot, None)
+                    if slot not in free:
+                        free.append(slot)
+                    workers[slot] = spawn(slot)
+
+            try:
+                rows = claim()
+            except requests.RequestException as error:
+                print(f"[warn] could not reach Supabase: {error}")
+                rows = []
+
+            assigned = set(busy.values())
+            for row in rows:
+                if not free:
+                    break
+                if row["user_id"] in assigned:
+                    continue
+                slot = free.pop(0)
+                busy[slot] = row["user_id"]
+                assigned.add(row["user_id"])
+                jobs.put((row["user_id"], row))
+            waiting.value = sum(1 for row in rows if row["user_id"] not in assigned)
+            time.sleep(CYCLE_SECONDS)
+    finally:
+        for _ in workers:
+            jobs.put(None)
+        for worker in workers:
+            worker.join(timeout=10)
+            if worker.is_alive():
+                worker.terminate()
 
 
 def main():
@@ -984,6 +1397,13 @@ def main():
     args = parser.parse_args()
 
     check_config()
+    if FLEET_SIZE:
+        if args.once:
+            print("[fleet] --once is one sequential pass; run without it for the fleet")
+        else:
+            run_fleet()
+            return
+
     print("MTL Ledger supervisor - polling for connections")
 
     while True:
@@ -997,20 +1417,7 @@ def main():
             try:
                 sync_one(row)
             except Exception as error:  # noqa: BLE001 - one account must not stop the rest
-                print(f"  {row['user_id'][:8]}… failed: {error}")
-                try:
-                    mark(row["user_id"], "failed", error=error)
-                except Exception:  # noqa: BLE001
-                    pass
-                # One notification per breakdown, not one every ten minutes: a
-                # row that is already `failed` is being retried, not news.
-                if row.get("status") != "failed":
-                    notify(
-                        row["user_id"],
-                        "MT5 sync stopped",
-                        f"{row.get('server') or 'Your broker'} could not be read. "
-                        "Open the app to reconnect.",
-                    )
+                report_failure(row, error)
 
         if args.once:
             break
@@ -1021,17 +1428,7 @@ def main():
                 try:
                     watch(watched)
                 except Exception as error:  # noqa: BLE001
-                    print(f"  {watched['user_id'][:8]}… watch failed: {error}")
-                    try:
-                        mark(watched["user_id"], "failed", error=error)
-                    except Exception:  # noqa: BLE001
-                        pass
-                    notify(
-                        watched["user_id"],
-                        "MT5 sync stopped",
-                        f"{watched.get('server') or 'Your broker'} could not be read. "
-                        "Open the app to reconnect.",
-                    )
+                    report_failure(watched, error)
                 continue
 
         time.sleep(CYCLE_SECONDS)

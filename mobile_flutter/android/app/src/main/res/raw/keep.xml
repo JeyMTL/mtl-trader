@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resources that are only reached by name from Dart.
+
+  The release build shrinks resources that nothing in a layout, style or the
+  manifest points at, and `ic_stat_ledger` is exactly that: the plugin resolves
+  it with `getIdentifier("ic_stat_ledger", "drawable", package)` at runtime, so
+  the shrinker cannot see it and removes it. `flutter_local_notifications` then
+  fails `initialize()` with `invalid_icon` and every notification is dropped —
+  which is what the device log showed before this file existed.
+
+  `tools:keep` is the supported way to say "this one is used, from code".
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_ledger" />
