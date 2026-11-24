@@ -7,6 +7,7 @@ import { formatCurrency, formatDuration, formatPercent } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
 import { SetupMatrix } from '@/components/setup-matrix'
+import { ExcursionCard } from '@/components/excursion-card'
 import type { CoachInsight } from '@/lib/ai/types'
 import { axisProps, gridProps, useChartPalette } from '@/lib/chart-theme'
 import { hourlySeries, sessionPeriod, timeEdgeReport, type EdgePeriod } from '@/lib/edge-window'
@@ -383,6 +384,8 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
       </div>
 
       <SetupMatrix tagStats={tagStats} strategyStats={strategyStats} />
+
+      <ExcursionCard />
 
       <div className="bg-surface border border-primary/40 rounded-xl p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
