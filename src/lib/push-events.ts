@@ -2,6 +2,12 @@ import { getAdminClient } from './server-auth'
 import { logEvent } from './log'
 import { sendPushToUser } from './push'
 import { propStatusLevel, type PropStatus } from './prop-rules'
+import {
+  formatCountdown,
+  normalizePlaybook,
+  reminderState,
+  type Playbook,
+} from './playbook'
 
 /**
  * The notifications nobody can see coming on their own.
@@ -19,7 +25,7 @@ import { propStatusLevel, type PropStatus } from './prop-rules'
  * safety net for trades entered by hand.
  */
 
-export type PushKind = 'trial_ending' | 'prop_breach'
+export type PushKind = 'trial_ending' | 'prop_breach' | 'session_soon'
 
 /** How far ahead a trial ending counts as news. */
 const TRIAL_NOTICE_HOURS = 24
@@ -97,6 +103,71 @@ function amount(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+}
+
+/**
+ * The reminder for a session that is about to start.
+ *
+ * The maths is the web reminder's own (`reminderState`), so the push, the banner
+ * and the phone's local alarms all open and close on the same clock. What
+ * differs is who runs it: a schedule on this plan can only fire once a day,
+ * which cannot land an arbitrary session time, so the supervisor calls this
+ * every cycle. The cron calls it too, as the backstop for accounts whose
+ * terminal is not attached.
+ *
+ * Deduped on the occurrence key (`session id + start instant`), so the same
+ * session is one notification no matter how many times either caller asks.
+ */
+export async function notifySessionStarting(now: Date = new Date()): Promise<number> {
+  const admin = getAdminClient()
+  const { data, error } = await admin
+    .from('playbooks')
+    .select('user_id, rules, days, sessions, reminder_minutes, reminders_enabled')
+    .eq('reminders_enabled', true)
+    .limit(SWEEP_LIMIT)
+  if (error) {
+    logEvent('warn', 'push_events.session_sweep', { error: error.message })
+    return 0
+  }
+
+  const rows = (data ?? []) as (Record<string, unknown> & { user_id: string })[]
+  if (rows.length === 0) return 0
+
+  const zones = await admin
+    .from('users')
+    .select('id, timezone')
+    .in('id', rows.map((row) => row.user_id))
+  const timeZoneOf = new Map<string, string | null>(
+    ((zones.data ?? []) as { id: string; timezone: string | null }[]).map((row) => [
+      row.id,
+      row.timezone,
+    ])
+  )
+
+  let sent = 0
+  for (const row of rows) {
+    try {
+      const playbook: Playbook = normalizePlaybook({
+        rules: row.rules,
+        days: row.days,
+        sessions: row.sessions,
+        reminderMinutes: row.reminder_minutes,
+        remindersEnabled: row.reminders_enabled,
+      })
+      const state = reminderState(playbook, now, timeZoneOf.get(row.user_id) ?? null)
+      if (!state?.due) continue
+
+      const done = await pushOnce(row.user_id, 'session_soon', state.key, {
+        title: `${state.occurrence.session.label} starts ${formatCountdown(state.minutesUntil)}`,
+        body: 'Read the rules before the first trade — not after it.',
+        data: { kind: 'session_soon' },
+      })
+      if (done) sent += 1
+    } catch (failure: unknown) {
+      logEvent('error', 'push_events.session_one', { userId: row.user_id, error: failure })
+    }
+  }
+  return sent
 }
 
 const BREACH_COPY: Record<string, { title: string; body: (status: PropStatus) => string }> = {

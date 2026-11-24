@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import '../services/daily_stop_bus.dart';
+import '../services/session_reminders.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -212,6 +215,9 @@ class _RulesScreenState extends State<RulesScreen> {
       // The lock mode lives on this row, so the gate and the account tab have
       // to re-read instead of waiting for their own timers.
       DailyStopBus.refresh();
+      // The lead time and the session times just changed, so the alarms have to
+      // follow the save rather than wait for the next launch.
+      unawaited(SessionReminders.sync());
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(

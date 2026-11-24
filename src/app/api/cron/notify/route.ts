@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { hasValidBearer } from '@/lib/auth-guards'
 import { apiError } from '@/lib/log'
-import { notifyTrialEnding, sweepPropBreaches } from '@/lib/push-events'
+import { notifySessionStarting, notifyTrialEnding, sweepPropBreaches } from '@/lib/push-events'
 
 /**
  * The scheduled half of the notification work.
@@ -31,8 +31,12 @@ export async function GET(req: Request) {
 
     const trials = await notifyTrialEnding()
     const breaches = await sweepPropBreaches()
+    // Included, but on this plan the schedule only runs once a day, so a session
+    // at 14:00 gets no push from here. The supervisor calls the same function
+    // every cycle; this is the backstop for accounts with no terminal attached.
+    const sessions = await notifySessionStarting()
 
-    return NextResponse.json({ ok: true, trials, breaches })
+    return NextResponse.json({ ok: true, trials, breaches, sessions })
   } catch (error: unknown) {
     return apiError('cron.notify', error, 500, 'The notification sweep failed.')
   }

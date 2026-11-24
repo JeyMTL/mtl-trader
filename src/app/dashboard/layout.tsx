@@ -1,5 +1,6 @@
 'use client'
 
+import RulesReminder from '@/components/rules-reminder'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -445,6 +446,11 @@ export default function DashboardLayout({
               </Link>
             </div>
           )}
+          {/* Above the page, not inside it: the reminder is about the session
+              starting, and a trader reading trades or charts is exactly who
+              needs it. It used to live in the dashboard page only, so every
+              other tab silently had no reminder. */}
+          <RulesReminder />
           {children}
         </main>
       </div>

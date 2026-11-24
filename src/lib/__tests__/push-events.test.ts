@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   propError: null as { message: string } | null,
   trialUsers: [] as Row[],
   propRuleUsers: [] as Row[],
+  playbookRows: [] as Row[],
+  userZones: [] as Row[],
   /** Every window the users query asked for, so the trial cut-off is testable. */
   windows: [] as { gt?: string; lte?: string }[],
   sends: [] as { userId: string; title: string; body: string }[],
@@ -22,10 +24,15 @@ function chain(table: string) {
   const filters: Record<string, unknown> = {}
   const build: Record<string, unknown> = {
     select: () => build,
-    limit: async () =>
-      table === 'prop_rules'
-        ? { data: state.propRuleUsers, error: null }
-        : { data: state.trialUsers, error: null },
+    in: () => ({
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve({ data: state.userZones, error: null }).then(resolve),
+    }),
+    limit: async () => {
+      if (table === 'prop_rules') return { data: state.propRuleUsers, error: null }
+      if (table === 'playbooks') return { data: state.playbookRows, error: null }
+      return { data: state.trialUsers, error: null }
+    },
     eq: (column: string, value: unknown) => {
       filters[column] = value
       return build
@@ -87,7 +94,12 @@ vi.mock('@/lib/push', () => ({
 
 vi.mock('@/lib/log', () => ({ logEvent: () => {} }))
 
-import { notifyPropBreach, notifyTrialEnding, sweepPropBreaches } from '@/lib/push-events'
+import {
+  notifyPropBreach,
+  notifySessionStarting,
+  notifyTrialEnding,
+  sweepPropBreaches,
+} from '@/lib/push-events'
 
 function breachStatus(over: Row = {}): Row {
   return {
@@ -110,6 +122,8 @@ beforeEach(() => {
   state.propError = null
   state.trialUsers = []
   state.propRuleUsers = []
+  state.playbookRows = []
+  state.userZones = []
   state.windows = []
   state.sends = []
   state.sendResult = { sent: 1, failed: 0, skipped: false }
@@ -188,6 +202,46 @@ describe('prop breach notifications', () => {
 
     expect(await sweepPropBreaches()).toBe(2)
     expect(state.sends).toHaveLength(2)
+  })
+})
+
+describe('session reminders', () => {
+  const playbook = {
+    user_id: 'u1',
+    rules: ['No trades before the London open.'],
+    days: [1, 2, 3, 4, 5],
+    sessions: [{ id: 's1', label: 'London', start: '13:09', end: '15:00' }],
+    reminder_minutes: 60,
+    reminders_enabled: true,
+  }
+
+  beforeEach(() => {
+    state.playbookRows = [playbook]
+    state.userZones = [{ id: 'u1', timezone: 'UTC' }]
+  })
+
+  it('pushes when the session is inside the lead window, with the countdown', async () => {
+    expect(await notifySessionStarting(new Date('2026-11-24T12:30:00Z'))).toBe(1)
+    expect(state.sends).toHaveLength(1)
+    expect(state.sends[0].title).toBe('London starts in 39 min')
+  })
+
+  it('says nothing an hour earlier', async () => {
+    expect(await notifySessionStarting(new Date('2026-11-24T10:00:00Z'))).toBe(0)
+    expect(state.sends).toEqual([])
+  })
+
+  it('does not start over while the window is open', async () => {
+    const at = new Date('2026-11-24T12:30:00Z')
+    await notifySessionStarting(at)
+    await notifySessionStarting(new Date('2026-11-24T12:35:00Z'))
+    expect(state.sends).toHaveLength(1)
+  })
+
+  it('says nothing to a trader with no rules to review', async () => {
+    state.playbookRows = [{ ...playbook, rules: [] }]
+    expect(await notifySessionStarting(new Date('2026-11-24T12:30:00Z'))).toBe(0)
+    expect(state.sends).toEqual([])
   })
 })
 

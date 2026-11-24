@@ -515,6 +515,39 @@ def notify(user_id, title, body):
         pass
 
 
+# How often to ask the API whether a playbook reminder is due. A minute is well
+# inside the shortest lead time the app offers (5 minutes), and the API dedupes
+# per session start, so asking more often costs a query and sends nothing extra.
+SESSION_REMINDER_SECONDS = int(os.environ.get("SESSION_REMINDER_SECONDS", "60"))
+_last_session_check = 0.0
+
+
+def session_reminders():
+    """Let the API push a session reminder that is due, at most once a minute.
+
+    The reminder itself belongs to the web app's playbook maths, which the phone
+    also mirrors for its own alarms. What the phone cannot do is remind somebody
+    whose alarms the OS dropped, or who has not opened the app since the session
+    was added — and what the daily cron cannot do is fire at 14:00. This host is
+    running anyway, so it is the cheap place to ask.
+
+    Best effort: a failure here is one missed reminder, never a sync problem.
+    """
+    global _last_session_check
+    now = time.monotonic()
+    if now < _last_session_check:
+        return
+    _last_session_check = now + SESSION_REMINDER_SECONDS
+    try:
+        requests.post(
+            f"{APP_URL}/api/push/sessions",
+            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+            timeout=10,
+        )
+    except requests.RequestException:
+        pass
+
+
 def history_total(start, wait_seconds, pause=2.0):
     """
     How many deals the terminal holds in [start, now], waiting for a download.
@@ -1342,6 +1375,7 @@ def run_fleet():
     busy = {}
     try:
         while True:
+            session_reminders()
             while True:
                 try:
                     done = results.get_nowait()
@@ -1407,6 +1441,7 @@ def main():
     print("MTL Ledger supervisor - polling for connections")
 
     while True:
+        session_reminders()
         try:
             rows = claim()
         except requests.RequestException as error:

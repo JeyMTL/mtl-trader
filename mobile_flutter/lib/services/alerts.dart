@@ -13,6 +13,7 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../core/chart_zone.dart';
+import '../core/session_schedule.dart';
 
 /// What an alert was about.
 enum AlertKind { dailyStop, levelTouch, journalReminder }
@@ -114,7 +115,13 @@ class Alerts {
   static const String _channelDaily = 'daily-stop';
   static const String _channelLevels = 'levels';
   static const String _channelJournal = 'journal';
+  static const String _channelSessions = 'sessions';
   static const int _reminderId = 4407;
+  /// One id per scheduled session reminder. A week of six sessions is 42, and
+  /// the block is cleared before every reschedule, so a session the trader
+  /// deleted cannot keep waking them up.
+  static const int _sessionIdBase = 4500;
+  static const int _sessionSlots = 48;
   static const int _historyLimit = 200;
 
   final FlutterLocalNotificationsPlugin _plugin =
@@ -221,6 +228,14 @@ class Alerts {
         'Journal reminder',
         description: 'A daily nudge to journal the day',
         importance: Importance.defaultImportance,
+      ),
+    );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _channelSessions,
+        'Session reminder',
+        description: 'When one of your trading sessions is about to start',
+        importance: Importance.high,
       ),
     );
   }
@@ -353,6 +368,49 @@ class Alerts {
       );
     } catch (_) {
       // A refused alarm is reported in the list as a muted event, not thrown.
+    }
+  }
+
+  /// Replaces the phone's session alarms with [reminders].
+  ///
+  /// Every slot is cancelled first: the playbook decides what should exist, so a
+  /// session that was deleted or moved must not leave last week's alarm behind.
+  /// An empty list is how "reminders are off" arrives here.
+  Future<void> scheduleSessionReminders(List<SessionReminder> reminders) async {
+    await init();
+    for (var slot = 0; slot < _sessionSlots; slot += 1) {
+      await _plugin.cancel(id: _sessionIdBase + slot);
+    }
+    if (reminders.isEmpty) return;
+    if (!await permissionGranted()) return;
+
+    for (var index = 0; index < reminders.length && index < _sessionSlots; index += 1) {
+      final reminder = reminders[index];
+      try {
+        await _plugin.zonedSchedule(
+          id: _sessionIdBase + index,
+          title: reminder.title,
+          body: 'Read the rules before the first trade — not after it.',
+          scheduledDate: tz.TZDateTime.from(reminder.at, _zone),
+          notificationDetails: const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelSessions,
+              'Session reminder',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          payload: 'session',
+        );
+      } catch (_) {
+        // One refused alarm must not stop the rest of the week's schedule.
+      }
     }
   }
 

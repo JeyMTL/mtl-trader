@@ -9,6 +9,7 @@ import '../l10n/gen/app_localizations.dart';
 import '../services/alerts.dart';
 import '../services/journal_api.dart';
 import '../services/push.dart';
+import '../services/session_reminders.dart';
 import '../ui/theme.dart';
 import 'account_screen.dart';
 import 'analytics_screen.dart';
@@ -82,6 +83,9 @@ class _AppShellState extends State<AppShell>
     // subscription. Nothing happens unless this build carries a Firebase
     // project, and the token is uploaded only once the session exists.
     unawaited(PushService.start(_api));
+    // Session alarms are device-scheduled, so they are re-armed on every launch
+    // from the playbook row rather than only when the Rules screen is opened.
+    unawaited(SessionReminders.sync());
     _startTradeWatch();
     // The shell can outlive a sign-out and sign-in pair, and the session is not
     // always there on the first frame. Watching the auth stream is what makes
@@ -94,6 +98,7 @@ class _AppShellState extends State<AppShell>
         // The token has an owner only once there is a session, so registering
         // here rather than at startup is what makes a sign-in take effect.
         unawaited(PushService.start(_api));
+        unawaited(SessionReminders.sync());
       } else if (state.event == AuthChangeEvent.signedOut) {
         _watchingUser = null;
         _tradeChannel?.unsubscribe();

@@ -856,5 +856,33 @@ class FailureNoticeTests(unittest.TestCase):
         self.assertEqual(sup._lapse_notified, set())
 
 
+class SessionReminderTickTests(unittest.TestCase):
+    """The supervisor is what asks for a session reminder often enough to land."""
+
+    def setUp(self):
+        self.calls = []
+        self.addCleanup(setattr, sup.requests, "post", sup.requests.post)
+        self.addCleanup(setattr, sup, "SESSION_REMINDER_SECONDS", sup.SESSION_REMINDER_SECONDS)
+        self.addCleanup(setattr, sup, "_last_session_check", sup._last_session_check)
+        sup.requests.post = lambda url, **kwargs: self.calls.append(url)
+        sup.SESSION_REMINDER_SECONDS = 60
+        sup._last_session_check = 0.0
+
+    def test_asks_the_api_once_per_interval(self):
+        sup.session_reminders()
+        sup.session_reminders()
+
+        self.assertEqual(len(self.calls), 1)
+        self.assertTrue(self.calls[0].endswith("/api/push/sessions"))
+
+    def test_a_refused_reminder_never_reaches_the_sync_loop(self):
+        def boom(*args, **kwargs):
+            raise sup.requests.RequestException("offline")
+
+        sup.requests.post = boom
+        sup.session_reminders()  # must not raise
+        sup._last_session_check = 0.0
+
+
 if __name__ == "__main__":
     unittest.main()
