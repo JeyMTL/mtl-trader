@@ -8,4 +8,9 @@
 ///
 /// Mirrors `MT5_HOSTED_SYNC_ENABLED` in `src/lib/features.ts` so the app and the
 /// web dashboard show the same thing on the same day.
-const bool kMt5SyncEnabled = false;
+///
+/// On since the supervisor was verified end to end (login, year of history,
+/// ingest). No host runs it 24/7 yet, so a connection made today can still sit on
+/// "Connecting…" — the screen says so itself after two minutes and tells the
+/// trader to start the host or disconnect, rather than hanging silently.
+const bool kMt5SyncEnabled = true;
