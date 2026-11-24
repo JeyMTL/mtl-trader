@@ -239,39 +239,38 @@ class TradingChartPainter extends CustomPainter {
       for (var i = from; i <= to; i++) candles[i].time,
     ];
 
-    // Session shading sits behind the candles: a translucent band per enabled
-    // session, so price action is never hidden by the context it traded in.
-    // Band edges come from UTC hours, which is why London starts at 07:00 no
-    // matter what the phone's clock says.
+    // Session context sits behind the candles as a ribbon along the bottom of
+    // the price pane, not as a wash over the whole area. The conventional
+    // windows tile a 24/5 FX day (Asian 00-09, London 07-16, New York 12-21), so
+    // a full-height fill tinted all but three hours of every day and the
+    // candles read through mud. The ribbon keeps the same bands without
+    // covering the price action; the break lines still mark the exact open.
     if (style.showSessions) {
+      const ribbonHeight = 14.0;
       for (final session in TradingSession.values) {
         if (!style.sessions.contains(session)) continue;
         for (final band in sessionBands(visibleTimes, session)) {
           final left = ((band.firstIndex + from - start) / span) * plotW;
           final right = ((band.lastIndex + 1 + from - start) / span) * plotW;
           if (right < 0 || left > plotW) continue;
+          // Anchored to the bottom of the price pane, along the time axis it
+          // describes. The top of the plot is where the OHLC readout sits, and
+          // a ribbon up there disappears underneath it.
           final rect = Rect.fromLTRB(
             math.max(0.0, left),
-            topPad,
+            topPad + plotH - ribbonHeight,
             math.min(plotW, right),
             topPad + plotH,
           );
           if (rect.width < 0.5) continue;
           canvas.drawRect(
             rect,
-            Paint()..color = session.tint.withAlpha(style.isLight ? 18 : 26),
+            Paint()..color = session.tint.withAlpha(style.isLight ? 30 : 38),
           );
-          // Only label a band wide enough to hold the word, or a zoomed-out
-          // chart turns into a wall of overlapping text.
-          if (rect.width >= 42) {
-            _label(
-              canvas,
-              session.label,
-              Offset(rect.left + 3, topPad + 2),
-              color: session.tint.withAlpha(style.isLight ? 200 : 165),
-              size: 8,
-            );
-          }
+          // No word in the ribbon: at 14 px the label sits exactly on the
+          // OHLC readout and the two fight over the same pixels. The tint and
+          // the break line carry the session; the names live in the session
+          // sheet, where they can be read.
           // The break line is drawn after the band so the tint cannot swallow
           // it: the line is the precise moment the session opened, the band is
           // only the stretch of time around it.
@@ -791,14 +790,21 @@ class TradingChartPainter extends CustomPainter {
     }
 
     final picks = <double>[start, start + span / 2, start + span - 1];
+    // A window longer than a day needs the date in the label. Three bare clock
+    // times spread over a week read as if time ran backwards (05:00, 03:30,
+    // 01:30), and the axis under a 30-minute chart is routinely a week wide.
+    final wide = interval.size * span >= const Duration(hours: 24);
     for (final raw in picks) {
       final index = raw.floor().clamp(0, candles.length - 1);
       final time = style.zone.wall(candles[index].time);
       final clock = style.use24Hour ? 'HH:mm' : 'h:mm a';
       final day = style.dayOfWeekLabels ? 'EEE d MMM' : 'd MMM';
       final text = interval.size < const Duration(days: 1)
-          ? DateFormat(style.dayOfWeekLabels ? 'EEE $clock' : clock)
-              .format(time)
+          ? DateFormat(
+              wide
+                  ? (style.dayOfWeekLabels ? 'EEE d MMM $clock' : 'd MMM $clock')
+                  : (style.dayOfWeekLabels ? 'EEE $clock' : clock),
+            ).format(time)
           : DateFormat(day).format(time);
       final painter = _painter(text, color: style.muted, size: 8.5);
       final cx = x(index.toDouble())
