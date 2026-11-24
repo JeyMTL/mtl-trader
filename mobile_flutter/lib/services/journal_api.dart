@@ -681,6 +681,19 @@ class JournalApi {
     return result.body;
   }
 
+  /// Stores this device's push token, so the server can reach the phone with
+  /// the app closed. Called on every launch and on every token refresh; the
+  /// server upserts, so repeats are free.
+  Future<void> registerPushToken({
+    required String token,
+    required String platform,
+  }) async {
+    await _api('POST', '/api/push/register', {
+      'token': token,
+      'platform': platform,
+    });
+  }
+
   /// Removes the connection and wipes the stored credential server-side.
   Future<Map<String, dynamic>> disconnectBroker() async {
     final result = await _api('DELETE', '/api/broker/connection');

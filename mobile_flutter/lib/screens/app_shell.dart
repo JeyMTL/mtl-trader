@@ -8,6 +8,7 @@ import '../core/format.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/alerts.dart';
 import '../services/journal_api.dart';
+import '../services/push.dart';
 import '../ui/theme.dart';
 import 'account_screen.dart';
 import 'analytics_screen.dart';
@@ -77,6 +78,10 @@ class _AppShellState extends State<AppShell>
     // Channels, the saved switches and the daily journal reminder, set up once
     // the session exists. A refusal here costs nothing else in the app.
     unawaited(Alerts.instance.init());
+    // Server-sent notifications: the broker connection dropping, a lapsed
+    // subscription. Nothing happens unless this build carries a Firebase
+    // project, and the token is uploaded only once the session exists.
+    unawaited(PushService.start(_api));
     _startTradeWatch();
     // The shell can outlive a sign-out and sign-in pair, and the session is not
     // always there on the first frame. Watching the auth stream is what makes
@@ -86,6 +91,9 @@ class _AppShellState extends State<AppShell>
           state.event == AuthChangeEvent.tokenRefreshed ||
           state.event == AuthChangeEvent.initialSession) {
         unawaited(_startTradeWatch());
+        // The token has an owner only once there is a session, so registering
+        // here rather than at startup is what makes a sign-in take effect.
+        unawaited(PushService.start(_api));
       } else if (state.event == AuthChangeEvent.signedOut) {
         _watchingUser = null;
         _tradeChannel?.unsubscribe();

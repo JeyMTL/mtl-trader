@@ -40,8 +40,41 @@ class AppConfig {
         '896111658733-62il22avnott85bhj46dnlkpcnp0era7.apps.googleusercontent.com',
   );
 
+  /// Firebase project values, passed at build time:
+  ///
+  /// ```
+  /// flutter build apk --dart-define-from-file=dart_defines.json
+  /// ```
+  ///
+  /// These are the *public* client values from Firebase → Project settings →
+  /// Your apps, not a service account. They are safe in an APK, exactly like
+  /// `SUPABASE_ANON_KEY`. With them absent, push stays off and the rest of the
+  /// app is unaffected — no `google-services.json` is needed, because the app is
+  /// initialised with these values directly.
+  static const String firebaseApiKey = String.fromEnvironment(
+    'FIREBASE_API_KEY',
+  );
+  static const String firebaseAppId = String.fromEnvironment('FIREBASE_APP_ID');
+  static const String firebaseSenderId = String.fromEnvironment(
+    'FIREBASE_SENDER_ID',
+  );
+  static const String firebaseProjectId = String.fromEnvironment(
+    'FIREBASE_PROJECT_ID',
+  );
+  static const String firebaseStorageBucket = String.fromEnvironment(
+    'FIREBASE_STORAGE_BUCKET',
+  );
+
   static bool get isConfigured =>
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+
+  /// Server-sent notifications are only possible when a Firebase project is
+  /// wired into this build.
+  static bool get pushConfigured =>
+      firebaseApiKey.isNotEmpty &&
+      firebaseAppId.isNotEmpty &&
+      firebaseSenderId.isNotEmpty &&
+      firebaseProjectId.isNotEmpty;
 
   /// Purchases in this app always go through Google Play.
   ///
