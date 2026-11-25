@@ -71,3 +71,30 @@ export function gridProps(palette: ChartPalette) {
     vertical: false,
   }
 }
+
+/**
+ * A y-axis range that hugs the data instead of always starting at zero.
+ *
+ * A two-trade account plotted from $0 flattens its whole equity curve into a
+ * line at the top of the panel. Padding the actual range gives the move room
+ * to read, and a single point still gets a visible band around it.
+ */
+export function paddedDomain(
+  values: number[],
+  padding = 0.18
+): [number, number] {
+  const finite = values.filter((value) => Number.isFinite(value))
+  if (finite.length === 0) return [0, 1]
+
+  let min = Math.min(...finite)
+  let max = Math.max(...finite)
+  const span = max - min
+  if (span < 1e-9) {
+    const band = Math.max(1, Math.abs(max) * 0.005)
+    min -= band
+    max += band
+    return [min, max]
+  }
+  const band = span * Math.max(0.05, padding)
+  return [min - band, max + band]
+}

@@ -158,8 +158,9 @@ Checklist:
   disabled` when the account was saved with its investor (read-only) password,
   so the daily-stop lock's resting-order deletion needs a master password. The
   log says so once instead of failing silently.
-* **A hard lock's EA still needs a chart.** The supervisor covers the
-  cancel-after-stop half; the guard EA is what blocks the initial click.
+* **A hard lock's EA still needs a chart.** The supervisor covers nothing of
+  the lock; only the guard EA acts on it, and it cannot block the initial click —
+  it deletes resting orders and closes the fill. Only the broker can refuse it.
 * **Windows Update reboots** take the terminal down for a few minutes; the log
   will show it reconnecting.
 
@@ -169,6 +170,40 @@ Checklist:
   `SUPERVISOR_SHARD=0` / `1` respectively, changed on both at the same time.
   Ownership is `crc32(user_id) % SUPERVISOR_SHARDS`, so no schema change is
   needed.
-* **Real fleet mode:** move to 4 vCPU / 8 GB and prepare slots with
-  `setup_fleet.ps1 -Count N` (`N` ≤ ~30), then set `FLEET_SIZE=N` and
-  `MT5_FLEET_DIRS` from what it prints.
+* **Real fleet mode:** prepare slots with `setup_fleet.ps1 -Count N`, then set
+  `FLEET_SIZE=N` and `MT5_FLEET_DIRS` from what it prints.
+
+  The fleet is capped by **memory, not by the number you ask for**. Each slot is
+  a logged-in terminal plus its worker process, so a slot costs roughly
+  `SLOT_MEMORY_MB` (default 240). The supervisor measures free physical memory
+  at startup and starts only what fits after `MEMORY_RESERVE_MB` (default 900)
+  is kept back, logging `[capacity] … starting N` when that is fewer than
+  `FLEET_SIZE`.
+
+  | Host RAM | Slots that fit (240 MB each, 900 MB reserved) |
+  | --- | --- |
+  | 8 GB | ~14 |
+  | 16 GB | ~30 |
+  | 32 GB | ~55 |
+
+  That cap exists because running past it is not a slow host, it is a dead one:
+  the next allocation fails inside OpenBLAS, the supervisor exits, and the
+  wrapper restarts it into the same wall — every account offline until someone
+  intervenes. Measured on the 8 GB host, 30 requested slots produced exactly
+  that crash loop.
+
+  So **30 accounts need a 16 GB host, or two 8 GB hosts** with
+  `SUPERVISOR_SHARDS=2` and `SUPERVISOR_SHARD=0`/`1`. Set `FLEET_SIZE=30`
+  either way: the accounts that do not fit a slot still sync in rotation
+  (`FLEET_MIN_HOLD_SECONDS`), so a close lands in a minute or two instead of a
+  couple of seconds — late, never lost.
+
+  Measure your own host before trusting the default:
+
+  ```powershell
+  (Get-Process terminal64 | Measure-Object WorkingSet64 -Sum).Sum/1MB
+  (Get-Process python | Measure-Object WorkingSet64 -Sum).Sum/1MB
+  ```
+
+  If a warm terminal is larger than the default, set `SLOT_MEMORY_MB` to its
+  working set plus ~40 MB for the worker.

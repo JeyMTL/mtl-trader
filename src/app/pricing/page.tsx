@@ -3,8 +3,10 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Loader2, RefreshCw } from 'lucide-react'
-import { PLANS } from '@/lib/plans'
+import { Loader2, RefreshCw } from 'lucide-react'
+import { PLAN_TAGLINES, PLANS } from '@/lib/plans'
+import { TRIAL_CTA, TRIAL_TRUST_LINE } from '@/lib/subscription'
+import { PlanFeatureGroups } from '@/components/plan-feature-groups'
 import { formatCurrency } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Logo } from '@/components/logo'
@@ -120,6 +122,7 @@ export default function PricingPage() {
               Simple, <span className="text-gradient">Transparent</span> Pricing
             </h1>
             <p className="text-gray-400 text-lg">Start free, upgrade when you need more</p>
+            <p className="mt-3 text-sm text-gray-500">{TRIAL_TRUST_LINE}</p>
             <div className="mt-8 inline-flex rounded-full border border-border bg-surface p-1">
               {(['month', 'year'] as const).map((option) => (
                 <button
@@ -136,19 +139,20 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">
             {PLANS.map((plan) => (
               <div
                 key={plan.id}
-                className={`card-hover bg-surface border rounded-2xl p-8 ${
+                className={`card-hover flex h-full flex-col rounded-2xl border bg-surface p-6 sm:p-7 ${
                   plan.popular ? 'border-primary glow-primary' : 'border-border'
                 }`}
               >
                 {plan.popular && (
-                  <div className="badge-pill mb-3">MOST POPULAR</div>
+                  <div className="badge-pill mb-4 w-fit">MOST POPULAR</div>
                 )}
-                <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
-                <div className="mb-6">
+                <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                <p className="mt-1.5 min-h-10 text-sm text-gray-500">{PLAN_TAGLINES[plan.id]}</p>
+                <div className="mb-6 mt-5">
                   {plan.price === 0 ? (
                     <span className="text-4xl font-bold text-white">Free</span>
                   ) : billing === 'year' && plan.annual_price ? (
@@ -168,23 +172,18 @@ export default function PricingPage() {
                     </>
                   )}
                 </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-gray-300 text-sm">
-                      <Check className="w-4 h-4 text-success flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+                <div className="flex-1">
+                  <PlanFeatureGroups plan={plan} />
+                </div>
                 {plan.price === 0 ? (
                   <Link
                     href="/auth/signup"
-                    className="block w-full text-center py-3 rounded-lg font-semibold transition-colors border border-border hover:border-primary text-gray-300 hover:text-white"
+                    className="mt-8 block w-full rounded-lg border border-border py-3 text-center font-semibold text-gray-300 transition-colors hover:border-primary hover:text-white"
                   >
-                    Start Free Trial
+                    {TRIAL_CTA}
                   </Link>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="mt-8 space-y-2">
                     {cardAvailable(plan.id, billing) && (
                     <button
                       onClick={() => handleCardSubscription(plan.id, billing)}

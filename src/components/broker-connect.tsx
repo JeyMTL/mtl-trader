@@ -177,6 +177,24 @@ export default function BrokerConnect() {
   }
 
   const status = connection?.status ?? 'none'
+
+  // A prefilled mail, so a stuck connection reaches support with the broker, the
+  // server and the sync host's own error instead of "it doesn't work".
+  const supportHref = () => {
+    const lines = [
+      `Broker: ${connection?.broker || '(unknown)'}`,
+      `Server: ${connection?.server || '(unknown)'}`,
+      `Account: ${connection?.account || '(unknown)'}`,
+      `Status: ${status}`,
+      ...(connection?.lastError ? [`Error: ${connection.lastError}`] : []),
+      '',
+      'What happened:',
+      '',
+    ]
+    return `mailto:support@mtlledger.com?subject=${encodeURIComponent(
+      'MTL Ledger connection problem'
+    )}&body=${encodeURIComponent(lines.join('\n'))}`
+  }
   const active = status === 'connected' || status === 'pending' || status === 'connecting'
 
   return (
@@ -238,20 +256,43 @@ export default function BrokerConnect() {
               <div className="flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3">
                 <XCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-yellow-200/90 space-y-1">
-                  <p>
-                    Still not connected after two minutes. That normally means the account number,
-                    server or investor password was rejected — or no sync session is available yet.
-                  </p>
-                  <p className="text-yellow-200/70">
-                    Disconnect below and enter the details again, or use the read-only investor
-                    password from MT5 → Settings → your account.
-                  </p>
+                  {status === 'connecting' ? (
+                    <>
+                      <p>
+                        Still signing in. The first sync reads up to a year of closed trades from
+                        the terminal, so it can take several minutes.
+                      </p>
+                      <p className="text-yellow-200/70">
+                        Leave it connected and reload this page to check again. Do not disconnect:
+                        that deletes the stored password and restarts the whole read.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        Still not connected after two minutes, and no sync session has picked the
+                        account up yet. That normally means the account number, server or investor
+                        password was rejected.
+                      </p>
+                      <p className="text-yellow-200/70">
+                        Disconnect below and enter the details again, or use the read-only investor
+                        password from MT5 → Settings → your account.
+                      </p>
+                    </>
+                  )}
+                  <a
+                    href={supportHref()}
+                    className="inline-block font-medium text-primary hover:underline"
+                  >
+                    Still stuck? Contact support
+                  </a>
                 </div>
               </div>
             ) : (
               <p className="text-xs text-gray-500">
-                This usually takes under a minute. If it stays here, check that the account number
-                and investor password are correct, then disconnect and connect again.
+                This usually takes under a minute; a first sync can take a few minutes while the
+                terminal downloads history. If it stays here, check that the account number and
+                investor password are correct, then disconnect and connect again.
               </p>
             ))}
           <button
@@ -267,7 +308,15 @@ export default function BrokerConnect() {
           {status === 'failed' && connection?.lastError && (
             <div className="flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3">
               <XCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-yellow-200/90">{connection.lastError}</p>
+              <div className="text-xs text-yellow-200/90 space-y-1">
+                <p>{connection.lastError}</p>
+                <a
+                  href={supportHref()}
+                  className="inline-block font-medium text-primary hover:underline"
+                >
+                  Still stuck? Contact support
+                </a>
+              </div>
             </div>
           )}
 

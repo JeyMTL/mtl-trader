@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/journal_api.dart';
@@ -262,12 +263,60 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
       if (error != null && error.isNotEmpty) {
         return 'Still not connected. The sync host reported: $error';
       }
+      // `connecting` means a slot has taken the account and is signing in, so
+      // telling the trader nothing has been attempted (and to disconnect, which
+      // wipes the password and restarts the whole year read) is both wrong and
+      // actively harmful. A first sync of a cold terminal is measured in
+      // minutes, not seconds.
+      if (_status == 'connecting') {
+        return 'Still signing in. The first sync reads up to a year of closed '
+            'trades from the terminal, so it can take several minutes. Leave it '
+            'connected and pull down to refresh.';
+      }
       return 'Still not connected after two minutes, and nothing has reported a '
           'sign-in attempt. The sync service is probably not running — start it, '
           'then disconnect here and connect again.';
     }
+    if (_status == 'connecting') {
+      return 'Signing in and reading your closed trades. A first sync can take a '
+          'few minutes while the terminal downloads history.';
+    }
     return 'A session usually connects in under a minute. If it does not, '
         'disconnect and check the account number, server and investor password.';
+  }
+
+  /// Opens the mail app with this connection's details already in the body, so a
+  /// "it won't connect" report arrives with the broker, server, account and the
+  /// host's own error instead of a screenshot of a spinner.
+  Future<void> _contactSupport() async {
+    final error = asString(_connection['lastError']);
+    final lines = [
+      'Broker: ${asString(_connection['broker']) ?? '(unknown)'}',
+      'Server: ${asString(_connection['server']) ?? '(unknown)'}',
+      'Account: ${asString(_connection['account']) ?? '(unknown)'}',
+      'Status: $_status',
+      if (error != null && error.isNotEmpty) 'Error: $error',
+      '',
+      'What happened:',
+      '',
+    ];
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'support@mtlledger.com',
+      queryParameters: {
+        'subject': 'MTL Ledger connection problem',
+        'body': lines.join('\n'),
+      },
+    );
+    try {
+      if (await launchUrl(uri)) return;
+    } catch (_) {
+      // Falls through to the message below.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open your mail app.')),
+    );
   }
 
   Widget _statusCard() {
@@ -342,6 +391,17 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
           _hint(),
           style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
         ),
+        // A connection that failed or has gone quiet is the moment to offer a way
+        // out. The mail is prefilled, so support gets the server and the error
+        // rather than "it doesn't work".
+        if (_status == 'failed' || _stalled) ...[
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: _contactSupport,
+            icon: const Icon(Icons.mail_outline, size: 16),
+            label: const Text('Contact support'),
+          ),
+        ],
         const SizedBox(height: 14),
         OutlinedButton.icon(
           onPressed: _disconnect,

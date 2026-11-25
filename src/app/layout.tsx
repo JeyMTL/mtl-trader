@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme";
 import { ToastProvider } from "@/components/toast";
+import { TranslationLayer } from "@/components/translation-layer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -73,9 +74,21 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Hide the English server-rendered copy until a selected pack has been
+            applied. With no cookie this is a no-op, so English never flashes. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var m=document.cookie.match(/(?:^|; )mtl_locale=([^;]+)/);if(m&&decodeURIComponent(m[1])!=='en'){document.documentElement.setAttribute('data-i18n-pending','1')}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-dvh flex flex-col bg-background text-foreground">
         <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <TranslationLayer />
+            {children}
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

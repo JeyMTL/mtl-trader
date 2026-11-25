@@ -52,12 +52,12 @@ const LOCK_CHOICES: { value: LockMode; label: string; blurb: string }[] = [
   {
     value: 'soft',
     label: 'Soft lock',
-    blurb: 'MT5 trading freezes. The journal stays open; unfreezing needs a written reason, recorded on the day.',
+    blurb: 'The guard clears resting orders and closes fills opened after the stop. The journal stays open; lifting it needs a written reason, recorded on the day.',
   },
   {
     value: 'hard',
     label: 'Hard lock',
-    blurb: 'MT5 trading freezes and the journal locks completely until the reset.',
+    blurb: 'The same guard applies, and the journal closes completely until the reset.',
   },
 ]
 
@@ -423,10 +423,12 @@ export default function PlaybookPage() {
             </h2>
             <p className="mb-4 text-xs leading-relaxed text-gray-500">
               The loss budget and entry cap you commit to before the session. Once either is
-              reached, the chosen lock applies for the rest of the local day. A soft lock closes
-              the app; a hard lock asks the MT5 guard EA to refuse orders. Neither can stop a
-              manual click at the broker — the EA is the closest a desktop app can get.
-              Measured in {timeZone.replace(/_/g, ' ')} time. Leave both at 0 to switch it off.
+              reached, the chosen lock applies for the rest of the local day. In MT5 both modes
+              do the same thing: the guard clears resting orders and closes any position opened
+              after the stop. A soft lock leaves the journal open; a hard lock closes it until
+              the reset. Neither can stop a manual click at the broker — the EA is the closest a
+              desktop app can get. Measured in {timeZone.replace(/_/g, ' ')} time. Leave both at
+              0 to switch it off.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
@@ -478,7 +480,7 @@ export default function PlaybookPage() {
                       type="button"
                       onClick={() => {
                         if (locked) {
-                          toast('Hard lock is part of Pro. Basic enforces the soft freeze.', {
+                          toast('Hard lock is part of Pro. Basic applies the soft lock.', {
                             tone: 'info',
                           })
                           return

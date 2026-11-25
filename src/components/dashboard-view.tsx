@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import { cn, formatCurrency, formatDuration, formatPercent } from '@/lib/utils'
 import { ChartTooltip } from '@/components/chart-tooltip'
-import { axisProps, gridProps, useChartPalette } from '@/lib/chart-theme'
+import { axisProps, gridProps, paddedDomain, useChartPalette } from '@/lib/chart-theme'
 import { Onboarding } from '@/components/onboarding'
 import { hourlySeries, timeEdgeReport, type EdgePeriod } from '@/lib/edge-window'
 import type {
@@ -263,6 +263,13 @@ export function DashboardView({
     [equity, depositsTotal]
   )
 
+  // The equity axis follows the balance, not zero: a young account's first few
+  // dollars would otherwise flatten into a line at the top of the chart.
+  const equityDomain = useMemo(
+    () => paddedDomain(equityData.map((point) => point.balance)),
+    [equityData]
+  )
+
   const dailySeries = useMemo(
     () =>
       dailyPnl.map((row) => ({
@@ -445,7 +452,12 @@ export function DashboardView({
                       </defs>
                       <CartesianGrid {...gridProps(palette)} />
                       <XAxis {...axisProps(palette)} dataKey="day" minTickGap={28} tickFormatter={(value: string) => value.slice(5)} />
-                      <YAxis {...axisProps(palette)} width={62} tickFormatter={(value: number) => `$${Math.round(value).toLocaleString('en-US')}`} />
+                      <YAxis
+                        {...axisProps(palette)}
+                        width={62}
+                        domain={equityDomain}
+                        tickFormatter={(value: number) => `$${Math.round(value).toLocaleString('en-US')}`}
+                      />
                       <Tooltip
                         content={<ChartTooltip format={(value) => formatCurrency(value)} />}
                         cursor={{ stroke: palette.axis, strokeDasharray: '3 3' }}
@@ -457,7 +469,9 @@ export function DashboardView({
                         stroke={totalPnl >= 0 ? palette.profit : palette.loss}
                         strokeWidth={1.8}
                         fill={`url(#${equityFillId})`}
-                        dot={false}
+                        dot={equityData.length <= 12
+                          ? { r: 2.6, strokeWidth: 0, fill: totalPnl >= 0 ? palette.profit : palette.loss }
+                          : false}
                         activeDot={{ r: 3, strokeWidth: 0 }}
                       />
                     </AreaChart>

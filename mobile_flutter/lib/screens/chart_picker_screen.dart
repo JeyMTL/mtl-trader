@@ -12,6 +12,7 @@ import '../core/chart_drawings.dart';
 import '../core/chart_layouts.dart';
 import '../core/chart_magnet.dart';
 import '../core/chart_presets.dart';
+import '../core/chart_projection.dart';
 import '../core/chart_scale.dart';
 import '../core/chart_sessions.dart';
 import '../core/chart_theme.dart';
@@ -180,6 +181,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
   /// default, because a stray second tap after finishing a shape would
   /// otherwise leave a duplicate on the chart.
   bool _keepDrawing = false;
+
+  /// Crosshair mode. When it is on, a one-finger drag scrubs the crosshair
+  /// instead of panning; when it is off, a drag always pans and a stationary
+  /// long press is the only other way to bring the crosshair out.
+  bool _crosshairMode = false;
   PositionSide? _armingSide;
 
   /// Window the trader entered. Both null means the live tail.
@@ -586,7 +592,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       );
       if (!mounted || tail.isEmpty) return;
       final byTime = {
-        for (final candle in _candles) candle.time.millisecondsSinceEpoch: candle,
+        for (final candle in _candles)
+          candle.time.millisecondsSinceEpoch: candle,
       };
       for (final candle in tail) {
         byTime[candle.time.millisecondsSinceEpoch] = candle;
@@ -1057,6 +1064,17 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             ),
           ),
           const Spacer(),
+          IconButton(
+            tooltip:
+                _crosshairMode ? 'Crosshair mode on' : 'Crosshair mode off',
+            onPressed: () => setState(() => _crosshairMode = !_crosshairMode),
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              Icons.center_focus_strong,
+              size: 18,
+              color: _crosshairMode ? _style.text : _style.muted,
+            ),
+          ),
           _syncAction(overlay: true),
         ],
       ),
@@ -1489,6 +1507,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       onReachStart: _loadingOlder ? null : _loadOlder,
       pendingKind: _armingKind,
       pendingSide: _armingSide,
+      keepDrawing: _keepDrawing,
+      crosshairMode: _crosshairMode,
+      onFinishPlacement: _disarmTool,
       magnet: _magnet,
       onCrosshair: (candle) {
         if (identical(candle, _hover)) return;
@@ -1504,10 +1525,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
 
     final armed = _armingKind != null || _armingSide != null;
     final selected = _selectedDrawing;
-    final showBar = selected != null &&
-        selected < _drawings.length &&
-        !armed &&
-        !_drawings[selected].look.locked;
+    // A locked object still shows its bar: More is the only door back to
+    // Unlock, and hiding the bar would leave it locked forever.
+    final showBar = selected != null && selected < _drawings.length && !armed;
     if (!armed && !showBar) return canvas;
     // The banners sit above the chart rather than floating over it, so they can
     // never cover the candles the object is being aimed at.
@@ -1690,6 +1710,13 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
               ),
             ),
           ),
+          action(
+            icon: Icons.more_vert,
+            tooltip: 'More actions',
+            onTap: () => unawaited(_openDrawingActions(index)),
+          ),
+          // Extend right lives in the object's Edit sheet, so the top bar keeps
+          // enough width for the controls a trader reaches for mid-drag.
           action(
             icon: Icons.copy_all_outlined,
             tooltip: 'Clone',
@@ -3766,7 +3793,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     var draft = _style;
     // The account's copy first, then the device's: a look saved on the web desk
     // should be in this list before the trader scrolls it.
-    final synced = await ChartTemplatesSync().sync(await ChartPresetStore.load());
+    final synced =
+        await ChartTemplatesSync().sync(await ChartPresetStore.load());
     final presets = synced.presets;
     if (synced.changed) unawaited(ChartPresetStore.save(presets));
     if (!mounted) return;
@@ -5206,7 +5234,25 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 text: _staleAt == null ? 'LIVE' : 'OFFLINE',
                 tone: _staleAt == null ? Tone.positive : Tone.negative,
               ),
-              const SizedBox(width: 8),
+              IconButton(
+                tooltip:
+                    _crosshairMode ? 'Crosshair mode on' : 'Crosshair mode off',
+                onPressed: () =>
+                    setState(() => _crosshairMode = !_crosshairMode),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 34,
+                  height: 30,
+                ),
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.center_focus_strong,
+                  size: 17,
+                  color:
+                      _crosshairMode ? AppColors.primaryLight : AppColors.muted,
+                ),
+              ),
+              const SizedBox(width: 6),
               // Expanded instead of Spacer: the timestamp is the part that has
               // to give way when the pills and a doubled text size leave no
               // room, and a Spacer only reports the overflow.
@@ -5731,6 +5777,9 @@ class _ChartCanvas extends StatefulWidget {
     this.onReachStart,
     this.pendingKind,
     this.pendingSide,
+    this.keepDrawing = false,
+    this.crosshairMode = false,
+    this.onFinishPlacement,
     required this.onDrawingCreated,
     this.magnet = MagnetMode.weak,
     this.onCrosshair,
@@ -5771,10 +5820,19 @@ class _ChartCanvas extends StatefulWidget {
   final VoidCallback onDrawingMoveEnd;
 
   /// The tool waiting for a place on the chart, armed from the tools sheet.
-  /// While one is set the canvas stops panning and starts placing: press and
-  /// drag sizes the object, a plain tap drops it at a usable default size.
+  /// While one is set the canvas stops panning and starts placing: a drag
+  /// sizes the object and lifts to finish, while two taps set its two anchors.
   final DrawingKind? pendingKind;
   final PositionSide? pendingSide;
+
+  /// Keep the armed tool armed after a valid object is committed.
+  final bool keepDrawing;
+
+  /// One-finger drags scrub the crosshair instead of panning.
+  final bool crosshairMode;
+
+  /// Put the tool away from the floating Done pill.
+  final VoidCallback? onFinishPlacement;
 
   /// A placed object, finished and ready for the screen to keep.
   final ValueChanged<ChartDrawing> onDrawingCreated;
@@ -5835,6 +5893,19 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// Where the last touch was, so a release can finish what the drag was doing
   /// without needing a focal point from the end event.
   Offset _lastTouch = Offset.zero;
+  Offset _tapDownAt = Offset.zero;
+  Offset _doubleTapAt = Offset.zero;
+  DateTime _tapDownTime = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// A two-anchor object has to be at least this wide in screen pixels before
+  /// it is committed; anything smaller is a stray tap, not a drawing.
+  static const double _minDrawingSpan = 12;
+
+  /// Movement past this many pixels is a drag, not a tap.
+  static const double _dragSlop = 8;
+
+  /// The live coordinate readout while a handle is held.
+  DrawingDragFeedback? _dragFeedback;
   List<ChartPoint> _brush = const [];
   double _baseSpan = 0;
   double _baseStart = 0;
@@ -6045,9 +6116,17 @@ class _ChartCanvasState extends State<_ChartCanvas>
     if (widget.candles.isEmpty) return null;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     if (plotW <= 0) return null;
-    final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
-    final index = _view.indexAt(ratio, widget.candles.length);
-    return widget.candles[index].time.toLocal();
+    final ms = chartTimeMsForX(
+      dx: local.dx,
+      candles: widget.candles,
+      interval: widget.interval.size,
+      start: _view.start,
+      span: _view.span,
+      plotW: plotW,
+    );
+    return ms == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true).toLocal();
   }
 
   double _yFor(double price) {
@@ -6076,7 +6155,10 @@ class _ChartCanvasState extends State<_ChartCanvas>
     final plotW = _size.width - TradingChartPainter.axisWidth;
     final candles = widget.candles;
     if (plotW <= 0 || candles.isEmpty) return raw;
-    final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
+    final chartW = chartCandleWidth(plotW);
+    // In the future gutter there is no candle to snap to yet.
+    if (chartW <= 0 || local.dx > chartW) return raw;
+    final ratio = (local.dx / chartW).clamp(0.0, 1.0).toDouble();
     final index = _view.indexAt(ratio, candles.length);
     final prices = <double>[
       for (var i = math.max(0, index - 1);
@@ -6116,7 +6198,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// zero-height smear.
   Offset _defaultEnd(DrawingKind kind, Offset from) {
     final plotW = _size.width - TradingChartPainter.axisWidth;
-    final dx = math.min(plotW * 0.3, 120.0);
+    final dx = math.min(chartCandleWidth(plotW) * 0.3, 120.0);
     final dy = switch (kind) {
       DrawingKind.trend || DrawingKind.measure => -24.0,
       DrawingKind.fibExtension => 40.0,
@@ -6179,6 +6261,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
     _settle.stop();
     widget.onPlacing?.call(true);
     setState(() {
+      _lastTouch = local;
       _crosshairPinned = false;
       _placeFrom = local;
       _brush = [_pointAt(local)];
@@ -6191,8 +6274,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
     final kind = widget.pendingKind;
     final from = _placeFrom;
     if (kind == null || from == null) return;
-    final moved = (local - from).distance > 6;
+    final moved = (local - from).distance > _dragSlop;
     setState(() {
+      _lastTouch = local;
       if (kind == DrawingKind.brush && moved) {
         _brush = [..._brush, _pointAt(local)];
       }
@@ -6201,8 +6285,34 @@ class _ChartCanvasState extends State<_ChartCanvas>
     });
   }
 
-  void _commitPlace() {
+  /// Two anchors, one tap each. A tap that lands too close to the first point
+  /// is thrown away rather than committed as an invisible sliver.
+  bool _needsSecondPoint(DrawingKind kind) =>
+      kind != DrawingKind.ray &&
+      kind != DrawingKind.vline &&
+      kind != DrawingKind.text &&
+      kind != DrawingKind.arrowUp &&
+      kind != DrawingKind.arrowDown;
+
+  void _commitPlace({bool force = false}) {
     final placed = _preview;
+    final from = _placeFrom;
+    final span = from == null ? double.infinity : (_lastTouch - from).distance;
+    final needsSpan = placed != null && _needsSecondPoint(placed.kind);
+    if (needsSpan && !force && span < _minDrawingSpan) {
+      // Discard the draft, but keep the tool armed: the next tap starts a
+      // fresh first point instead of leaving a zero-width ghost behind.
+      setState(() {
+        _preview = null;
+        _placeFrom = null;
+        _brush = const [];
+        _crosshair = null;
+        _crosshairPinned = false;
+      });
+      widget.onPlacing?.call(false);
+      widget.onCrosshair?.call(null);
+      return;
+    }
     setState(() {
       _preview = null;
       _placeFrom = null;
@@ -6223,8 +6333,10 @@ class _ChartCanvasState extends State<_ChartCanvas>
       _preview = null;
       _placeFrom = null;
       _brush = const [];
+      _crosshair = null;
     });
     widget.onPlacing?.call(false);
+    widget.onCrosshair?.call(null);
   }
 
   /// Whether a press has landed on the object that is already selected.
@@ -6237,40 +6349,82 @@ class _ChartCanvasState extends State<_ChartCanvas>
     if (drawing.look.locked || drawing.look.hidden) return false;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     if (plotW <= 0) return false;
+    // A handle's 24px touch target is bigger than the body's 14px one; a press
+    // near a corner has to grab the handle even when it is outside the stroke.
+    if (_handleAt(drawing, local, plotW) != null) return true;
     final distance = _drawingDistance(drawing, local, plotW);
     return distance != null && distance <= 14;
   }
 
+  double? _xForTime(int ms, double plotW) => chartXForTimeMs(
+        ms: ms,
+        candles: widget.candles,
+        interval: widget.interval.size,
+        start: _view.start,
+        span: _view.span,
+        plotW: plotW,
+      );
+
+  double _anchorX(int ms, double plotW) => _xForTime(ms, plotW) ?? 0;
+
   /// The draggable dots of an object: its anchors, or a trend line's two ends.
   List<Offset> _anchorsOf(ChartDrawing drawing, double plotW) {
     if (drawing.kind == DrawingKind.trend) {
-      final start = _indexForTime(drawing.startMs);
-      final end = _indexForTime(drawing.endMs);
+      final start = _xForTime(drawing.startMs, plotW);
+      final end = _xForTime(drawing.endMs, plotW);
       if (start == null || end == null) return const [];
       return [
-        Offset(_xForIndex(start, plotW), _yFor(drawing.startPrice)),
-        Offset(_xForIndex(end, plotW), _yFor(drawing.endPrice)),
+        Offset(start, _yFor(drawing.startPrice)),
+        Offset(end, _yFor(drawing.endPrice)),
       ];
     }
     if (!drawing.isAnchored) return const [];
     return [
       for (final point in drawing.points)
-        if (_indexForTime(point.ms) case final index?)
-          Offset(_xForIndex(index, plotW), _yFor(point.price)),
+        Offset(_anchorX(point.ms, plotW), _yFor(point.price)),
     ];
   }
 
-  /// Which anchor a press has taken hold of, or null when it is on the body.
+  /// Shapes that have a centre node for moving the whole object.
+  bool _hasCentreHandle(DrawingKind kind) => switch (kind) {
+        DrawingKind.rectangle ||
+        DrawingKind.ellipse ||
+        DrawingKind.fib ||
+        DrawingKind.fibExtension ||
+        DrawingKind.measure =>
+          true,
+        _ => false,
+      };
+
+  /// Which anchor a press has taken hold of, or -1 for the centre move node.
+  ///
+  /// Handle hit-testing is deliberately much wider than the drawn dot: a 5px
+  /// dot is a marker, not a touch target, and missing it turns a resize into a
+  /// pan.
   int? _handleAt(ChartDrawing drawing, Offset local, double plotW) {
     final anchors = _anchorsOf(drawing, plotW);
     int? best;
-    var bestDistance = 18.0;
+    var bestDistance = 24.0;
     for (var i = 0; i < anchors.length; i++) {
       final distance = (anchors[i] - local).distance;
       if (distance < bestDistance) {
         bestDistance = distance;
         best = i;
       }
+    }
+    if (best == null && _hasCentreHandle(drawing.kind) && anchors.length >= 2) {
+      var left = anchors.first.dx;
+      var right = anchors.first.dx;
+      var top = anchors.first.dy;
+      var bottom = anchors.first.dy;
+      for (final anchor in anchors.skip(1)) {
+        left = math.min(left, anchor.dx);
+        right = math.max(right, anchor.dx);
+        top = math.min(top, anchor.dy);
+        bottom = math.max(bottom, anchor.dy);
+      }
+      final centre = Offset((left + right) / 2, (top + bottom) / 2);
+      if ((centre - local).distance <= 24) return -1;
     }
     return best;
   }
@@ -6296,11 +6450,31 @@ class _ChartCanvasState extends State<_ChartCanvas>
     if (widget.candles.isEmpty) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     if (plotW <= 0 || local.dx > plotW) return;
-    // An armed tool owns the next tap: it lands where the trader put their
-    // finger, at a size they can already see. Nothing is created invisibly in
-    // the middle of the window.
-    if (widget.pendingKind != null) {
-      if (_preview == null) _beginPlace(local);
+    // A clean tap is short and still. A longer or travelling touch is a pan
+    // that the gesture recogniser happened to classify as a tap.
+    final clean = (local - _tapDownAt).distance < _dragSlop &&
+        DateTime.now().difference(_tapDownTime) <
+            const Duration(milliseconds: 250);
+    if (!clean) return;
+    // An armed tool owns the tap. One-point tools land immediately; two-anchor
+    // tools take a first point, then a second, and refuse a second point that
+    // would make an invisible sliver.
+    final kind = widget.pendingKind;
+    if (kind != null) {
+      _lastTouch = local;
+      if (!_needsSecondPoint(kind)) {
+        if (_preview == null) _beginPlace(local);
+        _commitPlace(force: true);
+        return;
+      }
+      final from = _placeFrom;
+      if (from == null) {
+        _beginPlace(local);
+        return;
+      }
+      setState(() {
+        _preview = _draftFor(kind, from, local, sized: true);
+      });
       _commitPlace();
       return;
     }
@@ -6322,8 +6496,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
     if (inPricePane) {
       final hit = _nearestDrawing(local);
       if (hit != null) {
+        // Selection shows the handles and the top bar. The bottom sheet is a
+        // deliberate second step — More, Edit, or a double tap.
         widget.onDrawingSelected(hit);
-        widget.onDrawingTapped(hit);
         return;
       }
     }
@@ -6344,22 +6519,37 @@ class _ChartCanvasState extends State<_ChartCanvas>
       _reportCrosshair(null);
     }
     _lastTouch = details.localFocalPoint;
-    if (widget.pendingKind != null) {
-      _beginPlace(details.localFocalPoint);
-      return;
-    }
-    // A selected object is grabbed directly: press on it and drag, instead of
-    // the long press every other object needs. Once it is selected, the trader
-    // has already said which thing they mean.
-    if (_hitsSelected(details.localFocalPoint)) {
-      _startDrag(details.localFocalPoint);
-      return;
-    }
+    // Every gesture keeps these, so a pinch that starts on an object still has
+    // the viewport it began with when it takes over.
     _baseSpan = _view.span;
     _baseStart = _view.start;
     _basePriceZoom = _priceZoom;
     _axisDragDelta = Offset.zero;
     _axisDrag = _AxisDrag.none;
+    if (widget.pendingKind != null) {
+      final from = _placeFrom;
+      if (from == null) {
+        _beginPlace(details.localFocalPoint);
+      } else {
+        setState(() {
+          _preview = _draftFor(
+            widget.pendingKind!,
+            from,
+            details.localFocalPoint,
+            sized: false,
+          );
+          _crosshair = details.localFocalPoint;
+        });
+      }
+      return;
+    }
+    // A selected object is grabbed directly: press on it and drag. An
+    // unselected object is selected by a clean tap, so its body cannot steal a
+    // pan from the chart.
+    if (_hitsSelected(details.localFocalPoint)) {
+      _startDrag(details.localFocalPoint);
+      return;
+    }
     if (details.pointerCount == 1) {
       final plotW = _size.width - TradingChartPainter.axisWidth;
       final point = details.localFocalPoint;
@@ -6410,10 +6600,21 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// Lift-off: the finger's speed becomes candle travel with friction, then the
   /// window settles onto a whole bar instead of resting between two.
   void _onScaleEnd(ScaleEndDetails details) {
-    // Whatever was being placed is finished on lift-off: the finger has said
-    // how big it should be, and leaving it hanging would be a tool that never
-    // commits.
+    // A drag sizes the object and commits on lift-off; a still press leaves it
+    // in 2 of 2, waiting for a deliberate second tap rather than dropping a
+    // zero-width shape where the finger happened to rest.
     if (_placeFrom != null) {
+      final moved = (_lastTouch - _placeFrom!).distance;
+      if (moved < _dragSlop) {
+        final kind = widget.pendingKind;
+        if (kind != null) {
+          setState(() {
+            _preview = _draftFor(kind, _placeFrom!, _placeFrom!, sized: false);
+            _crosshair = _placeFrom;
+          });
+        }
+        return;
+      }
       _commitPlace();
       return;
     }
@@ -6423,8 +6624,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
       return;
     }
     // A pinned crosshair survives the lift-off that follows its long press; a
-    // pan or pinch (above) has already put it away.
-    if (!_crosshairPinned) {
+    // pan or pinch has already put it away. In crosshair mode the finished
+    // position stays put, which is what a desk does.
+    if (!_crosshairPinned && !widget.crosshairMode) {
       setState(() => _crosshair = null);
       _reportCrosshair(null);
     }
@@ -6439,7 +6641,10 @@ class _ChartCanvasState extends State<_ChartCanvas>
     if (plotW <= 0) return;
 
     // Finger moving right moves the chart right, which walks the window back.
-    final perSecond = -details.velocity.pixelsPerSecond.dx / plotW * _view.span;
+    final chartW = chartCandleWidth(plotW);
+    if (chartW <= 0) return;
+    final perSecond =
+        -details.velocity.pixelsPerSecond.dx / chartW * _view.span;
     if (perSecond.abs() < 4) {
       // Too slow to be a throw: just sit on the nearest bar.
       _animateStartTo(_view.start.roundToDouble(), 120);
@@ -6449,20 +6654,32 @@ class _ChartCanvasState extends State<_ChartCanvas>
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
-    if (_placeFrom != null) {
-      _updatePlace(details.localFocalPoint);
-      return;
-    }
-    if (_drawingIndex != null) {
-      _lastTouch = details.localFocalPoint;
-      _updateDrag(details.localFocalPoint);
-      return;
+    // A second finger outranks everything: cancel a half-finished object drag
+    // or drawing, drop the crosshair, and give the gesture to pinch-zoom and
+    // pan. Object mutation never survives a pinch.
+    if (details.pointerCount >= 2) {
+      if (_drawingIndex != null) _abortDrawingDrag();
+      if (_placeFrom != null) _cancelPlace();
+      if (_dragging != null) setState(() => _dragging = null);
+    } else {
+      if (_placeFrom != null) {
+        _updatePlace(details.localFocalPoint);
+        return;
+      }
+      if (_drawingIndex != null) {
+        _lastTouch = details.localFocalPoint;
+        _updateDrag(details.localFocalPoint);
+        return;
+      }
     }
     if (widget.candles.length < 2) return;
     final plotW = _size.width - TradingChartPainter.axisWidth;
     if (plotW <= 0) return;
+    final chartW = chartCandleWidth(plotW);
+    if (chartW <= 0) return;
     final ratio =
-        (details.localFocalPoint.dx / plotW).clamp(0.0, 1.0).toDouble();
+        (details.localFocalPoint.dx / chartW).clamp(0.0, 1.0).toDouble();
+    final showCrosshair = widget.crosshairMode && details.pointerCount < 2;
     setState(() {
       if (details.pointerCount >= 2) {
         _view.zoomAround(
@@ -6486,7 +6703,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
           // them together, with the newest bar held in place so the live edge
           // does not walk out from under the trader.
           _view.zoomAround(
-            scale: axisDragZoom(_axisDragDelta.dx / plotW),
+            scale: axisDragZoom(_axisDragDelta.dx / chartW),
             anchorRatio: 1,
             count: widget.candles.length,
             baseSpan: _baseSpan,
@@ -6511,7 +6728,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
           }
         }
       } else {
-        _view.pan(-details.focalPointDelta.dx / plotW * _view.span);
+        _view.pan(-details.focalPointDelta.dx / chartW * _view.span);
         _view.clampTo(widget.candles.length);
         // Dragged onto the oldest loaded bar: ask for an earlier window, so the
         // chart keeps moving instead of stopping at the edge of the fetch.
@@ -6530,9 +6747,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
               .toDouble();
         }
       }
-      _crosshair = details.localFocalPoint;
+      _crosshair = showCrosshair ? details.localFocalPoint : null;
     });
-    _reportCrosshair(details.localFocalPoint);
+    _reportCrosshair(showCrosshair ? details.localFocalPoint : null);
   }
 
   /// Tells the screen which candle the crosshair is over. The chart itself has
@@ -6545,7 +6762,12 @@ class _ChartCanvasState extends State<_ChartCanvas>
       report(null);
       return;
     }
-    final ratio = (local.dx / plotW).clamp(0.0, 1.0).toDouble();
+    final chartW = chartCandleWidth(plotW);
+    if (chartW <= 0) {
+      report(null);
+      return;
+    }
+    final ratio = (local.dx / chartW).clamp(0.0, 1.0).toDouble();
     final index = _view.indexAt(ratio, widget.candles.length);
     report(widget.candles[index.clamp(0, widget.candles.length - 1)]);
   }
@@ -6569,30 +6791,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
     return best;
   }
 
-  /// Nearest candle index for an epoch-millisecond time, or null when the
-  /// drawing sits outside the loaded series.
-  double? _indexForTime(int ms) {
-    final candles = widget.candles;
-    if (candles.isEmpty) return null;
-    final first = candles.first.time.millisecondsSinceEpoch;
-    final last = candles.last.time.millisecondsSinceEpoch;
-    if (ms < first || ms > last) return null;
-    var low = 0;
-    var high = candles.length - 1;
-    while (low < high) {
-      final mid = (low + high) ~/ 2;
-      if (candles[mid].time.millisecondsSinceEpoch < ms) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-    return low.toDouble();
-  }
-
-  double _xForIndex(double index, double plotW) =>
-      ((index + 0.5 - _view.start) / _view.span) * plotW;
-
   double? _drawingDistance(ChartDrawing drawing, Offset local, double plotW) {
     if (drawing.kind == DrawingKind.ray) {
       final price = drawing.price;
@@ -6606,18 +6804,16 @@ class _ChartCanvasState extends State<_ChartCanvas>
       final xs = <double>[];
       final ys = <double>[];
       for (final point in drawing.points) {
-        final index = _indexForTime(point.ms);
-        xs.add(
-          index == null
-              ? (point.ms < widget.candles.first.time.millisecondsSinceEpoch
-                  ? 0.0
-                  : plotW)
-              : _xForIndex(index, plotW),
-        );
+        xs.add(_anchorX(point.ms, plotW));
         ys.add(_yFor(point.price));
       }
       final left = xs.reduce(math.min);
-      final right = xs.reduce(math.max);
+      var right = xs.reduce(math.max);
+      // The projected part of a rectangle is part of the object, so it has to
+      // be selectable too.
+      if (drawing.look.extendRight && drawing.kind == DrawingKind.rectangle) {
+        right = math.max(right, plotW);
+      }
       final top = ys.reduce(math.min);
       final bottom = ys.reduce(math.max);
       final dx = local.dx < left
@@ -6629,23 +6825,16 @@ class _ChartCanvasState extends State<_ChartCanvas>
       return math.sqrt(dx * dx + dy * dy);
     }
     if (drawing.isPosition) {
-      final start = _indexForTime(drawing.startMs);
       // An anchor older than the loaded window draws from the left edge, so a
-      // tap anywhere on the box still finds it.
-      if (start == null &&
-          drawing.startMs > widget.candles.last.time.millisecondsSinceEpoch) {
-        return null;
-      }
-      final left = start == null ? 0.0 : _xForIndex(start, plotW);
+      // tap anywhere on the box still finds it. A future end projects into the
+      // gutter and is grabbable there.
+      final left = _xForTime(drawing.startMs, plotW) ?? 0;
       if (local.dx < left - 12) return null;
-      // The box stops at its end time, so a tap beyond its right edge belongs
-      // to the chart and not to the drawing.
-      final endIndex = drawing.endMs > 0
-          ? _indexForTime(drawing.endMs)
-          : widget.candles.length - 1.0;
-      if (endIndex != null && local.dx > _xForIndex(endIndex, plotW) + 12) {
-        return null;
-      }
+      final endMs = drawing.endMs > 0
+          ? drawing.endMs
+          : widget.candles.last.time.millisecondsSinceEpoch;
+      final right = _xForTime(endMs, plotW) ?? plotW;
+      if (local.dx > right + 12) return null;
       var best = double.infinity;
       for (final level in PositionLevel.values) {
         final price = drawing.levelFor(level);
@@ -6668,14 +6857,18 @@ class _ChartCanvasState extends State<_ChartCanvas>
       if (local.dy >= top && local.dy <= bottom) return 0;
       return best;
     }
-    final start = _indexForTime(drawing.startMs);
-    final end = _indexForTime(drawing.endMs);
+    final start = _xForTime(drawing.startMs, plotW);
+    final end = _xForTime(drawing.endMs, plotW);
     if (start == null || end == null) return null;
-    return _distanceToSegment(
-      local,
-      Offset(_xForIndex(start, plotW), _yFor(drawing.startPrice)),
-      Offset(_xForIndex(end, plotW), _yFor(drawing.endPrice)),
-    );
+    final a = Offset(start, _yFor(drawing.startPrice));
+    var b = Offset(end, _yFor(drawing.endPrice));
+    // A line extended right is grabbable along its projection, not only on the
+    // stretch between its two anchors.
+    if (drawing.look.extendRight && b.dx > a.dx + 0.5) {
+      final slope = (b.dy - a.dy) / (b.dx - a.dx);
+      b = Offset(plotW, a.dy + slope * (plotW - a.dx));
+    }
+    return _distanceToSegment(local, a, b);
   }
 
   static double _distanceToSegment(Offset point, Offset a, Offset b) {
@@ -6711,7 +6904,9 @@ class _ChartCanvasState extends State<_ChartCanvas>
   ChartDrawing _movedDrawing(ChartDrawing original, Offset local) {
     // A drag on a dot moves that dot. Anything else slides the whole object.
     final handle = _dragHandle;
-    if (handle != null) {
+    // -1 is the centre move node: it translates the object, exactly as a drag
+    // on the body does, rather than replacing an anchor.
+    if (handle != null && handle >= 0) {
       return original.withPoint(handle, _pointAt(local));
     }
     // Down the screen is down the price axis. This used to be written the other
@@ -6725,15 +6920,15 @@ class _ChartCanvasState extends State<_ChartCanvas>
       );
     }
     final plotW = _size.width - TradingChartPainter.axisWidth;
-    final shift =
-        plotW <= 0 ? 0.0 : (local.dx - _dragOrigin.dx) / plotW * _view.span;
+    final chartW = chartCandleWidth(plotW);
+    final barMs = widget.interval.size.inMilliseconds;
+    final shiftBars = chartW <= 0 || barMs <= 0
+        ? 0
+        : ((local.dx - _dragOrigin.dx) / chartW * _view.span).round();
     final candles = widget.candles;
-    int shiftTime(int ms) {
-      final index = _indexForTime(ms);
-      if (index == null) return ms;
-      final moved = (index + shift).round().clamp(0, candles.length - 1);
-      return candles[moved].time.millisecondsSinceEpoch;
-    }
+    // Time follows whole bars, in either direction: an object dragged past the
+    // newest candle keeps a future timestamp instead of being clamped to it.
+    int shiftTime(int ms) => ms + shiftBars * barMs;
 
     // An anchor-based object moves as one piece: every point takes the same
     // price and time shift, so dragging a fib ladder does not stretch it.
@@ -6801,28 +6996,14 @@ class _ChartCanvasState extends State<_ChartCanvas>
 
   void _startDrag(Offset local) {
     if (widget.pendingKind != null) return;
-    final drawing = _nearestDrawing(local);
-    if (drawing != null) {
-      final original = widget.drawings[drawing];
-      if (original.look.locked) {
-        widget.onDrawingSelected(drawing);
-        return;
-      }
-      final plotW = _size.width - TradingChartPainter.axisWidth;
-      setState(() {
-        _crosshair = null;
-        _drawingIndex = drawing;
-        _drawingOriginal = original;
-        _dragOrigin = local;
-        _dragHandle = plotW > 0 ? _handleAt(original, local, plotW) : null;
-        _dragEdge = plotW > 0 &&
-            _dragHandle == null &&
-            _nearRightEdge(original, local, plotW);
-        _dragLevel = original.isPosition && !_dragEdge
-            ? _nearestPositionLevel(original, local)
-            : null;
-      });
-      widget.onDrawingSelected(drawing);
+    // Only the selected object captures a press. An unselected object is
+    // selected by a clean tap; its body does not steal a drag from the chart.
+    final selected = widget.selectedDrawing;
+    if (selected != null &&
+        selected >= 0 &&
+        selected < widget.drawings.length &&
+        _hitsSelected(local)) {
+      _beginDrawingDrag(selected, local);
       return;
     }
     final marker = _nearestLevel(local);
@@ -6839,25 +7020,80 @@ class _ChartCanvasState extends State<_ChartCanvas>
     }
   }
 
+  void _beginDrawingDrag(int index, Offset local) {
+    final original = widget.drawings[index];
+    if (original.look.locked) {
+      widget.onDrawingSelected(index);
+      return;
+    }
+    final plotW = _size.width - TradingChartPainter.axisWidth;
+    setState(() {
+      _crosshair = null;
+      _dragFeedback = null;
+      _drawingIndex = index;
+      _drawingOriginal = original;
+      _dragOrigin = local;
+      _dragHandle = plotW > 0 ? _handleAt(original, local, plotW) : null;
+      _dragEdge = plotW > 0 &&
+          _dragHandle == null &&
+          _nearRightEdge(original, local, plotW);
+      _dragLevel = original.isPosition && !_dragEdge
+          ? _nearestPositionLevel(original, local)
+          : null;
+    });
+    widget.onDrawingSelected(index);
+  }
+
   PositionLevel? _dragLevel;
 
   /// True while the finger holds the position box's right grip.
   bool _dragEdge = false;
 
   bool _nearRightEdge(ChartDrawing drawing, Offset local, double plotW) {
-    if (!drawing.isPosition) return false;
-    final endIndex = drawing.endMs > 0
-        ? _indexForTime(drawing.endMs)
-        : (widget.candles.isEmpty ? null : widget.candles.length - 1.0);
-    if (endIndex == null) return false;
-    return (local.dx - _xForIndex(endIndex, plotW)).abs() <= 16;
+    if (!drawing.isPosition || widget.candles.isEmpty) return false;
+    final endMs = drawing.endMs > 0
+        ? drawing.endMs
+        : widget.candles.last.time.millisecondsSinceEpoch;
+    final right = _xForTime(endMs, plotW);
+    if (right == null) return false;
+    return (local.dx - right).abs() <= 24;
+  }
+
+  /// Restores the object the drag started from, then ends the drag. Used when
+  /// a second finger turns the gesture into a pinch.
+  void _abortDrawingDrag() {
+    final index = _drawingIndex;
+    final original = _drawingOriginal;
+    if (index != null && original != null) {
+      widget.onDrawingMoved(index, original);
+    }
+    setState(() {
+      _drawingIndex = null;
+      _drawingOriginal = null;
+      _dragLevel = null;
+      _dragEdge = false;
+      _dragHandle = null;
+      _dragFeedback = null;
+    });
+    widget.onDrawingMoveEnd();
   }
 
   void _updateDrag(Offset local) {
+    _lastTouch = local;
     final drawing = _drawingOriginal;
     final index = _drawingIndex;
     if (drawing != null && index != null) {
-      setState(() => _crosshair = null);
+      final point = _pointAt(local);
+      setState(() {
+        _crosshair = null;
+        _dragFeedback = _dragHandle == null
+            ? null
+            : DrawingDragFeedback(
+                price: point.price,
+                ms: point.ms,
+                touch: local,
+              );
+      });
       widget.onDrawingMoved(index, _movedDrawing(drawing, local));
       return;
     }
@@ -6886,6 +7122,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
         _dragLevel = null;
         _dragEdge = false;
         _dragHandle = null;
+        _dragFeedback = null;
       });
       widget.onDrawingMoveEnd();
       return;
@@ -6948,13 +7185,27 @@ class _ChartCanvasState extends State<_ChartCanvas>
           _size = Size(constraints.maxWidth, height);
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
+            onTapDown: (details) {
+              _tapDownAt = details.localPosition;
+              _tapDownTime = DateTime.now();
+            },
             onTapUp: (details) => _tap(details.localPosition),
-            // Double-tap anywhere restores auto-fit, which is the gesture a
-            // trader reaches for after stretching the axis by mistake.
-            onDoubleTap: () => setState(() {
-              _pricePan = 0;
-              _priceZoom = 1;
-            }),
+            // A double tap on an object opens its full menu; anywhere else it
+            // restores auto-fit, which is the gesture a trader reaches for
+            // after stretching the axis by mistake.
+            onDoubleTapDown: (details) => _doubleTapAt = details.localPosition,
+            onDoubleTap: () {
+              final hit = _nearestDrawing(_doubleTapAt);
+              if (hit != null) {
+                widget.onDrawingSelected(hit);
+                widget.onDrawingTapped(hit);
+                return;
+              }
+              setState(() {
+                _pricePan = 0;
+                _priceZoom = 1;
+              });
+            },
             onScaleStart: _onScaleStart,
             onScaleUpdate: _onScaleUpdate,
             onScaleEnd: _onScaleEnd,
@@ -6989,6 +7240,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       selectedDrawing: widget.selectedDrawing,
                       positionOutcomes: widget.positionOutcomes,
                       preview: _preview,
+                      dragFeedback: _dragFeedback,
                       style: widget.style,
                       symbol: widget.symbol,
                     ),
@@ -7104,6 +7356,53 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       ),
                     ),
                   ),
+                // With Keep drawing on, the tool stays armed after a commit.
+                // A floating Done gives the trader an obvious way out without
+                // hunting for the bin in the placement banner.
+                if (widget.keepDrawing && widget.pendingKind != null)
+                  Positioned(
+                    left: 0,
+                    right: TradingChartPainter.axisWidth,
+                    bottom: 8,
+                    child: Center(
+                      child: Semantics(
+                        button: true,
+                        label: 'Finish drawing',
+                        child: GestureDetector(
+                          onTap: widget.onFinishPlacement,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: drawingColor,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check,
+                                  size: 15,
+                                  color: widget.style.background,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Done',
+                                  style: TextStyle(
+                                    color: widget.style.background,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           );
@@ -7114,9 +7413,10 @@ class _ChartCanvasState extends State<_ChartCanvas>
 
   Widget _readout() {
     final plotW = _size.width - TradingChartPainter.axisWidth;
-    final ratio = _crosshair == null || plotW <= 0
+    final chartW = chartCandleWidth(plotW);
+    final ratio = _crosshair == null || chartW <= 0
         ? 1.0
-        : (_crosshair!.dx / plotW).clamp(0.0, 1.0).toDouble();
+        : (_crosshair!.dx / chartW).clamp(0.0, 1.0).toDouble();
     final index = _view.indexAt(ratio, widget.candles.length);
     final candle = widget.candles[index];
     final color = candle.isUp ? widget.style.bull : widget.style.bear;

@@ -42,6 +42,25 @@ export default function CalendarPage() {
   const [selectedDayTrades, setSelectedDayTrades] = useState<CalendarTrade[]>([])
   const [dayLoading, setDayLoading] = useState(false)
   const touchStartX = useRef<number | null>(null)
+  // One automatic pick per month: closing the selected day must not make the
+  // page immediately reopen it.
+  const autoSelectedMonth = useRef<string | null>(null)
+
+  const loadDay = useCallback(async (day: DayData) => {
+    setSelectedDay(day)
+    setSelectedDayTrades([])
+    setDayLoading(true)
+
+    const { data } = await supabase.rpc('day_trades', { p_day: day.date })
+    const rows = (data as CalendarTrade[] | null) ?? []
+    setSelectedDayTrades(rows)
+    setSelectedDay({
+      ...day,
+      wins: rows.filter((trade) => Number(trade.pnl) >= 0).length,
+      losses: rows.filter((trade) => Number(trade.pnl) < 0).length,
+    })
+    setDayLoading(false)
+  }, [])
 
   // Open on the month of the latest trade without downloading the history.
   useEffect(() => {
@@ -94,11 +113,22 @@ export default function CalendarPage() {
       }
       setDailyData(next)
       setMonthLoading(false)
+
+      // The detail panel is useful immediately, not only after a tap. Pick the
+      // latest trading day in this month, once; closing it must not reopen it.
+      const key = `${year}-${month}`
+      if (autoSelectedMonth.current !== key) {
+        autoSelectedMonth.current = key
+        const latest = Object.values(next)
+          .filter((day) => day.trades > 0)
+          .sort((a, b) => b.date.localeCompare(a.date))[0]
+        if (latest) void loadDay(latest)
+      }
     }
 
     loadMonth()
     return () => { active = false }
-  }, [currentMonth, year, month, daysInMonth])
+  }, [currentMonth, year, month, daysInMonth, loadDay])
 
   const selectDay = useCallback(async (day: DayData) => {
     if (selectedDay?.date === day.date) {
@@ -106,21 +136,8 @@ export default function CalendarPage() {
       setSelectedDayTrades([])
       return
     }
-
-    setSelectedDay(day)
-    setSelectedDayTrades([])
-    setDayLoading(true)
-
-    const { data } = await supabase.rpc('day_trades', { p_day: day.date })
-    const rows = (data as CalendarTrade[] | null) ?? []
-    setSelectedDayTrades(rows)
-    setSelectedDay({
-      ...day,
-      wins: rows.filter((trade) => Number(trade.pnl) >= 0).length,
-      losses: rows.filter((trade) => Number(trade.pnl) < 0).length,
-    })
-    setDayLoading(false)
-  }, [selectedDay])
+    await loadDay(day)
+  }, [selectedDay, loadDay])
 
   const monthlyStats = Object.values(dailyData).reduce(
     (acc, d) => ({

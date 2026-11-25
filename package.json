@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "make:locales": "node scripts/make-locales.mjs",
+    "locales:web": "node scripts/extract-web-strings.mjs && node scripts/build-glossary-packs.mjs",
+    "translate:web": "node --env-file=.env.local scripts/translate-web.mjs",
     "check:deploy": "node scripts/check-deploy.mjs",
     "check:ai": "node scripts/check-ai.mjs",
     "check:audit": "node scripts/audit-gate.mjs"

@@ -17,6 +17,9 @@ import type { BillingInterval } from '@/types'
 
 export const UNLIMITED = -1
 export const TRIAL_DAYS = 3
+/** One wording for the trial across the hero, pricing cards and checkout CTAs. */
+export const TRIAL_CTA = `Start ${TRIAL_DAYS}-day free trial`
+export const TRIAL_TRUST_LINE = `${TRIAL_DAYS}-day free trial · No credit card required · Web + Android`
 /** Length of one paid billing period, in days. Renewals stack onto unexpired time. */
 export const PERIOD_DAYS = 30
 const MS_PER_DAY = 24 * 60 * 60 * 1000

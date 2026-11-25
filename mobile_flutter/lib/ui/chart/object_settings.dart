@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -138,7 +137,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
     _textField = TextEditingController(text: drawing.text ?? '');
     if (drawing.kind == DrawingKind.ray) {
       _priceFields.add(
-        TextEditingController(text: drawing.price?.toStringAsFixed(widget.decimals)),
+        TextEditingController(
+            text: drawing.price?.toStringAsFixed(widget.decimals)),
       );
     }
     if (drawing.isPosition) {
@@ -265,7 +265,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
   }
 
   Future<void> _pickBoxEdge({required bool start}) async {
-    final current = DateTime.fromMillisecondsSinceEpoch(start ? _startMs : _endMs);
+    final current =
+        DateTime.fromMillisecondsSinceEpoch(start ? _startMs : _endMs);
     final date = await showDatePicker(
       context: context,
       initialDate: current,
@@ -305,7 +306,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
       if (_drawing.supportsLabel) 'Text',
     ];
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.82,
         child: Column(
@@ -370,32 +372,34 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-          const SizedBox(width: 4),
-          for (var i = 0; i < tabs.length; i++)
-            InkWell(
-              key: ValueKey<String>('object-tab-$i'),
-              onTap: () => setState(() => _tab = i),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: _tab == i ? AppColors.primary : Colors.transparent,
-                      width: 2,
+            const SizedBox(width: 4),
+            for (var i = 0; i < tabs.length; i++)
+              InkWell(
+                key: ValueKey<String>('object-tab-$i'),
+                onTap: () => setState(() => _tab = i),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color:
+                            _tab == i ? AppColors.primary : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    tabs[i],
+                    style: TextStyle(
+                      color: _tab == i ? AppColors.text : AppColors.muted,
+                      fontSize: 12.5,
+                      fontWeight: _tab == i ? FontWeight.w800 : FontWeight.w600,
                     ),
                   ),
                 ),
-                child: Text(
-                  tabs[i],
-                  style: TextStyle(
-                    color: _tab == i ? AppColors.text : AppColors.muted,
-                    fontSize: 12.5,
-                    fontWeight: _tab == i ? FontWeight.w800 : FontWeight.w600,
-                  ),
-                ),
               ),
-            ),
           ],
         ),
       ),
@@ -473,7 +477,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
             _Chip(
               label: 'Chart colour',
               active: _look.tint == null,
-              onTap: () => setState(() => _look = _look.copyWith(clearTint: true)),
+              onTap: () =>
+                  setState(() => _look = _look.copyWith(clearTint: true)),
             ),
           ],
         ),
@@ -487,7 +492,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
                 _Chip(
                   label: '${width.toInt()}px',
                   active: _look.weight == width,
-                  onTap: () => setState(() => _look = _look.copyWith(weight: width)),
+                  onTap: () =>
+                      setState(() => _look = _look.copyWith(weight: width)),
                 ),
               _Chip(
                 label: 'Auto',
@@ -513,12 +519,14 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
               _Chip(
                 label: 'Dashed',
                 active: _look.dashed,
-                onTap: () => setState(() => _look = _look.copyWith(dashed: true)),
+                onTap: () =>
+                    setState(() => _look = _look.copyWith(dashed: true)),
               ),
               _Chip(
                 label: 'Dotted',
                 active: _look.dotted,
-                onTap: () => setState(() => _look = _look.copyWith(dotted: true)),
+                onTap: () =>
+                    setState(() => _look = _look.copyWith(dotted: true)),
               ),
             ],
           ),
@@ -532,14 +540,16 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
                 label: 'Front',
                 active: false,
                 onTap: () => Navigator.of(context).pop(
-                  ObjectSettingsResult.change(_build(), order: ObjectOrder.front),
+                  ObjectSettingsResult.change(_build(),
+                      order: ObjectOrder.front),
                 ),
               ),
               _Chip(
                 label: 'Back',
                 active: false,
                 onTap: () => Navigator.of(context).pop(
-                  ObjectSettingsResult.change(_build(), order: ObjectOrder.back),
+                  ObjectSettingsResult.change(_build(),
+                      order: ObjectOrder.back),
                 ),
               ),
             ],
@@ -615,6 +625,16 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
             () => _look = _look.copyWith(hidden: value),
           ),
         ),
+        if (_drawing.kind == DrawingKind.trend ||
+            _drawing.kind == DrawingKind.rectangle)
+          _toggle(
+            label: 'Extend right',
+            hint: 'Run to the price axis when the chart pans or zooms',
+            value: _look.extendRight,
+            onChanged: (value) => setState(
+              () => _look = _look.copyWith(extendRight: value),
+            ),
+          ),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -630,8 +650,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () =>
-                    Navigator.of(context).pop(const ObjectSettingsResult.remove()),
+                onPressed: () => Navigator.of(context)
+                    .pop(const ObjectSettingsResult.remove()),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.danger,
                   side: BorderSide(color: AppColors.danger.withAlpha(110)),
@@ -777,7 +797,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
           Text(
             'End is the right edge of the box. A box that stops where the idea '
             'stopped stays honest about when it was drawn.',
-            style: TextStyle(color: AppColors.faint, fontSize: 10.5, height: 1.4),
+            style:
+                TextStyle(color: AppColors.faint, fontSize: 10.5, height: 1.4),
           ),
         ],
       );
@@ -806,7 +827,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
           Text(
             'This freehand object holds ${_points.length} points. Drag it on '
             'the chart to move it, or restyle it in Style.',
-            style: TextStyle(color: AppColors.muted, fontSize: 11.5, height: 1.5),
+            style:
+                TextStyle(color: AppColors.muted, fontSize: 11.5, height: 1.5),
           ),
         ],
       );
@@ -892,7 +914,8 @@ class _ObjectSettingsState extends State<_ObjectSettings> {
         Text(
           '$placement A short note beats a paragraph: the chart is read at a '
           'glance, and a label that needs reading twice is in the way.',
-          style: TextStyle(color: AppColors.faint, fontSize: 10.5, height: 1.45),
+          style:
+              TextStyle(color: AppColors.faint, fontSize: 10.5, height: 1.45),
         ),
       ],
     );

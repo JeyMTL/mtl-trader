@@ -37,6 +37,7 @@ import { MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
 import LockGate from '@/components/lock-gate'
 import { Avatar } from '@/components/avatar'
+import { LanguagePicker } from '@/components/language-picker'
 import { useBackButton, useHaptics } from '@/hooks/useCapacitor'
 
 const navigation = [
@@ -389,6 +390,9 @@ export default function DashboardLayout({
             <LogOut className="w-5 h-5" />
             Logout
           </button>
+          <div className="mt-2 flex justify-center">
+            <LanguagePicker />
+          </div>
         </div>
       </aside>
 
@@ -599,10 +603,14 @@ export default function DashboardLayout({
               ))}
             </div>
 
+            <div className="mt-4 flex justify-center">
+              <LanguagePicker />
+            </div>
+
             <button
               type="button"
               onClick={handleLogout}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-danger/40 px-4 py-3 text-sm font-semibold text-danger active:bg-danger/10"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-danger/40 px-4 py-3 text-sm font-semibold text-danger active:bg-danger/10"
             >
               <LogOut className="h-4 w-4" />
               Log out

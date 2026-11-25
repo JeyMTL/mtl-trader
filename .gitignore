@@ -111,6 +111,8 @@ __pycache__/
 supervisor/.terminal-cache.json
 # Broker clock offset (server time minus UTC), measured from live ticks.
 supervisor/.server-offset.json
+# Accounts whose first full-year read has not finished downloading yet.
+supervisor/.backfill/
 
 # MT5 compiler output
 mt5/compile.log

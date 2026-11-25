@@ -777,7 +777,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountStopHard =>
-      'After the stop, the journal locks and the MT5 EA refuses orders. It clears at the start of your next trading day — a hard stop cannot be lifted.';
+      'After the stop, the journal locks and the MT5 guard removes resting orders and closes any position opened after it. It clears at the start of your next trading day — a hard stop cannot be lifted.';
 
   @override
   String get accountStopOff =>
@@ -832,11 +832,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rulesSoftBlurb =>
-      'MT5 freezes on this phone. The journal stays open.';
+      'MT5 is covered on this phone. The journal stays open.';
 
   @override
   String get rulesHardBlurb =>
-      'The journal locks and the MT5 EA refuses orders until tomorrow. No reset.';
+      'The journal locks and the MT5 guard removes resting orders until tomorrow. No reset.';
 
   @override
   String get rulesSessions => 'Trading sessions';
@@ -955,17 +955,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lockHardBody =>
-      'Your MT5 sync EA is refusing orders until the day rolls over. Pending orders are removed while locked, and a new fill is closed immediately.';
+      'Your MT5 guard removes resting orders while the day is locked and closes any position opened after the stop. It cannot stop a manual market order — only your broker can.';
 
   @override
   String get lockHardBody2 =>
       'A manual market order can still fill before any EA sees it — only the broker can stop that click. There is no release here: the lock clears at the start of your next trading day.';
 
   @override
-  String get lockUnfreezeToday => 'Unfreeze today';
+  String get lockUnfreezeToday => 'Lift the stop';
 
   @override
-  String get lockUnfreezing => 'Unfreezing…';
+  String get lockUnfreezing => 'Lifting…';
 
   @override
   String get lockGreenDay =>
@@ -984,13 +984,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'The daily stop is reached · the journal stays open';
 
   @override
-  String get lockSoftFrozen => 'Soft lock · MT5 frozen';
+  String get lockSoftFrozen => 'Soft lock · guard active';
 
   @override
   String get lockFreezerOff => 'Freezer is off — tap to turn it on';
 
   @override
-  String get lockUnfreeze => 'Unfreeze';
+  String get lockUnfreeze => 'Lift the stop';
 
   @override
   String get lockA11yService => 'Accessibility service';
@@ -1027,11 +1027,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lockAgree => 'Agree';
 
   @override
-  String get lockDialogTitle => 'Unfreeze MT5';
+  String get lockDialogTitle => 'Lift the stop — once today';
 
   @override
   String get lockDialogBody =>
-      'One lift a day. The EA releases the freeze on its next poll and your reason is recorded on today. The stop re-arms on the trades you take after this, with the same budget — lose that too and the day stays closed.';
+      'Saving your reason reopens the day, and the guard stops removing orders on its next poll. It is a grace run, not a reset: the stop re-arms on the trades you take after this, with the same budget — lose that too and the day stays closed.';
 
   @override
   String get lockReasonHint => 'Why is trading past the stop worth it today?';

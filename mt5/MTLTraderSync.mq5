@@ -40,16 +40,25 @@ input string InpUserId           = "";        // User id (from MT5 Sync page)
 input string InpSyncToken        = "";        // Sync token (from MT5 Sync page)
 input int    InpReconcileMinutes = 30;        // Full reconciliation interval
 input int    InpLookbackDays     = 30;        // Days re-read on reconcile
-input bool   InpEnforceLock      = true;      // Enforce the hard daily stop
+input bool   InpEnforceLock      = true;      // Apply the daily stop in this terminal
 input bool   InpDeletePending    = true;      // Delete pending orders while locked
 input bool   InpCloseNewFills    = true;      // Close positions opened while locked
 input int    InpDeviationPoints  = 30;        // Slippage allowed on the close
-input int    InpLockPollSeconds  = 30;        // Lock poll interval
+input int    InpLockPollSeconds  = 30;        // Lock poll interval while unlocked
 input int    InpUnreachableGraceMinutes = 5;  // Release after this long offline
 
 // The timer runs at a fixed five seconds so the lock can react quickly; the
 // sync and the lock poll keep their own clocks.
 #define TIMER_SECONDS 5
+
+// While a day is locked the server's answer cannot change before `until` — a
+// hard lock has no in-app release — so the EA can stop asking every 30 seconds
+// and still release on time. Five minutes is the safety net for the one thing
+// that does move the answer: a trader changing their timezone mid-day.
+#define LOCKED_POLL_SECONDS 300
+// How far the server and this terminal may disagree before `until` is treated
+// as untrustworthy and the normal poll takes over again.
+#define LOCK_SKEW_TOLERANCE 120
 
 string   g_appUrl = "";           // InpAppUrl without a trailing slash
 
@@ -62,6 +71,9 @@ bool     g_locked = false;
 string   g_lockReason = "";
 datetime g_lockLastOk = 0;
 datetime g_lockedSince = 0;   // the stop instant, in server time
+datetime g_lockUntil = 0;     // the day end the server reported, server time
+long     g_serverSkew = 0;    // server clock minus this terminal's clock, seconds
+string   g_lockMode = "";     // off | soft | hard, as the server reports it
 
 CTrade   g_trade;
 
@@ -103,6 +115,20 @@ datetime ParseIsoUtc(const string value)
    datetime utc = StructToTime(parts);
    long offset = (long)TimeTradeServer() - (long)TimeGMT();
    return (datetime)((long)utc + offset);
+  }
+
+//--- The value of `"key":"..."` in the flat JSON the lock route returns ---
+string JsonString(const string body, const string key)
+  {
+   string needle = "\"" + key + "\":\"";
+   int at = StringFind(body, needle);
+   if(at < 0)
+      return "";
+   int from = at + StringLen(needle);
+   int to = StringFind(body, "\"", from);
+   if(to <= from)
+      return "";
+   return StringSubstr(body, from, to - from);
   }
 
 //--- Position id -> whether it has a closing deal ------------------------
@@ -356,7 +382,7 @@ void SyncNewDeals(const bool full)
      }
   }
 
-//--- Ask the server whether today is hard-locked -------------------------
+//--- Ask the server whether today's stop is active ------------------------
 bool FetchLock()
   {
    string url = g_appUrl + "/api/ea/lock?userId=" + InpUserId;
@@ -365,7 +391,9 @@ bool FetchLock()
    string answer;
 
    ResetLastError();
-   int status = WebRequest("GET", url, headers, 15000, data, result, answer);
+   // A long timeout blocks the timer thread, and OnTradeTransaction runs on that
+   // same thread: a hung poll would delay the close the lock exists to make.
+   int status = WebRequest("GET", url, headers, 4000, data, result, answer);
    if(status == -1)
      {
       PrintFormat("Lock check failed (%d). Add %s to Tools > Options > Expert Advisors "
@@ -379,23 +407,16 @@ bool FetchLock()
      }
 
    bool locked = StringFind(answer, "\"locked\":true") >= 0;
-   string reason = "";
-   int reasonAt = StringFind(answer, "\"reason\":\"");
-   if(reasonAt >= 0)
-     {
-      int from = reasonAt + 10;
-      int to = StringFind(answer, "\"", from);
-      if(to > from) reason = StringSubstr(answer, from, to - from);
-     }
+   string reason = JsonString(answer, "reason");
+   datetime since = ParseIsoUtc(JsonString(answer, "since"));
 
-   datetime since = 0;
-   int sinceAt = StringFind(answer, "\"since\":\"");
-   if(sinceAt >= 0)
-     {
-      int from = sinceAt + 9;
-      int to = StringFind(answer, "\"", from);
-      if(to > from) since = ParseIsoUtc(StringSubstr(answer, from, to - from));
-     }
+   // The day end and the server's clock are what let the EA stop polling every
+   // 30 seconds while locked: nothing can change the answer before `until`.
+   g_lockUntil = ParseIsoUtc(JsonString(answer, "until"));
+   g_lockMode = JsonString(answer, "mode");
+   datetime serverAt = ParseIsoUtc(JsonString(answer, "serverTime"));
+   if(serverAt > 0)
+      g_serverSkew = (long)serverAt - (long)TimeCurrent();
 
    g_lockLastOk = TimeCurrent();
 
@@ -408,13 +429,19 @@ bool FetchLock()
          // The stop instant, not the moment this poll saw it: a position opened
          // between the breach and the poll is still an after-stop fill.
          g_lockedSince = since > 0 ? since : TimeCurrent();
-         PrintFormat("HARD LOCK ACTIVE: %s", reason);
-         Alert("MTL Ledger: daily stop reached. New orders are blocked until the reset.");
+         PrintFormat("Daily stop active (%s): %s", g_lockMode, reason);
+         // Say what happens, not what cannot: a manual market order still fills
+         // at the broker before this terminal reports it.
+         Alert("MTL Ledger: daily stop reached. Resting orders are removed and new "
+               "fills are closed; a manual market order can still fill.");
         }
       else
         {
          g_lockedSince = 0;
-         Print("MTL Ledger: hard lock released.");
+         g_lockUntil = 0;
+         g_serverSkew = 0;
+         g_lockMode = "";
+         Print("MTL Ledger: daily stop released.");
         }
      }
 
@@ -439,9 +466,9 @@ void RemovePendingOrders()
       if(!IsPendingOrder(OrderGetInteger(ORDER_TYPE))) continue;
 
       if(g_trade.OrderDelete(ticket))
-         PrintFormat("Hard lock: deleted pending order %I64u.", ticket);
+         PrintFormat("Daily stop: deleted pending order %I64u.", ticket);
       else
-         PrintFormat("Hard lock: could not delete order %I64u (%d).",
+         PrintFormat("Daily stop: could not delete order %I64u (%d).",
                      ticket, g_trade.ResultRetcode());
      }
   }
@@ -474,10 +501,36 @@ void CloseIfLocked(const ulong positionId)
    if(g_lockedSince > 0 && opened < g_lockedSince)
       return;
 
-   PrintFormat("Hard lock: closing position %I64u opened after the stop.", positionId);
+   PrintFormat("Daily stop: closing position %I64u opened after the stop.", positionId);
    if(!g_trade.PositionClose(positionId))
-      PrintFormat("Hard lock: close failed (%d) %s",
+      PrintFormat("Daily stop: close failed (%d) %s",
                   g_trade.ResultRetcode(), g_trade.ResultRetcodeDescription());
+  }
+
+//--- How long to wait before the next lock poll, in seconds --------------
+int LockPollInterval()
+  {
+   int normal = MathMax(5, InpLockPollSeconds);
+   if(!g_locked || g_lockUntil <= 0)
+      return normal;
+
+   // Only a hard lock is guaranteed to last until the day ends. A soft lock can
+   // be lifted from the journal at any moment, so slowing that poll would leave
+   // MT5 frozen for minutes after the trader reopened the day.
+   if(g_lockMode != "hard")
+      return normal;
+
+   // A terminal and a server whose clocks disagree cannot be trusted with
+   // `until`; a trader changing timezone mid-day moves it. The normal poll is
+   // the safe answer in both cases.
+   if(g_serverSkew > LOCK_SKEW_TOLERANCE || g_serverSkew < -LOCK_SKEW_TOLERANCE)
+      return normal;
+
+   // Inside the last minute the release is imminent, so ask again normally.
+   if(TimeCurrent() + 60 >= g_lockUntil)
+      return normal;
+
+   return MathMax(normal, LOCKED_POLL_SECONDS);
   }
 
 void CheckLock()
@@ -493,13 +546,18 @@ void CheckLock()
         {
          g_locked = false;
          g_lockedSince = 0;
-         Print("Hard lock: server unreachable past the grace period; releasing so the "
+         g_lockUntil = 0;
+         g_serverSkew = 0;
+         g_lockMode = "";
+         Print("Daily stop: server unreachable past the grace period; releasing so the "
                "account can still be managed.");
         }
       return;
      }
 
-   if(g_locked && InpDeletePending)
+   // Nothing to sweep is the common case on a quiet day; walking the order list
+   // for it is pure waste.
+   if(g_locked && InpDeletePending && OrdersTotal() > 0)
       RemovePendingOrders();
   }
 
@@ -540,7 +598,7 @@ void OnDeinit(const int reason)
 void OnTimer()
   {
    g_lockSeconds += TIMER_SECONDS;
-   if(g_lockSeconds >= MathMax(5, InpLockPollSeconds))
+   if(g_lockSeconds >= LockPollInterval())
      {
       g_lockSeconds = 0;
       CheckLock();
@@ -562,6 +620,20 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
                         const MqlTradeRequest &request,
                         const MqlTradeResult &result)
   {
+   // Polling is slow while locked, so a resting order must not wait for it: a
+   // limit order placed on a locked day is removed the moment the terminal
+   // reports it. Deleting it here is also what lets the five-minute poll be safe.
+   if(trans.type == TRADE_TRANSACTION_ORDER_ADD)
+     {
+      if(g_locked && InpEnforceLock && InpDeletePending && trans.order > 0 &&
+         trans.order_state == ORDER_STATE_PLACED)
+        {
+         if(g_trade.OrderDelete(trans.order))
+            PrintFormat("Daily stop: deleted pending order %I64u.", trans.order);
+        }
+      return;
+     }
+
    if(trans.type != TRADE_TRANSACTION_DEAL_ADD)
       return;
    if(trans.position == 0)

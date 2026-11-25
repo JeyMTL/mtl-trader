@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+
 /// A hue/saturation wheel with a brightness slider.
 ///
 /// The chart's candle colours used to be a fixed ten-swatch palette, which is a
@@ -99,8 +101,11 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
   Widget build(BuildContext context) {
     final color = _hsv.toColor();
     return AlertDialog(
-      backgroundColor: const Color(0xFF12151C),
-      title: Text(widget.title, style: const TextStyle(fontSize: 16)),
+      backgroundColor: AppColors.surface,
+      title: Text(
+        widget.title,
+        style: TextStyle(fontSize: 16, color: AppColors.text),
+      ),
       contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       content: SingleChildScrollView(
         child: Column(
@@ -131,19 +136,19 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF333B4B)),
+                    border: Border.all(color: AppColors.borderStrong),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     colorToHex(color),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.4,
                       fontFamily: 'JetBrainsMono',
-                      color: Color(0xFFEDF0F5),
+                      color: AppColors.text,
                     ),
                   ),
                 ),
@@ -152,10 +157,10 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.brightness_6_outlined,
                   size: 16,
-                  color: Color(0xFF6B7280),
+                  color: AppColors.faint,
                 ),
                 Expanded(
                   child: Slider(
@@ -183,8 +188,8 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: quick.toARGB32() == color.toARGB32()
-                                ? Colors.white
-                                : const Color(0xFF333B4B),
+                                ? AppColors.text
+                                : AppColors.borderStrong,
                             width: quick.toARGB32() == color.toARGB32() ? 2 : 1,
                           ),
                         ),

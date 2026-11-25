@@ -40,7 +40,7 @@ invalidates the old one immediately — update the EA inputs and reattach.
 | `InpDeletePending` | `true` | Delete resting orders while locked. |
 | `InpCloseNewFills` | `true` | Close a position opened while locked. |
 | `InpDeviationPoints` | `30` | Slippage allowed on that close. |
-| `InpLockPollSeconds` | `30` | How often the EA asks the server (minimum 5). |
+| `InpLockPollSeconds` | `30` | How often the EA asks the server while the day is open (minimum 5). |
 | `InpUnreachableGraceMinutes` | `5` | After this long offline, release the lock. |
 
 ## How sync behaves
@@ -56,15 +56,24 @@ invalidates the old one immediately — update the EA inputs and reattach.
   sync as a safety net and a full reconcile every 30 minutes.
 - A failed batch does not advance the cursor, so the next poll retries it.
 
-## Hard lock limits (read this)
+## What the guard can and cannot do (read this)
 
-MQL5 cannot refuse a manual terminal click. The EA enforces what a client-side
-program can:
+Both lock modes behave the same in the terminal. MQL5 cannot refuse a manual
+terminal click, so the guard does what a client-side program can:
 
 - **pending orders** are deleted while locked, so a resting limit/stop cannot
-  fill into a locked day;
+  fill into a locked day — on the order event itself, and again on each poll;
 - **a market order that fills** is closed immediately, which pays the spread and
   any slippage and is damage control, not prevention.
+
+While a **hard** lock is active the EA slows its server poll from 30 seconds to
+five minutes: the lock cannot be lifted before the day ends, so the answer cannot
+change, and the five-minute check is what catches the one thing that does move it
+(a timezone change that moves the day end). A soft lock keeps the normal poll,
+because the trader can lift it from the journal at any moment and the guard should
+stop acting within seconds of that. A terminal and server whose clocks disagree by
+more than two minutes also fall back to the normal poll, since the day end can no
+longer be trusted.
 
 Only a broker-side block, or an execution EA that checks `MtlOrderAllowed()`
 before sending, prevents the order outright. If the server cannot be reached the

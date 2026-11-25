@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mtl_trader_mobile/models/models.dart';
 import 'package:mtl_trader_mobile/services/alerts.dart';
 
 /// The journal reminder is one instant a day, stored as minutes past UTC

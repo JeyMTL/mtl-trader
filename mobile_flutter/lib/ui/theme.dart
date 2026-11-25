@@ -67,23 +67,24 @@ class AppPalette {
     faint: Color(0xFF6B7280),
   );
 
-  /// Soft, low-contrast light theme: paper-grey background, white cards, and a
-  /// deeper gold so the accent stays readable on white.
+  /// Warm paper rather than generic white: ivory ground, cream cards, and a
+  /// deeper brass so the light theme still reads as the same desk as Dark.
+  /// A cool-grey light mode looked like a different app wearing the gold.
   static const AppPalette light = AppPalette(
     id: 'light',
-    background: Color(0xFFF4F6F9),
-    surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFEDF0F5),
-    border: Color(0xFFDCE1E9),
-    borderStrong: Color(0xFFC2C9D6),
-    primary: Color(0xFF9A6E1F),
+    background: Color(0xFFF6F2E9),
+    surface: Color(0xFFFFFCF5),
+    surfaceAlt: Color(0xFFEEE8DA),
+    border: Color(0xFFDED5C3),
+    borderStrong: Color(0xFFC8BBA2),
+    primary: Color(0xFF8A6520),
     primaryLight: Color(0xFF7C5814),
     ink: Color(0xFFFFFFFF),
-    success: Color(0xFF0F7A57),
-    danger: Color(0xFFB93441),
-    text: Color(0xFF12161F),
-    muted: Color(0xFF5A6372),
-    faint: Color(0xFF8A94A3),
+    success: Color(0xFF157A50),
+    danger: Color(0xFFB23A45),
+    text: Color(0xFF17140F),
+    muted: Color(0xFF625B4E),
+    faint: Color(0xFF8C8171),
   );
 
   /// The cool alternative to brass: navy surfaces with an ice accent, for a

@@ -1448,7 +1448,7 @@ abstract class AppLocalizations {
   /// No description provided for @accountStopHard.
   ///
   /// In en, this message translates to:
-  /// **'After the stop, the journal locks and the MT5 EA refuses orders. It clears at the start of your next trading day — a hard stop cannot be lifted.'**
+  /// **'After the stop, the journal locks and the MT5 guard removes resting orders and closes any position opened after it. It clears at the start of your next trading day — a hard stop cannot be lifted.'**
   String get accountStopHard;
 
   /// No description provided for @accountStopOff.
@@ -1544,13 +1544,13 @@ abstract class AppLocalizations {
   /// No description provided for @rulesSoftBlurb.
   ///
   /// In en, this message translates to:
-  /// **'MT5 freezes on this phone. The journal stays open.'**
+  /// **'MT5 is covered on this phone. The journal stays open.'**
   String get rulesSoftBlurb;
 
   /// No description provided for @rulesHardBlurb.
   ///
   /// In en, this message translates to:
-  /// **'The journal locks and the MT5 EA refuses orders until tomorrow. No reset.'**
+  /// **'The journal locks and the MT5 guard removes resting orders until tomorrow. No reset.'**
   String get rulesHardBlurb;
 
   /// No description provided for @rulesSessions.
@@ -1754,7 +1754,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockHardBody.
   ///
   /// In en, this message translates to:
-  /// **'Your MT5 sync EA is refusing orders until the day rolls over. Pending orders are removed while locked, and a new fill is closed immediately.'**
+  /// **'Your MT5 guard removes resting orders while the day is locked and closes any position opened after the stop. It cannot stop a manual market order — only your broker can.'**
   String get lockHardBody;
 
   /// No description provided for @lockHardBody2.
@@ -1766,13 +1766,13 @@ abstract class AppLocalizations {
   /// No description provided for @lockUnfreezeToday.
   ///
   /// In en, this message translates to:
-  /// **'Unfreeze today'**
+  /// **'Lift the stop'**
   String get lockUnfreezeToday;
 
   /// No description provided for @lockUnfreezing.
   ///
   /// In en, this message translates to:
-  /// **'Unfreezing…'**
+  /// **'Lifting…'**
   String get lockUnfreezing;
 
   /// No description provided for @lockGreenDay.
@@ -1802,7 +1802,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockSoftFrozen.
   ///
   /// In en, this message translates to:
-  /// **'Soft lock · MT5 frozen'**
+  /// **'Soft lock · guard active'**
   String get lockSoftFrozen;
 
   /// No description provided for @lockFreezerOff.
@@ -1814,7 +1814,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockUnfreeze.
   ///
   /// In en, this message translates to:
-  /// **'Unfreeze'**
+  /// **'Lift the stop'**
   String get lockUnfreeze;
 
   /// No description provided for @lockA11yService.
@@ -1880,13 +1880,13 @@ abstract class AppLocalizations {
   /// No description provided for @lockDialogTitle.
   ///
   /// In en, this message translates to:
-  /// **'Unfreeze MT5'**
+  /// **'Lift the stop — once today'**
   String get lockDialogTitle;
 
   /// No description provided for @lockDialogBody.
   ///
   /// In en, this message translates to:
-  /// **'One lift a day. The EA releases the freeze on its next poll and your reason is recorded on today. The stop re-arms on the trades you take after this, with the same budget — lose that too and the day stays closed.'**
+  /// **'Saving your reason reopens the day, and the guard stops removing orders on its next poll. It is a grace run, not a reset: the stop re-arms on the trades you take after this, with the same budget — lose that too and the day stays closed.'**
   String get lockDialogBody;
 
   /// No description provided for @lockReasonHint.

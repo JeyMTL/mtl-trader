@@ -9,7 +9,7 @@ import { authedFetch } from '@/lib/api'
 import { SetupMatrix } from '@/components/setup-matrix'
 import { ExcursionCard } from '@/components/excursion-card'
 import type { CoachInsight } from '@/lib/ai/types'
-import { axisProps, gridProps, useChartPalette } from '@/lib/chart-theme'
+import { axisProps, gridProps, paddedDomain, useChartPalette } from '@/lib/chart-theme'
 import { hourlySeries, sessionPeriod, timeEdgeReport, type EdgePeriod } from '@/lib/edge-window'
 import { matchStrategyByLabel } from '@/lib/backtest/strategies'
 import {
@@ -215,6 +215,11 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
     [equity, depositsTotal]
   )
 
+  const equityDomain = useMemo(
+    () => paddedDomain(equityData.map((point) => point.balance)),
+    [equityData]
+  )
+
   const maxDrawdown = useMemo(() => {
     let peak = depositsTotal
     let worst = 0
@@ -235,6 +240,10 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
   const hourChart = useMemo(() => hourlySeries(timeStats), [timeStats])
   const sessionRows = useMemo(() => (timeStats.sessions ?? []).map(sessionPeriod), [timeStats.sessions])
   const hasTimeSamples = hourChart.some((row) => row.trades > 0)
+  const hasRankedEdge = Boolean(
+    edge.bestHour || edge.worstHour || edge.bestSession || edge.worstSession
+  )
+  const timedTrades = hourChart.reduce((sum, row) => sum + row.trades, 0)
 
   const symbolData = useMemo(
     () =>
@@ -562,12 +571,23 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
 
         {hasTimeSamples ? (
           <>
-            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <EdgeCard title="Most profitable hour" period={edge.bestHour} tone="pos" icon={TrendingUp} />
-              <EdgeCard title="Most losses" period={edge.worstHour} tone="neg" icon={TrendingDown} />
-              <EdgeCard title="Best session" period={edge.bestSession} tone="pos" icon={TrendingUp} />
-              <EdgeCard title="Weakest session" period={edge.worstSession} tone="neg" icon={TrendingDown} />
-            </div>
+            {hasRankedEdge ? (
+              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <EdgeCard title="Most profitable hour" period={edge.bestHour} tone="pos" icon={TrendingUp} />
+                <EdgeCard title="Most losses" period={edge.worstHour} tone="neg" icon={TrendingDown} />
+                <EdgeCard title="Best session" period={edge.bestSession} tone="pos" icon={TrendingUp} />
+                <EdgeCard title="Weakest session" period={edge.worstSession} tone="neg" icon={TrendingDown} />
+              </div>
+            ) : (
+              <div className="mt-4 flex flex-col gap-1 rounded-lg border border-border bg-surface-light/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs font-medium text-gray-300">
+                  {timedTrades} timed {timedTrades === 1 ? 'trade' : 'trades'} logged
+                </p>
+                <p className="text-xs text-gray-500">
+                  A window needs {edge.minTrades} trades before it can be ranked.
+                </p>
+              </div>
+            )}
 
             <div className="mt-5 h-[220px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -706,9 +726,23 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
               </defs>
               <CartesianGrid {...gridProps(palette)} />
               <XAxis {...axisProps(palette)} dataKey="day" tickFormatter={(value: string) => value.slice(5)} />
-              <YAxis {...axisProps(palette)} tickFormatter={(v) => `$${v}`} />
+              <YAxis
+                {...axisProps(palette)}
+                domain={equityDomain}
+                tickFormatter={(v) => `$${v}`}
+              />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: palette.grid }} />
-              <Area type="monotone" dataKey="balance" stroke={totalPnl >= 0 ? palette.profit : palette.loss} fill={`url(#${eqFillId})`} strokeWidth={2} name="Balance" />
+              <Area
+                type="monotone"
+                dataKey="balance"
+                stroke={totalPnl >= 0 ? palette.profit : palette.loss}
+                fill={`url(#${eqFillId})`}
+                strokeWidth={2}
+                name="Balance"
+                dot={equityData.length <= 12
+                  ? { r: 2.6, strokeWidth: 0, fill: totalPnl >= 0 ? palette.profit : palette.loss }
+                  : false}
+              />
             </AreaChart>
           </ResponsiveContainer>
           </div>

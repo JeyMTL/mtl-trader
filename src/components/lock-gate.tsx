@@ -16,10 +16,10 @@ import type { DayStateResponse } from '@/lib/daily-stop'
  * form to get around the gate. This is the whole app, which is the point — a
  * rule you have to walk past is a rule you will.
  *
- * Soft mode does not render this. There the guard EA freezes MT5 while the
- * journal stays usable, and a slim notice offers the same written override the
- * Day Over card uses. A hard lock has no in-app release: the EA enforces it and
- * offering a bypass would make it decorative.
+ * Soft mode does not render this. There the guard clears resting orders in MT5
+ * while the journal stays usable, and a slim notice offers the same written
+ * lift the Day Over card uses. A hard lock has no in-app release: the guard
+ * applies it and offering a bypass would make it decorative.
  */
 
 function resetLabel(endIso: string, now: Date): string {
@@ -117,7 +117,7 @@ export default function LockGate() {
       })
       const body = (await response.json()) as { error?: string }
       if (!response.ok) {
-        setError(body.error ?? 'Could not unfreeze. Try again.')
+        setError(body.error ?? 'Could not lift the stop. Try again.')
         return
       }
       // A full reload, not just this gate's state: the Day Over card and the
@@ -133,7 +133,7 @@ export default function LockGate() {
 
   if (!data || !active) return null
 
-  // Soft freezes MT5, not the journal: a usable notice, never a wall.
+  // Soft acts in MT5, not on the journal: a usable notice, never a wall.
   if (!hard) return <SoftLockBanner data={data} />
 
   // Billing and account deletion must not be held hostage by a trading rule.
@@ -221,8 +221,9 @@ export default function LockGate() {
         {hard && (
           <div className="mt-6 rounded-xl border border-border bg-surface p-4">
             <p className="text-xs leading-relaxed text-gray-400">
-              Your MT5 sync EA is refusing orders until the day rolls over. Pending orders are
-              removed while locked, and a new fill is closed immediately. A manual market order can
+              Your MT5 guard removes resting orders while the day is locked and closes any
+              position opened after the stop. It cannot stop a manual market order — only your
+              broker can. A manual market order can
               still fill before any EA sees it — only the broker can stop that click.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-gray-500">
@@ -247,7 +248,7 @@ export default function LockGate() {
                 onClick={() => setUnlockOpen(true)}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold text-white transition-colors hover:border-gray-600"
               >
-                <Unlock className="h-4 w-4" /> Unfreeze today
+                <Unlock className="h-4 w-4" /> Lift the stop
               </button>
             ) : (
               <div className="rounded-xl border border-border bg-surface p-4">
@@ -275,7 +276,7 @@ export default function LockGate() {
                     className="btn btn-primary flex-1 px-3 py-2 text-xs disabled:opacity-50"
                   >
                     {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                    {saving ? 'Unfreezing…' : 'Unfreeze and keep trading'}
+                    {saving ? 'Lifting…' : 'Lift and keep trading'}
                   </button>
                   <button
                     type="button"
@@ -323,7 +324,7 @@ export default function LockGate() {
 }
 
 /**
- * The soft lock is an MT5 freeze, not a journal freeze. The notice stays out of
+ * The soft lock acts in MT5, not on the journal. The notice stays out of
  * the way but keeps the override one tap away, and the reason lands on the same
  * `trading_days` row the Day Over card writes.
  */
@@ -348,7 +349,7 @@ function SoftLockBanner({ data }: { data: DayStateResponse }) {
       })
       const body = (await response.json()) as { error?: string }
       if (!response.ok) {
-        setError(body.error ?? 'Could not unfreeze. Try again.')
+        setError(body.error ?? 'Could not lift the stop. Try again.')
         return
       }
       window.location.reload()
@@ -365,7 +366,7 @@ function SoftLockBanner({ data }: { data: DayStateResponse }) {
         <div className="mx-auto flex max-w-md items-center gap-3 rounded-xl border border-warning/40 bg-surface/95 px-3 py-2.5 shadow-lg backdrop-blur">
           <Lock className="h-4 w-4 shrink-0 text-warning" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-white">Soft lock · MT5 is frozen</p>
+            <p className="text-xs font-semibold text-white">Soft lock · guard active</p>
             <p className="truncate text-[11px] text-gray-400">
               {limitReached
                 ? `${formatCurrency(state.lossUsed)} of ${formatCurrency(state.lossLimit)}`
@@ -378,7 +379,7 @@ function SoftLockBanner({ data }: { data: DayStateResponse }) {
             onClick={() => setOpen(true)}
             className="shrink-0 rounded-lg border border-warning/40 px-2.5 py-1 text-[11px] font-medium text-warning transition-colors hover:bg-warning/10"
           >
-            Unfreeze
+            Lift
           </button>
         </div>
       </div>
@@ -386,10 +387,11 @@ function SoftLockBanner({ data }: { data: DayStateResponse }) {
       {open ? (
         <div className="fixed inset-0 z-[121] flex items-end justify-center bg-black/50 p-4 sm:items-center">
           <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-4">
-            <p className="text-sm font-semibold text-white">Unfreeze MT5</p>
+            <p className="text-sm font-semibold text-white">Lift the stop — once today</p>
             <p className="mt-1 text-xs leading-relaxed text-gray-500">
-              The EA releases the freeze on its next poll. Write down why — the reason is
-              recorded on today, not hidden.
+              Saving your reason reopens the day, and the guard stops removing orders on its
+              next poll. It is a grace run, not a reset: the stop re-arms on the trades you take
+              after this, with the same budget. Lose that too and the day stays closed.
             </p>
             <textarea
               value={reason}
@@ -409,7 +411,7 @@ function SoftLockBanner({ data }: { data: DayStateResponse }) {
                 className="btn btn-primary flex-1 px-3 py-2 text-xs disabled:opacity-50"
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
-                {saving ? 'Unfreezing…' : 'Unfreeze MT5'}
+                {saving ? 'Lifting…' : 'Lift the stop'}
               </button>
               <button
                 type="button"

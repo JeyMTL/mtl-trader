@@ -18,7 +18,7 @@ import tempfile
 import types
 import unittest
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Imported by the supervisor at module import time.
@@ -453,6 +453,73 @@ class TradeTimeTests(unittest.TestCase):
         self.assertEqual(trade["open_time"], "2026-11-20T14:00:00+00:00")
 
 
+class HistoryClockTests(unittest.TestCase):
+    """History reads are bounded by the broker's clock, not UTC."""
+
+    def setUp(self):
+        self.saved = sup.mt5
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        sup.mt5 = self.saved
+
+    def test_every_broker_offset_is_shifted_from_utc(self):
+        for offset in (0, 7200, 10800, 19800, -14400):
+            with self.subTest(offset=offset):
+                windows = []
+
+                def history_deals_get(start, end):
+                    windows.append((start, end))
+                    return ()
+
+                sup.mt5 = types.SimpleNamespace(
+                    history_deals_get=history_deals_get
+                )
+                start = datetime.now(timezone.utc)
+
+                sup.deals_between(start, start + timedelta(minutes=30), offset)
+
+                self.assertEqual(
+                    (windows[0][0] - start).total_seconds(), offset
+                )
+                self.assertEqual(
+                    (windows[0][1] - windows[0][0]).total_seconds(), 1800
+                )
+
+    def test_position_trades_reads_recent_closes_on_the_broker_clock(self):
+        close_server = int(
+            (datetime.now(timezone.utc) + timedelta(seconds=7200)).timestamp()
+        )
+        opened = Deal(7, 0, 0.10, 1.10000, close_server - 300)
+        closed = Deal(7, 1, 0.10, 1.10100, close_server, ticket=2)
+        windows = []
+
+        def history_deals_get(start=None, end=None, position=None):
+            if position is not None:
+                return [opened, closed]
+            windows.append((start, end))
+            return [closed]
+
+        sup.mt5 = types.SimpleNamespace(
+            history_deals_get=history_deals_get,
+            history_orders_get=lambda position=None: (),
+            symbol_info=lambda symbol: types.SimpleNamespace(digits=5),
+        )
+
+        before = datetime.now(timezone.utc)
+        trades = sup.position_trades(
+            before - timedelta(minutes=30), offset=7200
+        )
+        after = datetime.now(timezone.utc)
+
+        self.assertEqual([trade["position_id"] for trade in trades], [7])
+        self.assertEqual(len(windows), 1)
+        start, end = windows[0]
+        # The 30-minute UTC window is shifted forward onto a UTC+2 broker.
+        self.assertGreaterEqual((start - before).total_seconds(), 5398)
+        self.assertLessEqual((end - after).total_seconds(), 7202)
+
+
 class ServerOffsetTests(unittest.TestCase):
     def setUp(self):
         self.saved = sup.mt5
@@ -475,6 +542,31 @@ class ServerOffsetTests(unittest.TestCase):
         sup.mt5 = types.SimpleNamespace(symbol_info_tick=lambda symbol: next(answers, None))
 
         self.assertEqual(sup.measure_server_offset(pause=0), 7200)
+
+    def test_a_suffixed_symbol_still_calibrates_the_clock(self):
+        now = int(sup.time.time())
+        answers = iter([self.tick(now + 7200), self.tick(now + 7203)])
+        sup.mt5 = types.SimpleNamespace(
+            symbols_get=lambda: [types.SimpleNamespace(name="EURUSDm")],
+            symbol_info_tick=lambda symbol: next(answers, None),
+        )
+
+        self.assertEqual(sup.measure_server_offset(pause=0), 7200)
+
+    def test_an_unselected_symbol_is_selected_before_calibrating(self):
+        now = int(sup.time.time())
+        answers = iter(
+            [None, self.tick(now + 7200), self.tick(now + 7203)]
+        )
+        selected = []
+        sup.mt5 = types.SimpleNamespace(
+            symbols_get=lambda: [types.SimpleNamespace(name="EURUSDm")],
+            symbol_select=lambda symbol, enable: selected.append((symbol, enable)),
+            symbol_info_tick=lambda symbol: next(answers, None),
+        )
+
+        self.assertEqual(sup.measure_server_offset(pause=0), 7200)
+        self.assertEqual(selected, [("EURUSDm", True)])
 
     def test_a_frozen_tick_is_not_an_offset(self):
         frozen = self.tick(int(sup.time.time()) + 7200)
@@ -527,6 +619,258 @@ class FirstSyncHistoryTests(unittest.TestCase):
         )
 
         self.assertEqual(total, -1)
+
+    def test_the_wait_window_is_read_on_the_broker_clock(self):
+        windows = []
+
+        def history_deals_total(start, end):
+            windows.append((start, end))
+            return 7
+
+        sup.mt5 = types.SimpleNamespace(history_deals_total=history_deals_total)
+        start = datetime.now(timezone.utc)
+
+        total = sup.history_total(start, wait_seconds=30, offset=7200)
+
+        self.assertEqual(total, 7)
+        self.assertGreaterEqual((windows[0][0] - start).total_seconds(), 7199)
+
+
+class BackfillTests(unittest.TestCase):
+    """A first sync reads the year a month at a time, and keeps trying.
+
+    On the XM account a single year-long read answered with the opening deposit
+    and no trades, so the sync reported 0 positions and the cursor moved past
+    three real closes. These tests pin the read that replaced it.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.saved = {
+            name: getattr(sup, name)
+            for name in (
+                "mt5",
+                "BACKFILL_DIR",
+                "server_offset",
+                "push",
+                "mark",
+                "HISTORY_WAIT_SECONDS",
+            )
+        }
+        sup.BACKFILL_DIR = Path(self.tmp.name) / "backfill"
+        sup.HISTORY_WAIT_SECONDS = 0
+        sup.server_offset = lambda row: 0
+        self.pushed = []
+
+        def push(user_id, trades):
+            self.pushed.append(list(trades))
+            return len(trades)
+
+        sup.push = push
+        sup.mark = lambda *args, **kwargs: None
+        self.windows = []
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        for name, value in self.saved.items():
+            setattr(sup, name, value)
+
+    def terminal(self, groups):
+        """A terminal whose cache answers only narrow, recent reads.
+
+        That is the behaviour that lost the XM block: a wide range arrives empty.
+        """
+        wides = []
+
+        def history_deals_get(start=None, end=None, position=None):
+            if position is not None:
+                return groups.get(position, [])
+            self.windows.append((start, end))
+            if (end - start) > timedelta(days=sup.BACKFILL_CHUNK_DAYS + 1):
+                wides.append((start, end))
+                return []
+            return [
+                deal
+                for group in groups.values()
+                for deal in group
+                if start <= datetime.fromtimestamp(deal.time, timezone.utc) < end
+            ]
+
+        def history_deals_total(start, end):
+            return sum(len(group) for group in groups.values())
+
+        return types.SimpleNamespace(
+            history_deals_get=history_deals_get,
+            history_deals_total=history_deals_total,
+            history_orders_get=lambda position=None: (),
+            symbol_info=lambda symbol: types.SimpleNamespace(digits=5),
+            last_error=lambda: (0, "stub"),
+        )
+
+    def position(self, closed_days_ago):
+        close = int(
+            (datetime.now(timezone.utc) - timedelta(days=closed_days_ago)).timestamp()
+        )
+        opened = Deal(7, 0, 0.01, 1.10000, close - 600)
+        closed = Deal(7, 1, 0.01, 1.10100, close, ticket=2)
+        return [opened, closed]
+
+    def test_an_old_close_a_wide_read_misses_is_backfilled(self):
+        sup.mt5 = self.terminal({7: self.position(200)})
+
+        trades = sup.backfill_trades(
+            datetime.now(timezone.utc) - timedelta(days=365), wait_seconds=0
+        )
+
+        self.assertEqual([trade["position_id"] for trade in trades], [7])
+        # A year is twelve-ish month-sized reads, never one wide one.
+        self.assertGreaterEqual(len(self.windows), 12)
+        for start, end in self.windows:
+            self.assertLessEqual((end - start).days, sup.BACKFILL_CHUNK_DAYS)
+
+    def test_the_newest_month_is_read_first(self):
+        sup.mt5 = self.terminal({})
+
+        sup.backfill_trades(
+            datetime.now(timezone.utc) - timedelta(days=365), wait_seconds=0
+        )
+
+        first_start, first_end = self.windows[0]
+        last_start, _ = self.windows[-1]
+        self.assertGreater(first_start, last_start)
+        self.assertLess(datetime.now(timezone.utc) - first_end, timedelta(minutes=1))
+
+    def first_sync(self):
+        row = {
+            "user_id": "u1",
+            "server": "XMGlobal-MT5 9",
+            "last_sync_at": None,
+        }
+        sup.read_closed(row)
+
+    def test_a_first_sync_leaves_a_marker_to_read_the_year_again(self):
+        sup.mt5 = self.terminal({7: self.position(200)})
+
+        self.first_sync()
+
+        state = json.loads(sup.backfill_path("u1").read_text(encoding="utf-8"))
+        self.assertEqual(state["left"], sup.BACKFILL_PASSES - 1)
+        self.assertEqual(len(self.pushed[-1]), 1)
+
+    def test_a_fresh_cursor_does_not_skip_the_pending_backfill(self):
+        sup.mt5 = self.terminal({7: self.position(200)})
+        self.first_sync()
+        windows_after_first = len(self.windows)
+        row = {
+            "user_id": "u1",
+            "server": "XMGlobal-MT5 9",
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        sup.read_closed(row)
+
+        # Still a year's worth of months, not the one 15-minute cursor window.
+        self.assertGreaterEqual(len(self.windows) - windows_after_first, 12)
+        self.assertEqual(len(self.pushed[-1]), 1)
+
+    def test_a_reconnect_with_a_stale_cursor_still_reads_the_year(self):
+        sup.mt5 = self.terminal({7: self.position(200)})
+
+        sup.read_closed(
+            {
+                "user_id": "u1",
+                "server": "XMGlobal-MT5 9",
+                "status": "pending",
+                "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+        self.assertGreaterEqual(len(self.windows), 12)
+        self.assertEqual(len(self.pushed[-1]), 1)
+
+    def test_the_marker_retires_once_its_passes_are_used(self):
+        sup.mt5 = self.terminal({})
+        row = {"user_id": "u1", "server": "XMGlobal-MT5 9", "last_sync_at": None}
+
+        for _ in range(sup.BACKFILL_PASSES):
+            sup.read_closed(row)
+
+        self.assertEqual(list(Path(sup.BACKFILL_DIR).glob("*.json")), [])
+        windows = len(self.windows)
+
+        sup.read_closed(
+            {
+                **row,
+                "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        # A settled account is read through the cursor again: one window.
+        self.assertEqual(len(self.windows) - windows, 1)
+
+
+class AccountZeroLoginTests(unittest.TestCase):
+    """A terminal that starts without authorising is retried, not reported."""
+
+    def setUp(self):
+        self.saved = {
+            name: getattr(sup, name)
+            for name in (
+                "mt5",
+                "decrypt_credential",
+                "remember_terminal",
+                "warn_if_no_algo_trading",
+            )
+        }
+        sup.decrypt_credential = lambda blob: "secret"
+        sup.remember_terminal = lambda key, path: None
+        sup.warn_if_no_algo_trading = lambda path: None
+        self.calls = []
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        for name, value in self.saved.items():
+            setattr(sup, name, value)
+
+    def terminal(self, logins):
+        answers = list(logins)
+
+        def initialize(path=None, portable=False, timeout=0, **session):
+            self.calls.append((path, session.get("login")))
+            return True
+
+        def account_info():
+            return types.SimpleNamespace(login=answers.pop(0) if answers else None)
+
+        return types.SimpleNamespace(
+            initialize=initialize,
+            account_info=account_info,
+            shutdown=lambda: True,
+            last_error=lambda: (0, "ok"),
+        )
+
+    def row(self):
+        return {
+            "user_id": "u1",
+            "account_login": 337339457,
+            "server": "XMGlobal-MT5 9",
+            "credential_cipher": "v1:x:y:z",
+        }
+
+    def test_account_zero_is_retried_on_the_same_terminal(self):
+        sup.mt5 = self.terminal([0, 337339457])
+
+        sup.open_session(self.row(), "C:/fleet/slot-1/terminal64.exe")
+
+        self.assertEqual(len(self.calls), 2)
+
+    def test_another_customers_account_is_still_refused(self):
+        sup.mt5 = self.terminal([999, 999])
+
+        with self.assertRaises(RuntimeError):
+            sup.open_session(self.row(), "C:/fleet/slot-1/terminal64.exe")
+
+        self.assertEqual(len(self.calls), 1)
 
 
 class RetiredInstallTests(unittest.TestCase):
@@ -1121,6 +1465,40 @@ class SoftLockTests(unittest.TestCase):
         self.assertEqual(sup.enforce_lock(self.row()), 0)
         self.assertEqual(self.asked, [])
         self.assertEqual(self.cancelled, [])
+
+
+class CapacityTests(unittest.TestCase):
+    """A fleet must not spawn more terminals than the host can hold.
+
+    Spawning past the budget does not degrade gracefully: the allocation fails
+    inside OpenBLAS, the supervisor exits, and the wrapper restarts it into the
+    same wall. On the 8 GB VPS that was a crash loop with every account offline.
+    """
+
+    def test_fits_the_measured_host(self):
+        # 30 requested, 4.3 GB free, 900 MB reserved, 240 MB a slot.
+        self.assertEqual(sup.capacity_slots(30, available_mb=4279), 14)
+
+    def test_never_exceeds_what_was_asked_for(self):
+        self.assertEqual(sup.capacity_slots(4, available_mb=64_000), 4)
+
+    def test_always_keeps_one_slot(self):
+        # A host with no headroom still syncs, slowly, instead of not at all.
+        self.assertEqual(sup.capacity_slots(30, available_mb=500), 1)
+
+    def test_sequential_mode_stays_sequential(self):
+        self.assertEqual(sup.capacity_slots(0, available_mb=64_000), 0)
+
+    def test_unreadable_memory_trusts_the_configuration(self):
+        self.addCleanup(setattr, sup, "available_memory_mb", sup.available_memory_mb)
+        sup.available_memory_mb = lambda: None
+
+        self.assertEqual(sup.capacity_slots(30), 30)
+
+    def test_a_bigger_slot_estimate_shrinks_the_fleet(self):
+        self.assertEqual(
+            sup.capacity_slots(30, available_mb=4279, slot_mb=400), 8
+        )
 
 
 if __name__ == "__main__":

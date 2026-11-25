@@ -185,8 +185,7 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           SectionTitle(
             title: _l10n.accountDailyStop,
-            subtitle:
-                _l10n.accountDailyStopBody,
+            subtitle: _l10n.accountDailyStopBody,
           ),
           const SizedBox(height: 10),
           if (_lockLoading)
@@ -1028,18 +1027,22 @@ class _AccountScreenState extends State<AccountScreen> {
                     children: [
                       SectionTitle(
                         title: _l10n.accountAppearance,
-                        subtitle:
-                            _l10n.accountAppearanceBody,
+                        subtitle: _l10n.accountAppearanceBody,
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          for (final theme in AppTheme.values) ...[
-                            _ThemeChoice(theme: theme),
-                            if (theme != AppTheme.values.last)
-                              const SizedBox(width: 6),
-                          ],
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          const gap = 8.0;
+                          final width = (constraints.maxWidth - gap) / 2;
+                          return Wrap(
+                            spacing: gap,
+                            runSpacing: gap,
+                            children: [
+                              for (final theme in AppTheme.values)
+                                _ThemeChoice(theme: theme, width: width),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -1054,8 +1057,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     children: [
                       SectionTitle(
                         title: _l10n.accountHelp,
-                        subtitle:
-                            _l10n.accountHelpBody,
+                        subtitle: _l10n.accountHelpBody,
                       ),
                       const SizedBox(height: 10),
                       // No address is shown. The button hands the mail app the
@@ -1210,12 +1212,15 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-/// One of the four appearance options. The root rebuilds the tree when the
-/// theme changes, so this needs no local state.
+/// One of the four appearance options. Each card shows the theme's own
+/// palette, so Light is visibly paper and Blue is visibly navy even while the
+/// app is currently dark. The root rebuilds the tree when the theme changes,
+/// so this needs no local state.
 class _ThemeChoice extends StatelessWidget {
-  const _ThemeChoice({required this.theme});
+  const _ThemeChoice({required this.theme, required this.width});
 
   final AppTheme theme;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -1233,39 +1238,86 @@ class _ThemeChoice extends StatelessWidget {
       AppTheme.blue => Icons.water_drop_outlined,
       AppTheme.system => Icons.brightness_auto_outlined,
     };
+    final preview = switch (theme) {
+      AppTheme.dark => AppPalette.dark,
+      AppTheme.light => AppPalette.light,
+      AppTheme.blue => AppPalette.blue,
+      AppTheme.system =>
+        ThemeController.instance.isLight ? AppPalette.light : AppPalette.dark,
+    };
 
-    return Expanded(
-      child: InkWell(
-        onTap: () => ThemeController.instance.setTheme(theme),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color:
-                active ? AppColors.primary.withAlpha(20) : AppColors.surfaceAlt,
-            border: Border.all(
-              color: active ? AppColors.primary : AppColors.border,
+    return SizedBox(
+      width: width,
+      child: Semantics(
+        button: true,
+        selected: active,
+        label: label,
+        child: InkWell(
+          onTap: () => ThemeController.instance.setTheme(theme),
+          borderRadius: BorderRadius.circular(10),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOut,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.primary.withAlpha(16)
+                  : AppColors.surfaceAlt,
+              border: Border.all(
+                color: active ? AppColors.primary : AppColors.border,
+              ),
+              borderRadius: BorderRadius.circular(10),
             ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: active ? AppColors.primary : AppColors.muted,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active ? AppColors.primary : AppColors.muted,
-                  fontSize: kMinLabelSize,
-                  fontWeight: FontWeight.w700,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 50,
+                  width: double.infinity,
+                  child: _ThemeSwatch(
+                    palette: preview,
+                    split: theme == AppTheme.system,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 7),
+                Row(
+                  children: [
+                    Icon(
+                      icon,
+                      size: 14,
+                      color: active ? AppColors.primary : AppColors.muted,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: active ? AppColors.primary : AppColors.muted,
+                          fontSize: kMinLabelSize,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (active)
+                      Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check,
+                          size: 9,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1273,3 +1325,111 @@ class _ThemeChoice extends StatelessWidget {
   }
 }
 
+/// A miniature journal rendered in one palette. Deliberately uses the preview
+/// palette rather than [AppColors], so the non-active themes still show their
+/// own ground, surface and accent.
+class _ThemeSwatch extends StatelessWidget {
+  const _ThemeSwatch({required this.palette, this.split = false});
+
+  final AppPalette palette;
+  final bool split;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(7),
+      child: split
+          ? Row(
+              children: [
+                Expanded(child: _MiniJournal(palette: AppPalette.dark)),
+                Expanded(child: _MiniJournal(palette: AppPalette.light)),
+              ],
+            )
+          : _MiniJournal(palette: palette),
+    );
+  }
+}
+
+class _MiniJournal extends StatelessWidget {
+  const _MiniJournal({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(Color color, double width, double height) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(1),
+        ),
+      );
+    }
+
+    return Container(
+      color: palette.background,
+      padding: const EdgeInsets.fromLTRB(7, 7, 7, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              bar(palette.primary, 18, 3),
+              const Spacer(),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: palette.success,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(5, 5, 5, 4),
+              decoration: BoxDecoration(
+                color: palette.surface,
+                border: Border.all(color: palette.border),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  bar(palette.text, 26, 2.5),
+                  const SizedBox(height: 3),
+                  bar(palette.muted, 36, 2),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      for (final color in [
+                        palette.success,
+                        palette.danger,
+                        palette.primary,
+                        palette.success,
+                      ])
+                        Container(
+                          width: 5,
+                          height: 5,
+                          margin: const EdgeInsets.only(right: 3),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

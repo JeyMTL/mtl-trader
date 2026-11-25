@@ -47,6 +47,10 @@ Environment:
                            each; 0 keeps the sequential single-terminal mode)
     MT5_FLEET_DIRS        (needed when FLEET_SIZE > 0 - one directory or
                            terminal64.exe per slot, comma or semicolon separated)
+    SLOT_MEMORY_MB        (default 240 - memory one fleet slot needs once its
+                           terminal is logged in; the fleet is capped to what
+                           the host can hold, not to FLEET_SIZE on faith)
+    MEMORY_RESERVE_MB     (default 900 - headroom kept for Windows and this loop)
     FAILED_RETRY_SECONDS  (default 600 - cooldown before a failed login is retried)
     HISTORY_WAIT_SECONDS  (default 90 - how long a first sync waits for the
                            terminal to finish downloading history)
@@ -118,6 +122,17 @@ FLEET_MIN_HOLD_SECONDS = float(os.environ.get("FLEET_MIN_HOLD_SECONDS", "60"))
 # The claim sorts by least recently synced, so a capped host rotates through a
 # backlog instead of serving the same few accounts forever.
 CAPACITY_WARN_SECONDS = 300
+# What one fleet slot costs once its terminal is logged in and holding a chart:
+# the terminal's private bytes plus its worker process. The fleet does not
+# degrade gracefully when a host runs out of memory — the next large allocation
+# fails inside OpenBLAS (numpy, which the MetaTrader5 package imports), the
+# supervisor exits, the wrapper restarts it, and the restart spawns another full
+# fleet until the box is unusable. So `FLEET_SIZE` is a wish and this is the
+# measured budget: a slot is only started if the host can actually hold it.
+SLOT_MEMORY_MB = max(64, int(os.environ.get("SLOT_MEMORY_MB", "240")))
+# Headroom kept for Windows, the RDP session and the supervisor loop itself.
+# Windows does not swap politely when commit runs out; whatever asks next fails.
+MEMORY_RESERVE_MB = max(0, int(os.environ.get("MEMORY_RESERVE_MB", "900")))
 _capacity_warned_at = 0.0
 # With exactly one connected account, the supervisor can stay logged in and
 # poll history, which is the only way to journal a close in seconds without an
@@ -149,6 +164,14 @@ INIT_TIMEOUT_MS = 120_000
 # cursor past it lost real trades permanently, so the first sync waits for the
 # download before it decides anything.
 HISTORY_WAIT_SECONDS = float(os.environ.get("HISTORY_WAIT_SECONDS", "90"))
+# A first sync reads the last year. One year-long `history_deals_get` is answered
+# from whatever the terminal happens to have cached at that moment: right after a
+# login that was the opening deposit and nothing else, so the account looked
+# empty and the cursor moved past three real closes. Ask a month at a time
+# instead, newest first, and give each month a share of the wait so the download
+# has time to land.
+BACKFILL_DAYS = 365
+BACKFILL_CHUNK_DAYS = 30
 
 # Deal and tick times arrive in the *broker's* clock, not UTC: FundedNext is
 # UTC+2 in winter, most brokers are +2 or +3, and the EA already subtracts
@@ -251,6 +274,59 @@ def prioritize_connections(rows):
             row.get("last_sync_at") or "",
         ),
     )
+
+
+def available_memory_mb():
+    """Physical memory Windows reports as free, in MB; None where it cannot say.
+
+    `GlobalMemoryStatusEx` through ctypes rather than psutil: this runs on a
+    stock Windows host with only the requirements.txt packages installed, and
+    adding a dependency for one number is not worth it.
+    """
+    try:
+        import ctypes
+
+        class MemoryStatusEx(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = MemoryStatusEx()
+        status.dwLength = ctypes.sizeof(MemoryStatusEx)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None
+        return int(status.ullAvailPhys // (1024 * 1024))
+    except (AttributeError, OSError, ImportError):
+        return None
+
+
+def capacity_slots(wanted, available_mb=None, slot_mb=None, reserve_mb=None):
+    """How many fleet slots this host can hold, never more than `wanted`.
+
+    Zero means sequential mode and stays zero. One slot is kept even when the
+    arithmetic says none fit: a small host that syncs slowly is more useful than
+    a supervisor that refuses to start, and one terminal usually still fits.
+    Where the memory cannot be read (any non-Windows host, a locked-down
+    process), the configured size stands.
+    """
+    if wanted <= 0:
+        return 0
+    if available_mb is None:
+        available_mb = available_memory_mb()
+    if available_mb is None:
+        return wanted
+    slot = SLOT_MEMORY_MB if slot_mb is None else slot_mb
+    reserve = MEMORY_RESERVE_MB if reserve_mb is None else reserve_mb
+    fits = (available_mb - reserve) // slot
+    return max(1, min(wanted, int(fits)))
 
 
 def shard_of(user_id):
@@ -453,29 +529,34 @@ def build_trade(position_id, offset=0):
     }
 
 
-def position_trades(since, offset=0):
-    """
-    Closed positions changed since `since`, in the shape /api/sync expects.
+def deals_between(start, end, offset=0):
+    """Deals in a **UTC** range, read with the broker's clock.
 
-    The cursor only finds *closing* deals. The full position is then fetched by
-    id, because the opening deal of a trade held for longer than the 15-minute
+    `history_deals_get` compares its bounds with the terminal's server time, not
+    UTC. A server on UTC+2 therefore answered an unshifted 30-minute watch
+    window with trades from two hours earlier. Shift at the boundary, then keep
+    everything outside this function in UTC.
+    """
+    shift = timedelta(seconds=offset)
+    return mt5.history_deals_get(start + shift, end + shift)
+
+
+def deals_to_trades(deals, since, offset=0):
+    """Closed positions from `deals`, keeping only closes after `since`.
+
+    The deal list only names *closing* deals. The full position is then fetched
+    by id, because the opening deal of a trade held for longer than the 15-minute
     overlap is not in the cursor window. Building from the cursor alone silently
     dropped every trade that had been open for more than 15 minutes.
     """
-    now = datetime.now(timezone.utc)
-    window_start = since if since is not None else now - timedelta(days=365)
-    recent = mt5.history_deals_get(window_start, now)
-    if recent is None:
-        raise RuntimeError(f"history_deals_get failed: {mt5.last_error()}")
-
-    closing_ids = {
+    closing = {
         deal.position_id
-        for deal in recent
+        for deal in deals
         if deal.position_id and deal.entry in (1, 2, 3)
     }
 
     trades = []
-    for position_id in closing_ids:
+    for position_id in closing:
         trade = build_trade(position_id, offset)
         if not trade:
             continue
@@ -485,6 +566,61 @@ def position_trades(since, offset=0):
 
     trades.sort(key=lambda item: item["close_time"])
     return trades
+
+
+def backfill_trades(start, offset=0, wait_seconds=None):
+    """Every closed position in [start, now], read a month at a time.
+
+    A single year-long read is not a download request: it returns what the
+    terminal already holds, and right after a login that can be the opening
+    deposit with none of the trades. Measured on a real XM account, that read
+    reported zero positions at 16:28 and the live watcher then journaled a close
+    seconds later. The older block was gone because the cursor had advanced.
+
+    Asking month by month makes the terminal fetch each month, and polling that
+    month's total gives the fetch time to land. Newest months go first: they are
+    the ones the terminal downloads on its own, and the customer notices a
+    missing trade from today long before one from ten months ago.
+    """
+    now = datetime.now(timezone.utc)
+    budget = HISTORY_WAIT_SECONDS if wait_seconds is None else wait_seconds
+    deadline = time.monotonic() + max(0.0, budget)
+    chunk = timedelta(days=BACKFILL_CHUNK_DAYS)
+
+    cursor = now
+    deals = []
+    while cursor > start:
+        begin = max(cursor - chunk, start)
+        left = max(1, int((cursor - start) / chunk) + 1)
+        # Split what is left of the budget over the months still to read, so one
+        # empty month cannot starve the rest of the year.
+        share = max(0.0, deadline - time.monotonic()) / left
+        history_total(begin, share, offset=offset, end=cursor)
+        found = deals_between(begin, cursor, offset)
+        if found is None:
+            raise RuntimeError(f"history_deals_get failed: {mt5.last_error()}")
+        deals.extend(found)
+        cursor = begin
+
+    return deals_to_trades(deals, None, offset)
+
+
+def position_trades(since, offset=0):
+    """
+    Closed positions changed since `since`, in the shape /api/sync expects.
+
+    `since=None` means a first sync or a backfill: the whole year is read in
+    month-sized pieces instead of one query the terminal may answer from a
+    partial cache.
+    """
+    if since is None:
+        now = datetime.now(timezone.utc)
+        return backfill_trades(now - timedelta(days=BACKFILL_DAYS), offset)
+
+    recent = deals_between(since, datetime.now(timezone.utc), offset)
+    if recent is None:
+        raise RuntimeError(f"history_deals_get failed: {mt5.last_error()}")
+    return deals_to_trades(recent, since, offset)
 
 
 def push(user_id, trades):
@@ -679,21 +815,28 @@ def enforce_lock(row):
     return cancelled
 
 
-def history_total(start, wait_seconds, pause=2.0):
+def history_total(start, wait_seconds, pause=2.0, offset=0, end=None):
     """
-    How many deals the terminal holds in [start, now], waiting for a download.
+    How many deals the terminal holds in [start, end] (now by default), waiting
+    for a download.
 
-    `history_deals_total` asks the server, so immediately after a fresh login it
-    answers 0 while the terminal is still fetching that account's history and the
-    real number arrives a second or two later. Treating that 0 as "this account
-    has no trades" advanced `last_sync_at` past the window, and the 15-minute
-    cursor never looked back far enough again: the trades were lost for good.
+    `history_deals_total` compares against the broker's clock, not UTC, so the
+    window is shifted by `offset` before it is sent. Without that shift a server
+    on UTC+2 answers 0 for trades made in the last two hours.
+
+    It asks the server, so immediately after a fresh login it answers 0 while the
+    terminal is still fetching that account's history and the real number arrives
+    a second or two later. Treating that 0 as "this account has no trades"
+    advanced `last_sync_at` past the window, and the 15-minute cursor never
+    looked back far enough again: the trades were lost for good.
     Returns -1 if the terminal cannot answer, which says nothing about the
     account and must not be read as a zero.
     """
+    shift = timedelta(seconds=offset)
     deadline = time.monotonic() + max(0.0, wait_seconds)
+    stop = end or datetime.now(timezone.utc)
     while True:
-        total = mt5.history_deals_total(start, datetime.now(timezone.utc))
+        total = mt5.history_deals_total(start + shift, stop + shift)
         if total > 0 or total < 0:
             return total
         if time.monotonic() >= deadline:
@@ -709,6 +852,36 @@ def load_offset_cache():
     return decoded if isinstance(decoded, dict) else {}
 
 
+OFFSET_SYMBOL_STEMS = ("EURUSD", "XAUUSD", "GBPUSD", "US30", "BTCUSD")
+
+
+def offset_symbols():
+    """Symbols that can calibrate the broker clock on this server.
+
+    Brokers suffix their symbols (`EURUSDm`, `EURUSD.raw`, `XAUUSD#`) and some
+    prop firms only expose indices or crypto. Trying the three exact names was
+    enough for XM and Exness, but on those servers it returned no offset at all,
+    which left the recent-history window on UTC and silently missed closes.
+    """
+    try:
+        names = [symbol.name for symbol in (mt5.symbols_get() or ())]
+    except Exception:  # noqa: BLE001 - calibration is best effort
+        names = []
+
+    exact = [name for name in OFFSET_SYMBOL_STEMS if name in names]
+    variants = [
+        name
+        for name in names
+        if any(name.startswith(stem) for stem in OFFSET_SYMBOL_STEMS)
+        and name not in exact
+    ]
+    candidates = exact + variants[:12]
+    if candidates:
+        return candidates
+    # A server whose symbol list could not be read still gets the common names.
+    return list(OFFSET_SYMBOL_STEMS) if not names else names[:12]
+
+
 def measure_server_offset(pause=3.0):
     """
     Seconds the broker's clock runs ahead of UTC, or None if unknowable.
@@ -719,9 +892,14 @@ def measure_server_offset(pause=3.0):
     apart: only a clock that moves with ours is evidence. Rounded to a quarter
     hour because broker offsets are always whole quarter hours.
     """
-    for symbol in ("EURUSD", "XAUUSD", "GBPUSD"):
+    for symbol in offset_symbols():
         try:
             first = mt5.symbol_info_tick(symbol)
+            if first is None and hasattr(mt5, "symbol_select"):
+                # A suffixed symbol is often absent from Market Watch, and an
+                # unselected symbol can have no tick to measure.
+                mt5.symbol_select(symbol, True)
+                first = mt5.symbol_info_tick(symbol)
             if first is None:
                 continue
             time.sleep(pause)
@@ -1157,19 +1335,25 @@ def open_session(row, terminal=None):
             initialized = initialize_terminal(session, path, portable)
             if initialized:
                 info = mt5.account_info()
-                if info is not None and int(info.login) == login:
+                actual = getattr(info, "login", None)
+                if actual is not None and int(actual) == login:
                     warn_if_no_algo_trading(path)
                     remember_terminal(key, path or "")
                     return
                 attempts.append(
                     (
                         path or "default install",
-                        f"logged in as account {getattr(info, 'login', 'unknown')}"
+                        f"logged in as account {actual if actual is not None else 'unknown'}"
                         f" instead of {login}",
                     )
                 )
                 mt5.shutdown()
-                break  # a different account is not a stale-terminal problem
+                # Account 0 is not another customer's account: it is a terminal
+                # that came up without authorising, which is the cold start this
+                # retry exists for. A real different account is not retried.
+                if actual not in (None, 0):
+                    break
+                continue
             error = mt5.last_error()
             attempts.append((path or "default install", str(error)))
             mt5.shutdown()
@@ -1271,6 +1455,69 @@ def relogin(row):
         return False
 
 
+# Which accounts still owe a full-year read, and how many reads they get. A
+# cold terminal can take minutes to fetch a year, so the marker survives
+# restarts and repeats the read a few times rather than declaring the account
+# empty on the first slow answer.
+#
+# One file per account rather than one shared JSON: fleet slots are separate
+# processes, and two of them doing read-modify-write on the same file loses
+# whichever marker lands last.
+BACKFILL_DIR = Path(__file__).with_name(".backfill")
+BACKFILL_PASSES = 3
+
+
+def backfill_path(user_id):
+    safe = "".join(ch for ch in str(user_id) if ch.isalnum() or ch in "-_")
+    return BACKFILL_DIR / f"{safe}.json"
+
+
+def backfill_retry(user_id):
+    """The start of a year still being read for this account, or None.
+
+    Kept across restarts on purpose: deploying a supervisor restarts it, and the
+    accounts it was already connected to then have a fresh `last_sync_at`, so a
+    cursor-only sync would never look back at the history that is still missing.
+    """
+    try:
+        entry = json.loads(backfill_path(user_id).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    try:
+        return datetime.fromisoformat(entry["from"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def start_backfill(user_id, start):
+    try:
+        BACKFILL_DIR.mkdir(exist_ok=True)
+        backfill_path(user_id).write_text(
+            json.dumps({"from": start.isoformat(), "left": BACKFILL_PASSES}),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass  # a read-only host rescans from scratch on the next connect
+
+
+def step_backfill(user_id):
+    """Count one delivered year-long read, and drop the marker when done."""
+    path = backfill_path(user_id)
+    try:
+        entry = json.loads(path.read_text(encoding="utf-8"))
+        left = int(entry.get("left", 0)) - 1
+    except (OSError, ValueError, TypeError, AttributeError):
+        return
+    try:
+        if left > 0:
+            entry["left"] = left
+            path.write_text(json.dumps(entry), encoding="utf-8")
+        else:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def read_closed(row):
     """Read this account's closed positions since the cursor, push, and mark.
 
@@ -1282,23 +1529,35 @@ def read_closed(row):
     since = None
     if row.get("last_sync_at"):
         since = datetime.fromisoformat(row["last_sync_at"].replace("Z", "+00:00")) - OVERLAP
-    else:
-        # First sync after connecting: read the whole year, and only once the
-        # terminal has actually downloaded it. A zero here used to be taken
-        # as "this account never traded", which advanced the cursor and lost
-        # every trade the terminal was still fetching.
-        lookback = datetime.now(timezone.utc) - timedelta(days=365)
-        found = history_total(lookback, HISTORY_WAIT_SECONDS)
-        if found < 0:
-            raise RuntimeError(f"terminal could not read history: {mt5.last_error()}")
-        if found == 0:
+
+    # A first sync reads the whole year, and so does a backfill that has not
+    # finished. The cursor cannot be trusted for either: the terminal may still
+    # be downloading closes from before it, and advancing the cursor over them
+    # is what lost the older XM block.
+    # A reconnect resets `last_sync_at`, but treat `pending` as a first sync too:
+    # the customer pressed Reconnect because trades are missing, so a cursor left
+    # behind by a half-finished sync must not decide what they get.
+    first = since is None or row.get("status") == "pending"
+    start = backfill_retry(user_id)
+    if start is None and first:
+        start = datetime.now(timezone.utc) - timedelta(days=BACKFILL_DAYS)
+        start_backfill(user_id, start)
+
+    if start is not None:
+        trades = backfill_trades(start, offset)
+        if not trades:
             print(
-                f"  {user_id[:8]}… no deals in the last 365 days after waiting "
-                f"{HISTORY_WAIT_SECONDS:.0f}s; marking it synced. "
-                "Press Reconnect if trades are missing."
+                f"  {user_id[:8]}… no closed trades since {start.date()} yet; "
+                "history is still downloading, so this read will be repeated."
             )
-    trades = position_trades(since, offset)
+    else:
+        trades = position_trades(since, offset)
+
     synced = push(user_id, trades) if trades else 0
+    if start is not None:
+        # Only a read that was actually delivered counts, so a refused ingest
+        # does not spend one of the retries.
+        step_backfill(user_id)
     mark(user_id, "connected", error="", synced_at=datetime.now(timezone.utc).isoformat())
     print(f"  {user_id[:8]}… {row['server']} -> {synced} position(s)")
     return synced
@@ -1441,7 +1700,7 @@ def watch(row, terminal=None, contended=True, should_yield=None):
             time.sleep(WATCH_SECONDS)
             enforce_lock(row)
             tick = datetime.now(timezone.utc)
-            recent = mt5.history_deals_get(tick - WATCH_WINDOW, tick) or []
+            recent = deals_between(tick - WATCH_WINDOW, tick, offset) or []
             candidates = {
                 deal.position_id
                 for deal in recent
@@ -1634,7 +1893,18 @@ def run_fleet():
     the pool when its account disconnects, goes stale for a refresh's worth of
     time, or fails; the account is re-claimed on a later cycle like any other.
     """
-    terminals = fleet_terminals()[:FLEET_SIZE]
+    free_mb = available_memory_mb()
+    size = capacity_slots(FLEET_SIZE, available_mb=free_mb)
+    terminals = fleet_terminals()[:size]
+    if size < FLEET_SIZE:
+        print(
+            f"[capacity] FLEET_SIZE={FLEET_SIZE} but only {size} slot(s) fit in "
+            f"{free_mb} MB free ({SLOT_MEMORY_MB} MB per slot, "
+            f"{MEMORY_RESERVE_MB} MB reserved); starting {size}. Accounts beyond "
+            "that still sync, in rotation — raise the host's memory to serve "
+            "more at once.",
+            flush=True,
+        )
     jobs, results = mp.Queue(), mp.Queue()
     # How many accounts are waiting for a terminal right now. Shared, because it
     # is the slots that have to decide to give one back.
@@ -1657,10 +1927,10 @@ def run_fleet():
         process.start()
         return process
 
-    workers = [spawn(slot) for slot in range(FLEET_SIZE)]
-    print(f"fleet: {FLEET_SIZE} terminal(s) held open, one account each")
+    workers = [spawn(slot) for slot in range(size)]
+    print(f"fleet: {size} terminal(s) held open, one account each", flush=True)
 
-    free = list(range(FLEET_SIZE))
+    free = list(range(size))
     busy = {}
     try:
         while True:

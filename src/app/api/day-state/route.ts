@@ -279,7 +279,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // A soft stop is a speed bump: it freezes MT5 while the journal stays
+    // A soft stop is a speed bump: the guard acts in MT5 while the journal stays
     // usable, and the written reason is what turns an override into a decision
     // on the record rather than a silent undo.
     const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 500) : ''

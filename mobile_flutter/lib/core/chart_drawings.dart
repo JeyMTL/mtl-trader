@@ -80,6 +80,7 @@ class DrawingLook {
     this.fill,
     this.alert = false,
     this.fired = false,
+    this.extendRight = false,
   });
 
   /// Colour of the stroke and its tags; null follows the chart style.
@@ -116,6 +117,12 @@ class DrawingLook {
   /// counting as active.
   final bool fired;
 
+  /// Project a box or a trend line to the price axis, so its right edge follows
+  /// pan and zoom instead of stopping at the last anchor. Only the tools that
+  /// have a right edge offer it; the flag lives on the look because that is the
+  /// value every copy and save already carries.
+  final bool extendRight;
+
   bool get isDefault =>
       tint == null &&
       weight == null &&
@@ -125,6 +132,7 @@ class DrawingLook {
       !hidden &&
       !alert &&
       !fired &&
+      !extendRight &&
       fill == null;
 
   DrawingLook copyWith({
@@ -137,6 +145,7 @@ class DrawingLook {
     int? fill,
     bool? alert,
     bool? fired,
+    bool? extendRight,
     bool clearTint = false,
     bool clearWeight = false,
     bool clearFill = false,
@@ -158,6 +167,7 @@ class DrawingLook {
       fill: clearFill ? null : (fill ?? this.fill),
       alert: alert ?? this.alert,
       fired: fired ?? this.fired,
+      extendRight: extendRight ?? this.extendRight,
     );
   }
 
@@ -171,6 +181,7 @@ class DrawingLook {
         if (fill != null) 'f': fill,
         if (alert) 'al': true,
         if (fired) 'fd': true,
+        if (extendRight) 'xr': true,
       };
 
   static DrawingLook fromJson(Object? value) {
@@ -188,6 +199,7 @@ class DrawingLook {
       fill: rawFill is num ? rawFill.toInt().clamp(0, 100) : null,
       alert: value['al'] == true,
       fired: value['fd'] == true,
+      extendRight: value['xr'] == true,
     );
   }
 }

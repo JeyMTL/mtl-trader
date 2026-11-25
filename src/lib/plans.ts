@@ -1,5 +1,12 @@
 import { SubscriptionPlan } from '@/types'
 
+/** One-line positioning for the marketing pricing cards. */
+export const PLAN_TAGLINES: Record<string, string> = {
+  free: 'Try every Pro tool, then keep 30 trades a month.',
+  basic: 'The full journal, chart desk and daily-stop guard.',
+  pro: 'Add AI reviews, replay and the backtester.',
+}
+
 /**
  * The plan catalogue: the single source every surface reads — the pricing page,
  * Settings, the Paddle checkout, `apply_paid_order`
@@ -55,7 +62,7 @@ export const PLANS: SubscriptionPlan[] = [
       'Unlimited trades and unlimited history',
       'Journal with photos, voice notes, tags, setups and mistakes',
       'MT5 auto sync, from the hosted agent or your own terminal with a sync token',
-      'Daily stop with the soft lock: trading freezes, the journal stays open',
+      'Daily stop with the soft lock: the guard clears resting orders and closes fills opened after the stop; the journal stays open',
       'Pin entry, stop and target levels straight off the live chart',
       'Chart desk from 30s and 45s up to daily candles, with VWAP and session ranges',
       'Time edge: the sessions and weekdays your results actually come from',
@@ -75,7 +82,7 @@ export const PLANS: SubscriptionPlan[] = [
     max_trades: -1,
     features: [
       'Everything in Basic',
-      'Daily stop with the hard lock: trading freezes and the journal closes until the reset',
+      'Daily stop with the hard lock: the same guard, and the journal closes until the reset',
       '40 AI journal reviews a month, written from your own logged trades',
       'Backtester with saved runs, simulating past sessions only',
       'Write your own entry and exit rules, then test them on past sessions',

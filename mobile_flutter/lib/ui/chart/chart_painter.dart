@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
 import '../../core/chart_drawings.dart';
+import '../../core/chart_projection.dart';
 import '../../core/chart_scale.dart';
 import '../../core/chart_sessions.dart';
 import '../../core/chart_theme.dart';
@@ -13,6 +14,21 @@ import '../../core/trade_exit.dart' show ResolvedExit;
 import '../../services/market_data.dart';
 import '../theme.dart';
 import 'chart_marker.dart';
+
+/// Where the handle under the finger is right now, so the painter can put the
+/// price and time pills on the axes and an offset crosshair clear of the thumb.
+@immutable
+class DrawingDragFeedback {
+  const DrawingDragFeedback({
+    required this.price,
+    required this.ms,
+    required this.touch,
+  });
+
+  final double price;
+  final int ms;
+  final Offset touch;
+}
 
 class TradingChartPainter extends CustomPainter {
   TradingChartPainter({
@@ -40,6 +56,7 @@ class TradingChartPainter extends CustomPainter {
     required this.positionOutcomes,
     this.preview,
     this.now,
+    this.dragFeedback,
   });
 
   /// The clock the bar-close countdown counts against. Null reads the device
@@ -135,6 +152,9 @@ class TradingChartPainter extends CustomPainter {
   /// is exactly what they get.
   final ChartDrawing? preview;
 
+  /// The live coordinate readout while a handle is being dragged.
+  final DrawingDragFeedback? dragFeedback;
+
   /// Where each position tool was taken out of its zones, aligned with
   /// [drawings]; null for every other kind of drawing and for an open idea.
   final List<ResolvedExit?> positionOutcomes;
@@ -142,21 +162,14 @@ class TradingChartPainter extends CustomPainter {
   /// Nearest candle x for an epoch-millisecond time, or null when the drawing
   /// sits outside the loaded series (then it is simply not drawn).
   double? _xForTime(int ms, double plotW) {
-    if (candles.isEmpty) return null;
-    final first = candles.first.time.millisecondsSinceEpoch;
-    final last = candles.last.time.millisecondsSinceEpoch;
-    if (ms < first || ms > last) return null;
-    var low = 0;
-    var high = candles.length - 1;
-    while (low < high) {
-      final mid = (low + high) ~/ 2;
-      if (candles[mid].time.millisecondsSinceEpoch < ms) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-    return ((low + 0.5 - start) / span) * plotW;
+    return chartXForTimeMs(
+      ms: ms,
+      candles: candles,
+      interval: interval.size,
+      start: start,
+      span: span,
+      plotW: plotW,
+    );
   }
 
   @override
@@ -178,6 +191,7 @@ class TradingChartPainter extends CustomPainter {
       );
     }
     final plotW = size.width - axisWidth;
+    final candleW = chartCandleWidth(plotW);
     final panes = paneLayout(size.height, style);
     final plotH = panes.priceH;
     if (candles.isEmpty || plotW <= 0 || plotH <= 0) return;
@@ -193,7 +207,12 @@ class TradingChartPainter extends CustomPainter {
               logScale: style.logScale,
             ) *
             plotH;
-    double x(double index) => ((index + 0.5 - start) / span) * plotW;
+    double x(double index) => chartXForIndex(
+          index: index,
+          start: start,
+          span: span,
+          plotW: plotW,
+        );
 
     final grid = Paint()
       ..color = style.grid
@@ -250,8 +269,8 @@ class TradingChartPainter extends CustomPainter {
       for (final session in TradingSession.values) {
         if (!style.sessions.contains(session)) continue;
         for (final band in sessionBands(visibleTimes, session)) {
-          final left = ((band.firstIndex + from - start) / span) * plotW;
-          final right = ((band.lastIndex + 1 + from - start) / span) * plotW;
+          final left = ((band.firstIndex + from - start) / span) * candleW;
+          final right = ((band.lastIndex + 1 + from - start) / span) * candleW;
           if (right < 0 || left > plotW) continue;
           // Anchored to the bottom of the price pane, along the time axis it
           // describes. The top of the plot is where the OHLC readout sits, and
@@ -275,7 +294,7 @@ class TradingChartPainter extends CustomPainter {
           // it: the line is the precise moment the session opened, the band is
           // only the stretch of time around it.
           if (style.showSessionBreaks && band.firstIndex + from > 0) {
-            final bx = ((band.firstIndex + from - start) / span) * plotW;
+            final bx = ((band.firstIndex + from - start) / span) * candleW;
             if (bx > 0 && bx < plotW) {
               _dashed(
                 canvas,
@@ -296,7 +315,7 @@ class TradingChartPainter extends CustomPainter {
         style.separatorGrain,
         wallTime: style.zone.wall,
       )) {
-        final gx = ((index + from - start) / span) * plotW;
+        final gx = ((index + from - start) / span) * candleW;
         if (gx < 0 || gx > plotW) continue;
         _dashed(
           canvas,
@@ -307,7 +326,7 @@ class TradingChartPainter extends CustomPainter {
       }
     }
 
-    final slot = plotW / span;
+    final slot = candleW / span;
     final bodyWidth = math.max(1.2, slot * 0.66);
     if (chartType == ChartType.candles) {
       for (var i = from; i <= to; i++) {
@@ -770,7 +789,7 @@ class TradingChartPainter extends CustomPainter {
         style.text,
       );
 
-      final ratio = (pointer.dx / plotW).clamp(0.0, 1.0).toDouble();
+      final ratio = (pointer.dx / candleW).clamp(0.0, 1.0).toDouble();
       final index =
           (start + ratio * span).floor().clamp(0, candles.length - 1).toInt();
       // The tag reads the same clock as the axis under it, so the crosshair
@@ -802,7 +821,9 @@ class TradingChartPainter extends CustomPainter {
       final text = interval.size < const Duration(days: 1)
           ? DateFormat(
               wide
-                  ? (style.dayOfWeekLabels ? 'EEE d MMM $clock' : 'd MMM $clock')
+                  ? (style.dayOfWeekLabels
+                      ? 'EEE d MMM $clock'
+                      : 'd MMM $clock')
                   : (style.dayOfWeekLabels ? 'EEE $clock' : clock),
             ).format(time)
           : DateFormat(day).format(time);
@@ -812,6 +833,87 @@ class TradingChartPainter extends CustomPainter {
           .toDouble();
       painter.paint(canvas, Offset(cx, size.height - bottomPad + 4));
     }
+
+    _paintDragFeedback(
+      canvas,
+      size: size,
+      plotW: plotW,
+      priceTop: panes.priceTop,
+      plotH: plotH,
+      y: y,
+    );
+  }
+
+  /// The live readout while a handle is being dragged: a magnifier-style
+  /// offset crosshair above the thumb, a price pill on the Y axis and a time
+  /// pill on the X axis, both taken from the handle rather than the raw finger.
+  void _paintDragFeedback(
+    Canvas canvas, {
+    required Size size,
+    required double plotW,
+    required double priceTop,
+    required double plotH,
+    required double Function(double) y,
+  }) {
+    final feedback = dragFeedback;
+    if (feedback == null) return;
+    final x = _xForTime(feedback.ms, plotW);
+    if (x == null) return;
+    final priceY = y(feedback.price);
+    final loupe = Offset(
+      x,
+      (feedback.touch.dy - 64)
+          .clamp(priceTop + 10, priceTop + plotH - 10)
+          .toDouble(),
+    );
+    final guide = Paint()
+      ..color = style.crosshair
+      ..strokeWidth = 1.1
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(
+      loupe,
+      14,
+      Paint()
+        ..color = style.background.withAlpha(150)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawCircle(
+      loupe,
+      14,
+      Paint()
+        ..color = style.crosshair
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+    canvas.drawLine(
+      Offset(loupe.dx - 18, loupe.dy),
+      Offset(loupe.dx + 18, loupe.dy),
+      guide,
+    );
+    canvas.drawLine(
+      Offset(loupe.dx, loupe.dy - 18),
+      Offset(loupe.dx, loupe.dy + 18),
+      guide,
+    );
+    canvas.drawCircle(loupe, 2.6, Paint()..color = style.crosshair);
+
+    if (priceY >= priceTop && priceY <= priceTop + plotH) {
+      _axisTag(
+        canvas,
+        size,
+        plotW,
+        priceY,
+        feedback.price.toStringAsFixed(decimals),
+        style.text,
+      );
+    }
+    final local = style.zone.wall(
+      DateTime.fromMillisecondsSinceEpoch(feedback.ms, isUtc: true),
+    );
+    final label = DateFormat(
+      style.use24Hour ? 'EEE d MMM HH:mm' : 'EEE d MMM h:mm a',
+    ).format(local);
+    _bottomTag(canvas, size, x, label);
   }
 
   void _watermark(Canvas canvas, double plotW, double plotH) {
@@ -970,12 +1072,20 @@ class TradingChartPainter extends CustomPainter {
       if (x1 == null || x2 == null) return;
       final p1 = Offset(x1, y(drawing.startPrice));
       final p2 = Offset(x2, y(drawing.endPrice));
+      // Extend right runs the line on to the price axis along its own slope.
+      // The anchors stay where they were drawn, so the extra length is a
+      // projection rather than a fourth coordinate the trader has to maintain.
+      var drawnEnd = p2;
+      if (drawing.look.extendRight && p2.dx > p1.dx + 0.5) {
+        final slope = (p2.dy - p1.dy) / (p2.dx - p1.dx);
+        drawnEnd = Offset(plotW, p1.dy + slope * (plotW - p1.dx));
+      }
       final width = drawing.look.weight ?? (selected ? 2.4 : 1.3);
       if (drawing.look.dashed || drawing.look.dotted) {
         _dashSegment(
           canvas,
           p1,
-          p2,
+          drawnEnd,
           drawing.ink,
           width,
           dotted: drawing.look.dotted,
@@ -983,7 +1093,7 @@ class TradingChartPainter extends CustomPainter {
       } else {
         canvas.drawLine(
           p1,
-          p2,
+          drawnEnd,
           Paint()
             ..color = drawing.ink
             ..strokeWidth = width
@@ -992,7 +1102,7 @@ class TradingChartPainter extends CustomPainter {
       }
       // Endpoints are the line's handles: filled when it is selected, so it is
       // obvious which end a drag will take hold of.
-      final handle = selected ? 4.0 : 2.5;
+      final handle = selected ? 5.5 : 2.5;
       canvas.drawCircle(p1, handle, Paint()..color = drawing.ink);
       canvas.drawCircle(p2, handle, Paint()..color = drawing.ink);
       return;
@@ -1067,8 +1177,11 @@ class TradingChartPainter extends CustomPainter {
       case DrawingKind.rectangle:
         if (anchors.length < 2) break;
         final rect = Rect.fromPoints(anchors.first, anchors.last);
-        canvas.drawRect(rect, fill);
-        canvas.drawRect(rect, stroke);
+        final body = drawing.look.extendRight
+            ? Rect.fromLTRB(rect.left, rect.top, plotW, rect.bottom)
+            : rect;
+        canvas.drawRect(body, fill);
+        canvas.drawRect(body, stroke);
         break;
       case DrawingKind.ellipse:
         if (anchors.length < 2) break;
@@ -1221,18 +1334,65 @@ class TradingChartPainter extends CustomPainter {
 
     if (selected) {
       for (final anchor in anchors) {
-        // A soft ring behind the dot: on a busy chart the handle is what says
-        // "this object is the one you are holding", and a bare 3px dot gets lost
-        // against a candle body.
+        // The visual dot stays small so it does not hide a wick; the finger's
+        // 24px hit circle lives in the canvas and is deliberately much larger.
         canvas.drawCircle(
           anchor,
-          7,
-          Paint()..color = drawing.ink.withAlpha(55),
+          9,
+          Paint()..color = drawing.ink.withAlpha(45),
         );
-        canvas.drawCircle(anchor, 3.5, Paint()..color = drawing.ink);
+        canvas.drawCircle(anchor, 5.5, Paint()..color = drawing.ink);
+        canvas.drawCircle(
+          anchor,
+          5.5,
+          Paint()
+            ..color = style.background.withAlpha(220)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1,
+        );
+      }
+      // A fifth, central handle translates the whole bounded shape. It sits on
+      // the body, so a drag in the middle cannot be mistaken for a resize.
+      if (_supportsCenterHandle(drawing.kind) && anchors.length >= 2) {
+        var left = anchors.first.dx;
+        var right = anchors.first.dx;
+        var top = anchors.first.dy;
+        var bottom = anchors.first.dy;
+        for (final anchor in anchors.skip(1)) {
+          left = math.min(left, anchor.dx);
+          right = math.max(right, anchor.dx);
+          top = math.min(top, anchor.dy);
+          bottom = math.max(bottom, anchor.dy);
+        }
+        final centre = Offset((left + right) / 2, (top + bottom) / 2);
+        canvas.drawCircle(
+          centre,
+          12,
+          Paint()..color = drawing.ink.withAlpha(38),
+        );
+        canvas.drawCircle(
+          centre,
+          9,
+          Paint()
+            ..color = drawing.ink
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6,
+        );
+        canvas.drawCircle(centre, 3.5, Paint()..color = drawing.ink);
       }
     }
   }
+
+  /// Shapes with a centre a finger can grab instead of a corner.
+  bool _supportsCenterHandle(DrawingKind kind) => switch (kind) {
+        DrawingKind.rectangle ||
+        DrawingKind.ellipse ||
+        DrawingKind.fib ||
+        DrawingKind.fibExtension ||
+        DrawingKind.measure =>
+          true,
+        _ => false,
+      };
 
   void _paintPosition(
     Canvas canvas,
@@ -1455,9 +1615,9 @@ class TradingChartPainter extends CustomPainter {
 
   /// Where a position box stops on the right.
   ///
-  /// A box never runs past its own end time, and never past the newest candle
-  /// either: a calibration is a record of the move it was drawn on, so it must
-  /// not stretch across the future bars that print after it.
+  /// A box always stops at its own end time. An end dragged into the future
+  /// gutter projects forward at the active bar spacing; zero means "no end
+  /// stored yet", so the painter falls back to the newest candle.
   double _positionRight(ChartDrawing drawing, double plotW) {
     final lastMs = candles.last.time.millisecondsSinceEpoch;
     final endMs = drawing.endMs > 0 ? drawing.endMs : lastMs;
@@ -1740,6 +1900,7 @@ class TradingChartPainter extends CustomPainter {
         oldDelegate.drawings != drawings ||
         oldDelegate.selectedDrawing != selectedDrawing ||
         oldDelegate.now != now ||
+        oldDelegate.dragFeedback != dragFeedback ||
         !identical(oldDelegate.preview, preview);
   }
 }

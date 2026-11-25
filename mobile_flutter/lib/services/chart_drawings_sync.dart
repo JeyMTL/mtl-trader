@@ -577,6 +577,7 @@ String lookSignature(DrawingLook look) => <Object?>[
       look.fill ?? '',
       look.alert ? 'al' : '',
       look.fired ? 'fd' : '',
+      look.extendRight ? 'xr' : '',
     ].join(',');
 
 String _money(double value) => value.toStringAsFixed(7);

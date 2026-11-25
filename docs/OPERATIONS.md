@@ -207,6 +207,26 @@ flow, a failed download keeping the previous language, and switching back to the
 device language. `mobile_flutter/test/language_packs_test.dart` covers the pack
 store, and `mobile_flutter/test/l10n_test.dart` checks every pack is complete.
 
+### Web locale layer
+
+The web app did not have a message catalog, so `src/lib/i18n` applies a
+source-derived catalog to the rendered DOM after hydration. It never rewrites
+source strings, which keeps the trading screens stable while copy is migrated.
+
+- `npm run locales:web` extracts `public/locales/web/en.json` from TSX/TS and
+  fills each locale with the reviewed mobile glossary.
+- `npm run translate:web` fills the missing web-specific keys with Gemini and
+  writes each locale after every batch, so a quota limit is resumable.
+- `public/locales/web/manifest.json` records coverage. A locale below 100% shows
+  a "still being translated" notice; legal pages also show an "English version
+  is authoritative" notice when machine translated.
+- `?lang=fr` sets the `mtl_locale` cookie and reloads. The normal picker is in
+  the landing header, the dashboard rail and the floating control on public
+  pages.
+- Server-rendered metadata, emails, AI prose, canvas chart labels and
+  interpolated numeric sentences remain English. They need explicit `translate()`
+  calls or server-side locale handling rather than the DOM layer.
+
 ## Hosted broker sync
 
 Most customers only have a phone, and MT5 mobile cannot run an Expert Advisor,

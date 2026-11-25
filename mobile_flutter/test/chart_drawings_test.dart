@@ -41,6 +41,20 @@ ChartDrawing _short() => const ChartDrawing.position(
 void main() {
   _lookTests();
 
+  test('extend right survives a save and reload', () {
+    final drawing = ChartDrawing.trend(
+      startMs: 1,
+      startPrice: 10,
+      endMs: 2,
+      endPrice: 12,
+      look: const DrawingLook(extendRight: true),
+    );
+    final back = decodeDrawings(encodeDrawings([drawing])).single;
+    expect(back.look.extendRight, isTrue);
+    expect(back.look.isDefault, isFalse);
+    expect(back.look.copyWith(extendRight: false).extendRight, isFalse);
+  });
+
   test('a position tool survives a save and reload', () {
     final decoded = decodeDrawings(encodeDrawings([_short()]));
     expect(decoded, hasLength(1));
