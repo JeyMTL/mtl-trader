@@ -171,7 +171,11 @@ class _DashboardBody extends StatelessWidget {
     final summary = data.summary;
     final edge = timeEdgeReport(data.timeStats);
     final hours = hourlySeries(data.timeStats);
-    final drawdown = _maxDrawdown(data.equity, data.deposits);
+    final rawDrawdown = _maxDrawdown(data.equity, data.deposits);
+    // A balance below the logged deposits is a ledger problem, not a 249%
+    // drawdown: no broker account goes below zero. The tile caps the scale and
+    // marks it, rather than printing a percentage that cannot be real.
+    final drawdown = rawDrawdown > 100 ? 100.0 : rawDrawdown;
     final hasHours = hours.any((row) => row.trades > 0);
 
     return ListView(
@@ -226,7 +230,9 @@ class _DashboardBody extends StatelessWidget {
               ),
               MetricCard(
                 label: l10n.maxDrawdown,
-                value: '${drawdown.toStringAsFixed(1)}%',
+                value: rawDrawdown > 100
+                    ? '100%+'
+                    : '${drawdown.toStringAsFixed(1)}%',
                 foot: l10n.peakToTrough,
                 tone: drawdown >= 10 ? Tone.negative : Tone.neutral,
                 icon: Icons.trending_down,

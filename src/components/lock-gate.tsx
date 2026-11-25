@@ -251,10 +251,11 @@ export default function LockGate() {
               </button>
             ) : (
               <div className="rounded-xl border border-border bg-surface p-4">
-                <p className="text-sm font-semibold text-white">Unfreeze the journal</p>
+                <p className="text-sm font-semibold text-white">Lift the stop — once today</p>
                 <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                  The rule exists to protect the rest of your week. If you are breaking it, write
-                  down why — the reason is recorded on today, not hidden.
+                  This reopens the journal and records your reason on today. It is a grace run,
+                  not a reset: the stop re-arms on the trades you take after it, with the same
+                  budget. Lose that too and the day stays closed.
                 </p>
                 <textarea
                   value={reason}

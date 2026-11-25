@@ -225,6 +225,12 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
     return worst
   }, [equityData, depositsTotal])
 
+  // Above 100% the logged balance has gone below the logged deposits — a real
+  // broker account cannot. The number is arithmetically right for the journal's
+  // own ledger, but printing "249.4%" reads as a metric about the account when it
+  // is really a data problem, so the card caps the scale and says so.
+  const drawdownBeyondDeposits = maxDrawdown > 100
+
   const edge = useMemo(() => timeEdgeReport(timeStats, 3), [timeStats])
   const hourChart = useMemo(() => hourlySeries(timeStats), [timeStats])
   const sessionRows = useMemo(() => (timeStats.sessions ?? []).map(sessionPeriod), [timeStats.sessions])
@@ -514,7 +520,15 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
             <AlertTriangle className="w-4 h-4" />
             Max Drawdown
           </div>
-          <div className="text-2xl font-bold text-warning">{maxDrawdown.toFixed(1)}%</div>
+          <div className="text-2xl font-bold text-warning">
+            {drawdownBeyondDeposits ? '100%+' : `${maxDrawdown.toFixed(1)}%`}
+          </div>
+          {drawdownBeyondDeposits && (
+            <p className="mt-1 text-[11px] leading-snug text-gray-500">
+              Your logged balance is below the deposits you logged. Check those and any
+              duplicated trades.
+            </p>
+          )}
         </div>
         <div className="bg-surface border border-border rounded-xl p-4">
           <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">

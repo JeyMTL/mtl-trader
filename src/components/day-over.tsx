@@ -341,15 +341,18 @@ export default function DayOver() {
                   onClick={() => setOverrideOpen(true)}
                   className="text-xs font-medium text-gray-500 underline decoration-border underline-offset-2 transition-colors hover:text-gray-300"
                 >
-                  Override today’s stop
+                  Lift today’s stop
                 </button>
               ) : (
                 <div className="rounded-lg border border-border bg-background p-3">
                   <p className="text-xs font-medium text-white">
-                    Override the stop
+                    Lift the stop — once today
                   </p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    This reopens the journal for today. It is recorded on the day, not hidden.
+                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                    This reopens the journal for today, and your reason is recorded on the day.
+                    It is a grace run, not a reset: the stop re-arms on the trades you take after
+                    saving it, with the same budget. Lose that too and the day stays closed —
+                    there is no second lift.
                   </p>
                   <textarea
                     value={reason}
@@ -366,7 +369,7 @@ export default function DayOver() {
                       disabled={saving || reason.trim().length < 10}
                       className="btn btn-secondary px-3 py-1.5 text-xs disabled:opacity-50"
                     >
-                      {saving ? 'Saving…' : 'Override today'}
+                      {saving ? 'Saving…' : 'Lift the stop'}
                     </button>
                     <button
                       type="button"

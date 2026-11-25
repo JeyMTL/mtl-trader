@@ -1886,7 +1886,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockDialogBody.
   ///
   /// In en, this message translates to:
-  /// **'The EA releases the freeze on its next poll. If you are breaking the rule, write down why — the reason is recorded on today, not hidden.'**
+  /// **'One lift a day. The EA releases the freeze on its next poll and your reason is recorded on today. The stop re-arms on the trades you take after this, with the same budget — lose that too and the day stays closed.'**
   String get lockDialogBody;
 
   /// No description provided for @lockReasonHint.
