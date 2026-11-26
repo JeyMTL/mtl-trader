@@ -269,8 +269,12 @@ one-shot task that runs five minutes later (move it with
 fleet to settle — no `.backfill` marker left and every live connection synced
 within the last 15 minutes — then stops the supervisor, audits the journal
 against each broker, re-arms the backfill for the accounts with missing trades
-and no others, starts the supervisor again, and unregisters itself. Its console
-output lands in `C:\MTLSync\logs\repair-<stamp>.log` and the list it queued in
+and no others, starts the supervisor again, and unregisters itself. If the audit
+queued anything, it waits for those re-reads to drain (up to four hours), audits
+once more, and reports the second result too — one recheck, not a loop, so a gap
+the backfill cannot close is named and left alone. Its console
+output lands in `C:\MTLSync\logs\repair-<stamp>.log` (and
+`repair-<stamp>-recheck.log` for the second pass) and the list it queued in
 `C:\MTLSync\repair-history.json`. A connection stuck on a bad password never
 settles; the wait is capped at ten hours, after which the audit runs anyway and
 reports that account as an error rather than a gap.
@@ -366,7 +370,11 @@ powershell -ExecutionPolicy Bypass -File C:\MTLSync\repair-history.ps1 -Now -Day
 ```
 
 Without `-Now` it waits up to ten hours for the fleet to settle first, which is
-what the scheduled run does. Output is in `C:\MTLSync\logs\repair-<stamp>.log`;
-the queued accounts are in `C:\MTLSync\repair-history.json`. The exit code is 0
-for a clean audit and for one that queued repairs, 1 if the verifier itself
-failed.
+what the scheduled run does. If the audit queues repairs, the script then waits
+for those re-reads (up to `-RepairWaitMinutes`, default 240), audits again, and
+reports the recheck; `-NoRecheck` stops after the first pass. Output is in
+`C:\MTLSync\logs\repair-<stamp>.log`; the queued accounts are in
+`C:\MTLSync\repair-history.json`, and the recheck's in
+`repair-history-recheck.json`. The exit code is 0 for a clean audit, for one that
+queued repairs and for a recheck that still found gaps; 1 only if the verifier
+itself failed.

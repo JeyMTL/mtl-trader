@@ -1677,6 +1677,107 @@ def journal_row(position_id, pnl=10.0, closed="2026-11-20T12:00:00+00:00"):
     return {"position_id": position_id, "pnl": pnl, "close_time": closed.replace("+00:00", "Z")}
 
 
+class RejectedBatchNamingTests(unittest.TestCase):
+    """A batch the API only partly took must name the trades it dropped.
+
+    The ingest answers with counts. A row that failed validation therefore used
+    to disappear behind a number, taking its P&L with it; the journal read-back
+    is what turns that number into tickets.
+    """
+
+    def setUp(self):
+        saved_get, saved_post = sup.requests.get, sup.requests.post
+        saved_pnl = sup.journal_pnl
+        self.addCleanup(setattr, sup.requests, "get", saved_get)
+        self.addCleanup(setattr, sup.requests, "post", saved_post)
+        self.addCleanup(setattr, sup, "journal_pnl", saved_pnl)
+
+    def response(self, body):
+        return types.SimpleNamespace(status_code=200, json=lambda: body, text=json.dumps(body))
+
+    def trade(self, position, pnl):
+        return {
+            "position_id": position,
+            "ticket": position + 1000,
+            "symbol": "XAUUSD",
+            "type": "SELL",
+            "pnl": pnl,
+        }
+
+    def run_push(self, chunk, body, stored):
+        sup.requests.post = lambda *args, **kwargs: self.response(body)
+        asked = []
+
+        def journal_pnl(user_id, positions):
+            asked.append((user_id, list(positions)))
+            return stored
+
+        sup.journal_pnl = journal_pnl
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            count = sup.push("u-12345678", chunk)
+        return count, out.getvalue(), asked
+
+    def test_a_row_that_did_not_land_is_named_with_its_pnl(self):
+        chunk = [self.trade(1, 12.5), self.trade(2, -42.1)]
+
+        count, output, asked = self.run_push(
+            chunk, {"imported": 1, "skipped": 0, "invalid": 1, "suppressed": 0}, {1: 12.5}
+        )
+
+        self.assertEqual(count, 2)
+        self.assertIn("position 1002 XAUUSD SELL PnL -42.10 is not in the journal", output)
+        # It must not accuse the row that did land.
+        self.assertNotIn("position 1001", output)
+        self.assertEqual(asked, [("u-12345678", [1, 2])])
+
+    def test_a_pnl_that_disagrees_with_the_journal_is_named(self):
+        chunk = [self.trade(1, 18.75), self.trade(2, 5.0)]
+
+        _, output, _ = self.run_push(
+            chunk, {"imported": 0, "skipped": 1, "invalid": 0, "suppressed": 0}, {1: 20.75, 2: 5.0}
+        )
+
+        self.assertIn("position 1001 XAUUSD PnL differs: journal 20.75, broker 18.75", output)
+        self.assertNotIn("not in the journal", output.split("position 1001")[0])
+
+    def test_a_batch_that_landed_in_full_does_not_read_the_journal(self):
+        chunk = [self.trade(1, 1.0), self.trade(2, 2.0)]
+
+        def journal_pnl(user_id, positions):
+            raise AssertionError("a complete batch must not cost a journal read")
+
+        sup.requests.post = lambda *args, **kwargs: self.response(
+            {"imported": 2, "skipped": 0, "invalid": 0, "suppressed": 0}
+        )
+        sup.journal_pnl = journal_pnl
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            sup.push("u-12345678", chunk)
+
+        self.assertEqual(out.getvalue(), "")
+
+    def test_a_suppressed_row_is_a_deletion_not_a_rejection(self):
+        chunk = [self.trade(1, 1.0), self.trade(2, 2.0)]
+
+        _, output, asked = self.run_push(
+            chunk, {"imported": 0, "skipped": 0, "invalid": 0, "suppressed": 2}, {}
+        )
+
+        self.assertEqual(output, "")
+        self.assertEqual(asked, [])
+
+    def test_an_unreadable_journal_does_not_call_every_row_rejected(self):
+        chunk = [self.trade(1, 1.0)]
+
+        _, output, _ = self.run_push(
+            chunk, {"imported": 0, "skipped": 0, "invalid": 0, "suppressed": 0}, None
+        )
+
+        self.assertIn("the journal could not be read to name them", output)
+        self.assertNotIn("is not in the journal", output)
+
+
 class HistoryAuditTests(unittest.TestCase):
     """The journal-versus-broker comparison, without a terminal.
 

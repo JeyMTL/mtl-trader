@@ -638,6 +638,97 @@ def position_trades(since, offset=0):
     return deals_to_trades(recent, since, offset)
 
 
+# A journal P&L within a cent of the broker's is the same number written twice;
+# anything larger is a real disagreement worth naming.
+PNL_TOLERANCE = 0.01
+
+
+def journal_pnl(user_id, positions):
+    """The P&L the journal holds for these position ids, keyed by position id.
+
+    `/api/sync` answers with counts, not with names, so the only way to say which
+    row of a batch did not land is to ask the journal. Returns None when the read
+    fails, which is different from an empty dict: an unreadable journal must not
+    turn every row into a "rejected" one.
+    """
+    ids = sorted({int(position) for position in positions if position is not None})
+    if not ids:
+        return {}
+    response = requests.get(
+        f"{SUPABASE_URL}/rest/v1/trades",
+        headers=REST_HEADERS,
+        params={
+            "select": "position_id,pnl",
+            "user_id": f"eq.{user_id}",
+            "position_id": f"in.({','.join(str(position) for position in ids)})",
+            "limit": str(len(ids)),
+        },
+        timeout=TIMEOUT,
+    )
+    if response.status_code != 200:
+        return None
+    stored = {}
+    for row in response.json():
+        try:
+            stored[int(row["position_id"])] = float(row.get("pnl") or 0.0)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return stored
+
+
+def name_short_batch(user_id, chunk, response):
+    """Name the rows a chunk did not store, and any P&L that disagrees.
+
+    `imported + skipped + suppressed` accounts for a row that landed, was already
+    there, or was deleted by the customer on purpose. Anything left over was
+    rejected by validation or lost in an insert error, and it matters which
+    trade: a rejected row's P&L never reaches the journal, the day lock reads a
+    day that did not happen, and the only trace was a count in a line the
+    customer never sees.
+
+    Comparing the journal's own P&L for the batch against what the terminal
+    reported names the row either way: absent, or present with a different
+    number.
+    """
+    try:
+        body = response.json()
+        imported = int(body.get("imported") or 0)
+        skipped = int(body.get("skipped") or 0)
+        suppressed = int(body.get("suppressed") or 0)
+    except (ValueError, TypeError, AttributeError):
+        return
+    unexplained = len(chunk) - imported - skipped - suppressed
+    if unexplained <= 0:
+        return
+    label = f"  [warn] {user_id[:8]}… {unexplained} of {len(chunk)} position(s) did not land"
+    stored = journal_pnl(user_id, [trade.get("position_id") for trade in chunk])
+    if stored is None:
+        print(f"{label}; the journal could not be read to name them")
+        return
+
+    named = set()
+    for trade in chunk:
+        position = int(trade["position_id"])
+        if position in stored or position in named:
+            continue
+        named.add(position)
+        print(
+            f"{label}: position {trade.get('ticket')} {trade.get('symbol')} {trade.get('type')} "
+            f"PnL {float(trade.get('pnl') or 0.0):.2f} is not in the journal "
+            "(rejected by the ingest, or deleted by the customer)"
+        )
+    for trade in chunk:
+        position = int(trade["position_id"])
+        if position not in stored:
+            continue
+        broker = float(trade.get("pnl") or 0.0)
+        if abs(stored[position] - broker) > PNL_TOLERANCE:
+            print(
+                f"{label}: position {trade.get('ticket')} {trade.get('symbol')} PnL differs: "
+                f"journal {stored[position]:.2f}, broker {broker:.2f}"
+            )
+
+
 def push(user_id, trades):
     for start in range(0, len(trades), CHUNK):
         chunk = trades[start:start + CHUNK]
@@ -649,6 +740,7 @@ def push(user_id, trades):
         )
         if response.status_code not in (200, 202):
             raise RuntimeError(f"ingest rejected ({response.status_code}): {response.text[:160]}")
+        name_short_batch(user_id, chunk, response)
     return len(trades)
 
 

@@ -17,6 +17,12 @@
 # `last_sync_at` within `-SettleMinutes`. A connection stuck on a bad password
 # never settles, so the wait is capped by `-MaxWaitMinutes` and the audit then
 # runs on whatever is there, reporting that account as an error instead of a gap.
+#
+# An audit that queues repairs is checked once more after those re-reads finish:
+# the queued accounts are given up to `-RepairWaitMinutes` to drain their markers,
+# the journal is audited again, and the second result is reported too. One
+# recheck, never a loop, so a gap the backfill cannot close is named and left
+# alone. `-NoRecheck` skips it.
 
 param(
     [string]$Root = 'C:\MTLSync',
@@ -27,9 +33,11 @@ param(
     [int]$Days = 0,
     [int]$SettleMinutes = 15,
     [int]$MaxWaitMinutes = 600,
+    [int]$RepairWaitMinutes = 240,
     [int]$PollSeconds = 60,
     [string]$Python = '',
-    [switch]$Now
+    [switch]$Now,
+    [switch]$NoRecheck
 )
 
 $ErrorActionPreference = 'Stop'
@@ -134,43 +142,87 @@ if (-not $Now) {
 
 # --- Stop the fleet, audit, start it again ----------------------------------
 
-Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 3
-Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
-
 $logs = Join-Path $Root 'logs'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
-$logFile = Join-Path $logs ('repair-{0}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
-$repairFile = Join-Path $Root 'repair-history.json'
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
-$code = -1
-try {
-    # Captured rather than teed: `Tee-Object` writes UTF-16 on PowerShell 5.1,
-    # which leaves NUL bytes in a log that tail and grep should read plainly.
-    $output = & $Python $verifier --days $Days --repair --repair-file $repairFile 2>&1
-    $code = $LASTEXITCODE
-    $output | Out-File -LiteralPath $logFile -Encoding utf8
-    $output | Write-Host
-} finally {
-    Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+function Invoke-Audit([string]$suffix) {
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
+    # The audit launches its own terminal through MT5_PATH; a terminal left open
+    # by the supervisor holds that profile and makes the login fail.
+    Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+
+    $logFile = Join-Path $logs ('repair-{0}{1}.log' -f $stamp, $suffix)
+    $repairFile = Join-Path $Root ('repair-history{0}.json' -f $suffix)
+    $code = -1
+    try {
+        # Captured rather than teed: `Tee-Object` writes UTF-16 on PowerShell 5.1,
+        # which leaves NUL bytes in a log that tail and grep should read plainly.
+        $output = & $Python $verifier --days $Days --repair --repair-file $repairFile 2>&1
+        $code = $LASTEXITCODE
+        $output | Out-File -LiteralPath $logFile -Encoding utf8
+        $output | Write-Host
+    } finally {
+        Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    }
+
+    $queued = 0
+    if (Test-Path -LiteralPath $repairFile) {
+        try { $queued = @((Get-Content -LiteralPath $repairFile -Raw | ConvertFrom-Json).repairs).Count } catch { $queued = 0 }
+    }
+    return [pscustomobject]@{
+        Code    = $code
+        Log     = $logFile
+        Repairs = $(if (Test-Path -LiteralPath $repairFile) { $repairFile } else { '' })
+        Queued  = $queued
+    }
 }
 
-$queued = 0
-if (Test-Path -LiteralPath $repairFile) {
-    try { $queued = @((Get-Content -LiteralPath $repairFile -Raw | ConvertFrom-Json).repairs).Count } catch { $queued = 0 }
-}
+$first = Invoke-Audit ''
 
 Write-Host ''
-if ($code -eq 0) {
+if ($first.Code -eq 0) {
     Write-Host 'Audit passed: the journal matches the brokers.' -ForegroundColor Green
-} elseif ($code -eq 1) {
-    Write-Host ("Audit found gaps; {0} account(s) queued to re-read. They fill on the next cycle." -f $queued) -ForegroundColor Yellow
+} elseif ($first.Code -eq 1) {
+    Write-Host ("Audit found gaps; {0} account(s) queued to re-read. They fill on the next cycle." -f $first.Queued) -ForegroundColor Yellow
 } else {
-    Write-Host ("verify_history.py exited with code {0}; see {1}" -f $code, $logFile) -ForegroundColor Red
+    Write-Host ("verify_history.py exited with code {0}; see {1}" -f $first.Code, $first.Log) -ForegroundColor Red
 }
-Write-Host ("  log     : {0}" -f $logFile)
-Write-Host ("  repairs : {0}" -f $(if (Test-Path -LiteralPath $repairFile) { $repairFile } else { '(none written)' }))
+Write-Host ("  log     : {0}" -f $first.Log)
+Write-Host ("  repairs : {0}" -f $(if ($first.Repairs) { $first.Repairs } else { '(none written)' }))
+
+# --- One recheck, after the repairs have had their turn ----------------------
+
+$recheck = $null
+if ($first.Code -eq 1 -and $first.Queued -gt 0 -and -not $NoRecheck) {
+    $deadline = (Get-Date).AddMinutes($RepairWaitMinutes)
+    while ($true) {
+        $pending = Get-PendingReads
+        if ($pending.Count -eq 0) { break }
+        if ((Get-Date) -ge $deadline) {
+            Write-Host ("Rechecking anyway after {0} minute(s): {1} account(s) still re-reading history." -f
+                $RepairWaitMinutes, $pending.Count) -ForegroundColor Yellow
+            break
+        }
+        Write-Host ("  repair running: {0} account(s) re-reading history" -f $pending.Count)
+        Start-Sleep -Seconds $PollSeconds
+    }
+    Write-Host 'Rechecking the accounts the repair queued...' -ForegroundColor Cyan
+    $recheck = Invoke-Audit '-recheck'
+    Write-Host ''
+    if ($recheck.Code -eq 0) {
+        Write-Host 'Recheck passed: the repairs closed every gap.' -ForegroundColor Green
+    } elseif ($recheck.Code -eq 1) {
+        Write-Host ("Recheck still finds gaps; {0} account(s) queued again. The log names them." -f $recheck.Queued) -ForegroundColor Yellow
+    } else {
+        Write-Host ("Recheck failed to run; see {0}" -f $recheck.Log) -ForegroundColor Red
+    }
+    Write-Host ("  log     : {0}" -f $recheck.Log)
+    Write-Host ("  repairs : {0}" -f $(if ($recheck.Repairs) { $recheck.Repairs } else { '(none written)' }))
+}
+
 Write-Host ("  fleet   : task '{0}' started again" -f $TaskName)
 
 if ($SelfTask) {
@@ -178,4 +230,5 @@ if ($SelfTask) {
     Write-Host ("  removed the one-shot task '{0}'" -f $SelfTask)
 }
 
-exit $(if ($code -ge 2) { 1 } else { 0 })
+$failed = $first.Code -ge 2 -or ($recheck -and $recheck.Code -ge 2)
+exit $(if ($failed) { 1 } else { 0 })

@@ -359,6 +359,29 @@ broker's server. `supervisor/verify_history.py` reads each account through MT5
 the way the supervisor does (a month at a time, so a cold terminal fetches
 instead of answering from cache) and compares the two sets by `position_id`.
 
+### A batch that only partly landed
+
+The supervisor notices a dropped row sooner than any audit. `/api/sync` answers
+with `{imported, skipped, invalid, suppressed}`, so when those counts do not
+account for the whole batch it reads the journal's own `pnl` for those positions
+and prints every row the journal does not hold — ticket, symbol, side and the
+broker's P&L — plus every row whose stored P&L disagrees by more than a cent:
+
+```
+[warn] 33733945… 2 of 5 position(s) did not land: position 512901 XAUUSD SELL
+       PnL -42.10 is not in the journal (rejected by the ingest, or deleted by
+       the customer)
+[warn] 33733945… 2 of 5 position(s) did not land: position 512902 XAUUSD PnL
+       differs: journal 20.75, broker 18.75
+```
+
+A row the customer deleted on purpose comes back as `suppressed`, is accounted
+for, and is not named. So the first line means the API refused that trade —
+check `sync.all_invalid` / `sync.insert` in the app log for the reason — while
+the second means the journal already held the position with another P&L (a scale
+out that was frozen before, or a broker correction). `--repair` is for the other
+case: a close the supervisor never sent at all.
+
 ### Journal-side queries
 
 Run these in the Supabase SQL editor. They are the cheap checks: what the
