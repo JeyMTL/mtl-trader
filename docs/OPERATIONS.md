@@ -468,6 +468,12 @@ the host folder refused the write. The task's next cycle picks a marker up withi
 `REFRESH_SECONDS`, so no restart is needed. Run the audit again afterwards; it
 passes once the read has filled the window.
 
+After a wipe, `reset-host.ps1` schedules `repair-history.ps1` to do this
+unattended: it waits for the fleet to settle, stops the supervisor, runs
+`verify_history.py --repair`, and starts the supervisor again. Its log is
+`C:\MTLSync\logs\repair-<stamp>.log` and its list is
+`C:\MTLSync\repair-history.json` — the same file `--repair` writes by hand.
+
 ## Vercel projects
 
 Two projects were building this repo on every push, which doubled build minutes

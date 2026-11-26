@@ -263,6 +263,18 @@ the way to check the plan before committing to it:
 powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\deploy\reset-host.ps1 -DryRun
 ```
 
+After the task is back the script also registers `MTL Ledger History Repair`, a
+one-shot task that runs five minutes later (move it with
+`-PostAuditDelayMinutes`, skip it with `-NoPostAudit`). That run waits for the
+fleet to settle — no `.backfill` marker left and every live connection synced
+within the last 15 minutes — then stops the supervisor, audits the journal
+against each broker, re-arms the backfill for the accounts with missing trades
+and no others, starts the supervisor again, and unregisters itself. Its console
+output lands in `C:\MTLSync\logs\repair-<stamp>.log` and the list it queued in
+`C:\MTLSync\repair-history.json`. A connection stuck on a bad password never
+settles; the wait is capped at ten hours, after which the audit runs anyway and
+reports that account as an error rather than a gap.
+
 The manual steps below are the same work, and the fallback if the script fails
 partway.
 
@@ -341,3 +353,20 @@ When the counts stop moving, restore the normal depth and start the task again:
 notepad C:\MTLSync\.env      # BACKFILL_DAYS=365
 powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\deploy\register-task.ps1
 ```
+
+### 6. Audit it, manually
+
+`reset-host.ps1` schedules this already. To repeat it at any time — and to re-run
+it after restoring `BACKFILL_DAYS=365` — run the same script by hand. It stops the
+supervisor, audits, re-arms only the accounts whose brokers hold a trade the
+journal lacks, and starts the supervisor again even if the audit crashes.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\MTLSync\repair-history.ps1 -Now -Days 3650
+```
+
+Without `-Now` it waits up to ten hours for the fleet to settle first, which is
+what the scheduled run does. Output is in `C:\MTLSync\logs\repair-<stamp>.log`;
+the queued accounts are in `C:\MTLSync\repair-history.json`. The exit code is 0
+for a clean audit and for one that queued repairs, 1 if the verifier itself
+failed.

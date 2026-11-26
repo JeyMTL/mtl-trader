@@ -17,6 +17,12 @@
 # elevation, which is the safe way to check the plan on a host you do not want to
 # touch yet.
 #
+# Once the task is back, the script registers `MTL Ledger History Repair` to run
+# once, five minutes later. That one-shot run waits for the fleet to settle,
+# audits the journal against each broker, re-arms only the accounts with missing
+# trades, starts the fleet again, and deletes its own task. `-NoPostAudit` skips
+# it; `-PostAuditDelayMinutes` moves it.
+#
 # `-DeepHistoryDays 3650` re-arms a from-scratch read for every live connection
 # through the Supabase REST API, which is what makes the rebuild recover old
 # trades instead of resuming from each account's cursor. It refuses to run if
@@ -44,6 +50,8 @@ param(
     [int]$DeepHistoryDays = 0,
     [switch]$Verify,
     [switch]$DryRun,
+    [switch]$NoPostAudit,
+    [int]$PostAuditDelayMinutes = 5,
     [switch]$Yes
 )
 
@@ -149,7 +157,8 @@ if ($DryRun) {
     Write-Host 'Would delete' -ForegroundColor Cyan
     Describe-Target $Root
     if (Test-Path -LiteralPath $Root) {
-        $restored = @('.env', 'mt5_supervisor.py', 'mt5-brokers.json', 'run-supervisor.ps1', 'register-task.ps1')
+        $restored = @('.env', 'mt5_supervisor.py', 'mt5-brokers.json', 'run-supervisor.ps1', 'register-task.ps1',
+            'verify_history.py', 'repair-history.ps1')
         foreach ($item in Get-ChildItem -LiteralPath $Root -Force) {
             $note = if ($restored -contains $item.Name) { 'staged first, restored after the wipe' } else { 'gone' }
             Write-Host ("    {0,-24} {1}" -f $item.Name, $note)
@@ -171,12 +180,17 @@ if ($DryRun) {
     Write-Host 'Would keep' -ForegroundColor Cyan
     Write-Host ("    {0}  (read, hashed, staged outside the wipe, also backed up under ProgramData)" -f $EnvPath)
     Write-Host ("    mt5_supervisor.py, mt5-brokers.json, run-supervisor.ps1, register-task.ps1 from {0}" -f $Source)
+    Write-Host "    verify_history.py and repair-history.ps1, if they are in the source folder"
     Write-Host ''
     Write-Host 'Would rebuild' -ForegroundColor Cyan
     Write-Host ("    {0} with the files above, .env byte-identical" -f $Root)
     if ($terminalDest) { Write-Host ("    a terminal copy at {0} from {1}" -f $terminalDest, $TerminalSource) }
     if ($fleetSize -gt 0) { Write-Host ("    {0} fleet slot(s) via setup_fleet.ps1" -f $fleetSize) }
     if ($DeepHistoryDays -gt 0) { Write-Host ("    every live connection re-armed for a {0}-day read in Supabase" -f $DeepHistoryDays) }
+    if (-not $NoPostAudit) {
+        Write-Host ("    one-shot task 'MTL Ledger History Repair' in {0} minute(s): waits for the fleet, audits," -f $PostAuditDelayMinutes)
+        Write-Host "    re-arms only the accounts with missing trades, starts the fleet, removes itself"
+    }
     Write-Host ''
     Write-Host 'Nothing changed. Run without -DryRun, then type WIPE, to do it.' -ForegroundColor Yellow
     return
@@ -207,6 +221,13 @@ foreach ($name in 'run-supervisor.ps1', 'register-task.ps1') {
     if (-not (Test-Path -LiteralPath $path)) { $path = Join-Path $Source $name }
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing $name in '$Source\deploy'. Re-copy the supervisor folder first." }
     Copy-Item -LiteralPath $path -Destination $stage -Force
+}
+# Optional: an older source folder may predate the audit, in which case the wipe
+# still proceeds and only the post-rebuild audit is skipped.
+foreach ($name in 'verify_history.py', 'repair-history.ps1') {
+    $path = Join-Path $Source $name
+    if (-not (Test-Path -LiteralPath $path)) { $path = Join-Path (Join-Path $Source 'deploy') $name }
+    if (Test-Path -LiteralPath $path) { Copy-Item -LiteralPath $path -Destination $stage -Force }
 }
 $stagedServers = Join-Path $Root 'servers.dat'
 if (Test-Path -LiteralPath $stagedServers) { Copy-Item -LiteralPath $stagedServers -Destination $stage -Force }
@@ -249,7 +270,8 @@ if ($terminalDest -and (Test-Path -LiteralPath $terminalDest)) {
 # --- Rebuild ----------------------------------------------------------------
 
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
-foreach ($name in '.env', 'mt5_supervisor.py', 'mt5-brokers.json', 'run-supervisor.ps1', 'register-task.ps1') {
+foreach ($name in '.env', 'mt5_supervisor.py', 'mt5-brokers.json', 'run-supervisor.ps1', 'register-task.ps1',
+    'verify_history.py', 'repair-history.ps1') {
     $from = Join-Path $stage $name
     if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $Root -Force }
 }
@@ -341,9 +363,43 @@ Start-Sleep -Seconds 10
 $log = Join-Path $Root 'logs\supervisor.log'
 if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 10 }
 
+# --- One automatic audit, now that the host is running again -----------------
+
+$auditTask = 'MTL Ledger History Repair'
+if ($NoPostAudit) {
+    Write-Host 'Post-rebuild audit skipped (-NoPostAudit).' -ForegroundColor Yellow
+} elseif (-not (Test-Path -LiteralPath (Join-Path $Root 'repair-history.ps1'))) {
+    Write-Host 'repair-history.ps1 is not in the host folder, so the post-rebuild audit was not scheduled.' -ForegroundColor Yellow
+} elseif (-not (Test-Path -LiteralPath (Join-Path $Root 'verify_history.py'))) {
+    Write-Host 'verify_history.py is not in the host folder, so the post-rebuild audit was not scheduled.' -ForegroundColor Yellow
+} else {
+    $auditDays = 365
+    if ($envMap['BACKFILL_DAYS'] -match '^\d+$') { $auditDays = [int]$envMap['BACKFILL_DAYS'] }
+    if ($DeepHistoryDays -gt $auditDays) { $auditDays = $DeepHistoryDays }
+
+    Unregister-ScheduledTask -TaskName $auditTask -Confirm:$false -ErrorAction SilentlyContinue
+    $arguments = ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -Root "{1}" -TaskName "{2}" -SelfTask "{3}" -Days {4} -Python "{5}"' -f
+        (Join-Path $Root 'repair-history.ps1'), $Root, $TaskName, $auditTask, $auditDays, $python)
+    $auditUser = "$env:USERDOMAIN\$env:USERNAME"
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments -WorkingDirectory $Root
+    $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes($PostAuditDelayMinutes))
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 24)
+    # Registered for the logged-on operator, not SYSTEM: the audit launches the
+    # same MT5 terminal the supervisor uses, and MT5 does not work in session 0.
+    Register-ScheduledTask -TaskName $auditTask -Action $action -Trigger $trigger `
+        -User $auditUser -RunLevel Highest -Settings $settings -Force | Out-Null
+    Write-Host ("Scheduled '{0}' once, in {1} minute(s), for a {2}-day audit." -f $auditTask, $PostAuditDelayMinutes, $auditDays)
+    Write-Host ("It runs as {0} in the logged-on session, where MT5 works; it waits for the fleet," -f $auditUser)
+    Write-Host 'audits, re-arms only the accounts with gaps, then removes itself.'
+}
+
 Write-Host ''
 Write-Host ("Done. .env unchanged (SHA256 {0}); backup at {1}" -f $envHash, $backup) -ForegroundColor Green
 if ($DeepHistoryDays -gt 0) {
     Write-Host ("The {0}-day read is filling in the background. Put BACKFILL_DAYS back to 365 when the counts stop moving." -f $DeepHistoryDays) -ForegroundColor Yellow
 }
 Write-Host ("Log: {0}" -f $log) -ForegroundColor Cyan
+if (-not $NoPostAudit -and (Get-ScheduledTask -TaskName $auditTask -ErrorAction SilentlyContinue)) {
+    Write-Host ("Audit: '{0}' runs at {1}; its output goes to {2}\logs\repair-*.log" -f
+        $auditTask, (Get-ScheduledTaskInfo -TaskName $auditTask).NextRunTime, $Root) -ForegroundColor Cyan
+}
