@@ -234,6 +234,27 @@ Get-FileHash C:\Users\Administrator\Desktop\mtlsync.env.bak -Algorithm SHA256
 Copy that file off the host before the next step. Without it the credentials in
 Supabase are unreadable and every account has to be reconnected by hand.
 
+### One package, one command
+
+`dist/mtlsync-vps.zip` holds the whole host: `supervisor\` (supervisor, installer,
+fleet setup, rebuild, audit) and `shared\mt5-brokers.json`. Expand it into `C:\`
+so you get `C:\MTL\supervisor` and `C:\MTL\shared`, then:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\deploy\install-host.ps1 -FleetSize 18
+```
+
+`install-host.ps1` asks only for the secrets `.env` is missing, with
+`Read-Host -AsSecureString`, so the values are never echoed into the console
+buffer or a screenshot. It then writes `.env` itself (including
+`MT5_FLEET_DIRS`, computed from `-FleetSize`, which is why nothing has to be
+pasted by hand), installs Python and MT5 if absent, prepares the slots, points
+`MT5_PATH` at the copy, and hands over to `reset-host.ps1`. Flags: `-DryRun`,
+`-RotateSecrets`, `-BackfillDays`, `-DeepHistoryDays`, `-SkipRebuild`.
+
+`-DryRun` prints the plan and every setting with the three secrets replaced by
+`(set, hidden)`, which is the safe way to check a box before it is wiped.
+
 ### Or let the script do the whole thing
 
 `supervisor/deploy/reset-host.ps1` performs every step below and refuses to edit
