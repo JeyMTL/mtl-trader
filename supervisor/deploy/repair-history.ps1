@@ -95,7 +95,10 @@ function Get-PendingReads {
 function Get-Unsettled {
     $uri = '{0}/rest/v1/broker_connections?select=id,status,last_sync_at&status=neq.disconnected' -f $url
     $headers = @{ apikey = $key; Authorization = "Bearer $key" }
-    $connections = @(Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -TimeoutSec 20)
+    # See reset-host.ps1: a default PowerShell agent looks like a browser, and
+    # Supabase refuses an `sb_secret_` key on those.
+    $connections = @(Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -TimeoutSec 20 `
+        -UserAgent 'mtlsync-host/1.0')
     $floor = (Get-Date).ToUniversalTime().AddMinutes(-$SettleMinutes)
     @($connections | Where-Object {
         if ($_.status -eq 'pending' -or -not $_.last_sync_at) {

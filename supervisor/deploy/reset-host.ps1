@@ -336,7 +336,12 @@ if ($DeepHistoryDays -gt 0) {
         Prefer        = 'return=minimal'
     }
     $body = @{ status = 'pending'; last_sync_at = $null; last_error = $null } | ConvertTo-Json
-    Invoke-RestMethod -Method Patch -Uri $uri -Headers $headers -Body $body | Out-Null
+    # PowerShell's default user-agent starts with `Mozilla/5.0`, and Supabase
+    # refuses an `sb_secret_` key on anything that looks like a browser
+    # ("Forbidden use of secret API key in browser"). A plain tool agent is
+    # accepted; python-requests and curl already are.
+    Invoke-RestMethod -Method Patch -Uri $uri -Headers $headers -Body $body `
+        -UserAgent 'mtlsync-host/1.0' | Out-Null
     Write-Host ("Re-armed every live connection for a {0}-day read." -f $DeepHistoryDays) -ForegroundColor DarkGray
 }
 
