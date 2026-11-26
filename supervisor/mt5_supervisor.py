@@ -390,16 +390,29 @@ def claim():
     # a cooldown is what stops one bad minute from leaving the row unusable until
     # the customer disconnects and reconnects by hand.
     retry_failed = (datetime.now(timezone.utc) - timedelta(seconds=FAILED_RETRY_SECONDS)).isoformat()
+    # A rejected password is the exception: nothing about it improves with time.
+    # Re-claiming it would open a terminal, be refused, and close it again every
+    # cooldown, tying up a fleet slot for credentials already known to be wrong.
+    # The row comes back on its own once the customer re-enters the password,
+    # because `/api/broker/connection` puts it back to `pending`.
+    not_rejected_password = (
+        "or(status.neq.failed,last_error.is.null,"
+        f"last_error.not.ilike.{WRONG_PASSWORD_MESSAGE}*)"
+    )
+    due = (
+        "or(status.eq.pending,status.eq.connecting,"
+        f"and(status.eq.failed,updated_at.lt.{retry_failed}),"
+        f"and(status.eq.connected,or(last_sync_at.is.null,last_sync_at.lt.{stale})))"
+    )
     params = {
         "select": (
             "user_id,broker_name,server,account_login,"
             "credential_cipher,status,last_sync_at"
         ),
-        "or": (
-            "(status.eq.pending,status.eq.connecting,"
-            f"and(status.eq.failed,updated_at.lt.{retry_failed}),"
-            f"and(status.eq.connected,or(last_sync_at.is.null,last_sync_at.lt.{stale})))"
-        ),
+        # Both conditions in one nested `and`: PostgREST keeps only the last
+        # parameter of a given name, so `or` and the password guard cannot be
+        # sent as two separate keys.
+        "and": f"({due},{not_rejected_password})",
         "credential_cipher": "neq.",
         # Enough rows to fill a cycle after the split, so two hosts do not
         # starve each other by each reading ten rows the other one owns. A fleet
@@ -1409,6 +1422,12 @@ class WrongPassword(RuntimeError):
     """The broker rejected the investor password. Retrying cannot fix it."""
 
 
+# The exact words `WrongPassword` carries, and the only marker the claim query
+# has to recognise the row by later. Kept in one place so the message the
+# customer sees and the filter that stops the retry cannot drift apart.
+WRONG_PASSWORD_MESSAGE = "password is incorrect"
+
+
 def is_wrong_password(error):
     """Whether MT5's last error is a rejected login, not a connection problem.
 
@@ -1604,7 +1623,7 @@ def open_session(row, terminal=None):
                 if is_wrong_password(error):
                     stop_terminal_process(path)
                     raise WrongPassword(
-                        f"password is incorrect for account {login} on {server}"
+                        f"{WRONG_PASSWORD_MESSAGE} for account {login} on {server}"
                     )
                 attempts.append(
                     (
@@ -1639,7 +1658,7 @@ def open_session(row, terminal=None):
             if is_wrong_password(error):
                 stop_terminal_process(path)
                 raise WrongPassword(
-                    f"password is incorrect for account {login} on {server}"
+                    f"{WRONG_PASSWORD_MESSAGE} for account {login} on {server}"
                 )
             # Only a terminal-side failure is worth a second try; an unknown
             # server answers the same way twice. All three of these mean the

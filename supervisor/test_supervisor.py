@@ -1971,5 +1971,35 @@ class HistoryAuditTests(unittest.TestCase):
         self.assertGreater((datetime.now(timezone.utc) - datetime.fromisoformat(third["from"])).days, 3600)
 
 
+class RejectedPasswordClaimTests(unittest.TestCase):
+    """A refused password must not cost a slot every cooldown.
+
+    Closing the terminal is the first half (see `test_a_rejected_password_is_not
+    _retried`). This is the second: the row itself has to drop out of the claim
+    until the customer re-enters the password, or the fleet would open a terminal
+    for it forever, one refusal per cycle.
+    """
+
+    def setUp(self):
+        self.asked = []
+        saved = sup.requests.get
+        self.addCleanup(setattr, sup.requests, "get", saved)
+        sup.requests.get = lambda url, **kwargs: (
+            self.asked.append(kwargs.get("params")),
+            FakeResponse(200, []),
+        )[1]
+
+    def test_the_claim_skips_a_failed_row_whose_password_was_refused(self):
+        self.assertEqual(sup.claim(), [])
+
+        tree = self.asked[-1]["and"]
+        self.assertIn(f"last_error.not.ilike.{sup.WRONG_PASSWORD_MESSAGE}*", tree)
+        # Scoped to failures: a customer who just re-submitted the password puts
+        # the row back to `pending` with the old error still stored on it, and
+        # that attempt must be tried.
+        self.assertIn("status.neq.failed", tree)
+        self.assertIn("status.eq.pending", tree)
+
+
 if __name__ == "__main__":
     unittest.main()
