@@ -290,9 +290,11 @@ export default function BrokerConnect() {
               </div>
             ) : (
               <p className="text-xs text-gray-500">
-                This usually takes under a minute; a first sync can take a few minutes while the
-                terminal downloads history. If it stays here, check that the account number and
-                investor password are correct, then disconnect and connect again.
+                The first connection can take a few minutes while the terminal downloads your
+                trade history. You can close this page — we send a notification to your phone
+                when sync is live, or if the password was rejected. If it stays here, check that
+                the account number and investor password are correct, then disconnect and
+                connect again.
               </p>
             ))}
           <button
@@ -407,6 +409,11 @@ export default function BrokerConnect() {
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plug className="w-4 h-4" />}
             {saving ? 'Saving…' : 'Connect account'}
           </button>
+          <p className="text-xs text-gray-500">
+            The first connection can take a few minutes while we download your trade history.
+            You can close this page: we notify you when sync is live, or if the password is
+            wrong.
+          </p>
         </form>
       )}
     </div>

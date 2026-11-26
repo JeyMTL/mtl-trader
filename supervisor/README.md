@@ -148,8 +148,10 @@ synced accounts are served first, so the backlog rotates rather than starving.
 ### Immediate journaling
 
 With **exactly one** connected account, the supervisor stays logged in and polls
-the terminal's deal history every `WATCH_SECONDS` (2). A close is journaled in
-about 2–5 seconds, no EA required.
+the terminal's deal history every `WATCH_SECONDS` (1). A close is journaled in
+about a second, no EA required. MT5's Python API has no push notification for
+deals, so this poll is the floor; 1 s per held terminal is cheap because the
+read is a short window, not the year.
 
 One MT5 terminal has one session, so two accounts cannot both be watched. With
 two or more connections the supervisor falls back to the rotation above
@@ -159,6 +161,23 @@ rotation.
 
 While it is watching, that terminal stays logged into the connected account.
 Use the portable copy if you want your own trading terminal left alone.
+
+### The daily stop, in the same second
+
+Every close that reaches the journal is followed immediately by a lock check, so
+a loss that breaches the day cancels resting orders in that same tick — no
+waiting for a poll. `LOCK_POLL_SECONDS` (10) is only the fallback for a rule
+edited in the app, or the trading day rolling over while a session is held.
+
+The supervisor authenticates this check with `SYNC_SUPERVISOR_TOKEN`, so the
+server buckets it per account rather than per host IP. That matters because a
+fleet shares one IP: an IP bucket sized for a single EA ran out after about ten
+minutes and every later check read as "unlocked". The supervisor token also
+covers phone-only accounts, which have no `agent_token` of their own.
+
+Enforcement is still limited to cancelling resting orders. It never closes an
+open position, and an account saved with its investor password answers 10017 on
+the first order, which is reported once in the log.
 
 ### Many accounts at once (fleet mode)
 

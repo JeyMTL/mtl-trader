@@ -141,11 +141,15 @@ phone sync only works while your own PC is on.
 - Foreground pushes are not drawn as in-app banners; Android shows them when the
   app is backgrounded or closed.
 - iOS needs an Apple APNs key uploaded in Firebase before push works there.
-- Server-side push covers three things: "sync stopped" (supervisor), "trial
+- Server-side push covers six things: "MT5 sync connected" and "Password
+  incorrect" (supervisor, sent when the row turns `connected` or the broker
+  rejects the login), "sync stopped" and "sync paused" (supervisor), "trial
   ending" (daily cron) and prop-rule breaches (checked on every sync ingest, with
   a daily sweep as backstop). A failed payment still does not notify — the
   Paddle/PayPal webhooks already own that lifecycle, and a second sender there
-  would need the same once-only record the other three now use.
+  would need the same once-only record the others now use. The connected notice
+  fires only for a row that was not already `connected`, so a stale-row refresh
+  cannot repeat it every cycle.
 - A lapsed subscription and a broken connection are told apart by the
   supervisor: the first gets "MTL Ledger sync paused" (plan ended), the second
   "MT5 sync stopped" (reconnect). The lapse notice is sent once and re-arms

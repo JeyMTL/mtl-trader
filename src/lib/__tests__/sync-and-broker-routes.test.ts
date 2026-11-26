@@ -401,3 +401,48 @@ describe('broker connection', () => {
     expect(wipe).toMatchObject({ credential_cipher: '', status: 'disconnected' })
   })
 })
+
+describe('EA lock route', () => {
+  async function getLock(token: string, userId = 'u1'): Promise<Response> {
+    const { GET } = await import('@/app/api/ea/lock/route')
+    return GET(
+      new Request(`http://localhost/api/ea/lock?userId=${userId}`, {
+        headers: { authorization: `Bearer ${token}` },
+      })
+    )
+  }
+
+  it('lets the supervisor read the lock for an account with no agent token', async () => {
+    // A phone-only customer never connected an EA, so there is no agent token.
+    // The supervisor still has to read the stop it is the only one able to
+    // enforce on that terminal.
+    process.env.SYNC_SUPERVISOR_TOKEN = 'super-secret'
+    state.agentToken = ''
+
+    const res = await getLock('super-secret')
+
+    expect(res.status).toBe(200)
+    expect((await res.json()).locked).toBe(false)
+  })
+
+  it('buckets the supervisor per account instead of per IP', async () => {
+    // One host serves the whole fleet from one IP; an IP bucket sized for one
+    // terminal ran out and every later check read as "unlocked".
+    process.env.SYNC_SUPERVISOR_TOKEN = 'super-secret'
+
+    await getLock('super-secret', 'u1')
+    await getLock('super-secret', 'u2')
+
+    expect(state.rateLimitKeys).toEqual(['ea-lock:supervisor:u1', 'ea-lock:supervisor:u2'])
+  })
+
+  it('still refuses a wrong bearer for an account with no agent token', async () => {
+    process.env.SYNC_SUPERVISOR_TOKEN = 'super-secret'
+    state.agentToken = ''
+
+    const res = await getLock('not-the-secret')
+
+    expect(res.status).toBe(401)
+    expect(state.rateLimitKeys).toEqual(['ea-lock:test'])
+  })
+})

@@ -14,7 +14,7 @@ per account) starts at 4 GB.
 | --- | --- | --- |
 | 2 vCPU / 2 GB | sequential (`FLEET_SIZE=0`) | one watched account at ~2s latency, the rest on a 3-minute rotation |
 | 2 vCPU / 4 GB | sequential | same, with room for Windows Update and a second terminal |
-| 4 vCPU / 8 GB | fleet (`FLEET_SIZE` up to ~30) | most accounts journaled within seconds |
+| 4 vCPU / 8 GB | fleet, capped by free RAM (about 18 slots at 240 MB each) | accounts beyond the cap rotate, so they wait longer |
 
 Measured cost per chartless fleet slot is ~140 MB working set and ~2.5% of one
 core, so the 2 GB machine has no room for a second slot once Windows Server
@@ -99,7 +99,8 @@ What the 2 GB tuning does, and why:
 | `FLEET_SIZE` | `0` | no RAM for extra terminals; sequential mode shares one session |
 | `CYCLE_SECONDS` | `30` | new sign-ins are claimed every 30s instead of 15s; one constant query either way |
 | `REFRESH_SECONDS` | `180` | this is the cost that grows with customers; 3 minutes keeps a small host inside its budget |
-| `WATCH_SECONDS` | `2` | the one connected account is still journaled ~2s after the close |
+| `WATCH_SECONDS` | `1` | a close is journaled about a second after it happens; MT5 has no deal push |
+| `LOCK_POLL_SECONDS` | `10` | a close is checked for the lock immediately; this only catches a rule edited in the app |
 | `MAX_ACCOUNTS` | `6` | a single cycle cannot run for minutes; least recently synced accounts go first |
 | `APP_URL` | `https://mtlledger.com` | the VPS does not run Next.js |
 | `FAILED_RETRY_SECONDS` | `900` | a rejected password does not hold the only session hostage |

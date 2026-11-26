@@ -138,7 +138,7 @@ _capacity_warned_at = 0.0
 # poll history, which is the only way to journal a close in seconds without an
 # EA on the terminal. Two accounts cannot share one terminal session, so the
 # watch falls back to the normal rotation.
-WATCH_SECONDS = float(os.environ.get("WATCH_SECONDS", "2"))
+WATCH_SECONDS = float(os.environ.get("WATCH_SECONDS", "1"))
 WATCH_WINDOW = timedelta(minutes=30)
 # The daily stop, as this host can enforce it. The server decides whether the day
 # is locked (`/api/ea/lock`, the same answer the guard EA gets); this process can
@@ -146,7 +146,11 @@ WATCH_WINDOW = timedelta(minutes=30)
 # deliberately never closes an open position: that costs the trader the spread
 # and the slippage, and a sync daemon is the wrong place to make that call.
 ENFORCE_LOCK = os.environ.get("ENFORCE_LOCK", "1").lower() not in ("0", "false", "no")
-LOCK_POLL_SECONDS = int(os.environ.get("LOCK_POLL_SECONDS", "30"))
+# How often a held session re-reads the lock when nothing has closed. A close
+# is checked immediately, so this only covers a rule edited in the app or the
+# day rolling over. Ten seconds reads as instant without a request per second
+# per account that no one needs.
+LOCK_POLL_SECONDS = int(os.environ.get("LOCK_POLL_SECONDS", "10"))
 # How long a failed connection waits before the supervisor tries it again.
 FAILED_RETRY_SECONDS = int(os.environ.get("FAILED_RETRY_SECONDS", "600"))
 OVERLAP = timedelta(minutes=15)
@@ -568,6 +572,12 @@ def deals_to_trades(deals, since, offset=0):
     return trades
 
 
+# Each month gets at least this long for the terminal to fetch it. A shared
+# budget split 12 ways left some months with about 7 seconds, which is too little
+# for a slow broker, so their trades were read as empty.
+MIN_MONTH_WAIT_SECONDS = 10.0
+
+
 def backfill_trades(start, offset=0, wait_seconds=None):
     """Every closed position in [start, now], read a month at a time.
 
@@ -594,7 +604,7 @@ def backfill_trades(start, offset=0, wait_seconds=None):
         left = max(1, int((cursor - start) / chunk) + 1)
         # Split what is left of the budget over the months still to read, so one
         # empty month cannot starve the rest of the year.
-        share = max(0.0, deadline - time.monotonic()) / left
+        share = max(MIN_MONTH_WAIT_SECONDS, (deadline - time.monotonic()) / left)
         history_total(begin, share, offset=offset, end=cursor)
         found = deals_between(begin, cursor, offset)
         if found is None:
@@ -711,37 +721,6 @@ def pending_tickets(orders):
     ]
 
 
-_agent_tokens = {}
-
-
-def agent_token_for(user_id):
-    """The account's EA token, which lives on `users`, not on the connection.
-
-    Cached because the watchdog asks for a lock every 30s per account and the
-    token only changes when the customer connects a terminal again.
-    """
-    if user_id in _agent_tokens:
-        return _agent_tokens[user_id]
-    try:
-        response = requests.get(
-            f"{SUPABASE_URL}/rest/v1/users",
-            params={"select": "agent_token", "id": f"eq.{user_id}"},
-            headers=REST_HEADERS,
-            timeout=TIMEOUT,
-        )
-        if response.status_code != 200:
-            return ""  # an outage is not an answer; the next poll tries again
-        rows = response.json()
-    except (requests.RequestException, ValueError):
-        return ""
-    token = (rows[0].get("agent_token") or "") if rows else ""
-    if token:
-        # Only a real token is worth remembering: caching empty would hide the
-        # customer connecting a terminal a minute later.
-        _agent_tokens[user_id] = token
-    return token
-
-
 def lock_state(row):
     """Today's lock, exactly as the server answers the guard EA.
 
@@ -749,16 +728,16 @@ def lock_state(row):
     outage must never leave a trader unable to close a position, which is the
     same fail-open the EA takes.
     """
-    token = row.get("agent_token") or agent_token_for(row["user_id"])
-    if not token:
-        # No EA token means the customer never connected a terminal by hand; the
-        # supervisor cannot pretend to be one.
-        return None
+    # The supervisor's own token, not the customer's: a phone-only account never
+    # connected an EA and has no `agent_token`, and those are exactly the
+    # accounts whose stop only this host can enforce. The server accepts this
+    # token for the same users it already syncs, and keys its rate limit per
+    # account so one fleet's IP is not mistaken for one terminal.
     try:
         response = requests.get(
             f"{APP_URL}/api/ea/lock",
             params={"userId": row["user_id"]},
-            headers={"Authorization": f"Bearer {token}"},
+            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
             timeout=TIMEOUT,
         )
     except requests.RequestException:
@@ -771,14 +750,17 @@ def lock_state(row):
         return None
 
 
-def enforce_lock(row):
+def enforce_lock(row, force=False):
     """Cancel resting orders while the daily stop holds.
 
     The half of the guard EA that a supervisor-synced account would otherwise be
     missing: the trades arrive here, the server decides the day is over, and
     nobody on the terminal is listening. This runs from the watch loop, so it
-    only acts while a session is actually open, and at most once per
-    `LOCK_POLL_SECONDS` per account.
+    only acts while a session is actually open.
+
+    `force` skips the poll interval. The caller passes it right after a close
+    reached the journal, because that close is the event that can end the day:
+    waiting for the next poll is what made the stop feel late.
 
     Returns the number of orders cancelled.
     """
@@ -786,7 +768,7 @@ def enforce_lock(row):
         return 0
     user_id = row["user_id"]
     now = time.monotonic()
-    if now < _lock_checked_at.get(user_id, 0.0):
+    if not force and now < _lock_checked_at.get(user_id, 0.0):
         return 0
     _lock_checked_at[user_id] = now + LOCK_POLL_SECONDS
 
@@ -1303,6 +1285,77 @@ def initialize_terminal(session, path, portable=None):
     )
 
 
+class WrongPassword(RuntimeError):
+    """The broker rejected the investor password. Retrying cannot fix it."""
+
+
+def is_wrong_password(error):
+    """Whether MT5's last error is a rejected login, not a connection problem.
+
+    `Authorization failed` is what `initialize` reports for a wrong password or
+    investor password on a known server.
+    """
+    if isinstance(error, WrongPassword):
+        return True
+    return "Authorization failed" in str(error)
+
+
+def stop_terminal_process(path):
+    """Close the terminal at `path` and wait until it is really gone.
+
+    A terminal that failed to authorise is still running, holding its config and
+    its one IPC connection. The retry after the customer fixes the password must
+    not have to fight the last one, so this closes the process and waits for it
+    to exit rather than firing a kill and hoping.
+
+    Scoped to that exact executable, so another customer's terminal on the same
+    host is never touched. Best effort: a missing process is not an error.
+    """
+    try:
+        mt5.shutdown()
+    except Exception:  # noqa: BLE001
+        pass
+    if os.name != "nt":
+        return
+    if not path:
+        # A default install gives nothing to scope the kill to. Saying so beats
+        # killing every terminal on a host that may be serving other customers.
+        print("  [warn] rejected login, but there is no terminal path to close")
+        return
+    import subprocess
+
+    # Match on the full executable path, so only this slot's terminal is stopped.
+    # The image name comes from the file itself: a broker that ships `terminal.exe`
+    # (32-bit) or renames the binary would be missed by a hard-coded terminal64.
+    target = os.path.abspath(path).replace("'", "''")
+    image = Path(path).stem or "terminal64"
+    script = (
+        f"$p = Get-Process -Name '{image}' -ErrorAction SilentlyContinue | "
+        f"Where-Object {{ $_.Path -eq '{target}' }}; "
+        "if (-not $p) { 'none' } else { "
+        "$p | Stop-Process -Force -ErrorAction SilentlyContinue; "
+        "$p | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue; "
+        "if (Get-Process -Id $p.Id -ErrorAction SilentlyContinue) "
+        "{ 'stuck' } else { 'killed' } }"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"  [warn] could not close {path}: {error}")
+        return
+    lines = (result.stdout or "").strip().splitlines()
+    outcome = lines[-1].strip() if lines else ""
+    if outcome == "stuck":
+        print(f"  [warn] terminal at {path} did not exit after the rejected login")
+    elif outcome == "killed":
+        print(f"  closed the terminal at {path} after the rejected login")
+
+
 def open_session(row, terminal=None):
     """Attach to MT5 and log in, trying every installed terminal until one can.
 
@@ -1331,7 +1384,7 @@ def open_session(row, terminal=None):
         # A fleet terminal is always portable: its accounts, history and config
         # belong to that slot and must not leak into %APPDATA% or another slot.
         portable = True if terminal or looks_portable(path) else None
-        for _ in range(2):  # one retry: a stale terminal often clears on shutdown
+        for attempt in range(2):  # one retry: a stale terminal often clears on shutdown
             initialized = initialize_terminal(session, path, portable)
             if initialized:
                 info = mt5.account_info()
@@ -1352,13 +1405,31 @@ def open_session(row, terminal=None):
                 # that came up without authorising, which is the cold start this
                 # retry exists for. A real different account is not retried.
                 if actual not in (None, 0):
+                    # That terminal is live on somebody else's account. Close it
+                    # before moving on: leaving it running keeps the wrong
+                    # account attached to this slot.
+                    stop_terminal_process(path)
                     break
-                continue
+                if attempt == 0:
+                    continue
+                # Two cold starts in a row: the terminal is up but still not
+                # authorised, so it is no use to the next attempt either.
+                stop_terminal_process(path)
+                break
+
             error = mt5.last_error()
             attempts.append((path or "default install", str(error)))
             mt5.shutdown()
-            # Only a terminal-side failure is worth a second try; a rejected
-            # password or an unknown server answers the same way twice.
+            # A wrong password is the customer's to fix, not the terminal's. Close
+            # the terminal this attempt opened so it does not linger logged out, and
+            # report the password rather than a generic sync failure.
+            if is_wrong_password(error):
+                stop_terminal_process(path)
+                raise WrongPassword(
+                    f"password is incorrect for account {login} on {server}"
+                )
+            # Only a terminal-side failure is worth a second try; an unknown
+            # server answers the same way twice.
             if "IPC timeout" not in str(error) and "Process create failed" not in str(error):
                 break
 
@@ -1554,11 +1625,15 @@ def read_closed(row):
         trades = position_trades(since, offset)
 
     synced = push(user_id, trades) if trades else 0
-    if start is not None:
-        # Only a read that was actually delivered counts, so a refused ingest
-        # does not spend one of the retries.
+    if start is not None and trades:
+        # Only a read that delivered trades counts. An empty read may just be a
+        # history still downloading, so it is repeated instead of spending a pass.
         step_backfill(user_id)
     mark(user_id, "connected", error="", synced_at=datetime.now(timezone.utc).isoformat())
+    # Only a row that was not already live is news: a stale `connected` row is
+    # refreshed every cycle and must not ring the phone each time.
+    if row.get("status") != "connected":
+        announce_connected(row, synced)
     print(f"  {user_id[:8]}… {row['server']} -> {synced} position(s)")
     return synced
 
@@ -1569,7 +1644,12 @@ def sync_one(row, terminal=None):
     mark(user_id, "connecting")
     try:
         open_session(row, terminal)
-        return read_closed(row)
+        synced = read_closed(row)
+        # The session is still open, so this is the moment the stop can be
+        # enforced for an account that is about to have its terminal closed.
+        # A close forces the check; an empty read keeps the normal interval.
+        enforce_lock(row, force=bool(synced))
+        return synced
     finally:
         mt5.shutdown()
 
@@ -1682,6 +1762,9 @@ def watch(row, terminal=None, contended=True, should_yield=None):
             push(user_id, trades)
             mark(user_id, "connected", error="", synced_at=now.isoformat())
             print(f"  {user_id[:8]}… {row['server']} -> {len(trades)} position(s)")
+            # Those trades can be the ones that ended the day; check now, not at
+            # the next poll.
+            enforce_lock(row, force=True)
 
         seen = {trade["position_id"] for trade in trades}
         seen.update(
@@ -1724,6 +1807,9 @@ def watch(row, terminal=None, contended=True, should_yield=None):
                         f"  {user_id[:8]}… closed {trade['symbol']} "
                         f"{trade['lot_size']} -> {trade['pnl']}"
                     )
+                # The close that breaches the stop is journaled above, so the
+                # lock acts in the same tick rather than up to a poll later.
+                enforce_lock(row, force=True)
 
             if time.monotonic() - last_claim >= CYCLE_SECONDS:
                 last_claim = time.monotonic()
@@ -1779,11 +1865,13 @@ LAPSE_MARKERS = ("(402)", "upgrade_required")
 
 
 _lapse_notified = set()
+_password_notified = set()
 
 
 def forget_lapse(user_id):
-    """Re-arm the "paused" notice after a sync that worked."""
+    """Re-arm the "paused" and "password" notices after a sync that worked."""
     _lapse_notified.discard(user_id)
+    _password_notified.discard(user_id)
 
 
 def is_lapse(error):
@@ -1798,6 +1886,28 @@ def is_lapse(error):
     return any(marker in text for marker in LAPSE_MARKERS)
 
 
+def announce_connected(row, imported):
+    """Tell the customer the session is live, once per attempt.
+
+    A first sync can take several minutes, and by then the phone is usually in
+    a pocket. This is the success half of the pair whose failure half is
+    `report_failure`: sent at the moment the row turns `connected`, so nobody
+    has to keep the app open to learn whether the password and server worked.
+    """
+    server = row.get("server") or "Your MT5 account"
+    if imported:
+        count = f"{imported} closed trade{'s' if imported != 1 else ''}"
+        body = (
+            f"{server} is connected. {count} imported; new closes now arrive "
+            "automatically."
+        )
+    else:
+        body = (
+            f"{server} is connected. New closed trades now arrive automatically."
+        )
+    notify(row["user_id"], "MT5 sync connected", body)
+
+
 def report_failure(row, error):
     """Mark the account failed and tell the customer once per breakdown."""
     user_id = row["user_id"]
@@ -1809,6 +1919,25 @@ def report_failure(row, error):
     # One notification per breakdown, not one every cycle: a row that is already
     # `failed` is being retried, not news.
     if row.get("status") == "failed":
+        return
+    if is_wrong_password(error):
+        # The customer must re-enter the password; retrying does not help. Told
+        # once per breakdown, like a lapse.
+        #
+        # `pending` is a password the customer just submitted: the API resets
+        # the row to that on every connect. Re-arm, or a second wrong password
+        # would fail silently because the first one was already announced.
+        if row.get("status") == "pending":
+            _password_notified.discard(user_id)
+        if user_id in _password_notified:
+            return
+        _password_notified.add(user_id)
+        notify(
+            user_id,
+            "Password incorrect",
+            "The investor password for your MT5 account is incorrect. "
+            "Open the app and re-enter it so sync can resume.",
+        )
         return
     if is_lapse(error):
         # A lapse is retried like any other failure, but unlike a dead terminal

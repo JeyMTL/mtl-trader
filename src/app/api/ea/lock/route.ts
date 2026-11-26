@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
 import { getAdminClient } from '@/lib/server-auth'
+import { hasValidBearer } from '@/lib/auth-guards'
 import { apiError } from '@/lib/log'
 import { clientKey, rateLimit } from '@/lib/rate-limit'
 import {
@@ -48,7 +49,12 @@ function reasonFor(state: DayState): string {
   return `Daily loss budget reached (${state.lossUsed.toFixed(2)} of ${state.lossLimit.toFixed(2)}).`
 }
 
-async function authorised(req: Request, userId: string): Promise<boolean> {
+async function authorised(req: Request, userId: string, supervisor: boolean): Promise<boolean> {
+  // The sync host already holds every customer's credential and posts their
+  // trades; reading the same day's lock is strictly less than that. It also
+  // covers phone-only accounts, which never connected an EA and so have no
+  // `agent_token` to authenticate with.
+  if (supervisor) return true
   const header = req.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return false
   const supplied = Buffer.from(header.slice('Bearer '.length))
@@ -77,7 +83,16 @@ export async function GET(req: Request) {
     // A 30-second poll is 120 requests an hour; 600 leaves room for retries and
     // for a second terminal without letting an unauthenticated caller hammer
     // the token comparison.
-    const limit = await rateLimit(clientKey(req, 'ea-lock'), 600, 60 * 60 * 1000)
+    //
+    // The supervisor is the exception. One host serves a whole fleet from a
+    // single IP, so an IP bucket sized for one terminal ran out after about ten
+    // minutes and every slot's lock check answered 429 for the rest of the
+    // hour — which read as "unlocked". Its checks are keyed per account
+    // instead, which is what the request is actually for.
+    const supervisor = hasValidBearer(req, process.env.SYNC_SUPERVISOR_TOKEN)
+    const limit = supervisor
+      ? await rateLimit(`ea-lock:supervisor:${userId}`, 2400, 60 * 60 * 1000)
+      : await rateLimit(clientKey(req, 'ea-lock'), 600, 60 * 60 * 1000)
     if (!limit.ok) {
       return NextResponse.json(
         { error: 'Too many lock checks. The EA will retry shortly.' },
@@ -88,7 +103,7 @@ export async function GET(req: Request) {
       )
     }
 
-    if (!(await authorised(req, userId))) {
+    if (!(await authorised(req, userId, supervisor))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

@@ -187,16 +187,70 @@ class TerminalResolutionTests(unittest.TestCase):
         only = make_terminal(self.tmp.name, "plain")
         sup.MT5_PATH = only
         sup.mt5 = FakeMt5([("fail", (-6, "Terminal: Authorization failed"))])
+        killed = []
+        saved_stop = sup.stop_terminal_process
+        self.addCleanup(setattr, sup, "stop_terminal_process", saved_stop)
+        sup.stop_terminal_process = lambda path: killed.append(path)
 
-        with self.assertRaises(RuntimeError) as caught:
+        with self.assertRaises(sup.WrongPassword) as caught:
             sup.open_session(self.row())
 
         self.assertEqual(len(sup.mt5.calls), 1)
-        self.assertIn("Authorization failed", str(caught.exception))
+        self.assertIn("password is incorrect", str(caught.exception))
+        # The terminal this attempt opened is closed, not left running.
+        self.assertEqual(killed, [only])
+
+    def test_a_wrong_password_notifies_the_app_once(self):
+        sent = []
+        saved_notify = sup.notify
+        saved_notified = set(sup._password_notified)
+        self.addCleanup(setattr, sup, "notify", saved_notify)
+        self.addCleanup(sup._password_notified.clear)
+        sup._password_notified.clear()
+        sup.notify = lambda user_id, title, body: sent.append((user_id, title, body))
+        saved_mark = sup.mark
+        self.addCleanup(setattr, sup, "mark", saved_mark)
+        sup.mark = lambda *a, **k: None
+        row = {"user_id": "user-pw-1", "status": "connecting", "server": "Broker-1"}
+        error = sup.WrongPassword("password is incorrect")
+
+        sup.report_failure(row, error)
+        sup.report_failure(row, error)
+
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0][1], "Password incorrect")
+        self.assertIn("incorrect", sent[0][2])
+        sup._password_notified.update(saved_notified)
+
+    def test_a_second_rejected_password_is_not_silent(self):
+        sent = []
+        saved_notify = sup.notify
+        saved_notified = set(sup._password_notified)
+        self.addCleanup(setattr, sup, "notify", saved_notify)
+        self.addCleanup(sup._password_notified.clear)
+        sup._password_notified.clear()
+        sup.notify = lambda user_id, title, body: sent.append(title)
+        saved_mark = sup.mark
+        self.addCleanup(setattr, sup, "mark", saved_mark)
+        sup.mark = lambda *a, **k: None
+        error = sup.WrongPassword("password is incorrect")
+
+        sup.report_failure({"user_id": "user-pw-2", "status": "connecting"}, error)
+        # The customer re-enters the password, so /api/broker/connection has put
+        # the row back to `pending`. That is a new attempt, and its rejection is
+        # news even though the first one was already announced.
+        sup.report_failure({"user_id": "user-pw-2", "status": "pending"}, error)
+
+        self.assertEqual(sent, ["Password incorrect", "Password incorrect"])
+        sup._password_notified.update(saved_notified)
 
     def test_a_terminal_on_another_account_is_rejected(self):
         first = make_terminal(self.tmp.name, "plain")
         second = make_terminal(self.tmp.name, "branded")
+        closed = []
+        saved_stop = sup.stop_terminal_process
+        self.addCleanup(setattr, sup, "stop_terminal_process", saved_stop)
+        sup.stop_terminal_process = lambda path: closed.append(path)
         sup.MT5_PATH = first
         os.environ["MT5_PATHS"] = second
         try:
@@ -655,11 +709,14 @@ class BackfillTests(unittest.TestCase):
                 "server_offset",
                 "push",
                 "mark",
+                "notify",
                 "HISTORY_WAIT_SECONDS",
+                "MIN_MONTH_WAIT_SECONDS",
             )
         }
         sup.BACKFILL_DIR = Path(self.tmp.name) / "backfill"
         sup.HISTORY_WAIT_SECONDS = 0
+        sup.MIN_MONTH_WAIT_SECONDS = 0
         sup.server_offset = lambda row: 0
         self.pushed = []
 
@@ -669,6 +726,9 @@ class BackfillTests(unittest.TestCase):
 
         sup.push = push
         sup.mark = lambda *args, **kwargs: None
+        # A first sync now says "connected" on the phone; these tests are about
+        # the read, not the notice, so keep them off the network.
+        sup.notify = lambda *args, **kwargs: None
         self.windows = []
         self.addCleanup(self._restore)
 
@@ -741,6 +801,26 @@ class BackfillTests(unittest.TestCase):
         self.assertGreater(first_start, last_start)
         self.assertLess(datetime.now(timezone.utc) - first_end, timedelta(minutes=1))
 
+    def test_an_empty_read_does_not_spend_a_pass(self):
+        sup.mt5 = self.terminal({})
+        row = {"user_id": "u1", "server": "XMGlobal-MT5 9", "last_sync_at": None}
+        sup.read_closed(row)
+
+        state = json.loads(sup.backfill_path("u1").read_text(encoding="utf-8"))
+        self.assertEqual(state["left"], sup.BACKFILL_PASSES)
+
+    def test_every_month_gets_a_minimum_wait(self):
+        sup.mt5 = self.terminal({})
+        waits = []
+        original = sup.history_total
+        sup.history_total = lambda start, wait, **kw: (waits.append(wait), 0)[1]
+        self.addCleanup(setattr, sup, "history_total", original)
+
+        sup.backfill_trades(datetime.now(timezone.utc) - timedelta(days=365), wait_seconds=0)
+
+        self.assertTrue(waits)
+        self.assertTrue(all(wait >= sup.MIN_MONTH_WAIT_SECONDS for wait in waits))
+
     def first_sync(self):
         row = {
             "user_id": "u1",
@@ -790,7 +870,7 @@ class BackfillTests(unittest.TestCase):
         self.assertEqual(len(self.pushed[-1]), 1)
 
     def test_the_marker_retires_once_its_passes_are_used(self):
-        sup.mt5 = self.terminal({})
+        sup.mt5 = self.terminal({7: self.position(200)})
         row = {"user_id": "u1", "server": "XMGlobal-MT5 9", "last_sync_at": None}
 
         for _ in range(sup.BACKFILL_PASSES):
@@ -820,11 +900,14 @@ class AccountZeroLoginTests(unittest.TestCase):
                 "decrypt_credential",
                 "remember_terminal",
                 "warn_if_no_algo_trading",
+                "stop_terminal_process",
             )
         }
         sup.decrypt_credential = lambda blob: "secret"
         sup.remember_terminal = lambda key, path: None
         sup.warn_if_no_algo_trading = lambda path: None
+        self.closed = []
+        sup.stop_terminal_process = lambda path: self.closed.append(path)
         self.calls = []
         self.addCleanup(self._restore)
 
@@ -864,6 +947,16 @@ class AccountZeroLoginTests(unittest.TestCase):
 
         self.assertEqual(len(self.calls), 2)
 
+    def test_a_terminal_stuck_on_account_zero_is_refused(self):
+        sup.mt5 = self.terminal([0, 0])
+
+        with self.assertRaises(RuntimeError):
+            sup.open_session(self.row(), "C:/fleet/slot-1/terminal64.exe")
+
+        # Two cold starts that never authorised: the terminal is closed, not
+        # left running for the next account to inherit.
+        self.assertEqual(self.closed, ["C:/fleet/slot-1/terminal64.exe"])
+
     def test_another_customers_account_is_still_refused(self):
         sup.mt5 = self.terminal([999, 999])
 
@@ -871,6 +964,9 @@ class AccountZeroLoginTests(unittest.TestCase):
             sup.open_session(self.row(), "C:/fleet/slot-1/terminal64.exe")
 
         self.assertEqual(len(self.calls), 1)
+        # A terminal live on somebody else's account must not be left attached
+        # to this slot while the supervisor moves on.
+        self.assertEqual(self.closed, ["C:/fleet/slot-1/terminal64.exe"])
 
 
 class RetiredInstallTests(unittest.TestCase):
@@ -1199,6 +1295,80 @@ class FailureNoticeTests(unittest.TestCase):
 
         self.assertEqual(sup._lapse_notified, set())
 
+    def test_a_live_session_is_announced_with_what_arrived(self):
+        sup.announce_connected(
+            {"user_id": "u-6", "server": "Exness-MT5Real"}, 12
+        )
+
+        self.assertEqual(len(self.sent), 1)
+        title, body = self.sent[0]
+        self.assertEqual(title, "MT5 sync connected")
+        self.assertIn("Exness-MT5Real", body)
+        self.assertIn("12 closed trades", body)
+
+    def test_a_first_sync_with_no_trades_yet_still_says_connected(self):
+        sup.announce_connected({"user_id": "u-7", "server": "Exness"}, 0)
+
+        title, body = self.sent[0]
+        self.assertEqual(title, "MT5 sync connected")
+        self.assertIn("connected", body)
+        self.assertNotIn("0 closed", body)
+
+
+class ConnectedNoticeTests(unittest.TestCase):
+    """`read_closed` announces only a row that was not already live."""
+
+    def setUp(self):
+        self.announced = []
+        saved = {
+            name: getattr(sup, name)
+            for name in (
+                "mt5",
+                "BACKFILL_DIR",
+                "server_offset",
+                "push",
+                "mark",
+                "announce_connected",
+                "HISTORY_WAIT_SECONDS",
+                "MIN_MONTH_WAIT_SECONDS",
+            )
+        }
+        self.addCleanup(lambda: [setattr(sup, n, v) for n, v in saved.items()])
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        sup.BACKFILL_DIR = Path(self.tmp.name) / "backfill"
+        sup.HISTORY_WAIT_SECONDS = 0
+        sup.MIN_MONTH_WAIT_SECONDS = 0
+        sup.server_offset = lambda row: 0
+        sup.push = lambda user_id, trades: len(trades)
+        sup.mark = lambda *args, **kwargs: None
+        sup.announce_connected = lambda row, imported: self.announced.append(
+            (row["user_id"], imported)
+        )
+        sup.mt5 = types.SimpleNamespace(
+            history_deals_get=lambda *args, **kwargs: [],
+            history_deals_total=lambda *args, **kwargs: 0,
+            last_error=lambda: (0, ""),
+        )
+
+    def row(self, status):
+        return {
+            "user_id": "u-conn",
+            "server": "Exness",
+            "status": status,
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def test_a_pending_row_is_announced(self):
+        sup.read_closed(self.row("pending"))
+
+        self.assertEqual(self.announced, [("u-conn", 0)])
+
+    def test_an_already_connected_row_is_not_announced_again(self):
+        sup.read_closed(self.row("connected"))
+
+        self.assertEqual(self.announced, [])
+
 
 class SessionReminderTickTests(unittest.TestCase):
     """The supervisor is what asks for a session reminder often enough to land."""
@@ -1337,36 +1507,6 @@ class AlgoTradingWarningTests(unittest.TestCase):
         self.assertEqual(self.said(), "")
 
 
-class AgentTokenLookupTests(unittest.TestCase):
-    """The EA token sits on `users`; the connection row does not carry it."""
-
-    def setUp(self):
-        self.addCleanup(setattr, sup, "_agent_tokens", sup._agent_tokens)
-        self.addCleanup(setattr, sup.requests, "get", sup.requests.get)
-        sup._agent_tokens = {}
-        self.calls = []
-
-    def test_reads_the_token_once_and_remembers_it(self):
-        def get(url, **kwargs):
-            self.calls.append((url, kwargs.get("params")))
-            return FakeResponse(200, [{"agent_token": "tok-1"}])
-
-        sup.requests.get = get
-
-        self.assertEqual(sup.agent_token_for("u-1"), "tok-1")
-        self.assertEqual(sup.agent_token_for("u-1"), "tok-1")
-        self.assertEqual(len(self.calls), 1)  # asked every 30s otherwise
-        self.assertTrue(self.calls[0][0].endswith("/rest/v1/users"))
-        self.assertEqual(self.calls[0][1], {"select": "agent_token", "id": "eq.u-1"})
-
-    def test_a_failed_lookup_is_retried_rather_than_cached(self):
-        sup.requests.get = lambda url, **kwargs: FakeResponse(401, {"message": "no"})
-
-        self.assertEqual(sup.agent_token_for("u-2"), "")
-        self.assertEqual(sup.agent_token_for("u-2"), "")
-        self.assertNotIn("u-2", sup._agent_tokens)
-
-
 class FakeResponse:
     def __init__(self, status, body):
         self.status_code = status
@@ -1450,13 +1590,25 @@ class SoftLockTests(unittest.TestCase):
         self.assertTrue(self.asked[0][0].endswith("/api/ea/lock"))
         self.assertEqual(self.asked[0][1], {"userId": "u-lock"})
 
-    def test_an_account_with_no_agent_token_is_left_alone(self):
-        row = {"user_id": "u-lock"}
-        self.addCleanup(setattr, sup, "agent_token_for", sup.agent_token_for)
-        sup.agent_token_for = lambda user_id: ""
+    def test_asks_with_the_supervisor_token_for_a_phone_only_account(self):
+        # No agent_token: the customer never connected an EA. That is exactly
+        # the account whose stop only this host can enforce, so the supervisor
+        # token must be enough to read it.
+        seen = []
+        sup.requests.get = lambda url, **kwargs: (
+            seen.append(kwargs.get("headers")),
+            FakeResponse(200, {"locked": False}),
+        )[1]
 
-        self.assertEqual(sup.enforce_lock(row), 0)
-        self.assertEqual(self.asked, [])
+        self.assertEqual(sup.enforce_lock({"user_id": "u-lock"}), 0)
+
+        self.assertEqual(seen, [{"Authorization": f"Bearer {sup.SUPERVISOR_TOKEN}"}])
+
+    def test_a_close_can_force_a_check_inside_the_interval(self):
+        sup.enforce_lock(self.row())
+        sup.enforce_lock(self.row(), force=True)
+
+        self.assertEqual(len(self.asked), 2)
 
     def test_enforcement_can_be_switched_off(self):
         sup.ENFORCE_LOCK = False

@@ -298,6 +298,8 @@ bool PostBatch(const string &bodies[], const int start, const int count)
    return true;
   }
 
+void CheckLock();
+
 //--- Push every closed position, in chunks the API will accept -----------
 bool Push(const string &bodies[])
   {
@@ -379,6 +381,8 @@ void SyncNewDeals(const bool full)
      {
       if(newest > 0) g_lastClose = newest;
       PrintFormat("Pushed %d position(s)", ArraySize(bodies));
+      // A close from another terminal or the phone can breach the stop too.
+      CheckLock();
      }
   }
 
@@ -654,6 +658,10 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
    // time. Advancing it to "now" here could skip a trade that closed between
    // the old cursor and this single push.
    Push(bodies);
+
+   // A close can be the one that breaches the daily stop. Ask now rather than
+   // waiting for the next lock poll, so the freeze lands right after the loss.
+   CheckLock();
   }
 
 //--- For an execution EA: refuse to send unless this returns true ----------

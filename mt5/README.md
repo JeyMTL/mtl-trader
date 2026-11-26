@@ -55,6 +55,9 @@ invalidates the old one immediately — update the EA inputs and reattach.
   push a close immediately from `OnTradeTransaction`, with a 30-second cursor
   sync as a safety net and a full reconcile every 30 minutes.
 - A failed batch does not advance the cursor, so the next poll retries it.
+- The lock is re-read the moment a batch is accepted, not on the next poll. A
+  close may be the one that breaches the daily stop, so the guard acts on that
+  event instead of up to 30 seconds later.
 
 ## What the guard can and cannot do (read this)
 

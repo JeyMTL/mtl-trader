@@ -150,11 +150,20 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
       );
       if (!mounted) return;
       _password.clear();
-      setState(() => _connection = data);
+      // A new attempt gets its own two minutes; an old stall must not carry over.
+      _pendingSince = null;
+      setState(() {
+        _connection = data;
+        _stalled = false;
+      });
       _schedulePoll();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Connection saved. We are signing in now.')),
+          content: Text(
+            'Signing in now. The first sync can take a few minutes — we will '
+            'notify you when it is live.',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -279,10 +288,12 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
     }
     if (_status == 'connecting') {
       return 'Signing in and reading your closed trades. A first sync can take a '
-          'few minutes while the terminal downloads history.';
+          'few minutes while the terminal downloads history. You can close the '
+          'app: we send a notification when sync is live, or if the password is '
+          'wrong.';
     }
-    return 'A session usually connects in under a minute. If it does not, '
-        'disconnect and check the account number, server and investor password.';
+    return 'Waiting for a sync session to pick this account up. If it stays '
+        'here, check the account number, server and investor password.';
   }
 
   /// Opens the mail app with this connection's details already in the body, so a
@@ -589,7 +600,9 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 4),
               Text(
-                'No PC needed. Enter the account details once and every closed trade lands in your journal.',
+                'No PC needed. Enter the account details once and every closed '
+                'trade lands in your journal. The first connection can take a '
+                'few minutes while we download your trade history.',
                 style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 11.5,
@@ -659,6 +672,13 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
                   ),
                 )
               : const Text('Connect account'),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'After you connect, you can close the app. The first sync can take a '
+          'few minutes, and we send a notification when it is live — or if the '
+          'password is wrong.',
+          style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
         ),
       ],
     );
