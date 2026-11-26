@@ -21,7 +21,14 @@ param(
     # prop-firm account fails before it ever reaches the network. Point this at
     # the data folder of a terminal that has logged into those brokers, e.g.
     # %APPDATA%\MetaQuotes\Terminal\<id>\config\servers.dat
-    [string]$ServersFrom = ""
+    [string]$ServersFrom = "",
+    # Terminal builds from 6230 on (confirmed on 6230 and 6333) refuse the Python
+    # IPC handshake until the terminal has authenticated once: a never-logged-in
+    # install answers every initialize() with (-10005, 'IPC timeout') while the
+    # journal shows "MCP started on 127.0.0.1:22346" and no login attempt. Copying
+    # the source's account file is what carries that authenticated state into a
+    # slot, so it is kept by default; -StripAccount restores the old wipe.
+    [switch]$StripAccount
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,12 +65,21 @@ for ($slot = 1; $slot -le $Count; $slot++) {
     # A copy of a terminal that has been used carries that account with it: the
     # login, the server list, the sealed passwords and the downloaded history.
     # Every slot would then start on the trader's account before the supervisor
-    # ever logs in, and two slots would fight over one session.
+    # ever logs in, and two slots would fight over one session. That is why
+    # `bases` and `logs` go: they are history, and a slot re-downloads what it
+    # needs. `config\accounts.dat` is the one file kept, because a terminal that
+    # has never logged in cannot be driven over IPC at all on current builds
+    # (6230/6333) - the supervisor replaces the account with the slot's own on
+    # its first initialize(), and refuses a terminal sitting on a different
+    # account. Pass -StripAccount for the old behaviour if the source was never
+    # logged in anyway.
     # servers.dat is deliberately kept: it is the list of broker servers, not
     # credentials. Deleting it leaves the slot unable to resolve any server name,
     # and the login fails with (-10001, 'IPC send failed') because the terminal
     # never gets as far as the network.
-    foreach ($leftover in @("config\accounts.dat", "bases", "profiles", "logs", "tester")) {
+    $leftovers = @("bases", "profiles", "logs", "tester")
+    if ($StripAccount) { $leftovers += "config\accounts.dat" }
+    foreach ($leftover in $leftovers) {
         $path = Join-Path $dest $leftover
         if (Test-Path $path) { Remove-Item $path -Recurse -Force }
     }
@@ -100,6 +116,12 @@ SaveDeleted=0
 $joined = ($dirs -join ";")
 Write-Host ""
 Write-Host "Prepared $Count terminal(s) under $Root."
+if ($StripAccount) {
+    Write-Host "Account files were stripped: every slot starts logged out."
+} else {
+    Write-Host "config\accounts.dat is kept from the source: a slot can only be driven"
+    Write-Host "over IPC once its terminal has authenticated at least once."
+}
 Write-Host "Each one starts with an empty profile and no chart, so a logged-in"
 Write-Host "terminal stays near 140 MB instead of downloading chart history."
 Write-Host ""
