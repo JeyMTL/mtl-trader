@@ -1363,7 +1363,19 @@ def ensure_algo_trading(config_path):
         changed = True
 
     if changed:
-        config_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+        try:
+            config_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+        except OSError as error:
+            # A terminal under Program Files belongs to an administrator, and a
+            # supervisor started by a normal user cannot write there. Raising
+            # here aborted the login and reported a permission error as if the
+            # account were unreadable; the sync works either way, it just cannot
+            # place orders from that terminal.
+            print(
+                f"[warn] cannot enable algo trading in {config_path} ({error}); "
+                "orders from that terminal stay blocked until it is enabled by hand"
+            )
+            return True
     return not changed
 
 

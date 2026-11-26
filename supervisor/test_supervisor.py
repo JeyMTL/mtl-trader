@@ -20,6 +20,7 @@ import unittest
 import zlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 # Imported by the supervisor at module import time.
 if "MetaTrader5" not in sys.modules:
@@ -1446,6 +1447,14 @@ class AlgoTradingConfigTests(unittest.TestCase):
         path = self.config("[Experts]\nAllowLiveTrading=1\nEnabled=1\n")
 
         self.assertTrue(sup.ensure_algo_trading(path))
+
+    def test_a_config_it_cannot_write_is_a_warning_not_a_failed_login(self):
+        # Program Files belongs to an administrator: the supervisor running as a
+        # normal user cannot rewrite that config, and used to abort the whole
+        # attempt with PermissionError, which reads like an unreadable account.
+        path = self.config("[Common]\nLogin=486046720\n")
+        with mock.patch.object(Path, "write_text", side_effect=PermissionError(13, "denied")):
+            self.assertTrue(sup.ensure_algo_trading(path))
 
     def test_does_not_invent_a_config_that_is_not_there(self):
         path = Path(tempfile.mkdtemp()) / "common.ini"
