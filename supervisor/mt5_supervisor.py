@@ -1293,13 +1293,24 @@ def terminal_config_path(path, portable):
 
 
 def looks_portable(path):
-    """A terminal directory with its own `config` folder is a portable install.
+    r"""Whether this folder is driven as a portable *data* folder, not just installed.
 
-    The fleet slots are, and so is a `MT5_PATH` someone points at one: starting
-    those non-portable reads `%APPDATA%` instead and silently loses the settings
-    written beside the exe.
+    Every install ships `config\common.ini`, `config\servers.dat` and the
+    shipped `Bases`/`Profiles` folders, so their presence proves nothing — a
+    stock `C:\Program Files\MetaTrader 5` has all of them. What a folder only
+    has by being used as a portable data folder is `config\accounts.dat` or
+    `config\terminal.ini`.
+
+    Guessing wrong is not cosmetic: calling a normal install portable makes MT5
+    look for its account beside the exe, where there is none and where Program
+    Files is read-only besides, so the terminal fails the IPC handshake exactly
+    like a terminal that never logged in. `MT5_PORTABLE=1` still says it outright
+    for a copy that has not been started yet.
     """
-    return bool(path) and (Path(path).parent / "config" / "common.ini").exists()
+    if not path:
+        return False
+    config = Path(path).parent / "config"
+    return (config / "accounts.dat").exists() or (config / "terminal.ini").exists()
 
 
 def ensure_algo_trading(config_path):

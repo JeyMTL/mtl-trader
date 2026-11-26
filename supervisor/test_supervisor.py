@@ -1513,11 +1513,19 @@ class AlgoTradingConfigTests(unittest.TestCase):
         self.assertTrue(sup.ensure_algo_trading(path))
         self.assertFalse(path.exists())
 
-    def test_a_terminal_with_its_own_config_folder_is_portable(self):
+    def test_an_install_with_a_config_folder_is_not_a_portable_one(self):
+        # A stock `C:\Program Files\MetaTrader 5` ships exactly this much. Calling
+        # it portable sends the terminal to a data folder under Program Files,
+        # which holds no account and is read-only — a working install then fails
+        # the IPC handshake as if it had never been logged in.
         folder = Path(tempfile.mkdtemp())
         (folder / "config").mkdir()
         (folder / "config" / "common.ini").write_text("", encoding="utf-8")
 
+        self.assertFalse(sup.looks_portable(str(folder / "terminal64.exe")))
+
+        # What only a portable start leaves behind is the account file.
+        (folder / "config" / "accounts.dat").write_bytes(b"saved")
         self.assertTrue(sup.looks_portable(str(folder / "terminal64.exe")))
         self.assertFalse(sup.looks_portable(str(Path(tempfile.mkdtemp()) / "terminal64.exe")))
         self.assertFalse(sup.looks_portable(""))
