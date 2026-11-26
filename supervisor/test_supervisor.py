@@ -322,6 +322,57 @@ class TerminalResolutionTests(unittest.TestCase):
         self.assertIn(str(nested / "terminal64.exe"), found)
 
 
+class PortableTerminalAuthTests(unittest.TestCase):
+    """A portable terminal that was never logged in explains itself.
+
+    Builds from 6230 on refuse a program login until the terminal has
+    authenticated once, and a portable terminal only saves that login in its own
+    folder when it is started with `/portable`. Nothing in the timeout says so.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.addCleanup(sup._never_authenticated_warned.clear)
+
+    def config_of(self, name="portable"):
+        terminal = make_terminal(self.tmp.name, name)
+        config = Path(terminal).parent / "config"
+        config.mkdir()
+        (config / "common.ini").write_text("[Common]\n", encoding="utf-8")
+        return terminal, config
+
+    def test_it_names_the_portable_switch_and_the_missing_login(self):
+        terminal, _ = self.config_of()
+
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            sup.warn_if_never_authenticated(terminal)
+
+        self.assertIn("/portable", printed.getvalue())
+        self.assertIn(terminal, printed.getvalue())
+
+    def test_it_stays_quiet_once_the_login_is_saved(self):
+        terminal, config = self.config_of()
+        (config / "accounts.dat").write_bytes(b"saved")
+
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            sup.warn_if_never_authenticated(terminal)
+
+        self.assertEqual(printed.getvalue(), "")
+
+    def test_it_says_it_once_per_terminal(self):
+        terminal, _ = self.config_of()
+
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            sup.warn_if_never_authenticated(terminal)
+            sup.warn_if_never_authenticated(terminal)
+
+        self.assertEqual(printed.getvalue().count("[warn]"), 1)
+
+
 class ClaimPriorityTests(unittest.TestCase):
     def test_new_connections_are_processed_before_refreshes(self):
         rows = [

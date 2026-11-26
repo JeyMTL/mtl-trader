@@ -1490,6 +1490,7 @@ def open_session(row, terminal=None):
     attempts = []
     candidates = [terminal] if terminal else (terminal_order(row) or [None])
     for path in candidates:
+        warn_if_never_authenticated(path)
         # A fleet terminal is always portable: its accounts, history and config
         # belong to that slot and must not leak into %APPDATA% or another slot.
         portable = True if terminal or looks_portable(path) else None
@@ -1546,9 +1547,41 @@ def open_session(row, terminal=None):
     raise RuntimeError(
         f"no terminal could log in to {server} as {login} ({tried}). "
         "Install the broker's own terminal and list it in MT5_PATHS, or open MT5 "
-        "once by hand, log in, and close it."
+        "once by hand, log in, and close it — a portable terminal has to be "
+        "started with /portable for that login to be the one reused here."
     )
 
+
+
+_never_authenticated_warned = set()
+
+
+def warn_if_never_authenticated(path):
+    """Say why a portable terminal cannot accept a program login yet.
+
+    MT5 builds 6230+ answer `-10005 IPC timeout` to every `initialize(login=…)`
+    until that terminal has authenticated once by hand. A portable install keeps
+    that first login beside the exe, in `config\\accounts.dat`; starting the same
+    exe without `/portable` writes it to `%APPDATA%` instead, so the manual login
+    silently does not count and the next attempt times out exactly the same way.
+    Naming the missing file and the switch is the difference between a four-
+    minute timeout and a fix.
+    """
+    if not path or os.name != "nt":
+        return
+    where = Path(path).parent
+    if not (where / "config" / "common.ini").exists():
+        return
+    if (where / "config" / "accounts.dat").exists():
+        return
+    if path in _never_authenticated_warned:
+        return
+    _never_authenticated_warned.add(path)
+    print(
+        f"  [warn] {path} has no saved account, and MT5 refuses a program login "
+        "until that terminal has been logged in once by hand: close every "
+        f"terminal64.exe, start '{path}' with /portable, log in, and close it"
+    )
 
 
 _algo_warned = set()
