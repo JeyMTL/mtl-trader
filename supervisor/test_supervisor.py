@@ -48,20 +48,34 @@ class FakeMt5:
     def __init__(self, answers):
         self.answers = list(answers)
         self.calls = []
+        self.logins = []
+        self.login_ok = True
         self._last = (0, "ok")
+        self._account = None
 
     def initialize(self, path=None, portable=False, timeout=0, **session):
         self.calls.append((path, session.get("login"), session.get("server")))
         answer = self.answers.pop(0) if self.answers else ("fail", (-6, "exhausted"))
         if answer[0] == "ok":
             self._last = (1, "ok")
+            self._account = session.get("login")
             return True
         self._last = answer[1]
+        self._account = None
         return False
 
+    def login(self, login=None, password=None, server=None):
+        """A switch on the attached terminal. The account moves, not the call's path."""
+        self.logins.append((login, server))
+        if not self.login_ok:
+            return False
+        self._account = login
+        return True
+
     def account_info(self):
-        login = self.calls[-1][1]
-        return types.SimpleNamespace(login=login)
+        if self._account is None:
+            return None
+        return types.SimpleNamespace(login=self._account)
 
     def shutdown(self):
         return True
@@ -154,7 +168,9 @@ class TerminalResolutionTests(unittest.TestCase):
 
         stored = json.loads(self.cache.read_text(encoding="utf-8"))
         self.assertEqual(stored["fundednext|fundednext-server 3"], second)
-        self.assertEqual(sup.mt5.calls[0][2], "FundedNext-Server 3")
+        # The account is switched on the attached terminal, not handed to it at
+        # start-up: that form is what times out on the current builds.
+        self.assertEqual(sup.mt5.logins[0], (35476861, "FundedNext-Server 3"))
 
         # The next login goes straight to the terminal that worked.
         sup.mt5 = FakeMt5([("ok", None)])
@@ -187,7 +203,9 @@ class TerminalResolutionTests(unittest.TestCase):
     def test_a_rejected_password_is_not_retried(self):
         only = make_terminal(self.tmp.name, "plain")
         sup.MT5_PATH = only
-        sup.mt5 = FakeMt5([("fail", (-6, "Terminal: Authorization failed"))])
+        # The first refusal is the attach finding no saved account, which is why
+        # the login is handed over; the second is that password being wrong.
+        sup.mt5 = FakeMt5([("fail", (-6, "Terminal: Authorization failed"))] * 2)
         killed = []
         saved_stop = sup.stop_terminal_process
         self.addCleanup(setattr, sup, "stop_terminal_process", saved_stop)
@@ -196,7 +214,7 @@ class TerminalResolutionTests(unittest.TestCase):
         with self.assertRaises(sup.WrongPassword) as caught:
             sup.open_session(self.row())
 
-        self.assertEqual(len(sup.mt5.calls), 1)
+        self.assertEqual(len(sup.mt5.calls), 2)
         self.assertIn("password is incorrect", str(caught.exception))
         # The terminal this attempt opened is closed, not left running.
         self.assertEqual(killed, [only])
@@ -256,6 +274,9 @@ class TerminalResolutionTests(unittest.TestCase):
         os.environ["MT5_PATHS"] = second
         try:
             sup.mt5 = FakeMt5([("ok", None), ("ok", None)])
+            # A terminal that stays on its own account even after the switch is
+            # asked for: it must be closed and the next candidate used.
+            sup.mt5.login_ok = False
             sup.mt5.account_info = lambda: types.SimpleNamespace(
                 login=11111111 if sup.mt5.calls[-1][0] == first else 35476861
             )
@@ -347,10 +368,21 @@ class PortableTerminalAuthTests(unittest.TestCase):
 
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
-            sup.warn_if_never_authenticated(terminal)
+            sup.warn_if_never_authenticated(terminal, True)
 
         self.assertIn("/portable", printed.getvalue())
         self.assertIn(terminal, printed.getvalue())
+
+    def test_a_normal_install_says_nothing(self):
+        # Its account lives under %APPDATA%, so an empty config folder beside the
+        # exe is normal and the warning would be a lie about every stock install.
+        terminal, _ = self.config_of()
+
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            sup.warn_if_never_authenticated(terminal, False)
+
+        self.assertEqual(printed.getvalue(), "")
 
     def test_it_stays_quiet_once_the_login_is_saved(self):
         terminal, config = self.config_of()
@@ -358,7 +390,7 @@ class PortableTerminalAuthTests(unittest.TestCase):
 
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
-            sup.warn_if_never_authenticated(terminal)
+            sup.warn_if_never_authenticated(terminal, True)
 
         self.assertEqual(printed.getvalue(), "")
 
@@ -367,8 +399,8 @@ class PortableTerminalAuthTests(unittest.TestCase):
 
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
-            sup.warn_if_never_authenticated(terminal)
-            sup.warn_if_never_authenticated(terminal)
+            sup.warn_if_never_authenticated(terminal, True)
+            sup.warn_if_never_authenticated(terminal, True)
 
         self.assertEqual(printed.getvalue().count("[warn]"), 1)
 

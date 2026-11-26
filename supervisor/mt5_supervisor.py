@@ -1420,6 +1420,69 @@ def is_wrong_password(error):
     return "Authorization failed" in str(error)
 
 
+def terminal_running(path):
+    """Whether a terminal at this exact path is running.
+
+    A terminal that is already up owns its data folder and its IPC pipe: the
+    instance `initialize()` starts exits immediately, and every call then answers
+    `-10005 IPC timeout`. Knowing this beforehand is what lets the supervisor
+    reclaim a folder a hand login left open instead of timing out twice.
+    """
+    if os.name != "nt" or not path:
+        return False
+    import subprocess
+
+    target = os.path.abspath(path).replace("'", "''")
+    image = Path(path).stem or "terminal64"
+    script = (
+        f"$p = Get-Process -Name '{image}' -ErrorAction SilentlyContinue | "
+        f"Where-Object {{ $_.Path -eq '{target}' }}; "
+        "if ($p) { 'running' } else { 'none' }"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception:  # noqa: BLE001 - not knowing is the safe answer
+        return False
+    return "running" in (result.stdout or "")
+
+
+def switch_account(login, password, server, settle_seconds=15.0):
+    """Move the attached terminal to `login`, believing the terminal, not the call.
+
+    MT5 drops the IPC channel while it re-authenticates on another server, so
+    `mt5.login()` answers `(-10005, 'IPC timeout')` for a switch that has in fact
+    happened: `account_info()` afterwards reports the requested account. Trusting
+    the return code is what turned a working login into a failed sync on every
+    host with a different account already saved.
+    """
+    try:
+        if mt5.login(login, password=password, server=server):
+            return True
+    except Exception:  # noqa: BLE001 - a dead pipe is what the check below reads
+        pass
+    # Only a dropped channel is worth waiting on. Any other answer (a rejected
+    # password, an unknown server) is the terminal's verdict and will not change.
+    error = str(mt5.last_error())
+    if "IPC timeout" not in error and "IPC send failed" not in error:
+        return False
+    deadline = time.monotonic() + settle_seconds
+    while time.monotonic() < deadline:
+        info = None
+        try:
+            info = mt5.account_info()
+        except Exception:  # noqa: BLE001
+            info = None
+        if info is not None and int(getattr(info, "login", 0) or 0) == login:
+            return True
+        time.sleep(0.5)
+    return False
+
+
 def stop_terminal_process(path):
     """Close the terminal at `path` and wait until it is really gone.
 
@@ -1501,12 +1564,31 @@ def open_session(row, terminal=None):
     attempts = []
     candidates = [terminal] if terminal else (terminal_order(row) or [None])
     for path in candidates:
-        warn_if_never_authenticated(path)
         # A fleet terminal is always portable: its accounts, history and config
         # belong to that slot and must not leak into %APPDATA% or another slot.
         portable = True if terminal or looks_portable(path) else None
+        warn_if_never_authenticated(
+            path, MT5_PORTABLE if portable is None else portable
+        )
+        # A terminal already running from this folder holds its IPC pipe, so the
+        # instance this attempt starts exits and everything times out. Closing it
+        # loses nothing: a terminal's account is saved when it logs in, not when
+        # it exits. This is the hand login the runbook asks for, left open.
+        if terminal_running(path):
+            print(f"  closing the terminal already running from {path}")
+            stop_terminal_process(path)
+
         for attempt in range(2):  # one retry: a stale terminal often clears on shutdown
-            initialized = initialize_terminal(session, path, portable)
+            # Attach without credentials first. On a terminal that has
+            # authenticated once this is the only form that returns — handing MT5
+            # the login at startup is what answers `IPC timeout` on builds from
+            # 6230 on — and the switch happens afterwards, in place.
+            initialized = initialize_terminal({}, path, portable)
+            if not initialized and is_wrong_password(mt5.last_error()):
+                # `Authorization failed` on a plain initialize means the terminal
+                # has no account saved to attach to: hand it the login instead.
+                # The same error from *this* call is a rejected password, below.
+                initialized = initialize_terminal(session, path, portable)
             if initialized:
                 info = mt5.account_info()
                 actual = getattr(info, "login", None)
@@ -1514,6 +1596,16 @@ def open_session(row, terminal=None):
                     warn_if_no_algo_trading(path)
                     remember_terminal(key, path or "")
                     return
+                if switch_account(login, password, server):
+                    warn_if_no_algo_trading(path)
+                    remember_terminal(key, path or "")
+                    return
+                error = mt5.last_error()
+                if is_wrong_password(error):
+                    stop_terminal_process(path)
+                    raise WrongPassword(
+                        f"password is incorrect for account {login} on {server}"
+                    )
                 attempts.append(
                     (
                         path or "default install",
@@ -1550,8 +1642,10 @@ def open_session(row, terminal=None):
                     f"password is incorrect for account {login} on {server}"
                 )
             # Only a terminal-side failure is worth a second try; an unknown
-            # server answers the same way twice.
-            if "IPC timeout" not in str(error) and "Process create failed" not in str(error):
+            # server answers the same way twice. All three of these mean the
+            # terminal never reached the network, not that the login was refused.
+            retryable = ("IPC timeout", "IPC send failed", "Process create failed")
+            if not any(hint in str(error) for hint in retryable):
                 break
 
     tried = "; ".join(f"{where} -> {why}" for where, why in attempts)
@@ -1567,7 +1661,7 @@ def open_session(row, terminal=None):
 _never_authenticated_warned = set()
 
 
-def warn_if_never_authenticated(path):
+def warn_if_never_authenticated(path, portable):
     """Say why a portable terminal cannot accept a program login yet.
 
     MT5 builds 6230+ answer `-10005 IPC timeout` to every `initialize(login=…)`
@@ -1578,7 +1672,9 @@ def warn_if_never_authenticated(path):
     Naming the missing file and the switch is the difference between a four-
     minute timeout and a fix.
     """
-    if not path or os.name != "nt":
+    # A normal install keeps its account under %APPDATA%, so only a terminal that
+    # will actually be started portable can be missing one in its own folder.
+    if not path or not portable or os.name != "nt":
         return
     where = Path(path).parent
     if not (where / "config" / "common.ini").exists():
