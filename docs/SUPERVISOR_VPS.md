@@ -208,3 +208,104 @@ Checklist:
 
   If a warm terminal is larger than the default, set `SLOT_MEMORY_MB` to its
   working set plus ~40 MB for the worker.
+
+## Wipe the host and keep every account's history
+
+The host holds no trades. The journal is `public.trades` in Supabase, and every
+account's deals live on the broker's server, which a fresh terminal downloads
+again on request. Deleting `C:\MTLSync` and every terminal directory cannot lose
+a journaled trade — but it does throw away the only copy of four things:
+
+| Keep | Why |
+| --- | --- |
+| `C:\MTLSync\.env` | `SYNC_CREDENTIAL_KEY` decrypts every saved account password. Lose it and all 30 customers must type their password again. `SUPABASE_SERVICE_ROLE_KEY` and `SYNC_SUPERVISOR_TOKEN` are the other two. |
+| `C:\MTLSync\mt5-brokers.json` | comes in the update zip; the supervisor needs it to spell broker servers correctly |
+| the update zip's `servers.dat` | MetaQuotes' server list, so a bare terminal can resolve a broker without a download |
+| `.backfill` markers | only progress, not data. Deleting them restarts the read, which is what a wipe wants anyway. |
+
+### 1. Back up the env file first
+
+```powershell
+Stop-ScheduledTask -TaskName 'MTL Ledger Sync Supervisor' -ErrorAction SilentlyContinue
+Copy-Item C:\MTLSync\.env C:\Users\Administrator\Desktop\mtlsync.env.bak
+Get-FileHash C:\Users\Administrator\Desktop\mtlsync.env.bak -Algorithm SHA256
+```
+
+Copy that file off the host before the next step. Without it the credentials in
+Supabase are unreadable and every account has to be reconnected by hand.
+
+### 2. Delete the host
+
+```powershell
+Unregister-ScheduledTask -TaskName 'MTL Ledger Sync Supervisor' -Confirm:$false -ErrorAction SilentlyContinue
+Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+Remove-Item C:\MTLSync -Recurse -Force
+Remove-Item C:\MT5-Sync -Recurse -Force
+Remove-Item C:\MT5-Fleet -Recurse -Force        # fleet slots, if this host had them
+```
+
+### 3. Rebuild it
+
+Run the installer, then put the backed-up secrets back and set the read depth:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\setup_vps.ps1
+Copy-Item C:\Users\Administrator\Desktop\mtlsync.env.bak C:\MTLSync\.env -Force
+notepad C:\MTLSync\.env     # set BACKFILL_DAYS=3650 for ten years, MT5_PATH as before
+Copy-Item 'C:\Program Files\MetaTrader 5' 'C:\MT5-Sync' -Recurse
+```
+
+`BACKFILL_DAYS=3650` is what makes the first sync read past the default year.
+Each month is a separate terminal read with a wait of its own, so ten years is
+roughly 20 minutes per pass, three passes per account — about an hour of filling
+per account, and a fleet of 30 shares 18 slots, so run this overnight. The
+account is being watched less closely while it fills; set `BACKFILL_DAYS=365`
+again once the import is done.
+
+### 4. Re-arm the read in Supabase
+
+A connection that already has `last_sync_at` would only read from its cursor.
+Clear it so the supervisor treats each account as a first sync:
+
+```sql
+update public.broker_connections
+   set status = 'pending', last_sync_at = null, last_error = null
+ where status <> 'disconnected';
+```
+
+If you also deleted journal rows to rebuild them, clear the tombstones that would
+block the re-import. Every deleted trade wrote one, and `/api/sync` skips a
+suppressed position on purpose:
+
+```sql
+-- only when the journal rows were deleted too
+ delete from public.sync_suppressions where user_id = '<user-id>';
+```
+
+Do not clear suppressions for an account whose trades are still in the journal:
+they are there because the customer deleted those trades themselves.
+
+### 5. Confirm the history landed
+
+```powershell
+cd C:\MTLSync
+python mt5_supervisor.py --once
+Get-Content C:\MTLSync\logs\supervisor.log -Tail 40
+```
+
+The `--once` pass prints `N position(s)` for each account it worked. `history is
+still downloading, so this read will be repeated` means the broker was slower
+than the wait — the marker keeps the account in the backfill queue, so it
+finishes on the next session. Then check the oldest row and the count:
+
+```sql
+select count(*), min(close_time), max(close_time)
+  from public.trades where user_id = '<user-id>';
+```
+
+When the counts stop moving, restore the normal depth and start the task again:
+
+```powershell
+notepad C:\MTLSync\.env      # BACKFILL_DAYS=365
+powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\deploy\register-task.ps1
+```

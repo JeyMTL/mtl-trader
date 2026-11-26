@@ -712,6 +712,7 @@ class BackfillTests(unittest.TestCase):
                 "notify",
                 "HISTORY_WAIT_SECONDS",
                 "MIN_MONTH_WAIT_SECONDS",
+                "BACKFILL_DAYS",
             )
         }
         sup.BACKFILL_DIR = Path(self.tmp.name) / "backfill"
@@ -800,6 +801,17 @@ class BackfillTests(unittest.TestCase):
         last_start, _ = self.windows[-1]
         self.assertGreater(first_start, last_start)
         self.assertLess(datetime.now(timezone.utc) - first_end, timedelta(minutes=1))
+
+    def test_the_backfill_depth_is_configurable(self):
+        # A host asked to recover years, not months, starts the first read that
+        # far back. The month-at-a-time walk then covers whatever depth it is.
+        sup.mt5 = self.terminal({})
+        sup.BACKFILL_DAYS = 3650
+        sup.read_closed({"user_id": "u1", "server": "XMGlobal-MT5 9", "last_sync_at": None})
+
+        state = json.loads(sup.backfill_path("u1").read_text(encoding="utf-8"))
+        start = datetime.fromisoformat(state["from"])
+        self.assertGreater((datetime.now(timezone.utc) - start).days, 3640)
 
     def test_an_empty_read_does_not_spend_a_pass(self):
         sup.mt5 = self.terminal({})
@@ -1331,6 +1343,7 @@ class ConnectedNoticeTests(unittest.TestCase):
                 "announce_connected",
                 "HISTORY_WAIT_SECONDS",
                 "MIN_MONTH_WAIT_SECONDS",
+                "BACKFILL_DAYS",
             )
         }
         self.addCleanup(lambda: [setattr(sup, n, v) for n, v in saved.items()])

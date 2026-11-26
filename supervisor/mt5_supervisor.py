@@ -174,7 +174,12 @@ HISTORY_WAIT_SECONDS = float(os.environ.get("HISTORY_WAIT_SECONDS", "90"))
 # empty and the cursor moved past three real closes. Ask a month at a time
 # instead, newest first, and give each month a share of the wait so the download
 # has time to land.
-BACKFILL_DAYS = 365
+#
+# `BACKFILL_DAYS` is how far back that first read goes. Raise it for a one-time
+# deep import (3650 is ten years); leave it at 365 for normal running, because
+# every month read is a terminal download and a slot cannot watch while it is
+# filling. A deep read is resumed per account by the `.backfill` marker.
+BACKFILL_DAYS = int(os.environ.get("BACKFILL_DAYS", "365"))
 BACKFILL_CHUNK_DAYS = 30
 
 # Deal and tick times arrive in the *broker's* clock, not UTC: FundedNext is
