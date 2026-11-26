@@ -255,6 +255,11 @@ pasted by hand), installs Python and MT5 if absent, prepares the slots, points
 `-DryRun` prints the plan and every setting with the three secrets replaced by
 `(set, hidden)`, which is the safe way to check a box before it is wiped.
 
+`-RotateSecrets` asks again for the supervisor token and the credential key only,
+which is what a value that appeared in a log needs. `-RotateServiceKey` adds
+`SUPABASE_SERVICE_ROLE_KEY` to that list; it is separate because replacing it
+also means creating a key in the Supabase dashboard and revoking the old one.
+
 ### Or let the script do the whole thing
 
 `supervisor/deploy/reset-host.ps1` performs every step below and refuses to edit

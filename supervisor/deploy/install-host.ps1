@@ -13,7 +13,9 @@
 #   -FleetSize 18            slots to prepare (default 4; 18 on the 8 GB host)
 #   -BackfillDays 3650       how far a first sync reads (default 3650)
 #   -DeepHistoryDays 3650    re-arm every live connection, same window
-#   -RotateSecrets           prompt again even when .env already has values
+#   -RotateSecrets           ask again for the supervisor token and the
+#                            credential key, even when .env already has them
+#   -RotateServiceKey        also ask again for SUPABASE_SERVICE_ROLE_KEY
 #   -SkipRebuild             install and stop before anything is deleted
 #   -DryRun                  print the plan and the settings, change nothing
 #
@@ -27,6 +29,7 @@ param(
     [int]$DeepHistoryDays = 3650,
     [string]$TerminalSource = 'C:\Program Files\MetaTrader 5',
     [switch]$RotateSecrets,
+    [switch]$RotateServiceKey,
     [switch]$SkipRebuild,
     [switch]$DryRun
 )
@@ -84,7 +87,13 @@ if (Test-Path -LiteralPath $EnvPath) {
 if (-not $values['SUPABASE_URL']) { $values['SUPABASE_URL'] = 'https://oknrivipgpptsebeyvsq.supabase.co' }
 if (-not $values['APP_URL']) { $values['APP_URL'] = 'https://mtlledger.com' }
 
-if ($RotateSecrets) { foreach ($key in $secretKeys) { $values.Remove($key) } }
+# Two of the three are cheap to rotate and worth rotating after they appear in a
+# log. The Supabase service key is behind its own switch because replacing it
+# means creating a key in the dashboard and revoking the old one.
+if ($RotateSecrets) {
+    foreach ($key in 'SYNC_CREDENTIAL_KEY', 'SYNC_SUPERVISOR_TOKEN') { $values.Remove($key) }
+}
+if ($RotateServiceKey) { $values.Remove('SUPABASE_SERVICE_ROLE_KEY') }
 $missing = @($secretKeys | Where-Object { -not $values[$_] })
 if ($missing.Count -and -not $DryRun) {
     Say 'Secrets missing from .env. Input is hidden: nothing is echoed.'
