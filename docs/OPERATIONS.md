@@ -350,6 +350,97 @@ signing out ends the console session and takes the supervisor with it
 (`0xC000013A` in the task history). Confirm on the dashboard that the row turns
 `connected`; the supervisor shows nothing in the UI until a login succeeds.
 
+## Auditing the journal against the brokers
+
+The journal is upsert-only, so a dropped push leaves no error anywhere: the
+account simply has fewer trades than it closed. `/api/sync` cannot notice that,
+and neither can SQL, because the other side of the comparison lives on the
+broker's server. `supervisor/verify_history.py` reads each account through MT5
+the way the supervisor does (a month at a time, so a cold terminal fetches
+instead of answering from cache) and compares the two sets by `position_id`.
+
+### Journal-side queries
+
+Run these in the Supabase SQL editor. They are the cheap checks: what the
+journal holds, and whether the identity the ingest depends on is intact.
+
+```sql
+-- What the journal holds per connection, and how far back it goes.
+select c.user_id, c.broker_name, c.account_login,
+       count(t.id)                                    as trades,
+       count(t.id) filter (where t.position_id is null) as no_position,
+       min(t.close_time)                              as oldest,
+       max(t.close_time)                              as newest,
+       round(sum(t.pnl)::numeric, 2)                  as pnl
+  from public.broker_connections c
+  left join public.trades t on t.user_id = c.user_id
+ where c.status <> 'disconnected'
+ group by 1, 2, 3
+ order by trades asc;
+```
+
+```sql
+-- Must return nothing: `user_id, position_id` is the upsert key. A row here
+-- means the unique index is gone and a re-sync can double a position's P&L.
+select user_id, position_id, count(*)
+  from public.trades
+ where position_id is not null
+ group by 1, 2
+having count(*) > 1;
+```
+
+```sql
+-- Positions the customer deleted. The broker still closed them; the ingest
+-- refuses to bring them back, so the audit excludes them from "missing".
+select user_id, count(*)
+  from public.sync_suppressions
+ group by 1
+ order by 2 desc;
+```
+
+```sql
+-- Sync health. `last_sync_at` null on a connected row is a row that has never
+-- completed a read; the error column is what the phone shows.
+select user_id, broker_name, account_login, status, last_sync_at, left(last_error, 60)
+  from public.broker_connections
+ where status <> 'disconnected'
+ order by last_sync_at nulls first;
+```
+
+### Broker-side comparison
+
+Stop the task first: two processes logging into one terminal fight over a single
+session, and the failed read looks like an account problem.
+
+```powershell
+Stop-ScheduledTask -TaskName 'MTL Ledger Sync Supervisor'
+cd C:\MTLSync
+python verify_history.py --days 365                    # every account, last year
+python verify_history.py --user <uuid> --days 3650    # one account, deep
+python verify_history.py --days 365 --json > audit.json
+Start-ScheduledTask -TaskName 'MTL Ledger Sync Supervisor'
+```
+
+| Column | Meaning | Fails the run |
+| --- | --- | --- |
+| `broker` | closed positions MT5 returned in the window | — |
+| `journal` | journal rows for the same window | — |
+| `missing` | the broker closed it, the journal never got it | **yes** |
+| `extra` | journal row the broker did not return (replaced account, import) | no |
+| `pnl diff` | journal total minus broker total for the window | only if a single position differs by more than 0.02 |
+
+It exits non-zero when an account has a missing position, a P&L difference or a
+`close_time` more than two minutes off (the signature of server-time/UTC
+confusion), and when an account could not be read at all — an unreadable account
+is not a pass. `--wait` is how long each month gets for the terminal to fetch
+it; raise it for a broker whose history is slow, lower it on a deep window to
+finish sooner.
+
+A `missing` position is fixed by the backfill, not by a manual insert: delete
+that account's `.backfill` marker (or press Reconnect on the phone) and let the
+next session read the window again. The rows are upserts, so the positions that
+are already right are not touched.
+
 ## Vercel projects
 
 Two projects were building this repo on every push, which doubled build minutes

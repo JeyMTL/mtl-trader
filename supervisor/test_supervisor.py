@@ -1666,5 +1666,72 @@ class CapacityTests(unittest.TestCase):
         )
 
 
+import verify_history  # noqa: E402  (needs the sys.path entry above)
+
+
+def broker_trade(position_id, pnl=10.0, closed="2026-11-20T12:00:00+00:00"):
+    return {"position_id": position_id, "pnl": pnl, "close_time": closed}
+
+
+def journal_row(position_id, pnl=10.0, closed="2026-11-20T12:00:00+00:00"):
+    return {"position_id": position_id, "pnl": pnl, "close_time": closed.replace("+00:00", "Z")}
+
+
+class HistoryAuditTests(unittest.TestCase):
+    """The journal-versus-broker comparison, without a terminal.
+
+    A lost push is silent by design (the ingest is upsert-only), so the audit has
+    to name the positions the broker closed and the journal never got, and must
+    not turn a deliberate deletion or a CSV import into a sync failure.
+    """
+
+    def test_a_close_the_journal_never_got_is_the_failure(self):
+        found = verify_history.compare(
+            [broker_trade(1), broker_trade(2), broker_trade(3)],
+            [journal_row(1), journal_row(3)],
+        )
+
+        self.assertEqual(found["missing"], [2])
+        self.assertEqual(verify_history.verdict(found), "missing")
+
+    def test_a_customer_deletion_is_not_missing(self):
+        found = verify_history.compare(
+            [broker_trade(1), broker_trade(2)],
+            [journal_row(1)],
+            suppressed={2},
+        )
+
+        self.assertEqual(found["missing"], [])
+        self.assertEqual(found["deleted"], 1)
+        self.assertEqual(verify_history.verdict(found), "ok")
+
+    def test_a_position_the_broker_no_longer_serves_is_only_reported(self):
+        found = verify_history.compare(
+            [broker_trade(1)],
+            [journal_row(1), journal_row(9)],
+        )
+
+        self.assertEqual(found["extra"], [9])
+        self.assertEqual(verify_history.verdict(found), "ok")
+
+    def test_a_pnl_difference_beyond_a_cent_fails_the_account(self):
+        found = verify_history.compare([broker_trade(1, pnl=25.0)], [journal_row(1, pnl=20.0)])
+
+        self.assertEqual(found["pnl"], [(1, 25.0, 20.0)])
+        self.assertEqual(verify_history.verdict(found), "mismatch")
+
+    def test_a_two_hour_close_shift_is_reported_as_a_clock_problem(self):
+        found = verify_history.compare(
+            [broker_trade(1, closed="2026-11-20T14:00:00+00:00")],
+            [journal_row(1, closed="2026-11-20T12:00:00+00:00")],
+        )
+
+        self.assertEqual(len(found["clock"]), 1)
+        self.assertEqual(verify_history.verdict(found), "mismatch")
+
+    def test_an_account_that_could_not_be_read_is_an_error_not_a_pass(self):
+        self.assertEqual(verify_history.verdict({"error": "Authorization failed"}), "error")
+
+
 if __name__ == "__main__":
     unittest.main()

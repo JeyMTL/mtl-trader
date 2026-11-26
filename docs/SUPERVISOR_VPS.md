@@ -234,6 +234,29 @@ Get-FileHash C:\Users\Administrator\Desktop\mtlsync.env.bak -Algorithm SHA256
 Copy that file off the host before the next step. Without it the credentials in
 Supabase are unreadable and every account has to be reconnected by hand.
 
+### Or let the script do the whole thing
+
+`supervisor/deploy/reset-host.ps1` performs every step below and refuses to edit
+`.env`: it stages the file and the code outside the host folder, hashes it,
+stops the task, deletes the host folder, the terminal copies and the fleet
+slots, puts the files back with `.env` byte-identical, re-copies the terminal,
+prepares the slots and re-registers the task.
+
+```powershell
+# The script installs the code it sits in, so copy the current repo `supervisor`
+# folder to C:\MTL\supervisor first (or pass -Source).
+# Then set BACKFILL_DAYS=3650 in C:\MTLSync\.env by hand, and run:
+powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\deploy\reset-host.ps1 -DeepHistoryDays 3650
+```
+
+`-DeepHistoryDays` also re-arms every live connection in Supabase, which is the
+step SQL does by hand below. `-Verify` runs one `--once` pass before starting the
+task. `-Yes` skips the `WIPE` prompt. If Python or the MT5 package is missing the
+script stops before registering the task and tells you to run `setup_vps.ps1`.
+
+The manual steps below are the same work, and the fallback if the script fails
+partway.
+
 ### 2. Delete the host
 
 ```powershell
