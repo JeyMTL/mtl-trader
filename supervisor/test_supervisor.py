@@ -1732,6 +1732,43 @@ class HistoryAuditTests(unittest.TestCase):
     def test_an_account_that_could_not_be_read_is_an_error_not_a_pass(self):
         self.assertEqual(verify_history.verdict({"error": "Authorization failed"}), "error")
 
+    def test_a_repair_queues_only_the_accounts_with_missing_positions(self):
+        reports = [
+            {"user_id": "u1", "account": 111, "broker": "A", "missing": [7, 8]},
+            {"user_id": "u2", "account": 222, "broker": "B", "missing": []},
+            {"user_id": "u3", "error": "Authorization failed"},
+        ]
+
+        entries = verify_history.repair_entries(reports)
+
+        self.assertEqual([entry["user_id"] for entry in entries], ["u1"])
+        self.assertEqual(entries[0]["missing"], [7, 8])
+
+    def test_a_repair_never_shortens_a_deeper_marker(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        saved = sup.BACKFILL_DIR
+        sup.BACKFILL_DIR = Path(tmp.name) / "backfill"
+        self.addCleanup(setattr, sup, "BACKFILL_DIR", saved)
+        entry = {"user_id": "u1", "missing": [7]}
+
+        self.assertEqual(verify_history.queue_repair(entry, days=365), "queued")
+        first = json.loads(sup.backfill_path("u1").read_text(encoding="utf-8"))
+        self.assertEqual(first["left"], sup.BACKFILL_PASSES)
+        depth = (datetime.now(timezone.utc) - datetime.fromisoformat(first["from"])).days
+        self.assertGreater(depth, 360)
+
+        # The audit that found the gap may be shallower than the import already
+        # queued. Arming it then would undo the deeper read.
+        self.assertEqual(verify_history.queue_repair(entry, days=30), "already queued")
+        second = json.loads(sup.backfill_path("u1").read_text(encoding="utf-8"))
+        self.assertEqual(second["from"], first["from"])
+
+        # A deeper audit does replace it, because it covers more than the old one.
+        self.assertEqual(verify_history.queue_repair(entry, days=3650), "queued")
+        third = json.loads(sup.backfill_path("u1").read_text(encoding="utf-8"))
+        self.assertGreater((datetime.now(timezone.utc) - datetime.fromisoformat(third["from"])).days, 3600)
+
 
 if __name__ == "__main__":
     unittest.main()

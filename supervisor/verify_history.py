@@ -11,6 +11,8 @@ sets by `position_id`.
   python supervisor/verify_history.py --days 3650     # deep import check
   python supervisor/verify_history.py --user <uuid>   # one customer
   python supervisor/verify_history.py --json > audit.json
+  python supervisor/verify_history.py --repair        # audit, then re-arm only
+                                                      # the accounts with gaps
 
 What counts as a failure:
 
@@ -29,6 +31,14 @@ A position the customer deleted on purpose is not missing: the `trades` delete
 trigger records it in `sync_suppressions`, and `/api/sync` refuses to bring it
 back, so the comparison excludes those on purpose.
 
+`--repair` turns the audit into the fix for exactly those gaps. It arms the
+`.backfill` marker for each account that has a missing position (and for no other
+account), so the supervisor's next session re-reads the audited window and the
+upserts fill the holes without touching the rows that are already right. The
+list of what it queued is written to `repair-history.json` (override with
+`--repair-file`), so the run leaves a record even when the supervisor is stopped.
+An account that could not be read is never queued: its history is unknown.
+
 Stop the supervisor task first (`Stop-ScheduledTask -TaskName 'MTL Ledger Sync
 Supervisor'`). Two processes logging into the same terminal fight over one
 session, and the read fails in a way that looks like an account problem.
@@ -38,6 +48,7 @@ import argparse
 import json
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import mt5_supervisor as sup
 
@@ -182,6 +193,45 @@ def verify(row, days, wait):
     return report
 
 
+def repair_entries(reports):
+    """Accounts whose gap a backfill can close: a missing position, not an error.
+
+    An unreadable account is left out on purpose. Its history is unknown, so
+    arming a deep read for it would be a guess, and the audit says so instead.
+    """
+    return [
+        {
+            "user_id": report["user_id"],
+            "account": report.get("account"),
+            "broker": report.get("broker"),
+            "missing": list(report.get("missing") or []),
+        }
+        for report in reports
+        if not report.get("error") and report.get("missing")
+    ]
+
+
+def queue_repair(entry, days):
+    """Arm the backfill marker for one account, and say what happened.
+
+    A marker is what makes the supervisor read history again on the next claim:
+    `read_closed` takes a marker as a reason to backfill even when the row is
+    `connected` and has a cursor. Writing one does not depend on the customer
+    pressing Reconnect.
+
+    Never shortens a marker that is already deeper. An interrupted ten-year
+    import must not be replaced by the one-year window this audit used, or the
+    repair would undo the import it was meant to help.
+    """
+    user_id = entry["user_id"]
+    start = datetime.now(timezone.utc) - timedelta(days=days)
+    existing = sup.backfill_retry(user_id)
+    if existing is not None and existing <= start:
+        return "already queued"
+    sup.start_backfill(user_id, start)
+    return "queued" if sup.backfill_path(user_id).exists() else "marker not writable"
+
+
 def verdict(report):
     """Whether this account passed, and the one-word reason when it did not."""
     if report.get("error"):
@@ -226,6 +276,8 @@ def main():
     parser.add_argument("--user", default="", help="one customer's user id instead of the whole fleet")
     parser.add_argument("--wait", type=float, default=10.0, help="seconds each month gets for the terminal to fetch it")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument("--repair", action="store_true", help="re-arm the backfill for the accounts with missing positions")
+    parser.add_argument("--repair-file", default="repair-history.json", help="where the repair list is written")
     args = parser.parse_args()
 
     sup.check_config()
@@ -240,18 +292,53 @@ def main():
             print(f"[{index}/{len(rows)}] account {row.get('account_login')} on {row.get('broker')}…")
         reports.append(verify(row, args.days, args.wait))
 
+    repairs = []
+    repair_file = None
+    if args.repair:
+        repairs = repair_entries(reports)
+        for entry in repairs:
+            entry["status"] = queue_repair(entry, args.days)
+        try:
+            Path(args.repair_file).write_text(
+                json.dumps(
+                    {
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                        "days": args.days,
+                        "repairs": repairs,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            repair_file = args.repair_file
+        except OSError as error:
+            print(f"[warn] could not write {args.repair_file}: {error}", file=sys.stderr)
+
     if args.json:
-        print(json.dumps({"days": args.days, "accounts": reports}, indent=2, default=str))
+        print(json.dumps({"days": args.days, "accounts": reports, "repairs": repairs}, indent=2, default=str))
     else:
         print()
         print_report(reports)
+        if args.repair:
+            print()
+            if repair_file:
+                print(f"Repair list: {repair_file}")
+            for entry in repairs:
+                print(
+                    f"  account {entry['account']} ({entry['broker']}): "
+                    f"{len(entry['missing'])} missing position(s) — {entry['status']}"
+                )
+            if not repairs:
+                print("  no account needs a backfill; the journal matches the brokers.")
 
     failed = [report for report in reports if verdict(report) != "ok"]
     if not args.json:
         print()
         print(f"{len(reports) - len(failed)}/{len(reports)} account(s) match the broker's history.")
-        if failed:
-            print("Re-run the supervisor's backfill for the accounts above: reset their `.backfill` marker or press Reconnect.")
+        if failed and not args.repair:
+            print("Re-run with --repair to re-arm only the accounts above, or press Reconnect on the phone.")
+        if failed and args.repair:
+            print("The queued accounts are repaired by the supervisor's next read; run this audit again after it has worked them.")
     return 1 if failed else 0
 
 

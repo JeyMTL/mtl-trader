@@ -12,6 +12,11 @@
 # `-Verify` to run one `--once` pass first (that pass can take an hour per
 # account when the history depth is years, so it is off by default).
 #
+# `-DryRun` prints every path it would delete, with the size of each, and every
+# process it would stop, then exits without changing anything. It does not need
+# elevation, which is the safe way to check the plan on a host you do not want to
+# touch yet.
+#
 # `-DeepHistoryDays 3650` re-arms a from-scratch read for every live connection
 # through the Supabase REST API, which is what makes the rebuild recover old
 # trades instead of resuming from each account's cursor. It refuses to run if
@@ -38,16 +43,12 @@ param(
     [string]$TaskName = 'MTL Ledger Sync Supervisor',
     [int]$DeepHistoryDays = 0,
     [switch]$Verify,
+    [switch]$DryRun,
     [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-
-$principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw 'Run this in an elevated PowerShell (Run as Administrator): it deletes directories and re-registers a task.'
-}
 
 function Read-EnvMap([string]$Path) {
     $map = @{}
@@ -130,6 +131,61 @@ Write-Host ("  history     : BACKFILL_DAYS={0}{1}" -f $envMap['BACKFILL_DAYS'], 
 Write-Host ''
 Write-Host 'Deleted: the host folder, its logs and .backfill markers, and every terminal copy above.'
 Write-Host ''
+
+function Describe-Target([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Host ("  absent      {0}" -f $Path)
+        return
+    }
+    $items = @(Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue)
+    $bytes = ($items | Measure-Object -Property Length -Sum).Sum
+    if (-not $bytes) { $bytes = 0 }
+    Write-Host ("  delete      {0}  ({1:N1} MB, {2} item(s))" -f $Path, ($bytes / 1MB), $items.Count)
+}
+
+if ($DryRun) {
+    Write-Host 'DRY RUN: nothing is stopped, deleted, copied or written.' -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host 'Would delete' -ForegroundColor Cyan
+    Describe-Target $Root
+    if (Test-Path -LiteralPath $Root) {
+        $restored = @('.env', 'mt5_supervisor.py', 'mt5-brokers.json', 'run-supervisor.ps1', 'register-task.ps1')
+        foreach ($item in Get-ChildItem -LiteralPath $Root -Force) {
+            $note = if ($restored -contains $item.Name) { 'staged first, restored after the wipe' } else { 'gone' }
+            Write-Host ("    {0,-24} {1}" -f $item.Name, $note)
+        }
+    }
+    foreach ($dir in $fleetDirs) { Describe-Target $dir }
+    if ($terminalDest) { Describe-Target $terminalDest }
+    if (Test-Path -LiteralPath (Join-Path $Root 'servers.dat')) {
+        Write-Host ("    {0,-24} {1}" -f 'servers.dat', 'staged, then copied into the new terminal config')
+    }
+    Write-Host ''
+    Write-Host 'Would stop' -ForegroundColor Cyan
+    Write-Host ("    scheduled task '{0}' (unregistered, then registered again at the end)" -f $TaskName)
+    $workers = @(Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -like '*mt5_supervisor.py*' })
+    $terminals = @(Get-Process terminal64 -ErrorAction SilentlyContinue)
+    Write-Host ("    {0} supervisor python process(es), {1} terminal64 process(es)" -f $workers.Count, $terminals.Count)
+    Write-Host ''
+    Write-Host 'Would keep' -ForegroundColor Cyan
+    Write-Host ("    {0}  (read, hashed, staged outside the wipe, also backed up under ProgramData)" -f $EnvPath)
+    Write-Host ("    mt5_supervisor.py, mt5-brokers.json, run-supervisor.ps1, register-task.ps1 from {0}" -f $Source)
+    Write-Host ''
+    Write-Host 'Would rebuild' -ForegroundColor Cyan
+    Write-Host ("    {0} with the files above, .env byte-identical" -f $Root)
+    if ($terminalDest) { Write-Host ("    a terminal copy at {0} from {1}" -f $terminalDest, $TerminalSource) }
+    if ($fleetSize -gt 0) { Write-Host ("    {0} fleet slot(s) via setup_fleet.ps1" -f $fleetSize) }
+    if ($DeepHistoryDays -gt 0) { Write-Host ("    every live connection re-armed for a {0}-day read in Supabase" -f $DeepHistoryDays) }
+    Write-Host ''
+    Write-Host 'Nothing changed. Run without -DryRun, then type WIPE, to do it.' -ForegroundColor Yellow
+    return
+}
+
+$principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'Run this in an elevated PowerShell (Run as Administrator): it deletes directories and re-registers a task.'
+}
 
 if (-not $Yes) {
     $answer = Read-Host "Type WIPE to continue"

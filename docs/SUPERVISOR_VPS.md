@@ -254,6 +254,15 @@ step SQL does by hand below. `-Verify` runs one `--once` pass before starting th
 task. `-Yes` skips the `WIPE` prompt. If Python or the MT5 package is missing the
 script stops before registering the task and tells you to run `setup_vps.ps1`.
 
+`-DryRun` prints every path it would delete with its size and item count, each
+top-level file in the host folder marked kept or gone, and every process it would
+stop — then exits without touching anything. It works without elevation, so it is
+the way to check the plan before committing to it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\deploy\reset-host.ps1 -DryRun
+```
+
 The manual steps below are the same work, and the fallback if the script fails
 partway.
 

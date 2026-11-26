@@ -436,10 +436,37 @@ is not a pass. `--wait` is how long each month gets for the terminal to fetch
 it; raise it for a broker whose history is slow, lower it on a deep window to
 finish sooner.
 
-A `missing` position is fixed by the backfill, not by a manual insert: delete
-that account's `.backfill` marker (or press Reconnect on the phone) and let the
-next session read the window again. The rows are upserts, so the positions that
-are already right are not touched.
+A `missing` position is fixed by the backfill, not by a manual insert. The audit
+can arm that itself, and only for the accounts that need it:
+
+```powershell
+python verify_history.py --repair                 # audit, then queue the gaps
+python verify_history.py --repair --days 3650     # same over the deep window
+```
+
+`--repair` writes the `.backfill` marker for each account with a missing position
+and for no other account, so the supervisor's next claim re-reads that window and
+the upserts fill the holes; the rows that are already right are not touched. It
+never shortens a marker that reaches further back than the audited window, so a
+running ten-year import is not replaced by a one-year repair. An account that
+could not be logged into is not queued: its history is unknown.
+
+```
+repair-history.json
+{
+  "days": 365,
+  "repairs": [
+    { "user_id": "…", "account": 337339457, "broker": "IC Markets",
+      "missing": [512901, 512909], "status": "queued" }
+  ]
+}
+```
+
+`status` is `queued` when the marker was written, `already queued` when a marker
+that already covers this window was left alone, and `marker not writable` when
+the host folder refused the write. The task's next cycle picks a marker up within
+`REFRESH_SECONDS`, so no restart is needed. Run the audit again afterwards; it
+passes once the read has filled the window.
 
 ## Vercel projects
 
