@@ -47,6 +47,40 @@ double pointValue(String symbol) {
   return 100000;
 }
 
+/// What a trade risks at its stop, stands to make at its target, and the ratio
+/// between the two — the figures a trader reads before pressing save.
+///
+/// Only a level on the losing side counts as risk and only a winning one as
+/// reward. A stop above the entry of a buy is a typo the form refuses to save,
+/// and a preview that called it a loss would be describing a trade the market
+/// cannot print. Commission and swap are left out on purpose: the preview is
+/// about the levels, and the costs are typed after them.
+({double risk, double reward, double? r}) riskRewardPreview({
+  required String type,
+  required String symbol,
+  required double entry,
+  required double? stop,
+  required double? take,
+  required double lots,
+}) {
+  double at(double price) => calculatePnl(
+        type: type,
+        symbol: symbol,
+        entry: entry,
+        exit: price,
+        lots: lots,
+      );
+  final loss = stop == null ? 0.0 : -at(stop);
+  final gain = take == null ? 0.0 : at(take);
+  final risk = loss > 0 ? loss : 0.0;
+  final reward = gain > 0 ? gain : 0.0;
+  return (
+    risk: risk,
+    reward: reward,
+    r: risk > 0 && reward > 0 ? reward / risk : null,
+  );
+}
+
 /// P&L = price movement × lots × contract size + commission + swap.
 /// Commission and swap are signed (negative means a cost), as MT5 reports them.
 double calculatePnl({

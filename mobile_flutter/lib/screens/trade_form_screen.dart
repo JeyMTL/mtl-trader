@@ -265,6 +265,107 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       ? 'Add a stop loss or a take profit, or the exit is marked at the latest price.'
       : null;
 
+  /// What the trade loses at the stop and stands to make at the target, in
+  /// account currency, recalculated on every keystroke. The maths lives in
+  /// `riskRewardPreview` so the strip and its tests cannot disagree.
+  ({double risk, double reward, double? r})? get _riskPreview {
+    final entry = _valueOf(_entry);
+    final lots = _valueOf(_lots);
+    final stop = _valueOf(_stop);
+    final take = _valueOf(_take);
+    if (entry == null || lots == null || lots <= 0) return null;
+    if (stop == null && take == null) return null;
+    return riskRewardPreview(
+      type: _type,
+      symbol: _symbol.text.trim().isEmpty ? 'EURUSD' : _symbol.text.trim(),
+      entry: entry,
+      stop: stop,
+      take: take,
+      lots: lots,
+    );
+  }
+
+  /// Three figures in a fixed order, so they land in the same place whether or
+  /// not the trade has a target yet. The strip sits under the numbers it reads,
+  /// not over the chart, and it updates as they are typed.
+  Widget _riskPreviewStrip() {
+    final preview = _riskPreview;
+    final risk = preview?.risk ?? 0;
+    final reward = preview?.reward ?? 0;
+    final r = preview?.r;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _riskCell(
+                'RISK',
+                risk > 0 ? '-${money(risk)}' : '—',
+                risk > 0 ? AppColors.danger : AppColors.faint,
+              ),
+              _riskCell(
+                'REWARD',
+                reward > 0 ? '+${money(reward)}' : '—',
+                reward > 0 ? AppColors.success : AppColors.faint,
+              ),
+              _riskCell(
+                'R',
+                r == null ? '—' : '1 : ${r.toStringAsFixed(1)}',
+                r == null ? AppColors.faint : AppColors.primaryLight,
+              ),
+            ],
+          ),
+          if (risk <= 0 && reward <= 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Add an entry, a level and a size to preview the risk.',
+                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _riskCell(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: AppColors.faint,
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.9,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: tabular.copyWith(
+              color: color,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Walks the candles forward from the entry and records where the market
   /// closed the trade: the target or the stop, whichever printed first.
   ///
@@ -1093,15 +1194,26 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  // The one control here that opens another screen, so it gets
+                  // the gold surface: it reads as the bridge to the chart, not
+                  // as a fourth choice of trade type above it.
                   OutlinedButton.icon(
                     onPressed: _saving ? null : _openChart,
                     icon: const Icon(
                       Icons.candlestick_chart_outlined,
-                      size: 16,
+                      size: 17,
                     ),
                     label: const Text('Pin levels from chart'),
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 40),
+                      minimumSize: const Size.fromHeight(44),
+                      backgroundColor: AppColors.primary.withAlpha(22),
+                      foregroundColor: AppColors.primaryLight,
+                      side: BorderSide(
+                        color: AppColors.primary.withAlpha(140),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.field),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1305,6 +1417,8 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  _riskPreviewStrip(),
                 ],
               ),
             ),
