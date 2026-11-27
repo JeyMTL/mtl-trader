@@ -105,6 +105,16 @@ class ChartPickerScreen extends StatefulWidget {
 
 class _ChartPickerScreenState extends State<ChartPickerScreen>
     with WidgetsBindingObserver {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
+  /// The magnet's own name, in the trader's language: the enum carries an
+  /// English label for logs and semantics, not for the screen.
+  String get _magnetName => switch (_magnet) {
+        MagnetMode.off => _l10n.magnetOff,
+        MagnetMode.weak => _l10n.magnetWeak,
+        MagnetMode.strong => _l10n.magnetStrong,
+      };
+
   final _market = MarketDataService();
 
   ChartInterval _interval = ChartInterval.fiveMinutes;
@@ -266,16 +276,16 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     final stop = _stop;
     final take = _take;
     if (stop != null && _isBuy && stop >= entry) {
-      return 'For a BUY the stop is normally below entry.';
+      return _l10n.chartStopBuyBelow;
     }
     if (stop != null && !_isBuy && stop <= entry) {
-      return 'For a SELL the stop is normally above entry.';
+      return _l10n.chartStopSellAbove;
     }
     if (take != null && _isBuy && take <= entry) {
-      return 'For a BUY the target is normally above entry.';
+      return _l10n.chartTargetBuyAbove;
     }
     if (take != null && !_isBuy && take >= entry) {
-      return 'For a SELL the target is normally below entry.';
+      return _l10n.chartTargetSellBelow;
     }
     return null;
   }
@@ -477,11 +487,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
   void _explainSyncFailure() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          _syncMessage ??
-              'This chart could not reach your account. The levels on this '
-                  'device are unaffected.',
-        ),
+        content: Text(_syncMessage ?? _l10n.chartUnreachableAccount),
       ),
     );
   }
@@ -524,10 +530,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     } catch (_) {
       // The sync handles its own network errors; this is the last line, so the
       // badge can never sit on "syncing" for good.
-      _setSyncOutcome(
-        'This chart could not reach your account. The levels on this device '
-        'are unaffected.',
-      );
+      _setSyncOutcome(_l10n.chartUnreachableAccount);
     } finally {
       _cloudSyncRunning = false;
       if (_cloudSyncAgain) {
@@ -690,10 +693,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                '${refused.key.toUpperCase()} candles are not served by this '
-                'chart feed yet — showing 1M.',
-              ),
+              content:
+                  Text(_l10n.chartIntervalRefused(refused.key.toUpperCase())),
             ),
           );
           await _load(force: true);
@@ -837,9 +838,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     final loaded = await _loadWindow(start: from, end: to);
     if (!mounted || loaded == null) return;
     if (loaded.isEmpty) {
-      setState(
-        () => _error = 'No candles in that time frame. Try a wider window.',
-      );
+      setState(() => _error = _l10n.chartNoCandlesWindow);
     }
   }
 
@@ -1069,8 +1068,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           ),
           const Spacer(),
           IconButton(
-            tooltip:
-                _crosshairMode ? 'Crosshair mode on' : 'Crosshair mode off',
+            tooltip: _crosshairMode
+                ? _l10n.chartCrosshairOn
+                : _l10n.chartCrosshairOff,
             onPressed: () => setState(() => _crosshairMode = !_crosshairMode),
             visualDensity: VisualDensity.compact,
             icon: Icon(
@@ -1119,41 +1119,42 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           const SizedBox(height: 4),
           button(
             icon: Icons.draw_outlined,
-            tooltip: 'Drawing tools',
+            tooltip: _l10n.chartDrawingTools,
             onTap: _openDrawingTools,
             active: _armingKind != null || _armingSide != null,
           ),
           button(
             icon: Icons.timer_outlined,
-            tooltip: 'Time frame',
+            tooltip: _l10n.timeFrameTitle,
             onTap: _openTimeFrameSheet,
           ),
           button(
             icon: Icons.replay,
-            tooltip: 'Market replay',
+            tooltip: _l10n.chartMarketReplay,
             onTap: _candles.length < 12 ? null : _toggleReplayMode,
             active: _replay != null,
           ),
           button(
             icon: _magnetIcon,
-            tooltip: 'Magnet: ${_magnet.label}',
+            tooltip: _l10n.chartMagnetTooltip(_magnetName),
             onTap: _cycleMagnet,
             active: _magnet != MagnetMode.off,
           ),
           button(
             icon: Icons.tune,
-            tooltip: 'Chart style',
+            tooltip: _l10n.chartStyle,
             onTap: _openStyleSheet,
           ),
           button(
             icon: Icons.more_horiz,
-            tooltip: 'Analysis hub',
+            tooltip: _l10n.analysisHub,
             onTap: _openAnalysisHub,
           ),
           const Spacer(),
           button(
             icon: _tradeBarOpen ? Icons.close : Icons.swap_vert,
-            tooltip: _tradeBarOpen ? 'Hide buy and sell' : 'Buy / sell',
+            tooltip:
+                _tradeBarOpen ? _l10n.chartHideBuySell : _l10n.chartBuySell,
             onTap: _activePosition() == null
                 ? null
                 : () => setState(() => _tradeBarOpen = !_tradeBarOpen),
@@ -1170,20 +1171,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('${instrument.symbol} · chart'),
+        title: Text(_l10n.chartTitle(instrument.symbol)),
         actions: [
           IconButton(
-            tooltip: 'Drawing tools',
+            tooltip: _l10n.chartDrawingTools,
             onPressed: _openDrawingTools,
             icon: Icon(Icons.draw_outlined, size: 20),
           ),
           IconButton(
-            tooltip: 'Market replay',
+            tooltip: _l10n.chartMarketReplay,
             onPressed: _candles.length < 12 ? null : _toggleReplayMode,
             icon: Icon(Icons.replay, size: 20),
           ),
           IconButton(
-            tooltip: 'Chart style',
+            tooltip: _l10n.chartStyle,
             onPressed: _openStyleSheet,
             icon: Icon(Icons.tune, size: 20),
           ),
@@ -1193,7 +1194,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           // next to fullscreen under the same finger.
           _syncAction(),
           IconButton(
-            tooltip: 'Magnet: ${_magnet.label}',
+            tooltip: _l10n.chartMagnetTooltip(_magnetName),
             onPressed: _cycleMagnet,
             icon: Icon(
               _magnetIcon,
@@ -1210,7 +1211,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             color: AppColors.border,
           ),
           IconButton(
-            tooltip: 'Fullscreen',
+            tooltip: _l10n.chartFullscreen,
             onPressed: _candles.isEmpty ? null : _toggleFullscreen,
             icon: Icon(Icons.fullscreen, size: 21),
           ),
@@ -1247,9 +1248,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 _levelsCard(),
                 if (_timeInvalid) ...[
                   const SizedBox(height: 8),
-                  const _Warning(
-                    text: 'The exit time is before the entry time.',
-                  ),
+                  _Warning(text: _l10n.chartExitTimeBeforeEntry),
                 ],
                 if (_directionWarning != null) ...[
                   const SizedBox(height: 8),
@@ -1258,7 +1257,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 if (_directionWarning != null || _timeInvalid) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'You can still save it — this is only a heads-up.',
+                    _l10n.chartHeadsUp,
                     style: TextStyle(color: AppColors.faint, fontSize: 10),
                   ),
                 ],
@@ -1332,17 +1331,17 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             ),
           ),
           IconButton(
-            tooltip: 'Chart tools',
+            tooltip: _l10n.chartToolsTitle,
             onPressed: _openDrawingTools,
             icon: Icon(Icons.draw_outlined, size: 20, color: _style.muted),
           ),
           IconButton(
-            tooltip: 'Market replay',
+            tooltip: _l10n.chartMarketReplay,
             onPressed: _candles.length < 12 ? null : _toggleReplayMode,
             icon: Icon(Icons.replay, size: 20, color: _style.muted),
           ),
           IconButton(
-            tooltip: 'Chart style',
+            tooltip: _l10n.chartStyle,
             onPressed: _openStyleSheet,
             icon: Icon(Icons.tune, size: 20, color: _style.muted),
           ),
@@ -1351,7 +1350,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           // discover after leaving the canvas.
           _syncAction(overlay: true),
           IconButton(
-            tooltip: 'Magnet: ${_magnet.label}',
+            tooltip: _l10n.chartMagnetTooltip(_magnetName),
             onPressed: _cycleMagnet,
             icon: Icon(
               _magnetIcon,
@@ -1366,7 +1365,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             color: _style.axis,
           ),
           IconButton(
-            tooltip: 'Exit fullscreen',
+            tooltip: _l10n.chartExitFullscreen,
             onPressed: _toggleFullscreen,
             icon: Icon(Icons.fullscreen_exit, size: 21, color: _style.muted),
           ),
@@ -1392,7 +1391,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Drag a level line to move it and its time',
+                  _l10n.chartDragLevel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: _style.muted, fontSize: 9.5),
@@ -1423,7 +1422,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     final ink = open ? AppColors.primaryLight : _style.muted;
     return Semantics(
       button: true,
-      label: open ? 'Hide buy and sell' : 'Show buy and sell',
+      label: open ? _l10n.chartHideBuySell : _l10n.chartBuySell,
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: ready ? () => setState(() => _tradeBarOpen = !open) : null,
@@ -1446,7 +1445,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     size: 15, color: ink),
                 const SizedBox(width: 5),
                 Text(
-                  open ? 'Hide' : 'Buy / sell',
+                  open ? _l10n.chartHide : _l10n.chartBuySell,
                   style: TextStyle(
                     color: ink,
                     fontSize: 10.5,
@@ -1551,8 +1550,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     // then what the finger has to do next — not "drag", which hides the tap
     // that also works.
     final title = _placing
-        ? (total > 1 ? 'Move to size it, then lift to finish' : 'Lift to place')
-        : (total > 1 ? 'Tap to set the first point' : 'Tap to place');
+        ? (total > 1 ? _l10n.chartPlacementMove : _l10n.chartPlacementLift)
+        : (total > 1 ? _l10n.chartPlacementTapFirst : _l10n.chartPlacementTap);
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       height: 34,
@@ -1571,7 +1570,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              '$placed of $total',
+              _l10n.chartPlacedOfTotal(placed, total),
               style: tabular.copyWith(
                 color: drawingColor,
                 fontSize: 10.5,
@@ -1602,7 +1601,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 Icon(_magnetIcon, size: 13, color: AppColors.muted),
                 const SizedBox(width: 3),
                 Text(
-                  '${_magnet.label} magnet',
+                  _l10n.chartMagnetSuffix(_magnetName),
                   style: tabular.copyWith(
                     color: AppColors.muted,
                     fontSize: 10,
@@ -1614,7 +1613,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             const SizedBox(width: 6),
           ],
           IconButton(
-            tooltip: _keepDrawing ? 'Keep drawing on' : 'Keep drawing off',
+            tooltip: _keepDrawing
+                ? _l10n.chartKeepDrawingOn
+                : _l10n.chartKeepDrawingOff,
             onPressed: () => setState(() => _keepDrawing = !_keepDrawing),
             visualDensity: VisualDensity.compact,
             icon: Icon(
@@ -1626,7 +1627,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             ),
           ),
           IconButton(
-            tooltip: 'Put the tool away',
+            tooltip: _l10n.chartPutToolAway,
             onPressed: _disarmTool,
             visualDensity: VisualDensity.compact,
             icon: const Icon(
@@ -1712,19 +1713,19 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           ),
           action(
             icon: Icons.more_vert,
-            tooltip: 'More actions',
+            tooltip: _l10n.chartMoreActions,
             onTap: () => unawaited(_openDrawingActions(index)),
           ),
           // Extend right lives in the object's Edit sheet, so the top bar keeps
           // enough width for the controls a trader reaches for mid-drag.
           action(
             icon: Icons.copy_all_outlined,
-            tooltip: 'Clone',
+            tooltip: _l10n.chartClone,
             onTap: () => _cloneDrawing(index),
           ),
           action(
             icon: Icons.palette_outlined,
-            tooltip: 'Colour',
+            tooltip: _l10n.chartColour,
             active: look.tint != null,
             onTap: () => unawaited(
               _pickCustomColor(
@@ -1738,7 +1739,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           ),
           action(
             icon: Icons.line_weight,
-            tooltip: 'Line width',
+            tooltip: _l10n.chartLineWidth,
             active: look.weight != null,
             onTap: () {
               // 1, 2, 3 and back to the chart's own weight.
@@ -1757,7 +1758,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           ),
           action(
             icon: Icons.more_horiz,
-            tooltip: 'Line style',
+            tooltip: _l10n.chartLineStyle,
             active: look.dashed,
             onTap: () => _restyleSelected(
               (current) => current.copyWith(dashed: !current.dashed),
@@ -1765,7 +1766,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           ),
           action(
             icon: Icons.lock_outline,
-            tooltip: 'Lock',
+            tooltip: _l10n.chartLock,
             onTap: () => _restyleSelected(
               (current) => current.copyWith(locked: true),
               reselect: false,
@@ -1773,7 +1774,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           ),
           action(
             icon: Icons.delete_outline,
-            tooltip: 'Remove',
+            tooltip: _l10n.chartRemove,
             tone: AppColors.danger,
             onTap: () => _deleteDrawing(index),
           ),
@@ -1871,28 +1872,28 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
               ),
               row(
                 icon: Icons.notifications_active_outlined,
-                title: 'Add alert on $symbol at $label',
-                subtitle: 'A line that fires when price reaches this level',
+                title: _l10n.chartAddAlertAt(symbol, label),
+                subtitle: _l10n.chartAlertSubtitle,
                 value: 'alert',
                 tone: alertColour,
               ),
               row(
                 icon: Icons.horizontal_rule,
-                title: 'Pin a level here',
-                subtitle: 'A plain line, no notification',
+                title: _l10n.chartPinLevel,
+                subtitle: _l10n.chartPinSubtitle,
                 value: 'level',
                 tone: drawingColor,
               ),
               row(
                 icon: Icons.login,
-                title: 'Use as entry',
-                subtitle: 'Fills the entry price and this candle’s time',
+                title: _l10n.chartUseAsEntry,
+                subtitle: _l10n.chartUseAsEntrySub,
                 value: 'entry',
                 tone: AppColors.primary,
               ),
               row(
                 icon: Icons.copy_all_outlined,
-                title: 'Copy price',
+                title: _l10n.chartCopyPrice,
                 subtitle: label,
                 value: 'copy',
               ),
@@ -1914,7 +1915,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
         );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Alert set at $label.'),
+            content: Text(_l10n.chartAlertSet(label)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -1923,7 +1924,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
         _addDrawing(ChartDrawing.ray(price: price));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Level pinned at $label.'),
+            content: Text(_l10n.chartLevelPinned(label)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -1941,7 +1942,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$label copied.'),
+            content: Text(_l10n.chartPriceCopied(label)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -1962,7 +1963,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       initialDate: initial.isAfter(now) ? now : initial,
       firstDate: first,
       lastDate: now,
-      helpText: 'Replay from a date',
+      helpText: _l10n.chartReplayFromDate,
     );
     if (picked == null || !mounted) return;
 
@@ -1973,7 +1974,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'No candles for ${DateFormat('d MMM yyyy').format(start)}.',
+            _l10n.chartNoCandlesFor(DateFormat('d MMM yyyy').format(start)),
           ),
         ),
       );
@@ -2036,8 +2037,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Feed down — showing this window from the copy saved '
-              '${DateFormat('EEE HH:mm').format(copy.at)}.',
+              _l10n.chartFeedDown(DateFormat('EEE HH:mm').format(copy.at)),
             ),
           ),
         );
@@ -2075,7 +2075,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       if (fresh.isEmpty) {
         setState(() => _loadingOlder = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No earlier candles for this range.')),
+          SnackBar(content: Text(_l10n.chartNoEarlierCandles)),
         );
         return;
       }
@@ -2188,9 +2188,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          pro
-              ? '5s, 10s and 15s candles are a Pro feature. Basic charts run from 30s up.'
-              : '30s and 45s candles are part of Basic. Free charts run from 1m up.',
+          pro ? _l10n.chartProIntervals : _l10n.chartBasicIntervals,
         ),
       ),
     );
@@ -2206,13 +2204,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
 
     if (!mounted) return false;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Pinning entry, stop and target on the chart is part of Basic. '
-          'Upgrade to pin your levels — the chart itself and every other '
-          'drawing tool stay free.',
-        ),
-      ),
+      SnackBar(content: Text(_l10n.chartPinUpgrade)),
     );
     return false;
   }
@@ -2227,10 +2219,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
 
     if (!mounted) return false;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Market replay is a Pro feature. Upgrade to Pro to use it.'),
-      ),
+      SnackBar(content: Text(_l10n.chartReplayUpgrade)),
     );
     return false;
   }
@@ -2311,7 +2300,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           IconButton(
             // At the first loaded candle there is nothing to step back to, so
             // the same button pages further back through history instead.
-            tooltip: replay.atStart ? 'Load earlier candles' : 'Previous bar',
+            tooltip: replay.atStart
+                ? _l10n.chartLoadEarlier
+                : _l10n.chartPreviousBar,
             visualDensity: VisualDensity.compact,
             onPressed: replay.atStart
                 ? (_loadingOlder ? null : _loadOlder)
@@ -2332,7 +2323,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   ),
           ),
           IconButton(
-            tooltip: _playing ? 'Pause replay' : 'Play replay',
+            tooltip:
+                _playing ? _l10n.chartPauseReplay : _l10n.chartPlayReplay,
             visualDensity: VisualDensity.compact,
             onPressed: replay.atEnd ? null : _togglePlay,
             icon: Icon(
@@ -2342,7 +2334,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             ),
           ),
           IconButton(
-            tooltip: 'Next bar',
+            tooltip: _l10n.chartNextBar,
             visualDensity: VisualDensity.compact,
             onPressed: replay.atEnd ? null : () => _step(1),
             icon: Icon(
@@ -2381,7 +2373,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             ),
           ),
           IconButton(
-            tooltip: 'Jump to a date',
+            tooltip: _l10n.chartJumpToDate,
             visualDensity: VisualDensity.compact,
             onPressed: _jumpToDate,
             icon: Icon(Icons.event, size: 17, color: muted),
@@ -2393,7 +2385,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
               minimumSize: const Size(0, 32),
               padding: const EdgeInsets.symmetric(horizontal: 10),
             ),
-            child: const Text('Exit'),
+            child: Text(_l10n.chartExitReplay),
           ),
         ],
       ),
@@ -2761,26 +2753,26 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text(
-          'Text',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        title: Text(
+          _l10n.toolText,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLength: 80,
           style: TextStyle(color: AppColors.text, fontSize: 13),
-          decoration: const InputDecoration(hintText: 'Note on the chart'),
+          decoration: InputDecoration(hintText: _l10n.chartNoteHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(_l10n.cancel),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.pop(dialogContext, controller.text.trim()),
-            child: const Text('Add'),
+            child: Text(_l10n.chartAdd),
           ),
         ],
       ),
@@ -2882,35 +2874,39 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     switch (drawing.kind) {
       case DrawingKind.ray:
         if (drawing.look.alert) {
-          return drawing.look.fired ? 'Alert line — fired' : 'Alert line';
+          return drawing.look.fired
+              ? _l10n.chartAlertLineFired
+              : _l10n.chartAlertLine;
         }
-        return 'Horizontal ray';
+        return _l10n.toolRay;
       case DrawingKind.trend:
-        return 'Trend line';
+        return _l10n.toolTrendLine;
       case DrawingKind.position:
         return drawing.side == PositionSide.short
-            ? 'Short position'
-            : 'Long position';
+            ? _l10n.toolShort
+            : _l10n.toolLong;
       case DrawingKind.rectangle:
-        return 'Rectangle';
+        return _l10n.toolRectangle;
       case DrawingKind.ellipse:
-        return 'Ellipse';
+        return _l10n.toolEllipse;
       case DrawingKind.vline:
-        return 'Vertical line';
+        return _l10n.toolVertical;
       case DrawingKind.fib:
-        return 'Fib retracement';
+        return _l10n.toolFibRetracement;
       case DrawingKind.fibExtension:
-        return 'Fib extension';
+        return _l10n.toolFibExtension;
       case DrawingKind.text:
-        return drawing.text == null ? 'Text' : 'Text — ${drawing.text}';
+        return drawing.text == null
+            ? _l10n.toolText
+            : _l10n.chartTextWith(drawing.text!);
       case DrawingKind.arrowUp:
-        return 'Arrow up';
+        return _l10n.toolArrowUp;
       case DrawingKind.arrowDown:
-        return 'Arrow down';
+        return _l10n.toolArrowDown;
       case DrawingKind.brush:
-        return 'Brush';
+        return _l10n.toolBrush;
       case DrawingKind.measure:
-        return 'Measure';
+        return _l10n.toolMeasure;
     }
   }
 
@@ -2922,8 +2918,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     final risk = drawing.rewardRatio;
     String fmt(double? value) =>
         value == null ? '—' : value.toStringAsFixed(decimals);
-    return 'Entry ${fmt(entry)} · Stop ${fmt(stop)} · Target ${fmt(target)}'
-        '${risk == null ? '' : ' · ${risk.toStringAsFixed(1)}R'}';
+    return _l10n.chartPositionSummary(
+      fmt(entry),
+      fmt(stop),
+      fmt(target),
+      risk == null ? '' : ' · ${risk.toStringAsFixed(1)}R',
+    );
   }
 
   /// What tapping an object offers: TradingView's edit, clone and delete.
@@ -2953,7 +2953,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Close',
+                    tooltip: _l10n.closeAction,
                     onPressed: () => Navigator.of(sheetContext).pop(),
                     icon: Icon(
                       Icons.close,
@@ -2979,8 +2979,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   Expanded(
                     child: _toolCard(
                       icon: Icons.edit_outlined,
-                      label: 'Edit',
-                      subtitle: 'Set levels',
+                      label: _l10n.objectEdit,
+                      subtitle: _l10n.objectEditSub,
                       onTap: () => Navigator.of(sheetContext).pop('edit'),
                     ),
                   ),
@@ -2988,8 +2988,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   Expanded(
                     child: _toolCard(
                       icon: Icons.copy_all_outlined,
-                      label: 'Clone',
-                      subtitle: 'Copy it',
+                      label: _l10n.objectClone,
+                      subtitle: _l10n.objectCloneSub,
                       onTap: () => Navigator.of(sheetContext).pop('clone'),
                     ),
                   ),
@@ -2997,8 +2997,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   Expanded(
                     child: _toolCard(
                       icon: Icons.delete_outline,
-                      label: 'Delete',
-                      subtitle: 'Remove',
+                      label: _l10n.objectDelete,
+                      subtitle: _l10n.objectDeleteSub,
                       tone: AppColors.danger,
                       onTap: () => Navigator.of(sheetContext).pop('delete'),
                     ),
@@ -3016,11 +3016,13 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   drawing.look.locked ? Icons.lock : Icons.lock_open,
                   size: 19,
                 ),
-                title: Text(drawing.look.locked ? 'Unlock' : 'Lock'),
+                title: Text(
+                  drawing.look.locked ? _l10n.chartUnlock : _l10n.chartLock,
+                ),
                 subtitle: Text(
                   drawing.look.locked
-                      ? 'Let the finger move it again'
-                      : 'Hold it exactly where it is',
+                      ? _l10n.chartObjectLockedBody
+                      : _l10n.chartObjectUnlockedBody,
                 ),
                 onTap: () => Navigator.of(sheetContext).pop('lock'),
               ),
@@ -3028,16 +3030,16 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.visibility_off_outlined, size: 19),
-                title: const Text('Hide'),
-                subtitle: const Text('Clear it off the chart, keep the idea'),
+                title: Text(_l10n.chartHide),
+                subtitle: Text(_l10n.chartHideBody),
                 onTap: () => Navigator.of(sheetContext).pop('hide'),
               ),
               ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.account_tree_outlined, size: 19),
-                title: const Text('Object tree'),
-                subtitle: Text('${_drawings.length} objects on this chart'),
+                title: Text(_l10n.objectTree),
+                subtitle: Text(_l10n.chartObjectsOnChart(_drawings.length)),
                 onTap: () => Navigator.of(sheetContext).pop('tree'),
               ),
             ],
@@ -3072,9 +3074,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       _commitDrawings(next);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Object hidden.'),
+          content: Text(_l10n.chartObjectHidden),
           action: SnackBarAction(
-            label: 'Undo',
+            label: _l10n.chartUndoAction,
             onPressed: () {
               if (!mounted) return;
               final restore = [..._drawings];
@@ -3133,7 +3135,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                         children: [
                           Expanded(
                             child: Text(
-                              'Object tree',
+                              _l10n.objectTree,
                               style: TextStyle(
                                 color: AppColors.text,
                                 fontSize: 14.5,
@@ -3196,7 +3198,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  tooltip: item.look.locked ? 'Unlock' : 'Lock',
+                                  tooltip: item.look.locked
+                                      ? _l10n.chartUnlock
+                                      : _l10n.chartLock,
                                   onPressed: () => update(
                                     index,
                                     (look) =>
@@ -3213,7 +3217,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                                   ),
                                 ),
                                 IconButton(
-                                  tooltip: item.look.hidden ? 'Show' : 'Hide',
+                                  tooltip: item.look.hidden
+                                      ? _l10n.chartShow
+                                      : _l10n.chartHide,
                                   onPressed: () => update(
                                     index,
                                     (look) =>
@@ -3475,6 +3481,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (sheetContext) {
+        final l10n = AppLocalizations.of(sheetContext);
         final active = _layouts
             .where((layout) => layout.id == _activeLayoutId)
             .cast<ChartLayout?>()
@@ -3489,7 +3496,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 Row(
                   children: [
                     Text(
-                      AppLocalizations.of(sheetContext).analysisHub,
+                      l10n.analysisHub,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 15,
@@ -3498,7 +3505,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     ),
                     const Spacer(),
                     IconButton(
-                      tooltip: AppLocalizations.of(sheetContext).closeAction,
+                      tooltip: l10n.closeAction,
                       onPressed: () => Navigator.of(sheetContext).pop(),
                       icon: Icon(Icons.close, size: 18, color: AppColors.muted),
                     ),
@@ -3506,8 +3513,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 ),
                 Text(
                   active == null
-                      ? 'No layout saved yet — Save keeps this chart exactly as it looks.'
-                      : 'Layout: ${active.name}',
+                      ? l10n.chartNoLayoutSaved
+                      : l10n.chartLayoutName(active.name),
                   style: TextStyle(
                     color: AppColors.faint,
                     fontSize: 10.5,
@@ -3515,15 +3522,15 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                _sheetLabel('WORKSPACE'),
+                _sheetLabel(l10n.chartWorkspace),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
                       child: _toolCard(
                         icon: Icons.dashboard_customize_outlined,
-                        label: 'Layouts',
-                        subtitle: '${_layouts.length} saved',
+                        label: l10n.chartLayouts,
+                        subtitle: l10n.chartLayoutsSaved(_layouts.length),
                         onTap: () => Navigator.of(sheetContext).pop('layouts'),
                       ),
                     ),
@@ -3531,7 +3538,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.tune,
-                        label: 'Settings',
+                        label: l10n.chartSettings,
                         subtitle: _style.name,
                         onTap: () => Navigator.of(sheetContext).pop('settings'),
                       ),
@@ -3540,8 +3547,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.save_outlined,
-                        label: 'Save',
-                        subtitle: 'This chart',
+                        label: l10n.chartSaveShort,
+                        subtitle: l10n.chartThisChart,
                         onTap: () => Navigator.of(sheetContext).pop('save'),
                       ),
                     ),
@@ -3553,8 +3560,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.folder_open_outlined,
-                        label: 'Open',
-                        subtitle: 'From library',
+                        label: l10n.chartOpen,
+                        subtitle: l10n.chartFromLibrary,
                         onTap: () => Navigator.of(sheetContext).pop('open'),
                       ),
                     ),
@@ -3562,8 +3569,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.note_add_outlined,
-                        label: 'New',
-                        subtitle: 'Blank chart',
+                        label: l10n.chartNew,
+                        subtitle: l10n.chartBlankChart,
                         onTap: () => Navigator.of(sheetContext).pop('new'),
                       ),
                     ),
@@ -3571,7 +3578,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.grid_view_outlined,
-                        label: 'Type',
+                        label: l10n.chartType,
                         subtitle: _style.chartType.label,
                         onTap: () => Navigator.of(sheetContext).pop('type'),
                       ),
@@ -3579,17 +3586,17 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   ],
                 ),
                 const SizedBox(height: 14),
-                _sheetLabel('TOOLS'),
+                _sheetLabel(l10n.chartToolsLabel),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
                       child: _toolCard(
                         icon: Icons.show_chart,
-                        label: 'Indicators',
+                        label: l10n.chartIndicators,
                         subtitle: _style.studies.isEmpty
-                            ? 'None'
-                            : '${_style.studies.length} on',
+                            ? l10n.chartNone
+                            : l10n.chartStudiesOn(_style.studies.length),
                         onTap: () =>
                             Navigator.of(sheetContext).pop('indicators'),
                       ),
@@ -3598,8 +3605,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.notifications_active_outlined,
-                        label: 'Alerts',
-                        subtitle: 'Level touches',
+                        label: l10n.chartAlerts,
+                        subtitle: l10n.chartLevelTouches,
                         onTap: () => Navigator.of(sheetContext).pop('alerts'),
                       ),
                     ),
@@ -3607,8 +3614,9 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.replay,
-                        label: 'Replay',
-                        subtitle: _replay == null ? 'Off' : 'On',
+                        label: l10n.chartReplay,
+                        subtitle:
+                            _replay == null ? l10n.switchOff : l10n.switchOn,
                         onTap: _candles.length < 12
                             ? null
                             : () => Navigator.of(sheetContext).pop('replay'),
@@ -3622,8 +3630,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.account_tree_outlined,
-                        label: 'Object tree',
-                        subtitle: '${_drawings.length} objects',
+                        label: l10n.objectTree,
+                        subtitle: l10n.chartObjectsShort(_drawings.length),
                         onTap: _drawings.isEmpty
                             ? null
                             : () => Navigator.of(sheetContext).pop('tree'),
@@ -3633,7 +3641,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.schedule,
-                        label: 'Time zone',
+                        label: l10n.chartTimeZone,
                         subtitle: _style.zone.describe(),
                         onTap: () => Navigator.of(sheetContext).pop('zone'),
                       ),
@@ -3642,7 +3650,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     Expanded(
                       child: _toolCard(
                         icon: Icons.calendar_month_outlined,
-                        label: 'Events',
+                        label: l10n.chartEvents,
                         subtitle: _eventsSummary(_style),
                         onTap: () => Navigator.of(sheetContext).pop('events'),
                       ),
@@ -3733,27 +3741,33 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(existing == null ? 'Save layout' : 'Update layout'),
+        title: Text(
+          existing == null
+              ? _l10n.chartSaveLayoutTitle
+              : _l10n.chartUpdateLayoutTitle,
+        ),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLength: 40,
-          decoration: const InputDecoration(
-            labelText: 'Layout name',
+          decoration: InputDecoration(
+            labelText: _l10n.chartLayoutNameLabel,
             hintText: 'JeyMTL',
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
           onSubmitted: (value) => Navigator.of(dialogContext).pop(value.trim()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+            child: Text(_l10n.cancel),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: Text(existing == null ? 'Save' : 'Update'),
+            child: Text(
+              existing == null ? _l10n.chartSave : _l10n.chartUpdate,
+            ),
           ),
         ],
       ),
@@ -3785,7 +3799,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Saved “$name”.'),
+        content: Text(_l10n.chartSavedName(name)),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -3845,9 +3859,11 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       SnackBar(
         content: Text(
           layout.symbol == widget.instrument.symbol
-              ? 'Opened “${layout.name}”.'
-              : 'Opened “${layout.name}” on ${widget.instrument.symbol} — the '
-                  'palette and candle size came with it.',
+              ? _l10n.chartOpenedLayout(layout.name)
+              : _l10n.chartOpenedLayoutOn(
+                  layout.name,
+                  widget.instrument.symbol,
+                ),
         ),
         duration: const Duration(seconds: 3),
       ),
@@ -5737,6 +5753,8 @@ class _ChartCanvas extends StatefulWidget {
 
 class _ChartCanvasState extends State<_ChartCanvas>
     with SingleTickerProviderStateMixin {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   final _view = ChartViewport();
 
   double? _entry;
@@ -7167,7 +7185,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                     top: (_crosshair!.dy - 12).clamp(0.0, _size.height - 24),
                     child: Semantics(
                       button: true,
-                      label: 'Quick actions at this price',
+                      label: _l10n.chartA11yQuickActions,
                       child: GestureDetector(
                         onTap: () {
                           final price = _priceFor(_crosshair!);
@@ -7199,7 +7217,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                     bottom: 34,
                     child: Semantics(
                       button: true,
-                      label: 'Fit the price scale',
+                      label: _l10n.chartA11yFitScale,
                       child: GestureDetector(
                         onTap: () => setState(() {
                           _pricePan = 0;
@@ -7272,7 +7290,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
                     child: Center(
                       child: Semantics(
                         button: true,
-                        label: 'Finish drawing',
+                        label: _l10n.chartA11yFinishDrawing,
                         child: GestureDetector(
                           onTap: widget.onFinishPlacement,
                           child: Container(
@@ -8099,6 +8117,8 @@ class _ZoneSheetState extends State<_ZoneSheet> {
   final _search = TextEditingController();
   String _query = '';
 
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   @override
   void dispose() {
     _search.dispose();
@@ -8119,7 +8139,7 @@ class _ZoneSheetState extends State<_ZoneSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Chart time zone',
+                      _l10n.chartTimeZoneTitle,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 15.5,
@@ -8128,7 +8148,7 @@ class _ZoneSheetState extends State<_ZoneSheet> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Close',
+                    tooltip: _l10n.closeAction,
                     onPressed: () => Navigator.of(context).pop(),
                     icon: Icon(
                       Icons.close,
@@ -8147,7 +8167,7 @@ class _ZoneSheetState extends State<_ZoneSheet> {
                 style: TextStyle(color: AppColors.text, fontSize: 13),
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: 'Search a city or zone',
+                  hintText: _l10n.chartSearchZone,
                   prefixIcon: const Icon(Icons.search, size: 18),
                   border: const OutlineInputBorder(),
                 ),

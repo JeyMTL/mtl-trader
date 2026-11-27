@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../core/format.dart';
 import '../core/import_history.dart';
 import '../core/import_parser.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -34,6 +35,8 @@ class ImportScreen extends StatefulWidget {
 }
 
 class _ImportScreenState extends State<ImportScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   String? _fileName;
   List<ParsedTrade>? _trades;
   List<ImportRecord> _history = const [];
@@ -77,16 +80,12 @@ class _ImportScreenState extends State<ImportScreen> {
       bytes = await File(file.path!).readAsBytes();
     }
     if (bytes == null) {
-      setState(() => _error = 'Could not read that file. Try picking it again.');
+      setState(() => _error = _l10n.importUnreadableFile);
       return;
     }
     if (bytes.length > _maxImportBytes) {
       final size = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
-      setState(() {
-        _error =
-            'That file is $size MB. Imports are limited to 20 MB — split the '
-            'report and import it in parts.';
-      });
+      setState(() => _error = _l10n.importFileTooLarge(size));
       return;
     }
 
@@ -116,29 +115,24 @@ class _ImportScreenState extends State<ImportScreen> {
         _busy = false;
         _fileName = file.name;
         _trades = trades;
-        if (trades.isEmpty) {
-          _error =
-              'No closed trades were found. Make sure the file is an MT5 or '
-              'broker history export — open positions are skipped.';
-        }
+        if (trades.isEmpty) _error = _l10n.importNoClosedTrades;
       });
     } catch (error) {
       setState(() {
         _busy = false;
-        _error = _friendly(error);
+        _error = _friendly(error, _l10n);
       });
     }
   }
 
   /// Parser exceptions read like stack traces; everything else here is a
   /// message written for the trader.
-  String _friendly(Object error) {
+  String _friendly(Object error, AppLocalizations l10n) {
     final text = friendlyError(error);
     return text.startsWith('FormatException') ||
             text.startsWith('RangeError') ||
             text.startsWith('UnsupportedError')
-        ? 'No readable data in this file. Export it as CSV from MT5 or your '
-            'broker and try again.'
+        ? l10n.importNoReadableData
         : text;
   }
 
@@ -157,7 +151,7 @@ class _ImportScreenState extends State<ImportScreen> {
         history = await ImportHistoryStore.add(
           ImportRecord(
             id: importId,
-            filename: _fileName ?? 'Unknown',
+            filename: _fileName ?? _l10n.importUnknownFile,
             tradeCount: outcome.imported,
             timestamp: DateTime.now(),
           ),
@@ -183,20 +177,18 @@ class _ImportScreenState extends State<ImportScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete this import?'),
+        title: Text(_l10n.importDeleteTitle),
         content: Text(
-          '${record.tradeCount} ${record.tradeCount == 1 ? 'trade' : 'trades'} '
-          'from ${record.filename} will be removed from your journal. This '
-          'cannot be undone.',
+          _l10n.importDeleteBody(record.tradeCount, record.filename),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
+            child: Text(_l10n.keepAction),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(_l10n.deleteAction),
           ),
         ],
       ),
@@ -211,10 +203,7 @@ class _ImportScreenState extends State<ImportScreen> {
       widget.onImported?.call();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Deleted ${record.tradeCount} imported '
-            '${record.tradeCount == 1 ? 'trade' : 'trades'}.',
-          ),
+          content: Text(_l10n.importDeleted(record.tradeCount)),
         ),
       );
     } catch (error) {
@@ -241,7 +230,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Import trades')),
+      appBar: AppBar(title: Text(_l10n.importTitle)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(14, 6, 14, 32),
         children: [
@@ -272,21 +261,19 @@ class _ImportScreenState extends State<ImportScreen> {
               ElevatedButton(
                 onPressed: _busy ? null : _import,
                 child: Text(
-                  _busy
-                      ? 'Importing…'
-                      : 'Import ${countNoun(trades.length, 'trade')}',
+                  _busy ? _l10n.importImporting : _l10n.importAction(trades.length),
                 ),
               ),
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: _busy ? null : _reset,
-                child: const Text('Cancel'),
+                child: Text(_l10n.cancel),
               ),
             ] else ...[
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: _busy ? null : _reset,
-                child: const Text('Choose another file'),
+                child: Text(_l10n.importChooseAnother),
               ),
             ],
           ],
@@ -312,7 +299,7 @@ class _ImportScreenState extends State<ImportScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            _busy ? 'Reading file…' : 'Choose a trade history file',
+            _busy ? _l10n.importReadingFile : _l10n.importChooseFile,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.text,
@@ -322,15 +309,13 @@ class _ImportScreenState extends State<ImportScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'MT5 XML report, CSV, TSV, an Excel .xlsx/.xls export, or a broker '
-            'CSV.',
+            _l10n.importFileTypes,
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.45),
           ),
           const SizedBox(height: 12),
           Text(
-            'Already-imported tickets are skipped, so importing the same '
-            'statement twice does not double your journal.',
+            _l10n.importSkippedNote,
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
           ),
@@ -345,22 +330,20 @@ class _ImportScreenState extends State<ImportScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionTitle(
-            title: _fileName ?? 'Selected file',
+            title: _fileName ?? _l10n.importSelectedFile,
             subtitle: trades.isEmpty
-                ? '0 closed trades found'
-                : '${countNoun(trades.length, 'trade')} · '
-                    '${countNoun(_wins, 'win')} · '
-                    '${countNoun(_losses, 'loss')}',
+                ? _l10n.importNoTradesFound
+                : _l10n.importFileStats(trades.length, _wins, _losses),
             trailing: IconButton(
-              tooltip: 'Remove file',
+              tooltip: _l10n.importRemoveFile,
               onPressed: _busy ? null : _reset,
               icon: const Icon(Icons.close, size: 18),
             ),
           ),
           if (trades.isNotEmpty) ...[
             const ListDivider(),
-            LabelValue(label: 'Net P&L', value: signedMoney(_netPnl)),
-            LabelValue(label: 'Date range', value: _dateRange(trades)),
+            LabelValue(label: _l10n.importNetPnl, value: signedMoney(_netPnl)),
+            LabelValue(label: _l10n.importDateRange, value: _dateRange(trades)),
           ],
         ],
       ),
@@ -388,8 +371,8 @@ class _ImportScreenState extends State<ImportScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionTitle(
-            title: 'Preview',
-            subtitle: 'First ${preview.length} of ${trades.length}',
+            title: _l10n.importPreview,
+            subtitle: _l10n.importPreviewSub(preview.length, trades.length),
           ),
           const SizedBox(height: 4),
           for (final trade in preview) ...[
@@ -411,7 +394,7 @@ class _ImportScreenState extends State<ImportScreen> {
                           ),
                         ),
                         Text(
-                          '${trade.type} · ${trade.lot} lots',
+                          _l10n.importPreviewLine(trade.type, '${trade.lot}'),
                           style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 11,
@@ -455,7 +438,7 @@ class _ImportScreenState extends State<ImportScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  nothingNew ? 'Nothing new to import' : 'Import complete',
+                  nothingNew ? _l10n.importNothingNew : _l10n.importComplete,
                   style: TextStyle(
                     color: AppColors.text,
                     fontSize: 15,
@@ -468,9 +451,12 @@ class _ImportScreenState extends State<ImportScreen> {
           const SizedBox(height: 8),
           Text(
             nothingNew
-                ? '${outcome.skipped} ${outcome.skipped == 1 ? 'trade is' : 'trades are'} already in your journal.'
-                : '${outcome.imported} ${outcome.imported == 1 ? 'trade' : 'trades'} added to your journal.'
-                    '${outcome.skipped > 0 ? ' ${outcome.skipped} duplicate${outcome.skipped == 1 ? '' : 's'} skipped.' : ''}',
+                ? _l10n.importAlreadyInJournal(outcome.skipped)
+                : [
+                    _l10n.importAdded(outcome.imported),
+                    if (outcome.skipped > 0)
+                      _l10n.importDuplicatesSkipped(outcome.skipped),
+                  ].join(' '),
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.45),
           ),
           if (outcome.notice != null) ...[
@@ -484,12 +470,12 @@ class _ImportScreenState extends State<ImportScreen> {
           const SizedBox(height: 12),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(outcome.imported > 0),
-            child: const Text('Done'),
+            child: Text(_l10n.doneAction),
           ),
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: _reset,
-            child: const Text('Import another file'),
+            child: Text(_l10n.importAnother),
           ),
         ],
       ),
@@ -501,19 +487,16 @@ class _ImportScreenState extends State<ImportScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear the journal?'),
-        content: const Text(
-          'Every trade — imported or logged by hand — will be deleted. This '
-          'cannot be undone.',
-        ),
+        title: Text(_l10n.clearJournalTitle),
+        content: Text(_l10n.importClearBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
+            child: Text(_l10n.keepAction),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear journal'),
+            child: Text(_l10n.importClearAction),
           ),
         ],
       ),
@@ -534,13 +517,13 @@ class _ImportScreenState extends State<ImportScreen> {
       });
       widget.onImported?.call();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Journal cleared.')),
+        SnackBar(content: Text(_l10n.importJournalCleared)),
       );
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = _friendly(error);
+        _error = _friendly(error, _l10n);
       });
     }
   }
@@ -556,20 +539,20 @@ class _ImportScreenState extends State<ImportScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionTitle(
-            title: 'Import history',
-            subtitle: 'Statements imported from this device.',
+            title: _l10n.importHistoryTitle,
+            subtitle: _l10n.importHistorySub,
             trailing: _history.isEmpty
                 ? null
                 : TextButton(
                     onPressed: _busy ? null : _clearJournal,
-                    child: const Text('Clear journal'),
+                    child: Text(_l10n.importClearAction),
                   ),
           ),
           if (_history.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                'No imports yet.',
+                _l10n.importHistoryEmpty,
                 style: TextStyle(color: AppColors.faint, fontSize: 12),
               ),
             ),
@@ -597,10 +580,11 @@ class _ImportScreenState extends State<ImportScreen> {
                           ),
                         ),
                         Text(
-                          '${record.tradeCount} '
-                          '${record.tradeCount == 1 ? 'trade' : 'trades'} · '
-                          '${dayOf(record.timestamp)} '
-                          '${_timeOf(record.timestamp)}',
+                          _l10n.importHistoryLine(
+                            record.tradeCount,
+                            '${dayOf(record.timestamp)} '
+                                '${_timeOf(record.timestamp)}',
+                          ),
                           style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 11,
@@ -610,7 +594,7 @@ class _ImportScreenState extends State<ImportScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Delete this import',
+                    tooltip: _l10n.importDeleteTooltip,
                     onPressed: _busy ? null : () => _deleteImport(record),
                     icon: const Icon(Icons.delete_outline, size: 18),
                   ),
@@ -628,21 +612,15 @@ class _ImportScreenState extends State<ImportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionTitle(title: 'How to export from MT5'),
+          SectionTitle(title: _l10n.importHowToTitle),
           const SizedBox(height: 10),
           Text(
-            '1. Open MetaTrader 5 → History tab.\n'
-            '2. Right-click → All History, then select the trades.\n'
-            '3. Right-click → Report / Export and save as CSV or the XML '
-            'report (ReportHistory files).\n'
-            '4. Pick that file above.',
+            _l10n.importHowToSteps,
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.6),
           ),
           const SizedBox(height: 12),
           Text(
-            'P&L is stored net: MT5 profit plus commission and swap. Excel '
-            '.xlsx and .xls exports work too — .xls up to 4 MB is read on our '
-            'server, so larger ones should be saved as .xlsx or CSV.',
+            _l10n.importNetNote,
             style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.5),
           ),
         ],

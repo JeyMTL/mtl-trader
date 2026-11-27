@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/compile_attachments.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../services/backtest_api.dart';
 import '../services/voice_clip_recorder.dart';
 import '../ui/theme.dart';
@@ -65,6 +66,8 @@ class CustomBacktestScreen extends StatefulWidget {
 }
 
 class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   late final BacktestApi _api = widget.api ?? BacktestApi();
 
   late final TextEditingController _description = TextEditingController();
@@ -123,6 +126,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
   /// trader attached.
   Future<void> _addCharts() async {
     if (_busy || _transcribing) return;
+    final l10n = _l10n;
     setState(() => _error = null);
 
     List<XFile> files;
@@ -130,10 +134,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
       files = await _picker.pickMultiImage(imageQuality: 70, maxWidth: 1600);
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error = 'Could not open the gallery. Check the photo '
-              'permission and try again.',
-        );
+        setState(() => _error = l10n.cbGalleryFailed);
       }
       return;
     }
@@ -156,12 +157,17 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
           mimeType: mime,
         );
         if (rejection != null) {
-          problem = rejection;
+          problem = switch (rejection) {
+            ChartRejection.format => l10n.cbUseImage,
+            ChartRejection.tooMany => l10n.cbTooManyCharts(maxCompileCharts),
+            ChartRejection.tooLarge => l10n.cbChartTooLarge,
+            ChartRejection.budget => l10n.cbChartsBudget,
+          };
           break;
         }
         final dataUrl = chartDataUrl(mime, bytes);
         if (dataUrl == null) {
-          problem = 'Use a PNG, JPEG or WebP screenshot.';
+          problem = l10n.cbUseImage;
           break;
         }
         next.add(
@@ -174,7 +180,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
         );
         used += bytes.length;
       } catch (_) {
-        problem = 'Could not read ${file.name}. Try picking it again.';
+        problem = l10n.cbReadFailed(file.name);
         break;
       }
     }
@@ -243,9 +249,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
       final clip = await _voice.stop();
       if (clip == null) {
         if (mounted) {
-          setState(
-            () => _error = 'Nothing was recorded. Hold on, speak, then stop.',
-          );
+          setState(() => _error = _l10n.cbNothingRecorded);
         }
         return;
       }
@@ -267,16 +271,13 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
       );
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Voice note added to the description.')),
+        SnackBar(content: Text(_l10n.cbVoiceAdded)),
       );
     } on BacktestApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error = 'Could not use that recording. Type the explanation '
-              'instead.',
-        );
+        setState(() => _error = _l10n.cbRecordingFailed);
       }
     } finally {
       if (mounted) setState(() => _transcribing = false);
@@ -287,11 +288,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
     if (_busy) return;
     final description = _description.text.trim();
     if (description.length < 20) {
-      setState(
-        () => _error =
-            'Describe the setup in at least a sentence — what has to happen '
-            'before you take the trade?',
-      );
+      setState(() => _error = _l10n.cbDescribeFirst);
       return;
     }
     setState(() {
@@ -320,10 +317,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _error = 'The description could not be compiled. Check your '
-              'connection and try again.',
-        );
+        setState(() => _error = _l10n.cbCompileFailed);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -335,14 +329,12 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
     final compiled = _compiled;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Custom backtest')),
+      appBar: AppBar(title: Text(_l10n.backtestCustom)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(14, 6, 14, 28),
         children: [
           Text(
-            'Write the setup in your own words. The server turns it into a '
-            'rule set, shows you the rules in plain English, and only then can '
-            'you run them over your bar data.',
+            _l10n.cbIntro,
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.5),
           ),
           const SizedBox(height: 12),
@@ -351,7 +343,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '1. The setup',
+                  _l10n.cbStepSetup,
                   style: TextStyle(
                     color: AppColors.text,
                     fontSize: 14,
@@ -364,11 +356,8 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
                   minLines: 4,
                   maxLines: 8,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText:
-                        'e.g. Wait for the London open, then buy when price '
-                        'closes above the previous 20-bar high and the 200 EMA '
-                        'is rising. Exit at 2R or when the 20 high is lost.',
+                  decoration: InputDecoration(
+                    hintText: _l10n.cbDescriptionHint,
                   ),
                 ),
                 _attachmentsBlock(),
@@ -383,16 +372,18 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(child: _plainField('Symbol (optional)', _symbol)),
+                    Expanded(
+                      child: _plainField(_l10n.cbSymbolOptional, _symbol),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _plainField('Stop rule (optional)', _stop),
+                      child: _plainField(_l10n.cbStopOptional, _stop),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 _plainField(
-                  'Your definition of a valid setup (optional)',
+                  _l10n.cbCriteriaLabel,
                   _criteria,
                 ),
                 if (_error != null) ...[
@@ -419,7 +410,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
                           )
                         : const Icon(Icons.auto_fix_high, size: 17),
                     label: Text(
-                      _busy ? 'Compiling rules…' : 'Compile rules',
+                      _busy ? _l10n.cbCompiling : _l10n.cbCompileAction,
                     ),
                   ),
                 ),
@@ -443,9 +434,12 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${compiled.timeframe} · '
-                    '${_sentCharts == 0 ? 'no charts sent' : '$_sentCharts chart${_sentCharts == 1 ? '' : 's'} sent'}'
-                    ' · check every line before you run it',
+                    _l10n.cbRulesLine(
+                      compiled.timeframe,
+                      _sentCharts == 0
+                          ? _l10n.cbNoChartsSent
+                          : _l10n.cbChartsSent(_sentCharts),
+                    ),
                     style: TextStyle(
                       color: AppColors.faint,
                       fontSize: kMinLabelSize,
@@ -494,7 +488,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
                   if (compiled.model != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Compiled with ${compiled.model}',
+                      _l10n.cbCompiledWith(compiled.model!),
                       style: TextStyle(
                         color: AppColors.faint,
                         fontSize: kMinLabelSize,
@@ -506,13 +500,13 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context, compiled),
-                      child: const Text('Use these rules'),
+                      child: Text(_l10n.cbUseRules),
                     ),
                   ),
                   const SizedBox(height: 6),
                   TextButton(
                     onPressed: _busy ? null : _compile,
-                    child: const Text('Compile again'),
+                    child: Text(_l10n.cbCompileAgain),
                   ),
                 ],
               ),
@@ -539,8 +533,8 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
               icon: const Icon(Icons.add_photo_alternate_outlined, size: 15),
               label: Text(
                 _charts.isEmpty
-                    ? 'Add chart'
-                    : 'Add chart (${_charts.length}/$maxCompileCharts)',
+                    ? _l10n.cbAddChart
+                    : _l10n.cbAddChartCount(_charts.length, maxCompileCharts),
               ),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 38),
@@ -556,10 +550,10 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
               ),
               label: Text(
                 _recording
-                    ? 'Stop · ${_recordSeconds}s'
+                    ? _l10n.cbStopRecording(_recordSeconds)
                     : _transcribing
-                        ? 'Transcribing…'
-                        : 'Voice note',
+                        ? _l10n.cbTranscribing
+                        : _l10n.cbVoiceNote,
                 style: TextStyle(
                   color: _recording ? AppColors.danger : null,
                 ),
@@ -587,9 +581,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
         ],
         const SizedBox(height: 4),
         Text(
-          'Up to $maxCompileCharts chart screenshots and a 60-second voice '
-          'note. The charts are sent to the model with the description; the '
-          'note is transcribed into the description and never stored.',
+          _l10n.cbAttachmentsNote(maxCompileCharts),
           style: TextStyle(
             color: AppColors.faint,
             fontSize: kMinLabelSize,
@@ -649,7 +641,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Timeframe',
+          _l10n.cbTimeframe,
           style: TextStyle(color: AppColors.faint, fontSize: 11),
         ),
         const SizedBox(height: 4),
@@ -689,7 +681,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Confirmation (optional)',
+          _l10n.cbConfirmation,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(color: AppColors.faint, fontSize: 11),
@@ -705,7 +697,7 @@ class _CustomBacktestScreenState extends State<CustomBacktestScreen> {
             contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           ),
           items: [
-            const DropdownMenuItem(value: '', child: Text('None')),
+            DropdownMenuItem(value: '', child: Text(_l10n.cbNone)),
             for (final value in options)
               DropdownMenuItem(value: value, child: Text(value)),
           ],

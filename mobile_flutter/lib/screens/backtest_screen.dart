@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../core/backtest.dart';
 import '../core/format.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../services/backtest_api.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -34,6 +35,8 @@ class BacktestScreen extends StatefulWidget {
 }
 
 class _BacktestScreenState extends State<BacktestScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   late final BacktestApi _api = widget.api ?? BacktestApi();
 
   final TextEditingController _name = TextEditingController();
@@ -177,11 +180,11 @@ class _BacktestScreenState extends State<BacktestScreen> {
       bytes = await File(file.path!).readAsBytes();
     }
     if (bytes == null) {
-      _fail('Could not read that file. Try picking it again.');
+      _fail(_l10n.backtestFileUnreadable);
       return;
     }
     if (bytes.length > _maxCsvBytes) {
-      _fail('That file is over 4 MB. Export a shorter range.');
+      _fail(_l10n.backtestFileTooLarge);
       return;
     }
 
@@ -233,7 +236,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
 
   Future<void> _run() async {
     if (_csv.text.trim().isEmpty) {
-      _fail('Upload or paste the bar data first.');
+      _fail(_l10n.backtestNeedData);
       return;
     }
     setState(() {
@@ -269,16 +272,14 @@ class _BacktestScreenState extends State<BacktestScreen> {
         _report = result.report;
       });
       _toast(
-        result.saved
-            ? 'Run complete and saved.'
-            : 'Run complete — the archive write failed.',
+        result.saved ? _l10n.backtestRunSaved : _l10n.backtestRunUnsaved,
       );
       await _loadRuns();
     } catch (error) {
       if (error is BacktestApiException) {
         _fail(error.message, upgrade: error.upgradeRequired);
       } else {
-        _fail('The run could not be completed. Try again.');
+        _fail(_l10n.backtestRunFailed);
       }
     }
   }
@@ -295,9 +296,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
       });
     } catch (error) {
       _fail(
-        error is BacktestApiException
-            ? error.message
-            : 'Could not load that run.',
+        error is BacktestApiException ? error.message : _l10n.backtestLoadRunFailed,
       );
     }
   }
@@ -306,19 +305,19 @@ class _BacktestScreenState extends State<BacktestScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete this saved run?'),
+        title: Text(_l10n.backtestDeleteTitle),
         content: Text(
-          run.name.isEmpty ? 'This run' : run.name,
+          run.name.isEmpty ? _l10n.backtestThisRun : run.name,
           style: TextStyle(color: AppColors.muted, fontSize: 12.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
+            child: Text(_l10n.keepAction),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
+            child: Text(_l10n.deleteAction),
           ),
         ],
       ),
@@ -331,12 +330,12 @@ class _BacktestScreenState extends State<BacktestScreen> {
       setState(() {
         _runs = _runs.where((entry) => entry.id != run.id).toList();
       });
-      _toast('Run deleted.');
+      _toast(_l10n.backtestRunDeleted);
     } catch (error) {
       _fail(
         error is BacktestApiException
             ? error.message
-            : 'Could not delete the run.',
+            : _l10n.backtestDeleteFailed,
       );
     }
   }
@@ -351,20 +350,19 @@ class _BacktestScreenState extends State<BacktestScreen> {
     final report = _report;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Backtest')),
+      appBar: AppBar(title: Text(_l10n.backtestTitle)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(14, 6, 14, 32),
         children: [
           Text(
-            'Replay your own rules over your own MT5 bar data, with '
-            'costs and the fill assumptions printed on the result.',
+            _l10n.backtestIntro,
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.5),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: _busy ? null : _openCustom,
             icon: const Icon(Icons.auto_fix_high, size: 17),
-            label: const Text('Custom backtest'),
+            label: Text(_l10n.backtestCustom),
           ),
           const SizedBox(height: 14),
           _barsCard(),
@@ -414,7 +412,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.play_arrow, size: 18),
-            label: Text(_busy ? 'Simulating…' : 'Run backtest'),
+            label: Text(_busy ? _l10n.backtestSimulating : _l10n.backtestRunAction),
           ),
           const SizedBox(height: 18),
           if (report == null) _emptyCard() else ..._reportCards(report),
@@ -491,13 +489,13 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('1. Bar data'),
+          _cardTitle(_l10n.backtestBarsTitle),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: _busy ? null : _pickFile,
             icon: const Icon(Icons.upload_file, size: 17),
             label: Text(
-              _fileName ?? 'Choose a CSV or paste below',
+              _fileName ?? _l10n.backtestChooseCsv,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -514,7 +512,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
                           _csv.clear();
                         }),
                 icon: const Icon(Icons.close, size: 14),
-                label: const Text('Clear'),
+                label: Text(_l10n.clearAction),
               ),
             ),
           ],
@@ -534,8 +532,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Up to 60,000 bars. In MT5: select the chart with Ctrl+A, copy, '
-            'paste into a text file.',
+            _l10n.backtestBarsHint,
             style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
           ),
         ],
@@ -549,15 +546,15 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('2. Rules'),
+          _cardTitle(_l10n.backtestRulesTitle),
           const SizedBox(height: 10),
-          _fieldLabel('Run name'),
+          _fieldLabel(_l10n.backtestRunName),
           TextField(
             controller: _name,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
-              hintText: 'e.g. EURUSD M1 SMA cross',
+              hintText: _l10n.backtestRunNameHint,
             ),
           ),
           const SizedBox(height: 12),
@@ -565,7 +562,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _fieldLabel('Symbol'),
+                _fieldLabel(_l10n.backtestSymbol),
                 TextField(
                   controller: _symbol,
                   textCapitalization: TextCapitalization.characters,
@@ -589,7 +586,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _fieldLabel('Timeframe'),
+                _fieldLabel(_l10n.backtestTimeframe),
                 TextField(
                   controller: _timeframe,
                   style: tabular.copyWith(color: AppColors.text, fontSize: 13),
@@ -612,7 +609,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
           ]),
           const SizedBox(height: 12),
           if (_compiled == null) ...[
-            _fieldLabel('Rules'),
+            _fieldLabel(_l10n.backtestRulesLabel),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
@@ -654,7 +651,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
                 _numberField(spec.label, _paramControllers[spec.key]!),
             ]),
           ] else ...[
-            _fieldLabel('Compiled rules'),
+            _fieldLabel(_l10n.backtestCompiledRules),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(10),
@@ -696,7 +693,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
                   ? null
                   : () => setState(() => _compiled = null),
               icon: const Icon(Icons.library_books_outlined, size: 15),
-              label: const Text('Use a built-in rule set instead'),
+              label: Text(_l10n.backtestUseBuiltIn),
             ),
           ],
         ],
@@ -709,18 +706,18 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('3. Sizing and costs'),
+          _cardTitle(_l10n.backtestCostsTitle),
           const SizedBox(height: 10),
           _fieldPairs([
-            _numberField('Starting balance', _balance),
-            _numberField('Risk per trade %', _risk),
-            _numberField('Contract size', _contractSize),
-            _numberField('Max leverage', _maxLeverage),
-            _numberField('Spread (price)', _spread),
-            _numberField('Slippage (price)', _slippage),
-            _numberField('Commission / trade', _commission),
-            _numberField('In-sample share', _splitRatio),
-            _numberField('Server clock offset (min)', _clockOffset,
+            _numberField(_l10n.backtestStartingBalance, _balance),
+            _numberField(_l10n.backtestRiskPercent, _risk),
+            _numberField(_l10n.backtestContractSize, _contractSize),
+            _numberField(_l10n.backtestMaxLeverage, _maxLeverage),
+            _numberField(_l10n.backtestSpread, _spread),
+            _numberField(_l10n.backtestSlippage, _slippage),
+            _numberField(_l10n.backtestCommission, _commission),
+            _numberField(_l10n.backtestInSampleShare, _splitRatio),
+            _numberField(_l10n.backtestClockOffset, _clockOffset,
                 allowNegative: true),
           ]),
         ],
@@ -738,7 +735,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
           Icon(Icons.science_outlined, size: 34, color: AppColors.faint),
           const SizedBox(height: 10),
           Text(
-            'No run yet',
+            _l10n.backtestEmptyTitle,
             style: TextStyle(
               color: AppColors.text,
               fontSize: 14,
@@ -747,8 +744,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Upload a history export, choose the rules and the cost model, and '
-            'the report appears here with its assumptions.',
+            _l10n.backtestEmptyBody,
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.faint, fontSize: 11.5, height: 1.45),
           ),
@@ -809,9 +805,12 @@ class _BacktestScreenState extends State<BacktestScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${NumberFormat.decimalPattern('en_US').format(report.barCount)} '
-                      'bars · ${_dayRange(report.from, report.to)} · '
-                      '${report.timeframe}',
+                      _l10n.backtestBarsLine(
+                        NumberFormat.decimalPattern('en_US')
+                            .format(report.barCount),
+                        _dayRange(report.from, report.to),
+                        report.timeframe,
+                      ),
                       style: TextStyle(
                         color: AppColors.faint,
                         fontSize: 11,
@@ -850,44 +849,44 @@ class _BacktestScreenState extends State<BacktestScreen> {
   Widget _metricsGrid(BacktestMetrics metrics) {
     final items = <({String label, String value, Tone tone})>[
       (
-        label: 'Net P&L',
+        label: _l10n.importNetPnl,
         value: _signed(metrics.netPnl),
         tone: metrics.netPnl >= 0 ? Tone.positive : Tone.negative,
       ),
       (
-        label: 'Return',
+        label: _l10n.backtestReturn,
         value: _pct(metrics.returnPct, 2),
         tone: metrics.returnPct >= 0 ? Tone.positive : Tone.negative,
       ),
       (
-        label: 'Profit factor',
+        label: _l10n.profitFactor,
         value: _ratio(metrics.profitFactor),
         tone: Tone.neutral,
       ),
-      (label: 'Win rate', value: _pct(metrics.winRate), tone: Tone.neutral),
-      (label: 'Trades', value: '${metrics.trades}', tone: Tone.neutral),
+      (label: _l10n.winRate, value: _pct(metrics.winRate), tone: Tone.neutral),
+      (label: _l10n.summaryTrades, value: '${metrics.trades}', tone: Tone.neutral),
       (
-        label: 'Expectancy',
+        label: _l10n.expectancy,
         value: _signed(metrics.expectancy),
         tone: Tone.neutral,
       ),
       (
-        label: 'Max drawdown',
+        label: _l10n.maxDrawdown,
         value: _pct(metrics.maxDrawdownPct, 2),
         tone: Tone.negative,
       ),
       (
-        label: 'Sharpe',
+        label: _l10n.backtestSharpe,
         value: metrics.sharpe == null ? '—' : metrics.sharpe!.toStringAsFixed(2),
         tone: Tone.neutral,
       ),
       (
-        label: 'Exposure',
+        label: _l10n.backtestExposure,
         value: _pct(metrics.exposurePct, 0),
         tone: Tone.neutral,
       ),
       (
-        label: 'Avg R',
+        label: _l10n.backtestAvgR,
         value: metrics.avgRMultiple == null
             ? '—'
             : metrics.avgRMultiple!.toStringAsFixed(2),
@@ -968,7 +967,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('Equity'),
+          _cardTitle(_l10n.backtestEquity),
           const SizedBox(height: 10),
           SizedBox(
             height: 150,
@@ -1013,12 +1012,10 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('In-sample vs out-of-sample'),
+          _cardTitle(_l10n.backtestSplitTitle),
           const SizedBox(height: 4),
           Text(
-            'Two independent runs from the same balance. The second window '
-            'knows nothing the first produced — the closest thing to an '
-            'out-of-sample test one file can give you.',
+            _l10n.backtestSplitBody,
             style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
           ),
           const SizedBox(height: 10),
@@ -1026,39 +1023,39 @@ class _BacktestScreenState extends State<BacktestScreen> {
             children: [
               Expanded(
                 flex: 3,
-                child: Text('Window',
+                child: Text(_l10n.backtestColWindow,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 2,
-                child: Text('Trades',
+                child: Text(_l10n.backtestColTrades,
                     textAlign: TextAlign.right,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 3,
-                child: Text('Net',
+                child: Text(_l10n.backtestColNet,
                     textAlign: TextAlign.right,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 2,
-                child: Text('Win',
+                child: Text(_l10n.backtestColWin,
                     textAlign: TextAlign.right,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 3,
-                child: Text('Max DD',
+                child: Text(_l10n.backtestColMaxDd,
                     textAlign: TextAlign.right,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          _splitRow('In-sample', split.inSample),
+          _splitRow(_l10n.backtestInSample, split.inSample),
           const ListDivider(),
-          _splitRow('Out-of-sample', split.outOfSample),
+          _splitRow(_l10n.backtestOutOfSample, split.outOfSample),
         ],
       ),
     );
@@ -1123,7 +1120,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('Assumptions'),
+          _cardTitle(_l10n.backtestAssumptions),
           const SizedBox(height: 8),
           for (final assumption in assumptions)
             Padding(
@@ -1158,35 +1155,35 @@ class _BacktestScreenState extends State<BacktestScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardTitle('Trades (${trades.length})'),
+          _cardTitle(_l10n.backtestTradesTitle(trades.length)),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 flex: 3,
-                child: Text('Side',
+                child: Text(_l10n.backtestColSide,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 4,
-                child: Text('Entry',
+                child: Text(_l10n.backtestColEntry,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 3,
-                child: Text('Lots',
+                child: Text(_l10n.backtestColLots,
                     textAlign: TextAlign.right,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 4,
-                child: Text('P&L',
+                child: Text(_l10n.backtestColPnl,
                     textAlign: TextAlign.right,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
               Expanded(
                 flex: 3,
-                child: Text('Why',
+                child: Text(_l10n.backtestColWhy,
                     textAlign: TextAlign.right,
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5)),
               ),
@@ -1274,8 +1271,8 @@ class _BacktestScreenState extends State<BacktestScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: SectionTitle(
-              title: 'Saved runs',
-              subtitle: 'Runs from this account, on any device.',
+              title: _l10n.backtestSavedRuns,
+              subtitle: _l10n.backtestSavedSub,
               trailing: _loadingRuns
                   ? const SizedBox(
                       width: 14,
@@ -1289,7 +1286,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'No saved runs yet.',
+                _l10n.backtestNoSavedRuns,
                 style: TextStyle(color: AppColors.faint, fontSize: 12),
               ),
             ),
@@ -1309,7 +1306,9 @@ class _BacktestScreenState extends State<BacktestScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              run.name.isEmpty ? '${run.symbol} run' : run.name,
+                              run.name.isEmpty
+                                  ? _l10n.backtestRunFallback(run.symbol)
+                                  : run.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -1345,7 +1344,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Delete ${run.name}',
+                    tooltip: _l10n.backtestDeleteTooltip(run.name),
                     onPressed: _busy ? null : () => _deleteSaved(run),
                     icon: const Icon(Icons.delete_outline, size: 18),
                   ),

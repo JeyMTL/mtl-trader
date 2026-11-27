@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mtl_trader_mobile/l10n/gen/app_localizations.dart';
 import 'package:mtl_trader_mobile/models/models.dart';
 import 'package:mtl_trader_mobile/screens/sync_screen.dart';
 import 'package:mtl_trader_mobile/services/journal_api.dart';
@@ -28,6 +29,9 @@ class _CountingApi implements JournalApi {
 }
 
 Widget _harness(Widget home) => MaterialApp(
+      locale: const Locale('en'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildFlatTheme(AppPalette.dark),
       home: home,
     );

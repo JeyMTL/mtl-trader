@@ -2010,4 +2010,1114 @@ class AppLocalizationsPack extends AppLocalizations {
 
   @override
   String get unpin => _read('unpin') ?? _en.unpin;
+
+  @override
+  String get keepAction => _read('keepAction') ?? _en.keepAction;
+
+  @override
+  String get doneAction => _read('doneAction') ?? _en.doneAction;
+
+  @override
+  String get importTitle => _read('importTitle') ?? _en.importTitle;
+
+  @override
+  String get importUnreadableFile => _read('importUnreadableFile') ?? _en.importUnreadableFile;
+
+  @override
+  String importFileTooLarge(String size) {
+    final template = _read('importFileTooLarge');
+    if (template == null) return _en.importFileTooLarge(size);
+    return _fill(template, <String, Object?>{'size': size});
+  }
+
+  @override
+  String get importNoClosedTrades => _read('importNoClosedTrades') ?? _en.importNoClosedTrades;
+
+  @override
+  String get importNoReadableData => _read('importNoReadableData') ?? _en.importNoReadableData;
+
+  @override
+  String get importUnknownFile => _read('importUnknownFile') ?? _en.importUnknownFile;
+
+  @override
+  String get importDeleteTitle => _read('importDeleteTitle') ?? _en.importDeleteTitle;
+
+  @override
+  String importDeleteBody(int count, String filename) {
+    final template = _read('importDeleteBody');
+    if (template == null) return _en.importDeleteBody(count, filename);
+    return _fill(template, <String, Object?>{'count': count, 'filename': filename});
+  }
+
+  @override
+  String importDeleted(int count) {
+    final template = _read('importDeleted');
+    if (template == null) return _en.importDeleted(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get importImporting => _read('importImporting') ?? _en.importImporting;
+
+  @override
+  String importAction(int count) {
+    final template = _read('importAction');
+    if (template == null) return _en.importAction(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get importChooseAnother => _read('importChooseAnother') ?? _en.importChooseAnother;
+
+  @override
+  String get importReadingFile => _read('importReadingFile') ?? _en.importReadingFile;
+
+  @override
+  String get importChooseFile => _read('importChooseFile') ?? _en.importChooseFile;
+
+  @override
+  String get importFileTypes => _read('importFileTypes') ?? _en.importFileTypes;
+
+  @override
+  String get importSkippedNote => _read('importSkippedNote') ?? _en.importSkippedNote;
+
+  @override
+  String get importSelectedFile => _read('importSelectedFile') ?? _en.importSelectedFile;
+
+  @override
+  String get importNoTradesFound => _read('importNoTradesFound') ?? _en.importNoTradesFound;
+
+  @override
+  String importFileStats(int trades, int wins, int losses) {
+    final template = _read('importFileStats');
+    if (template == null) return _en.importFileStats(trades, wins, losses);
+    return _fill(template, <String, Object?>{'trades': trades, 'wins': wins, 'losses': losses});
+  }
+
+  @override
+  String get importRemoveFile => _read('importRemoveFile') ?? _en.importRemoveFile;
+
+  @override
+  String get importNetPnl => _read('importNetPnl') ?? _en.importNetPnl;
+
+  @override
+  String get importDateRange => _read('importDateRange') ?? _en.importDateRange;
+
+  @override
+  String get importPreview => _read('importPreview') ?? _en.importPreview;
+
+  @override
+  String importPreviewSub(int shown, int total) {
+    final template = _read('importPreviewSub');
+    if (template == null) return _en.importPreviewSub(shown, total);
+    return _fill(template, <String, Object?>{'shown': shown, 'total': total});
+  }
+
+  @override
+  String importPreviewLine(String type, String lot) {
+    final template = _read('importPreviewLine');
+    if (template == null) return _en.importPreviewLine(type, lot);
+    return _fill(template, <String, Object?>{'type': type, 'lot': lot});
+  }
+
+  @override
+  String get importNothingNew => _read('importNothingNew') ?? _en.importNothingNew;
+
+  @override
+  String get importComplete => _read('importComplete') ?? _en.importComplete;
+
+  @override
+  String importAlreadyInJournal(int count) {
+    final template = _read('importAlreadyInJournal');
+    if (template == null) return _en.importAlreadyInJournal(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String importAdded(int count) {
+    final template = _read('importAdded');
+    if (template == null) return _en.importAdded(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String importDuplicatesSkipped(int count) {
+    final template = _read('importDuplicatesSkipped');
+    if (template == null) return _en.importDuplicatesSkipped(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get importAnother => _read('importAnother') ?? _en.importAnother;
+
+  @override
+  String get importClearBody => _read('importClearBody') ?? _en.importClearBody;
+
+  @override
+  String get importClearAction => _read('importClearAction') ?? _en.importClearAction;
+
+  @override
+  String get importJournalCleared => _read('importJournalCleared') ?? _en.importJournalCleared;
+
+  @override
+  String get importHistoryTitle => _read('importHistoryTitle') ?? _en.importHistoryTitle;
+
+  @override
+  String get importHistorySub => _read('importHistorySub') ?? _en.importHistorySub;
+
+  @override
+  String get importHistoryEmpty => _read('importHistoryEmpty') ?? _en.importHistoryEmpty;
+
+  @override
+  String importHistoryLine(int count, String when) {
+    final template = _read('importHistoryLine');
+    if (template == null) return _en.importHistoryLine(count, when);
+    return _fill(template, <String, Object?>{'count': count, 'when': when});
+  }
+
+  @override
+  String get importDeleteTooltip => _read('importDeleteTooltip') ?? _en.importDeleteTooltip;
+
+  @override
+  String get importHowToTitle => _read('importHowToTitle') ?? _en.importHowToTitle;
+
+  @override
+  String get importHowToSteps => _read('importHowToSteps') ?? _en.importHowToSteps;
+
+  @override
+  String get importNetNote => _read('importNetNote') ?? _en.importNetNote;
+
+  @override
+  String get syncTitle => _read('syncTitle') ?? _en.syncTitle;
+
+  @override
+  String get syncSubmitting => _read('syncSubmitting') ?? _en.syncSubmitting;
+
+  @override
+  String get syncDisconnectTitle => _read('syncDisconnectTitle') ?? _en.syncDisconnectTitle;
+
+  @override
+  String get syncDisconnectBody => _read('syncDisconnectBody') ?? _en.syncDisconnectBody;
+
+  @override
+  String get syncDisconnectAction => _read('syncDisconnectAction') ?? _en.syncDisconnectAction;
+
+  @override
+  String get syncNotYet => _read('syncNotYet') ?? _en.syncNotYet;
+
+  @override
+  String syncSecondsAgo(int count) {
+    final template = _read('syncSecondsAgo');
+    if (template == null) return _en.syncSecondsAgo(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String syncMinutesAgo(int count) {
+    final template = _read('syncMinutesAgo');
+    if (template == null) return _en.syncMinutesAgo(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String syncHoursAgo(int count) {
+    final template = _read('syncHoursAgo');
+    if (template == null) return _en.syncHoursAgo(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String syncDaysAgo(int count) {
+    final template = _read('syncDaysAgo');
+    if (template == null) return _en.syncDaysAgo(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get syncStatusConnected => _read('syncStatusConnected') ?? _en.syncStatusConnected;
+
+  @override
+  String get syncStatusConnecting => _read('syncStatusConnecting') ?? _en.syncStatusConnecting;
+
+  @override
+  String get syncStatusFailed => _read('syncStatusFailed') ?? _en.syncStatusFailed;
+
+  @override
+  String get syncStatusDisconnected => _read('syncStatusDisconnected') ?? _en.syncStatusDisconnected;
+
+  @override
+  String get syncCurrent => _read('syncCurrent') ?? _en.syncCurrent;
+
+  @override
+  String get syncBroker => _read('syncBroker') ?? _en.syncBroker;
+
+  @override
+  String get syncServer => _read('syncServer') ?? _en.syncServer;
+
+  @override
+  String get syncAccount => _read('syncAccount') ?? _en.syncAccount;
+
+  @override
+  String get syncLastTrade => _read('syncLastTrade') ?? _en.syncLastTrade;
+
+  @override
+  String get syncHintConnected => _read('syncHintConnected') ?? _en.syncHintConnected;
+
+  @override
+  String syncHintStalledError(String error) {
+    final template = _read('syncHintStalledError');
+    if (template == null) return _en.syncHintStalledError(error);
+    return _fill(template, <String, Object?>{'error': error});
+  }
+
+  @override
+  String get syncHintStalledConnecting => _read('syncHintStalledConnecting') ?? _en.syncHintStalledConnecting;
+
+  @override
+  String get syncHintStalled => _read('syncHintStalled') ?? _en.syncHintStalled;
+
+  @override
+  String get syncHintConnecting => _read('syncHintConnecting') ?? _en.syncHintConnecting;
+
+  @override
+  String get syncHintPending => _read('syncHintPending') ?? _en.syncHintPending;
+
+  @override
+  String get syncMailFailed => _read('syncMailFailed') ?? _en.syncMailFailed;
+
+  @override
+  String get syncContactSupport => _read('syncContactSupport') ?? _en.syncContactSupport;
+
+  @override
+  String get syncDisconnectLong => _read('syncDisconnectLong') ?? _en.syncDisconnectLong;
+
+  @override
+  String get syncSearchBrokers => _read('syncSearchBrokers') ?? _en.syncSearchBrokers;
+
+  @override
+  String get syncDemo => _read('syncDemo') ?? _en.syncDemo;
+
+  @override
+  String get syncLive => _read('syncLive') ?? _en.syncLive;
+
+  @override
+  String syncLastAttempt(String details) {
+    final template = _read('syncLastAttempt');
+    if (template == null) return _en.syncLastAttempt(details);
+    return _fill(template, <String, Object?>{'details': details});
+  }
+
+  @override
+  String get syncConnectTitle => _read('syncConnectTitle') ?? _en.syncConnectTitle;
+
+  @override
+  String get syncConnectBody => _read('syncConnectBody') ?? _en.syncConnectBody;
+
+  @override
+  String get syncAccountNumber => _read('syncAccountNumber') ?? _en.syncAccountNumber;
+
+  @override
+  String get syncInvestorPassword => _read('syncInvestorPassword') ?? _en.syncInvestorPassword;
+
+  @override
+  String get syncInvestorNote => _read('syncInvestorNote') ?? _en.syncInvestorNote;
+
+  @override
+  String get syncConnectAction => _read('syncConnectAction') ?? _en.syncConnectAction;
+
+  @override
+  String get syncAfterConnect => _read('syncAfterConnect') ?? _en.syncAfterConnect;
+
+  @override
+  String get syncUseTyped => _read('syncUseTyped') ?? _en.syncUseTyped;
+
+  @override
+  String get syncBrokersUnavailableTitle => _read('syncBrokersUnavailableTitle') ?? _en.syncBrokersUnavailableTitle;
+
+  @override
+  String get syncBrokersUnavailableBody => _read('syncBrokersUnavailableBody') ?? _en.syncBrokersUnavailableBody;
+
+  @override
+  String get syncTypeServer => _read('syncTypeServer') ?? _en.syncTypeServer;
+
+  @override
+  String syncBrokerCount(int count) {
+    final template = _read('syncBrokerCount');
+    if (template == null) return _en.syncBrokerCount(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get backtestTitle => _read('backtestTitle') ?? _en.backtestTitle;
+
+  @override
+  String get backtestIntro => _read('backtestIntro') ?? _en.backtestIntro;
+
+  @override
+  String get backtestCustom => _read('backtestCustom') ?? _en.backtestCustom;
+
+  @override
+  String get backtestFileUnreadable => _read('backtestFileUnreadable') ?? _en.backtestFileUnreadable;
+
+  @override
+  String get backtestFileTooLarge => _read('backtestFileTooLarge') ?? _en.backtestFileTooLarge;
+
+  @override
+  String get backtestNeedData => _read('backtestNeedData') ?? _en.backtestNeedData;
+
+  @override
+  String get backtestRunSaved => _read('backtestRunSaved') ?? _en.backtestRunSaved;
+
+  @override
+  String get backtestRunUnsaved => _read('backtestRunUnsaved') ?? _en.backtestRunUnsaved;
+
+  @override
+  String get backtestRunFailed => _read('backtestRunFailed') ?? _en.backtestRunFailed;
+
+  @override
+  String get backtestLoadRunFailed => _read('backtestLoadRunFailed') ?? _en.backtestLoadRunFailed;
+
+  @override
+  String get backtestDeleteTitle => _read('backtestDeleteTitle') ?? _en.backtestDeleteTitle;
+
+  @override
+  String get backtestThisRun => _read('backtestThisRun') ?? _en.backtestThisRun;
+
+  @override
+  String get backtestRunDeleted => _read('backtestRunDeleted') ?? _en.backtestRunDeleted;
+
+  @override
+  String get backtestDeleteFailed => _read('backtestDeleteFailed') ?? _en.backtestDeleteFailed;
+
+  @override
+  String get backtestSimulating => _read('backtestSimulating') ?? _en.backtestSimulating;
+
+  @override
+  String get backtestRunAction => _read('backtestRunAction') ?? _en.backtestRunAction;
+
+  @override
+  String get backtestBarsTitle => _read('backtestBarsTitle') ?? _en.backtestBarsTitle;
+
+  @override
+  String get backtestChooseCsv => _read('backtestChooseCsv') ?? _en.backtestChooseCsv;
+
+  @override
+  String get clearAction => _read('clearAction') ?? _en.clearAction;
+
+  @override
+  String get backtestBarsHint => _read('backtestBarsHint') ?? _en.backtestBarsHint;
+
+  @override
+  String get backtestRulesTitle => _read('backtestRulesTitle') ?? _en.backtestRulesTitle;
+
+  @override
+  String get backtestRunName => _read('backtestRunName') ?? _en.backtestRunName;
+
+  @override
+  String get backtestRunNameHint => _read('backtestRunNameHint') ?? _en.backtestRunNameHint;
+
+  @override
+  String get backtestSymbol => _read('backtestSymbol') ?? _en.backtestSymbol;
+
+  @override
+  String get backtestTimeframe => _read('backtestTimeframe') ?? _en.backtestTimeframe;
+
+  @override
+  String get backtestRulesLabel => _read('backtestRulesLabel') ?? _en.backtestRulesLabel;
+
+  @override
+  String get backtestCompiledRules => _read('backtestCompiledRules') ?? _en.backtestCompiledRules;
+
+  @override
+  String get backtestUseBuiltIn => _read('backtestUseBuiltIn') ?? _en.backtestUseBuiltIn;
+
+  @override
+  String get backtestCostsTitle => _read('backtestCostsTitle') ?? _en.backtestCostsTitle;
+
+  @override
+  String get backtestStartingBalance => _read('backtestStartingBalance') ?? _en.backtestStartingBalance;
+
+  @override
+  String get backtestRiskPercent => _read('backtestRiskPercent') ?? _en.backtestRiskPercent;
+
+  @override
+  String get backtestContractSize => _read('backtestContractSize') ?? _en.backtestContractSize;
+
+  @override
+  String get backtestMaxLeverage => _read('backtestMaxLeverage') ?? _en.backtestMaxLeverage;
+
+  @override
+  String get backtestSpread => _read('backtestSpread') ?? _en.backtestSpread;
+
+  @override
+  String get backtestSlippage => _read('backtestSlippage') ?? _en.backtestSlippage;
+
+  @override
+  String get backtestCommission => _read('backtestCommission') ?? _en.backtestCommission;
+
+  @override
+  String get backtestInSampleShare => _read('backtestInSampleShare') ?? _en.backtestInSampleShare;
+
+  @override
+  String get backtestClockOffset => _read('backtestClockOffset') ?? _en.backtestClockOffset;
+
+  @override
+  String get backtestEmptyTitle => _read('backtestEmptyTitle') ?? _en.backtestEmptyTitle;
+
+  @override
+  String get backtestEmptyBody => _read('backtestEmptyBody') ?? _en.backtestEmptyBody;
+
+  @override
+  String get backtestReturn => _read('backtestReturn') ?? _en.backtestReturn;
+
+  @override
+  String get backtestSharpe => _read('backtestSharpe') ?? _en.backtestSharpe;
+
+  @override
+  String get backtestExposure => _read('backtestExposure') ?? _en.backtestExposure;
+
+  @override
+  String get backtestAvgR => _read('backtestAvgR') ?? _en.backtestAvgR;
+
+  @override
+  String backtestBarsLine(String bars, String range, String timeframe) {
+    final template = _read('backtestBarsLine');
+    if (template == null) return _en.backtestBarsLine(bars, range, timeframe);
+    return _fill(template, <String, Object?>{'bars': bars, 'range': range, 'timeframe': timeframe});
+  }
+
+  @override
+  String get backtestEquity => _read('backtestEquity') ?? _en.backtestEquity;
+
+  @override
+  String get backtestSplitTitle => _read('backtestSplitTitle') ?? _en.backtestSplitTitle;
+
+  @override
+  String get backtestSplitBody => _read('backtestSplitBody') ?? _en.backtestSplitBody;
+
+  @override
+  String get backtestColWindow => _read('backtestColWindow') ?? _en.backtestColWindow;
+
+  @override
+  String get backtestColTrades => _read('backtestColTrades') ?? _en.backtestColTrades;
+
+  @override
+  String get backtestColNet => _read('backtestColNet') ?? _en.backtestColNet;
+
+  @override
+  String get backtestColWin => _read('backtestColWin') ?? _en.backtestColWin;
+
+  @override
+  String get backtestColMaxDd => _read('backtestColMaxDd') ?? _en.backtestColMaxDd;
+
+  @override
+  String get backtestInSample => _read('backtestInSample') ?? _en.backtestInSample;
+
+  @override
+  String get backtestOutOfSample => _read('backtestOutOfSample') ?? _en.backtestOutOfSample;
+
+  @override
+  String get backtestAssumptions => _read('backtestAssumptions') ?? _en.backtestAssumptions;
+
+  @override
+  String backtestTradesTitle(int count) {
+    final template = _read('backtestTradesTitle');
+    if (template == null) return _en.backtestTradesTitle(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get backtestColSide => _read('backtestColSide') ?? _en.backtestColSide;
+
+  @override
+  String get backtestColEntry => _read('backtestColEntry') ?? _en.backtestColEntry;
+
+  @override
+  String get backtestColLots => _read('backtestColLots') ?? _en.backtestColLots;
+
+  @override
+  String get backtestColPnl => _read('backtestColPnl') ?? _en.backtestColPnl;
+
+  @override
+  String get backtestColWhy => _read('backtestColWhy') ?? _en.backtestColWhy;
+
+  @override
+  String get backtestSavedRuns => _read('backtestSavedRuns') ?? _en.backtestSavedRuns;
+
+  @override
+  String get backtestSavedSub => _read('backtestSavedSub') ?? _en.backtestSavedSub;
+
+  @override
+  String get backtestNoSavedRuns => _read('backtestNoSavedRuns') ?? _en.backtestNoSavedRuns;
+
+  @override
+  String backtestRunFallback(String symbol) {
+    final template = _read('backtestRunFallback');
+    if (template == null) return _en.backtestRunFallback(symbol);
+    return _fill(template, <String, Object?>{'symbol': symbol});
+  }
+
+  @override
+  String backtestDeleteTooltip(String name) {
+    final template = _read('backtestDeleteTooltip');
+    if (template == null) return _en.backtestDeleteTooltip(name);
+    return _fill(template, <String, Object?>{'name': name});
+  }
+
+  @override
+  String get cbIntro => _read('cbIntro') ?? _en.cbIntro;
+
+  @override
+  String get cbGalleryFailed => _read('cbGalleryFailed') ?? _en.cbGalleryFailed;
+
+  @override
+  String get cbUseImage => _read('cbUseImage') ?? _en.cbUseImage;
+
+  @override
+  String cbReadFailed(String name) {
+    final template = _read('cbReadFailed');
+    if (template == null) return _en.cbReadFailed(name);
+    return _fill(template, <String, Object?>{'name': name});
+  }
+
+  @override
+  String cbTooManyCharts(int max) {
+    final template = _read('cbTooManyCharts');
+    if (template == null) return _en.cbTooManyCharts(max);
+    return _fill(template, <String, Object?>{'max': max});
+  }
+
+  @override
+  String get cbChartTooLarge => _read('cbChartTooLarge') ?? _en.cbChartTooLarge;
+
+  @override
+  String get cbChartsBudget => _read('cbChartsBudget') ?? _en.cbChartsBudget;
+
+  @override
+  String get cbNothingRecorded => _read('cbNothingRecorded') ?? _en.cbNothingRecorded;
+
+  @override
+  String get cbVoiceAdded => _read('cbVoiceAdded') ?? _en.cbVoiceAdded;
+
+  @override
+  String get cbRecordingFailed => _read('cbRecordingFailed') ?? _en.cbRecordingFailed;
+
+  @override
+  String get cbDescribeFirst => _read('cbDescribeFirst') ?? _en.cbDescribeFirst;
+
+  @override
+  String get cbCompileFailed => _read('cbCompileFailed') ?? _en.cbCompileFailed;
+
+  @override
+  String get cbStepSetup => _read('cbStepSetup') ?? _en.cbStepSetup;
+
+  @override
+  String get cbDescriptionHint => _read('cbDescriptionHint') ?? _en.cbDescriptionHint;
+
+  @override
+  String get cbSymbolOptional => _read('cbSymbolOptional') ?? _en.cbSymbolOptional;
+
+  @override
+  String get cbStopOptional => _read('cbStopOptional') ?? _en.cbStopOptional;
+
+  @override
+  String get cbCriteriaLabel => _read('cbCriteriaLabel') ?? _en.cbCriteriaLabel;
+
+  @override
+  String get cbCompiling => _read('cbCompiling') ?? _en.cbCompiling;
+
+  @override
+  String get cbCompileAction => _read('cbCompileAction') ?? _en.cbCompileAction;
+
+  @override
+  String get cbNoChartsSent => _read('cbNoChartsSent') ?? _en.cbNoChartsSent;
+
+  @override
+  String cbChartsSent(int count) {
+    final template = _read('cbChartsSent');
+    if (template == null) return _en.cbChartsSent(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String cbRulesLine(String timeframe, String charts) {
+    final template = _read('cbRulesLine');
+    if (template == null) return _en.cbRulesLine(timeframe, charts);
+    return _fill(template, <String, Object?>{'timeframe': timeframe, 'charts': charts});
+  }
+
+  @override
+  String cbCompiledWith(String model) {
+    final template = _read('cbCompiledWith');
+    if (template == null) return _en.cbCompiledWith(model);
+    return _fill(template, <String, Object?>{'model': model});
+  }
+
+  @override
+  String get cbUseRules => _read('cbUseRules') ?? _en.cbUseRules;
+
+  @override
+  String get cbCompileAgain => _read('cbCompileAgain') ?? _en.cbCompileAgain;
+
+  @override
+  String get cbAddChart => _read('cbAddChart') ?? _en.cbAddChart;
+
+  @override
+  String cbAddChartCount(int current, int max) {
+    final template = _read('cbAddChartCount');
+    if (template == null) return _en.cbAddChartCount(current, max);
+    return _fill(template, <String, Object?>{'current': current, 'max': max});
+  }
+
+  @override
+  String cbStopRecording(int seconds) {
+    final template = _read('cbStopRecording');
+    if (template == null) return _en.cbStopRecording(seconds);
+    return _fill(template, <String, Object?>{'seconds': seconds});
+  }
+
+  @override
+  String get cbTranscribing => _read('cbTranscribing') ?? _en.cbTranscribing;
+
+  @override
+  String get cbVoiceNote => _read('cbVoiceNote') ?? _en.cbVoiceNote;
+
+  @override
+  String cbAttachmentsNote(int max) {
+    final template = _read('cbAttachmentsNote');
+    if (template == null) return _en.cbAttachmentsNote(max);
+    return _fill(template, <String, Object?>{'max': max});
+  }
+
+  @override
+  String get cbTimeframe => _read('cbTimeframe') ?? _en.cbTimeframe;
+
+  @override
+  String get cbConfirmation => _read('cbConfirmation') ?? _en.cbConfirmation;
+
+  @override
+  String get cbNone => _read('cbNone') ?? _en.cbNone;
+
+  @override
+  String get chartDrawingTools => _read('chartDrawingTools') ?? _en.chartDrawingTools;
+
+  @override
+  String get chartMarketReplay => _read('chartMarketReplay') ?? _en.chartMarketReplay;
+
+  @override
+  String get chartStyle => _read('chartStyle') ?? _en.chartStyle;
+
+  @override
+  String chartMagnetTooltip(String mode) {
+    final template = _read('chartMagnetTooltip');
+    if (template == null) return _en.chartMagnetTooltip(mode);
+    return _fill(template, <String, Object?>{'mode': mode});
+  }
+
+  @override
+  String get chartHideBuySell => _read('chartHideBuySell') ?? _en.chartHideBuySell;
+
+  @override
+  String get chartBuySell => _read('chartBuySell') ?? _en.chartBuySell;
+
+  @override
+  String chartTitle(String symbol) {
+    final template = _read('chartTitle');
+    if (template == null) return _en.chartTitle(symbol);
+    return _fill(template, <String, Object?>{'symbol': symbol});
+  }
+
+  @override
+  String get chartFullscreen => _read('chartFullscreen') ?? _en.chartFullscreen;
+
+  @override
+  String get chartExitFullscreen => _read('chartExitFullscreen') ?? _en.chartExitFullscreen;
+
+  @override
+  String get chartExitTimeBeforeEntry => _read('chartExitTimeBeforeEntry') ?? _en.chartExitTimeBeforeEntry;
+
+  @override
+  String get chartHeadsUp => _read('chartHeadsUp') ?? _en.chartHeadsUp;
+
+  @override
+  String get chartDragLevel => _read('chartDragLevel') ?? _en.chartDragLevel;
+
+  @override
+  String get chartCrosshairOn => _read('chartCrosshairOn') ?? _en.chartCrosshairOn;
+
+  @override
+  String get chartCrosshairOff => _read('chartCrosshairOff') ?? _en.chartCrosshairOff;
+
+  @override
+  String get chartStopBuyBelow => _read('chartStopBuyBelow') ?? _en.chartStopBuyBelow;
+
+  @override
+  String get chartStopSellAbove => _read('chartStopSellAbove') ?? _en.chartStopSellAbove;
+
+  @override
+  String get chartTargetBuyAbove => _read('chartTargetBuyAbove') ?? _en.chartTargetBuyAbove;
+
+  @override
+  String get chartTargetSellBelow => _read('chartTargetSellBelow') ?? _en.chartTargetSellBelow;
+
+  @override
+  String get chartUnreachableAccount => _read('chartUnreachableAccount') ?? _en.chartUnreachableAccount;
+
+  @override
+  String chartIntervalRefused(String interval) {
+    final template = _read('chartIntervalRefused');
+    if (template == null) return _en.chartIntervalRefused(interval);
+    return _fill(template, <String, Object?>{'interval': interval});
+  }
+
+  @override
+  String get chartNoCandlesWindow => _read('chartNoCandlesWindow') ?? _en.chartNoCandlesWindow;
+
+  @override
+  String get chartPlacementMove => _read('chartPlacementMove') ?? _en.chartPlacementMove;
+
+  @override
+  String get chartPlacementLift => _read('chartPlacementLift') ?? _en.chartPlacementLift;
+
+  @override
+  String get chartPlacementTapFirst => _read('chartPlacementTapFirst') ?? _en.chartPlacementTapFirst;
+
+  @override
+  String get chartPlacementTap => _read('chartPlacementTap') ?? _en.chartPlacementTap;
+
+  @override
+  String chartPlacedOfTotal(int placed, int total) {
+    final template = _read('chartPlacedOfTotal');
+    if (template == null) return _en.chartPlacedOfTotal(placed, total);
+    return _fill(template, <String, Object?>{'placed': placed, 'total': total});
+  }
+
+  @override
+  String chartMagnetSuffix(String mode) {
+    final template = _read('chartMagnetSuffix');
+    if (template == null) return _en.chartMagnetSuffix(mode);
+    return _fill(template, <String, Object?>{'mode': mode});
+  }
+
+  @override
+  String get chartKeepDrawingOn => _read('chartKeepDrawingOn') ?? _en.chartKeepDrawingOn;
+
+  @override
+  String get chartKeepDrawingOff => _read('chartKeepDrawingOff') ?? _en.chartKeepDrawingOff;
+
+  @override
+  String get chartPutToolAway => _read('chartPutToolAway') ?? _en.chartPutToolAway;
+
+  @override
+  String get chartMoreActions => _read('chartMoreActions') ?? _en.chartMoreActions;
+
+  @override
+  String get chartClone => _read('chartClone') ?? _en.chartClone;
+
+  @override
+  String get chartColour => _read('chartColour') ?? _en.chartColour;
+
+  @override
+  String get chartLineWidth => _read('chartLineWidth') ?? _en.chartLineWidth;
+
+  @override
+  String get chartLineStyle => _read('chartLineStyle') ?? _en.chartLineStyle;
+
+  @override
+  String get chartLock => _read('chartLock') ?? _en.chartLock;
+
+  @override
+  String get chartUnlock => _read('chartUnlock') ?? _en.chartUnlock;
+
+  @override
+  String get chartShow => _read('chartShow') ?? _en.chartShow;
+
+  @override
+  String get chartHide => _read('chartHide') ?? _en.chartHide;
+
+  @override
+  String get chartRemove => _read('chartRemove') ?? _en.chartRemove;
+
+  @override
+  String chartAddAlertAt(String symbol, String price) {
+    final template = _read('chartAddAlertAt');
+    if (template == null) return _en.chartAddAlertAt(symbol, price);
+    return _fill(template, <String, Object?>{'symbol': symbol, 'price': price});
+  }
+
+  @override
+  String get chartAlertSubtitle => _read('chartAlertSubtitle') ?? _en.chartAlertSubtitle;
+
+  @override
+  String get chartPinLevel => _read('chartPinLevel') ?? _en.chartPinLevel;
+
+  @override
+  String get chartPinSubtitle => _read('chartPinSubtitle') ?? _en.chartPinSubtitle;
+
+  @override
+  String get chartUseAsEntry => _read('chartUseAsEntry') ?? _en.chartUseAsEntry;
+
+  @override
+  String get chartUseAsEntrySub => _read('chartUseAsEntrySub') ?? _en.chartUseAsEntrySub;
+
+  @override
+  String get chartCopyPrice => _read('chartCopyPrice') ?? _en.chartCopyPrice;
+
+  @override
+  String chartAlertSet(String price) {
+    final template = _read('chartAlertSet');
+    if (template == null) return _en.chartAlertSet(price);
+    return _fill(template, <String, Object?>{'price': price});
+  }
+
+  @override
+  String chartLevelPinned(String price) {
+    final template = _read('chartLevelPinned');
+    if (template == null) return _en.chartLevelPinned(price);
+    return _fill(template, <String, Object?>{'price': price});
+  }
+
+  @override
+  String chartPriceCopied(String price) {
+    final template = _read('chartPriceCopied');
+    if (template == null) return _en.chartPriceCopied(price);
+    return _fill(template, <String, Object?>{'price': price});
+  }
+
+  @override
+  String get chartReplayFromDate => _read('chartReplayFromDate') ?? _en.chartReplayFromDate;
+
+  @override
+  String chartNoCandlesFor(String date) {
+    final template = _read('chartNoCandlesFor');
+    if (template == null) return _en.chartNoCandlesFor(date);
+    return _fill(template, <String, Object?>{'date': date});
+  }
+
+  @override
+  String chartFeedDown(String at) {
+    final template = _read('chartFeedDown');
+    if (template == null) return _en.chartFeedDown(at);
+    return _fill(template, <String, Object?>{'at': at});
+  }
+
+  @override
+  String get chartNoEarlierCandles => _read('chartNoEarlierCandles') ?? _en.chartNoEarlierCandles;
+
+  @override
+  String get chartProIntervals => _read('chartProIntervals') ?? _en.chartProIntervals;
+
+  @override
+  String get chartBasicIntervals => _read('chartBasicIntervals') ?? _en.chartBasicIntervals;
+
+  @override
+  String get chartPinUpgrade => _read('chartPinUpgrade') ?? _en.chartPinUpgrade;
+
+  @override
+  String get chartReplayUpgrade => _read('chartReplayUpgrade') ?? _en.chartReplayUpgrade;
+
+  @override
+  String get chartLoadEarlier => _read('chartLoadEarlier') ?? _en.chartLoadEarlier;
+
+  @override
+  String get chartPreviousBar => _read('chartPreviousBar') ?? _en.chartPreviousBar;
+
+  @override
+  String get chartNextBar => _read('chartNextBar') ?? _en.chartNextBar;
+
+  @override
+  String get chartPauseReplay => _read('chartPauseReplay') ?? _en.chartPauseReplay;
+
+  @override
+  String get chartPlayReplay => _read('chartPlayReplay') ?? _en.chartPlayReplay;
+
+  @override
+  String get chartJumpToDate => _read('chartJumpToDate') ?? _en.chartJumpToDate;
+
+  @override
+  String get chartExitReplay => _read('chartExitReplay') ?? _en.chartExitReplay;
+
+  @override
+  String get chartNoteHint => _read('chartNoteHint') ?? _en.chartNoteHint;
+
+  @override
+  String get chartAdd => _read('chartAdd') ?? _en.chartAdd;
+
+  @override
+  String get chartAlertLine => _read('chartAlertLine') ?? _en.chartAlertLine;
+
+  @override
+  String get chartAlertLineFired => _read('chartAlertLineFired') ?? _en.chartAlertLineFired;
+
+  @override
+  String chartTextWith(String body) {
+    final template = _read('chartTextWith');
+    if (template == null) return _en.chartTextWith(body);
+    return _fill(template, <String, Object?>{'body': body});
+  }
+
+  @override
+  String chartPositionSummary(String entry, String stop, String target, String risk) {
+    final template = _read('chartPositionSummary');
+    if (template == null) return _en.chartPositionSummary(entry, stop, target, risk);
+    return _fill(template, <String, Object?>{'entry': entry, 'stop': stop, 'target': target, 'risk': risk});
+  }
+
+  @override
+  String get chartObjectLockedBody => _read('chartObjectLockedBody') ?? _en.chartObjectLockedBody;
+
+  @override
+  String get chartObjectUnlockedBody => _read('chartObjectUnlockedBody') ?? _en.chartObjectUnlockedBody;
+
+  @override
+  String get chartHideBody => _read('chartHideBody') ?? _en.chartHideBody;
+
+  @override
+  String chartObjectsOnChart(int count) {
+    final template = _read('chartObjectsOnChart');
+    if (template == null) return _en.chartObjectsOnChart(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get chartObjectHidden => _read('chartObjectHidden') ?? _en.chartObjectHidden;
+
+  @override
+  String get chartUndoAction => _read('chartUndoAction') ?? _en.chartUndoAction;
+
+  @override
+  String get chartWorkspace => _read('chartWorkspace') ?? _en.chartWorkspace;
+
+  @override
+  String get chartToolsLabel => _read('chartToolsLabel') ?? _en.chartToolsLabel;
+
+  @override
+  String get chartNoLayoutSaved => _read('chartNoLayoutSaved') ?? _en.chartNoLayoutSaved;
+
+  @override
+  String chartLayoutName(String name) {
+    final template = _read('chartLayoutName');
+    if (template == null) return _en.chartLayoutName(name);
+    return _fill(template, <String, Object?>{'name': name});
+  }
+
+  @override
+  String get chartLayouts => _read('chartLayouts') ?? _en.chartLayouts;
+
+  @override
+  String chartLayoutsSaved(int count) {
+    final template = _read('chartLayoutsSaved');
+    if (template == null) return _en.chartLayoutsSaved(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get chartSettings => _read('chartSettings') ?? _en.chartSettings;
+
+  @override
+  String get chartSaveShort => _read('chartSaveShort') ?? _en.chartSaveShort;
+
+  @override
+  String get chartThisChart => _read('chartThisChart') ?? _en.chartThisChart;
+
+  @override
+  String get chartOpen => _read('chartOpen') ?? _en.chartOpen;
+
+  @override
+  String get chartFromLibrary => _read('chartFromLibrary') ?? _en.chartFromLibrary;
+
+  @override
+  String get chartNew => _read('chartNew') ?? _en.chartNew;
+
+  @override
+  String get chartBlankChart => _read('chartBlankChart') ?? _en.chartBlankChart;
+
+  @override
+  String get chartType => _read('chartType') ?? _en.chartType;
+
+  @override
+  String get chartIndicators => _read('chartIndicators') ?? _en.chartIndicators;
+
+  @override
+  String get chartNone => _read('chartNone') ?? _en.chartNone;
+
+  @override
+  String chartStudiesOn(int count) {
+    final template = _read('chartStudiesOn');
+    if (template == null) return _en.chartStudiesOn(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get chartAlerts => _read('chartAlerts') ?? _en.chartAlerts;
+
+  @override
+  String get chartLevelTouches => _read('chartLevelTouches') ?? _en.chartLevelTouches;
+
+  @override
+  String get chartReplay => _read('chartReplay') ?? _en.chartReplay;
+
+  @override
+  String chartObjectsShort(int count) {
+    final template = _read('chartObjectsShort');
+    if (template == null) return _en.chartObjectsShort(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get chartTimeZone => _read('chartTimeZone') ?? _en.chartTimeZone;
+
+  @override
+  String get chartEvents => _read('chartEvents') ?? _en.chartEvents;
+
+  @override
+  String get chartSaveLayoutTitle => _read('chartSaveLayoutTitle') ?? _en.chartSaveLayoutTitle;
+
+  @override
+  String get chartUpdateLayoutTitle => _read('chartUpdateLayoutTitle') ?? _en.chartUpdateLayoutTitle;
+
+  @override
+  String get chartLayoutNameLabel => _read('chartLayoutNameLabel') ?? _en.chartLayoutNameLabel;
+
+  @override
+  String get chartSave => _read('chartSave') ?? _en.chartSave;
+
+  @override
+  String get chartUpdate => _read('chartUpdate') ?? _en.chartUpdate;
+
+  @override
+  String chartSavedName(String name) {
+    final template = _read('chartSavedName');
+    if (template == null) return _en.chartSavedName(name);
+    return _fill(template, <String, Object?>{'name': name});
+  }
+
+  @override
+  String chartOpenedLayout(String name) {
+    final template = _read('chartOpenedLayout');
+    if (template == null) return _en.chartOpenedLayout(name);
+    return _fill(template, <String, Object?>{'name': name});
+  }
+
+  @override
+  String chartOpenedLayoutOn(String name, String symbol) {
+    final template = _read('chartOpenedLayoutOn');
+    if (template == null) return _en.chartOpenedLayoutOn(name, symbol);
+    return _fill(template, <String, Object?>{'name': name, 'symbol': symbol});
+  }
+
+  @override
+  String get chartA11yQuickActions => _read('chartA11yQuickActions') ?? _en.chartA11yQuickActions;
+
+  @override
+  String get chartA11yFitScale => _read('chartA11yFitScale') ?? _en.chartA11yFitScale;
+
+  @override
+  String get chartA11yFinishDrawing => _read('chartA11yFinishDrawing') ?? _en.chartA11yFinishDrawing;
+
+  @override
+  String get chartTimeZoneTitle => _read('chartTimeZoneTitle') ?? _en.chartTimeZoneTitle;
+
+  @override
+  String get chartSearchZone => _read('chartSearchZone') ?? _en.chartSearchZone;
 }

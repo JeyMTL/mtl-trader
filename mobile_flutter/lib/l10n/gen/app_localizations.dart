@@ -3382,6 +3382,1819 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove from favorites'**
   String get unpin;
+
+  /// No description provided for @keepAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get keepAction;
+
+  /// No description provided for @doneAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get doneAction;
+
+  /// No description provided for @importTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import trades'**
+  String get importTitle;
+
+  /// No description provided for @importUnreadableFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read that file. Try picking it again.'**
+  String get importUnreadableFile;
+
+  /// No description provided for @importFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is {size} MB. Imports are limited to 20 MB — split the report and import it in parts.'**
+  String importFileTooLarge(String size);
+
+  /// No description provided for @importNoClosedTrades.
+  ///
+  /// In en, this message translates to:
+  /// **'No closed trades were found. Make sure the file is an MT5 or broker history export — open positions are skipped.'**
+  String get importNoClosedTrades;
+
+  /// No description provided for @importNoReadableData.
+  ///
+  /// In en, this message translates to:
+  /// **'No readable data in this file. Export it as CSV from MT5 or your broker and try again.'**
+  String get importNoReadableData;
+
+  /// No description provided for @importUnknownFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown file'**
+  String get importUnknownFile;
+
+  /// No description provided for @importDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this import?'**
+  String get importDeleteTitle;
+
+  /// No description provided for @importDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 trade from {filename} will be removed from your journal. This cannot be undone.} other{{count} trades from {filename} will be removed from your journal. This cannot be undone.}}'**
+  String importDeleteBody(int count, String filename);
+
+  /// No description provided for @importDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Deleted 1 imported trade.} other{Deleted {count} imported trades.}}'**
+  String importDeleted(int count);
+
+  /// No description provided for @importImporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing…'**
+  String get importImporting;
+
+  /// No description provided for @importAction.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Import 1 trade} other{Import {count} trades}}'**
+  String importAction(int count);
+
+  /// No description provided for @importChooseAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another file'**
+  String get importChooseAnother;
+
+  /// No description provided for @importReadingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading file…'**
+  String get importReadingFile;
+
+  /// No description provided for @importChooseFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a trade history file'**
+  String get importChooseFile;
+
+  /// No description provided for @importFileTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'MT5 XML report, CSV, TSV, an Excel .xlsx/.xls export, or a broker CSV.'**
+  String get importFileTypes;
+
+  /// No description provided for @importSkippedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Already-imported tickets are skipped, so importing the same statement twice does not double your journal.'**
+  String get importSkippedNote;
+
+  /// No description provided for @importSelectedFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected file'**
+  String get importSelectedFile;
+
+  /// No description provided for @importNoTradesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No closed trades found'**
+  String get importNoTradesFound;
+
+  /// No description provided for @importFileStats.
+  ///
+  /// In en, this message translates to:
+  /// **'{trades, plural, =1{1 trade} other{{trades} trades}} · {wins, plural, =1{1 win} other{{wins} wins}} · {losses, plural, =1{1 loss} other{{losses} losses}}'**
+  String importFileStats(int trades, int wins, int losses);
+
+  /// No description provided for @importRemoveFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove file'**
+  String get importRemoveFile;
+
+  /// No description provided for @importNetPnl.
+  ///
+  /// In en, this message translates to:
+  /// **'Net P&L'**
+  String get importNetPnl;
+
+  /// No description provided for @importDateRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Date range'**
+  String get importDateRange;
+
+  /// No description provided for @importPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get importPreview;
+
+  /// No description provided for @importPreviewSub.
+  ///
+  /// In en, this message translates to:
+  /// **'First {shown} of {total}'**
+  String importPreviewSub(int shown, int total);
+
+  /// No description provided for @importPreviewLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{type} · {lot} lots'**
+  String importPreviewLine(String type, String lot);
+
+  /// No description provided for @importNothingNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing new to import'**
+  String get importNothingNew;
+
+  /// No description provided for @importComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Import complete'**
+  String get importComplete;
+
+  /// No description provided for @importAlreadyInJournal.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 trade is already in your journal.} other{{count} trades are already in your journal.}}'**
+  String importAlreadyInJournal(int count);
+
+  /// No description provided for @importAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 trade added to your journal.} other{{count} trades added to your journal.}}'**
+  String importAdded(int count);
+
+  /// No description provided for @importDuplicatesSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 duplicate skipped.} other{{count} duplicates skipped.}}'**
+  String importDuplicatesSkipped(int count);
+
+  /// No description provided for @importAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Import another file'**
+  String get importAnother;
+
+  /// No description provided for @importClearBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every trade — imported or logged by hand — will be deleted. This cannot be undone.'**
+  String get importClearBody;
+
+  /// No description provided for @importClearAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear journal'**
+  String get importClearAction;
+
+  /// No description provided for @importJournalCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Journal cleared.'**
+  String get importJournalCleared;
+
+  /// No description provided for @importHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import history'**
+  String get importHistoryTitle;
+
+  /// No description provided for @importHistorySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Statements imported from this device.'**
+  String get importHistorySub;
+
+  /// No description provided for @importHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No imports yet.'**
+  String get importHistoryEmpty;
+
+  /// No description provided for @importHistoryLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 trade} other{{count} trades}} · {when}'**
+  String importHistoryLine(int count, String when);
+
+  /// No description provided for @importDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this import'**
+  String get importDeleteTooltip;
+
+  /// No description provided for @importHowToTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to export from MT5'**
+  String get importHowToTitle;
+
+  /// No description provided for @importHowToSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Open MetaTrader 5 → History tab.\n2. Right-click → All History, then select the trades.\n3. Right-click → Report / Export and save as CSV or the XML report (ReportHistory files).\n4. Pick that file above.'**
+  String get importHowToSteps;
+
+  /// No description provided for @importNetNote.
+  ///
+  /// In en, this message translates to:
+  /// **'P&L is stored net: MT5 profit plus commission and swap. Excel .xlsx and .xls exports work too — .xls up to 4 MB is read on our server, so larger ones should be saved as .xlsx or CSV.'**
+  String get importNetNote;
+
+  /// No description provided for @syncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'MT5 Sync'**
+  String get syncTitle;
+
+  /// No description provided for @syncSubmitting.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in now. The first sync can take a few minutes — we will notify you when it is live.'**
+  String get syncSubmitting;
+
+  /// No description provided for @syncDisconnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect account?'**
+  String get syncDisconnectTitle;
+
+  /// No description provided for @syncDisconnectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We delete the stored password and stop syncing. Your trades stay in your journal.'**
+  String get syncDisconnectBody;
+
+  /// No description provided for @syncDisconnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get syncDisconnectAction;
+
+  /// No description provided for @syncNotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'not yet'**
+  String get syncNotYet;
+
+  /// No description provided for @syncSecondsAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1s ago} other{{count}s ago}}'**
+  String syncSecondsAgo(int count);
+
+  /// No description provided for @syncMinutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1m ago} other{{count}m ago}}'**
+  String syncMinutesAgo(int count);
+
+  /// No description provided for @syncHoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1h ago} other{{count}h ago}}'**
+  String syncHoursAgo(int count);
+
+  /// No description provided for @syncDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1d ago} other{{count}d ago}}'**
+  String syncDaysAgo(int count);
+
+  /// No description provided for @syncStatusConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get syncStatusConnected;
+
+  /// No description provided for @syncStatusConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting…'**
+  String get syncStatusConnecting;
+
+  /// No description provided for @syncStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed'**
+  String get syncStatusFailed;
+
+  /// No description provided for @syncStatusDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get syncStatusDisconnected;
+
+  /// No description provided for @syncCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current connection'**
+  String get syncCurrent;
+
+  /// No description provided for @syncBroker.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker'**
+  String get syncBroker;
+
+  /// No description provided for @syncServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get syncServer;
+
+  /// No description provided for @syncAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get syncAccount;
+
+  /// No description provided for @syncLastTrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Last trade'**
+  String get syncLastTrade;
+
+  /// No description provided for @syncHintConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed trades arrive automatically, even with the app shut.'**
+  String get syncHintConnected;
+
+  /// No description provided for @syncHintStalledError.
+  ///
+  /// In en, this message translates to:
+  /// **'Still not connected. The sync host reported: {error}'**
+  String syncHintStalledError(String error);
+
+  /// No description provided for @syncHintStalledConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Still signing in. The first sync reads up to a year of closed trades from the terminal, so it can take several minutes. Leave it connected and pull down to refresh.'**
+  String get syncHintStalledConnecting;
+
+  /// No description provided for @syncHintStalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Still not connected after two minutes, and nothing has reported a sign-in attempt. The sync service is probably not running — start it, then disconnect here and connect again.'**
+  String get syncHintStalled;
+
+  /// No description provided for @syncHintConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing in and reading your closed trades. A first sync can take a few minutes while the terminal downloads history. You can close the app: we send a notification when sync is live, or if the password is wrong.'**
+  String get syncHintConnecting;
+
+  /// No description provided for @syncHintPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a sync session to pick this account up. If it stays here, check the account number, server and investor password.'**
+  String get syncHintPending;
+
+  /// No description provided for @syncMailFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open your mail app.'**
+  String get syncMailFailed;
+
+  /// No description provided for @syncContactSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get syncContactSupport;
+
+  /// No description provided for @syncDisconnectLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect and delete password'**
+  String get syncDisconnectLong;
+
+  /// No description provided for @syncSearchBrokers.
+  ///
+  /// In en, this message translates to:
+  /// **'Search MT5 brokers'**
+  String get syncSearchBrokers;
+
+  /// No description provided for @syncDemo.
+  ///
+  /// In en, this message translates to:
+  /// **'DEMO'**
+  String get syncDemo;
+
+  /// No description provided for @syncLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get syncLive;
+
+  /// No description provided for @syncLastAttempt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last attempt: {details}'**
+  String syncLastAttempt(String details);
+
+  /// No description provided for @syncConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect automatically'**
+  String get syncConnectTitle;
+
+  /// No description provided for @syncConnectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No PC needed. Enter the account details once and every closed trade lands in your journal. The first connection can take a few minutes while we download your trade history.'**
+  String get syncConnectBody;
+
+  /// No description provided for @syncAccountNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Account number'**
+  String get syncAccountNumber;
+
+  /// No description provided for @syncInvestorPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Investor (read-only) password'**
+  String get syncInvestorPassword;
+
+  /// No description provided for @syncInvestorNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the investor password, never your trading password: MT5 → Settings → your account → Change investor password. It cannot trade, it is stored encrypted, and changing it in MT5 instantly cuts our access.'**
+  String get syncInvestorNote;
+
+  /// No description provided for @syncConnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect account'**
+  String get syncConnectAction;
+
+  /// No description provided for @syncAfterConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'After you connect, you can close the app. The first sync can take a few minutes, and we send a notification when it is live — or if the password is wrong.'**
+  String get syncAfterConnect;
+
+  /// No description provided for @syncUseTyped.
+  ///
+  /// In en, this message translates to:
+  /// **'Use what you typed'**
+  String get syncUseTyped;
+
+  /// No description provided for @syncBrokersUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Broker list unavailable'**
+  String get syncBrokersUnavailableTitle;
+
+  /// No description provided for @syncBrokersUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the broker name in the field and it will be used as is.'**
+  String get syncBrokersUnavailableBody;
+
+  /// No description provided for @syncTypeServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the server name'**
+  String get syncTypeServer;
+
+  /// No description provided for @syncBrokerCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 MT5 broker} other{{count} MT5 brokers}} · any broker works, even one not listed'**
+  String syncBrokerCount(int count);
+
+  /// No description provided for @backtestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backtest'**
+  String get backtestTitle;
+
+  /// No description provided for @backtestIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay your own rules over your own MT5 bar data, with costs and the fill assumptions printed on the result.'**
+  String get backtestIntro;
+
+  /// No description provided for @backtestCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom backtest'**
+  String get backtestCustom;
+
+  /// No description provided for @backtestFileUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read that file. Try picking it again.'**
+  String get backtestFileUnreadable;
+
+  /// No description provided for @backtestFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is over 4 MB. Export a shorter range.'**
+  String get backtestFileTooLarge;
+
+  /// No description provided for @backtestNeedData.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload or paste the bar data first.'**
+  String get backtestNeedData;
+
+  /// No description provided for @backtestRunSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Run complete and saved.'**
+  String get backtestRunSaved;
+
+  /// No description provided for @backtestRunUnsaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Run complete — the archive write failed.'**
+  String get backtestRunUnsaved;
+
+  /// No description provided for @backtestRunFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The run could not be completed. Try again.'**
+  String get backtestRunFailed;
+
+  /// No description provided for @backtestLoadRunFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load that run.'**
+  String get backtestLoadRunFailed;
+
+  /// No description provided for @backtestDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this saved run?'**
+  String get backtestDeleteTitle;
+
+  /// No description provided for @backtestThisRun.
+  ///
+  /// In en, this message translates to:
+  /// **'This run'**
+  String get backtestThisRun;
+
+  /// No description provided for @backtestRunDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Run deleted.'**
+  String get backtestRunDeleted;
+
+  /// No description provided for @backtestDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete the run.'**
+  String get backtestDeleteFailed;
+
+  /// No description provided for @backtestSimulating.
+  ///
+  /// In en, this message translates to:
+  /// **'Simulating…'**
+  String get backtestSimulating;
+
+  /// No description provided for @backtestRunAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Run backtest'**
+  String get backtestRunAction;
+
+  /// No description provided for @backtestBarsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Bar data'**
+  String get backtestBarsTitle;
+
+  /// No description provided for @backtestChooseCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a CSV or paste below'**
+  String get backtestChooseCsv;
+
+  /// No description provided for @clearAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearAction;
+
+  /// No description provided for @backtestBarsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 60,000 bars. In MT5: select the chart with Ctrl+A, copy, paste into a text file.'**
+  String get backtestBarsHint;
+
+  /// No description provided for @backtestRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'2. Rules'**
+  String get backtestRulesTitle;
+
+  /// No description provided for @backtestRunName.
+  ///
+  /// In en, this message translates to:
+  /// **'Run name'**
+  String get backtestRunName;
+
+  /// No description provided for @backtestRunNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. EURUSD M1 SMA cross'**
+  String get backtestRunNameHint;
+
+  /// No description provided for @backtestSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbol'**
+  String get backtestSymbol;
+
+  /// No description provided for @backtestTimeframe.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeframe'**
+  String get backtestTimeframe;
+
+  /// No description provided for @backtestRulesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get backtestRulesLabel;
+
+  /// No description provided for @backtestCompiledRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Compiled rules'**
+  String get backtestCompiledRules;
+
+  /// No description provided for @backtestUseBuiltIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a built-in rule set instead'**
+  String get backtestUseBuiltIn;
+
+  /// No description provided for @backtestCostsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'3. Sizing and costs'**
+  String get backtestCostsTitle;
+
+  /// No description provided for @backtestStartingBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting balance'**
+  String get backtestStartingBalance;
+
+  /// No description provided for @backtestRiskPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Risk per trade %'**
+  String get backtestRiskPercent;
+
+  /// No description provided for @backtestContractSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract size'**
+  String get backtestContractSize;
+
+  /// No description provided for @backtestMaxLeverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Max leverage'**
+  String get backtestMaxLeverage;
+
+  /// No description provided for @backtestSpread.
+  ///
+  /// In en, this message translates to:
+  /// **'Spread (price)'**
+  String get backtestSpread;
+
+  /// No description provided for @backtestSlippage.
+  ///
+  /// In en, this message translates to:
+  /// **'Slippage (price)'**
+  String get backtestSlippage;
+
+  /// No description provided for @backtestCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission / trade'**
+  String get backtestCommission;
+
+  /// No description provided for @backtestInSampleShare.
+  ///
+  /// In en, this message translates to:
+  /// **'In-sample share'**
+  String get backtestInSampleShare;
+
+  /// No description provided for @backtestClockOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Server clock offset (min)'**
+  String get backtestClockOffset;
+
+  /// No description provided for @backtestEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No run yet'**
+  String get backtestEmptyTitle;
+
+  /// No description provided for @backtestEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a history export, choose the rules and the cost model, and the report appears here with its assumptions.'**
+  String get backtestEmptyBody;
+
+  /// No description provided for @backtestReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get backtestReturn;
+
+  /// No description provided for @backtestSharpe.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharpe'**
+  String get backtestSharpe;
+
+  /// No description provided for @backtestExposure.
+  ///
+  /// In en, this message translates to:
+  /// **'Exposure'**
+  String get backtestExposure;
+
+  /// No description provided for @backtestAvgR.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg R'**
+  String get backtestAvgR;
+
+  /// No description provided for @backtestBarsLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{bars} bars · {range} · {timeframe}'**
+  String backtestBarsLine(String bars, String range, String timeframe);
+
+  /// No description provided for @backtestEquity.
+  ///
+  /// In en, this message translates to:
+  /// **'Equity'**
+  String get backtestEquity;
+
+  /// No description provided for @backtestSplitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'In-sample vs out-of-sample'**
+  String get backtestSplitTitle;
+
+  /// No description provided for @backtestSplitBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Two independent runs from the same balance. The second window knows nothing the first produced — the closest thing to an out-of-sample test one file can give you.'**
+  String get backtestSplitBody;
+
+  /// No description provided for @backtestColWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Window'**
+  String get backtestColWindow;
+
+  /// No description provided for @backtestColTrades.
+  ///
+  /// In en, this message translates to:
+  /// **'Trades'**
+  String get backtestColTrades;
+
+  /// No description provided for @backtestColNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get backtestColNet;
+
+  /// No description provided for @backtestColWin.
+  ///
+  /// In en, this message translates to:
+  /// **'Win'**
+  String get backtestColWin;
+
+  /// No description provided for @backtestColMaxDd.
+  ///
+  /// In en, this message translates to:
+  /// **'Max DD'**
+  String get backtestColMaxDd;
+
+  /// No description provided for @backtestInSample.
+  ///
+  /// In en, this message translates to:
+  /// **'In-sample'**
+  String get backtestInSample;
+
+  /// No description provided for @backtestOutOfSample.
+  ///
+  /// In en, this message translates to:
+  /// **'Out-of-sample'**
+  String get backtestOutOfSample;
+
+  /// No description provided for @backtestAssumptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Assumptions'**
+  String get backtestAssumptions;
+
+  /// No description provided for @backtestTradesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trades ({count})'**
+  String backtestTradesTitle(int count);
+
+  /// No description provided for @backtestColSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Side'**
+  String get backtestColSide;
+
+  /// No description provided for @backtestColEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry'**
+  String get backtestColEntry;
+
+  /// No description provided for @backtestColLots.
+  ///
+  /// In en, this message translates to:
+  /// **'Lots'**
+  String get backtestColLots;
+
+  /// No description provided for @backtestColPnl.
+  ///
+  /// In en, this message translates to:
+  /// **'P&L'**
+  String get backtestColPnl;
+
+  /// No description provided for @backtestColWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Why'**
+  String get backtestColWhy;
+
+  /// No description provided for @backtestSavedRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved runs'**
+  String get backtestSavedRuns;
+
+  /// No description provided for @backtestSavedSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs from this account, on any device.'**
+  String get backtestSavedSub;
+
+  /// No description provided for @backtestNoSavedRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved runs yet.'**
+  String get backtestNoSavedRuns;
+
+  /// No description provided for @backtestRunFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'{symbol} run'**
+  String backtestRunFallback(String symbol);
+
+  /// No description provided for @backtestDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}'**
+  String backtestDeleteTooltip(String name);
+
+  /// No description provided for @cbIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Write the setup in your own words. The server turns it into a rule set, shows you the rules in plain English, and only then can you run them over your bar data.'**
+  String get cbIntro;
+
+  /// No description provided for @cbGalleryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the gallery. Check the photo permission and try again.'**
+  String get cbGalleryFailed;
+
+  /// No description provided for @cbUseImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a PNG, JPEG or WebP screenshot.'**
+  String get cbUseImage;
+
+  /// No description provided for @cbReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read {name}. Try picking it again.'**
+  String cbReadFailed(String name);
+
+  /// No description provided for @cbTooManyCharts.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {max} charts.'**
+  String cbTooManyCharts(int max);
+
+  /// No description provided for @cbChartTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That screenshot is over 4 MB. Crop it to the setup.'**
+  String get cbChartTooLarge;
+
+  /// No description provided for @cbChartsBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Those charts are too large to send together. Remove one, or crop it.'**
+  String get cbChartsBudget;
+
+  /// No description provided for @cbNothingRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was recorded. Hold on, speak, then stop.'**
+  String get cbNothingRecorded;
+
+  /// No description provided for @cbVoiceAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice note added to the description.'**
+  String get cbVoiceAdded;
+
+  /// No description provided for @cbRecordingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not use that recording. Type the explanation instead.'**
+  String get cbRecordingFailed;
+
+  /// No description provided for @cbDescribeFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the setup in at least a sentence — what has to happen before you take the trade?'**
+  String get cbDescribeFirst;
+
+  /// No description provided for @cbCompileFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The description could not be compiled. Check your connection and try again.'**
+  String get cbCompileFailed;
+
+  /// No description provided for @cbStepSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'1. The setup'**
+  String get cbStepSetup;
+
+  /// No description provided for @cbDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Wait for the London open, then buy when price closes above the previous 20-bar high and the 200 EMA is rising. Exit at 2R or when the 20 high is lost.'**
+  String get cbDescriptionHint;
+
+  /// No description provided for @cbSymbolOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbol (optional)'**
+  String get cbSymbolOptional;
+
+  /// No description provided for @cbStopOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop rule (optional)'**
+  String get cbStopOptional;
+
+  /// No description provided for @cbCriteriaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your definition of a valid setup (optional)'**
+  String get cbCriteriaLabel;
+
+  /// No description provided for @cbCompiling.
+  ///
+  /// In en, this message translates to:
+  /// **'Compiling rules…'**
+  String get cbCompiling;
+
+  /// No description provided for @cbCompileAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Compile rules'**
+  String get cbCompileAction;
+
+  /// No description provided for @cbNoChartsSent.
+  ///
+  /// In en, this message translates to:
+  /// **'no charts sent'**
+  String get cbNoChartsSent;
+
+  /// No description provided for @cbChartsSent.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 chart sent} other{{count} charts sent}}'**
+  String cbChartsSent(int count);
+
+  /// No description provided for @cbRulesLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{timeframe} · {charts} · check every line before you run it'**
+  String cbRulesLine(String timeframe, String charts);
+
+  /// No description provided for @cbCompiledWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Compiled with {model}'**
+  String cbCompiledWith(String model);
+
+  /// No description provided for @cbUseRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Use these rules'**
+  String get cbUseRules;
+
+  /// No description provided for @cbCompileAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Compile again'**
+  String get cbCompileAgain;
+
+  /// No description provided for @cbAddChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Add chart'**
+  String get cbAddChart;
+
+  /// No description provided for @cbAddChartCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Add chart ({current}/{max})'**
+  String cbAddChartCount(int current, int max);
+
+  /// No description provided for @cbStopRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop · {seconds}s'**
+  String cbStopRecording(int seconds);
+
+  /// No description provided for @cbTranscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing…'**
+  String get cbTranscribing;
+
+  /// No description provided for @cbVoiceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice note'**
+  String get cbVoiceNote;
+
+  /// No description provided for @cbAttachmentsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {max} chart screenshots and a 60-second voice note. The charts are sent to the model with the description; the note is transcribed into the description and never stored.'**
+  String cbAttachmentsNote(int max);
+
+  /// No description provided for @cbTimeframe.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeframe'**
+  String get cbTimeframe;
+
+  /// No description provided for @cbConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation (optional)'**
+  String get cbConfirmation;
+
+  /// No description provided for @cbNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get cbNone;
+
+  /// No description provided for @chartDrawingTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Drawing tools'**
+  String get chartDrawingTools;
+
+  /// No description provided for @chartMarketReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Market replay'**
+  String get chartMarketReplay;
+
+  /// No description provided for @chartStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart style'**
+  String get chartStyle;
+
+  /// No description provided for @chartMagnetTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Magnet: {mode}'**
+  String chartMagnetTooltip(String mode);
+
+  /// No description provided for @chartHideBuySell.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide buy and sell'**
+  String get chartHideBuySell;
+
+  /// No description provided for @chartBuySell.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy / sell'**
+  String get chartBuySell;
+
+  /// No description provided for @chartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{symbol} · chart'**
+  String chartTitle(String symbol);
+
+  /// No description provided for @chartFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen'**
+  String get chartFullscreen;
+
+  /// No description provided for @chartExitFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit fullscreen'**
+  String get chartExitFullscreen;
+
+  /// No description provided for @chartExitTimeBeforeEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'The exit time is before the entry time.'**
+  String get chartExitTimeBeforeEntry;
+
+  /// No description provided for @chartHeadsUp.
+  ///
+  /// In en, this message translates to:
+  /// **'You can still save it — this is only a heads-up.'**
+  String get chartHeadsUp;
+
+  /// No description provided for @chartDragLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag a level line to move it and its time'**
+  String get chartDragLevel;
+
+  /// No description provided for @chartCrosshairOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Crosshair mode on'**
+  String get chartCrosshairOn;
+
+  /// No description provided for @chartCrosshairOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Crosshair mode off'**
+  String get chartCrosshairOff;
+
+  /// No description provided for @chartStopBuyBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'For a BUY the stop is normally below entry.'**
+  String get chartStopBuyBelow;
+
+  /// No description provided for @chartStopSellAbove.
+  ///
+  /// In en, this message translates to:
+  /// **'For a SELL the stop is normally above entry.'**
+  String get chartStopSellAbove;
+
+  /// No description provided for @chartTargetBuyAbove.
+  ///
+  /// In en, this message translates to:
+  /// **'For a BUY the target is normally above entry.'**
+  String get chartTargetBuyAbove;
+
+  /// No description provided for @chartTargetSellBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'For a SELL the target is normally below entry.'**
+  String get chartTargetSellBelow;
+
+  /// No description provided for @chartUnreachableAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'This chart could not reach your account. The levels on this device are unaffected.'**
+  String get chartUnreachableAccount;
+
+  /// No description provided for @chartIntervalRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'{interval} candles are not served by this chart feed yet — showing 1M.'**
+  String chartIntervalRefused(String interval);
+
+  /// No description provided for @chartNoCandlesWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'No candles in that time frame. Try a wider window.'**
+  String get chartNoCandlesWindow;
+
+  /// No description provided for @chartPlacementMove.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to size it, then lift to finish'**
+  String get chartPlacementMove;
+
+  /// No description provided for @chartPlacementLift.
+  ///
+  /// In en, this message translates to:
+  /// **'Lift to place'**
+  String get chartPlacementLift;
+
+  /// No description provided for @chartPlacementTapFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to set the first point'**
+  String get chartPlacementTapFirst;
+
+  /// No description provided for @chartPlacementTap.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to place'**
+  String get chartPlacementTap;
+
+  /// No description provided for @chartPlacedOfTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'{placed} of {total}'**
+  String chartPlacedOfTotal(int placed, int total);
+
+  /// No description provided for @chartMagnetSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'{mode} magnet'**
+  String chartMagnetSuffix(String mode);
+
+  /// No description provided for @chartKeepDrawingOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep drawing on'**
+  String get chartKeepDrawingOn;
+
+  /// No description provided for @chartKeepDrawingOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep drawing off'**
+  String get chartKeepDrawingOff;
+
+  /// No description provided for @chartPutToolAway.
+  ///
+  /// In en, this message translates to:
+  /// **'Put the tool away'**
+  String get chartPutToolAway;
+
+  /// No description provided for @chartMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get chartMoreActions;
+
+  /// No description provided for @chartClone.
+  ///
+  /// In en, this message translates to:
+  /// **'Clone'**
+  String get chartClone;
+
+  /// No description provided for @chartColour.
+  ///
+  /// In en, this message translates to:
+  /// **'Colour'**
+  String get chartColour;
+
+  /// No description provided for @chartLineWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Line width'**
+  String get chartLineWidth;
+
+  /// No description provided for @chartLineStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Line style'**
+  String get chartLineStyle;
+
+  /// No description provided for @chartLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock'**
+  String get chartLock;
+
+  /// No description provided for @chartUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get chartUnlock;
+
+  /// No description provided for @chartShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get chartShow;
+
+  /// No description provided for @chartHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get chartHide;
+
+  /// No description provided for @chartRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get chartRemove;
+
+  /// No description provided for @chartAddAlertAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Add alert on {symbol} at {price}'**
+  String chartAddAlertAt(String symbol, String price);
+
+  /// No description provided for @chartAlertSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A line that fires when price reaches this level'**
+  String get chartAlertSubtitle;
+
+  /// No description provided for @chartPinLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin a level here'**
+  String get chartPinLevel;
+
+  /// No description provided for @chartPinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A plain line, no notification'**
+  String get chartPinSubtitle;
+
+  /// No description provided for @chartUseAsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as entry'**
+  String get chartUseAsEntry;
+
+  /// No description provided for @chartUseAsEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Fills the entry price and this candle’s time'**
+  String get chartUseAsEntrySub;
+
+  /// No description provided for @chartCopyPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy price'**
+  String get chartCopyPrice;
+
+  /// No description provided for @chartAlertSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert set at {price}.'**
+  String chartAlertSet(String price);
+
+  /// No description provided for @chartLevelPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Level pinned at {price}.'**
+  String chartLevelPinned(String price);
+
+  /// No description provided for @chartPriceCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} copied.'**
+  String chartPriceCopied(String price);
+
+  /// No description provided for @chartReplayFromDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay from a date'**
+  String get chartReplayFromDate;
+
+  /// No description provided for @chartNoCandlesFor.
+  ///
+  /// In en, this message translates to:
+  /// **'No candles for {date}.'**
+  String chartNoCandlesFor(String date);
+
+  /// No description provided for @chartFeedDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Feed down — showing this window from the copy saved {at}.'**
+  String chartFeedDown(String at);
+
+  /// No description provided for @chartNoEarlierCandles.
+  ///
+  /// In en, this message translates to:
+  /// **'No earlier candles for this range.'**
+  String get chartNoEarlierCandles;
+
+  /// No description provided for @chartProIntervals.
+  ///
+  /// In en, this message translates to:
+  /// **'5s, 10s and 15s candles are a Pro feature. Basic charts run from 30s up.'**
+  String get chartProIntervals;
+
+  /// No description provided for @chartBasicIntervals.
+  ///
+  /// In en, this message translates to:
+  /// **'30s and 45s candles are part of Basic. Free charts run from 1m up.'**
+  String get chartBasicIntervals;
+
+  /// No description provided for @chartPinUpgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinning entry, stop and target on the chart is part of Basic. Upgrade to pin your levels — the chart itself and every other drawing tool stay free.'**
+  String get chartPinUpgrade;
+
+  /// No description provided for @chartReplayUpgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Market replay is a Pro feature. Upgrade to Pro to use it.'**
+  String get chartReplayUpgrade;
+
+  /// No description provided for @chartLoadEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'Load earlier candles'**
+  String get chartLoadEarlier;
+
+  /// No description provided for @chartPreviousBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous bar'**
+  String get chartPreviousBar;
+
+  /// No description provided for @chartNextBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Next bar'**
+  String get chartNextBar;
+
+  /// No description provided for @chartPauseReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause replay'**
+  String get chartPauseReplay;
+
+  /// No description provided for @chartPlayReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play replay'**
+  String get chartPlayReplay;
+
+  /// No description provided for @chartJumpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to a date'**
+  String get chartJumpToDate;
+
+  /// No description provided for @chartExitReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get chartExitReplay;
+
+  /// No description provided for @chartNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Note on the chart'**
+  String get chartNoteHint;
+
+  /// No description provided for @chartAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get chartAdd;
+
+  /// No description provided for @chartAlertLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert line'**
+  String get chartAlertLine;
+
+  /// No description provided for @chartAlertLineFired.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert line — fired'**
+  String get chartAlertLineFired;
+
+  /// No description provided for @chartTextWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Text — {body}'**
+  String chartTextWith(String body);
+
+  /// No description provided for @chartPositionSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry {entry} · Stop {stop} · Target {target}{risk}'**
+  String chartPositionSummary(
+      String entry, String stop, String target, String risk);
+
+  /// No description provided for @chartObjectLockedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the finger move it again'**
+  String get chartObjectLockedBody;
+
+  /// No description provided for @chartObjectUnlockedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold it exactly where it is'**
+  String get chartObjectUnlockedBody;
+
+  /// No description provided for @chartHideBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear it off the chart, keep the idea'**
+  String get chartHideBody;
+
+  /// No description provided for @chartObjectsOnChart.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 object on this chart} other{{count} objects on this chart}}'**
+  String chartObjectsOnChart(int count);
+
+  /// No description provided for @chartObjectHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Object hidden.'**
+  String get chartObjectHidden;
+
+  /// No description provided for @chartUndoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get chartUndoAction;
+
+  /// No description provided for @chartWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'WORKSPACE'**
+  String get chartWorkspace;
+
+  /// No description provided for @chartToolsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'TOOLS'**
+  String get chartToolsLabel;
+
+  /// No description provided for @chartNoLayoutSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'No layout saved yet — Save keeps this chart exactly as it looks.'**
+  String get chartNoLayoutSaved;
+
+  /// No description provided for @chartLayoutName.
+  ///
+  /// In en, this message translates to:
+  /// **'Layout: {name}'**
+  String chartLayoutName(String name);
+
+  /// No description provided for @chartLayouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Layouts'**
+  String get chartLayouts;
+
+  /// No description provided for @chartLayoutsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 saved} other{{count} saved}}'**
+  String chartLayoutsSaved(int count);
+
+  /// No description provided for @chartSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get chartSettings;
+
+  /// No description provided for @chartSaveShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get chartSaveShort;
+
+  /// No description provided for @chartThisChart.
+  ///
+  /// In en, this message translates to:
+  /// **'This chart'**
+  String get chartThisChart;
+
+  /// No description provided for @chartOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get chartOpen;
+
+  /// No description provided for @chartFromLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'From library'**
+  String get chartFromLibrary;
+
+  /// No description provided for @chartNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get chartNew;
+
+  /// No description provided for @chartBlankChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank chart'**
+  String get chartBlankChart;
+
+  /// No description provided for @chartType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get chartType;
+
+  /// No description provided for @chartIndicators.
+  ///
+  /// In en, this message translates to:
+  /// **'Indicators'**
+  String get chartIndicators;
+
+  /// No description provided for @chartNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get chartNone;
+
+  /// No description provided for @chartStudiesOn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 on} other{{count} on}}'**
+  String chartStudiesOn(int count);
+
+  /// No description provided for @chartAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts'**
+  String get chartAlerts;
+
+  /// No description provided for @chartLevelTouches.
+  ///
+  /// In en, this message translates to:
+  /// **'Level touches'**
+  String get chartLevelTouches;
+
+  /// No description provided for @chartReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay'**
+  String get chartReplay;
+
+  /// No description provided for @chartObjectsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 object} other{{count} objects}}'**
+  String chartObjectsShort(int count);
+
+  /// No description provided for @chartTimeZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Time zone'**
+  String get chartTimeZone;
+
+  /// No description provided for @chartEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Events'**
+  String get chartEvents;
+
+  /// No description provided for @chartSaveLayoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save layout'**
+  String get chartSaveLayoutTitle;
+
+  /// No description provided for @chartUpdateLayoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update layout'**
+  String get chartUpdateLayoutTitle;
+
+  /// No description provided for @chartLayoutNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Layout name'**
+  String get chartLayoutNameLabel;
+
+  /// No description provided for @chartSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get chartSave;
+
+  /// No description provided for @chartUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get chartUpdate;
+
+  /// No description provided for @chartSavedName.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved “{name}”.'**
+  String chartSavedName(String name);
+
+  /// No description provided for @chartOpenedLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened “{name}”.'**
+  String chartOpenedLayout(String name);
+
+  /// No description provided for @chartOpenedLayoutOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened “{name}” on {symbol} — the palette and candle size came with it.'**
+  String chartOpenedLayoutOn(String name, String symbol);
+
+  /// No description provided for @chartA11yQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick actions at this price'**
+  String get chartA11yQuickActions;
+
+  /// No description provided for @chartA11yFitScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit the price scale'**
+  String get chartA11yFitScale;
+
+  /// No description provided for @chartA11yFinishDrawing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish drawing'**
+  String get chartA11yFinishDrawing;
+
+  /// No description provided for @chartTimeZoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart time zone'**
+  String get chartTimeZoneTitle;
+
+  /// No description provided for @chartSearchZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Search a city or zone'**
+  String get chartSearchZone;
 }
 
 class _AppLocalizationsDelegate

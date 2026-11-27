@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
@@ -25,6 +26,8 @@ class SyncScreen extends StatefulWidget {
 }
 
 class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   final TextEditingController _broker = TextEditingController();
   final TextEditingController _server = TextEditingController();
   final TextEditingController _login = TextEditingController();
@@ -158,12 +161,7 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
       });
       _schedulePoll();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Signing in now. The first sync can take a few minutes — we will '
-            'notify you when it is live.',
-          ),
-        ),
+        SnackBar(content: Text(_l10n.syncSubmitting)),
       );
     } catch (error) {
       if (!mounted) return;
@@ -178,20 +176,20 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title:
-            const Text('Disconnect account?', style: TextStyle(fontSize: 16)),
+        title: Text(_l10n.syncDisconnectTitle,
+            style: const TextStyle(fontSize: 16)),
         content: Text(
-          'We delete the stored password and stop syncing. Your trades stay in your journal.',
+          _l10n.syncDisconnectBody,
           style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.45),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(_l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Disconnect'),
+            child: Text(_l10n.syncDisconnectAction),
           ),
         ],
       ),
@@ -210,12 +208,13 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
   }
 
   String _since(String? iso) {
-    if (iso == null || iso.isEmpty) return 'not yet';
+    final l10n = _l10n;
+    if (iso == null || iso.isEmpty) return l10n.syncNotYet;
     final elapsed = DateTime.now().difference(DateTime.parse(iso).toLocal());
-    if (elapsed.inSeconds < 60) return '${elapsed.inSeconds}s ago';
-    if (elapsed.inMinutes < 60) return '${elapsed.inMinutes}m ago';
-    if (elapsed.inHours < 24) return '${elapsed.inHours}h ago';
-    return '${elapsed.inDays}d ago';
+    if (elapsed.inSeconds < 60) return l10n.syncSecondsAgo(elapsed.inSeconds);
+    if (elapsed.inMinutes < 60) return l10n.syncMinutesAgo(elapsed.inMinutes);
+    if (elapsed.inHours < 24) return l10n.syncHoursAgo(elapsed.inHours);
+    return l10n.syncDaysAgo(elapsed.inDays);
   }
 
   @override
@@ -223,10 +222,10 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('MT5 Sync'),
+        title: Text(_l10n.syncTitle),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: _l10n.refresh,
             onPressed: _load,
             icon: Icon(Icons.refresh, size: 20, color: AppColors.muted),
           ),
@@ -264,13 +263,14 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
   /// sync host (a terminal that never started), which sent the trader to check a
   /// password that was never the problem.
   String _hint() {
+    final l10n = _l10n;
     if (_status == 'connected') {
-      return 'Closed trades arrive automatically, even with the app shut.';
+      return l10n.syncHintConnected;
     }
     final error = asString(_connection['lastError']);
     if (_stalled) {
       if (error != null && error.isNotEmpty) {
-        return 'Still not connected. The sync host reported: $error';
+        return l10n.syncHintStalledError(error);
       }
       // `connecting` means a slot has taken the account and is signing in, so
       // telling the trader nothing has been attempted (and to disconnect, which
@@ -278,22 +278,14 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
       // actively harmful. A first sync of a cold terminal is measured in
       // minutes, not seconds.
       if (_status == 'connecting') {
-        return 'Still signing in. The first sync reads up to a year of closed '
-            'trades from the terminal, so it can take several minutes. Leave it '
-            'connected and pull down to refresh.';
+        return l10n.syncHintStalledConnecting;
       }
-      return 'Still not connected after two minutes, and nothing has reported a '
-          'sign-in attempt. The sync service is probably not running — start it, '
-          'then disconnect here and connect again.';
+      return l10n.syncHintStalled;
     }
     if (_status == 'connecting') {
-      return 'Signing in and reading your closed trades. A first sync can take a '
-          'few minutes while the terminal downloads history. You can close the '
-          'app: we send a notification when sync is live, or if the password is '
-          'wrong.';
+      return l10n.syncHintConnecting;
     }
-    return 'Waiting for a sync session to pick this account up. If it stays '
-        'here, check the account number, server and investor password.';
+    return l10n.syncHintPending;
   }
 
   /// Opens the mail app with this connection's details already in the body, so a
@@ -326,16 +318,16 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open your mail app.')),
+      SnackBar(content: Text(_l10n.syncMailFailed)),
     );
   }
 
   Widget _statusCard() {
     final label = switch (_status) {
-      'connected' => 'Connected',
-      'pending' || 'connecting' => 'Connecting…',
-      'failed' => 'Connection failed',
-      _ => 'Disconnected',
+      'connected' => _l10n.syncStatusConnected,
+      'pending' || 'connecting' => _l10n.syncStatusConnecting,
+      'failed' => _l10n.syncStatusFailed,
+      _ => _l10n.syncStatusDisconnected,
     };
     final tone = _status == 'connected'
         ? Tone.positive
@@ -353,7 +345,7 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
                 children: [
                   Expanded(
                     child: Text(
-                      'Current connection',
+                      _l10n.syncCurrent,
                       style: TextStyle(
                         color: AppColors.muted,
                         fontSize: 11,
@@ -367,19 +359,19 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 10),
               LabelValue(
-                label: 'Broker',
+                label: _l10n.syncBroker,
                 value: asString(_connection['broker']) ?? '—',
               ),
               LabelValue(
-                label: 'Server',
+                label: _l10n.syncServer,
                 value: asString(_connection['server']) ?? '—',
               ),
               LabelValue(
-                label: 'Account',
+                label: _l10n.syncAccount,
                 value: asString(_connection['account']) ?? '—',
               ),
               LabelValue(
-                label: 'Last trade',
+                label: _l10n.syncLastTrade,
                 value: _since(asString(_connection['lastSyncAt'])),
               ),
               if (asString(_connection['lastError']) case final message?
@@ -410,14 +402,14 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
           TextButton.icon(
             onPressed: _contactSupport,
             icon: const Icon(Icons.mail_outline, size: 16),
-            label: const Text('Contact support'),
+            label: Text(_l10n.syncContactSupport),
           ),
         ],
         const SizedBox(height: 14),
         OutlinedButton.icon(
           onPressed: _disconnect,
           icon: const Icon(Icons.link_off, size: 16),
-          label: const Text('Disconnect and delete password'),
+          label: Text(_l10n.syncDisconnectLong),
         ),
       ],
     );
@@ -475,7 +467,8 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Broker', style: TextStyle(color: AppColors.muted, fontSize: 11)),
+        Text(_l10n.syncBroker,
+            style: TextStyle(color: AppColors.muted, fontSize: 11)),
         const SizedBox(height: 4),
         TextField(
           controller: _broker,
@@ -483,7 +476,7 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
           onTap: _pickBroker,
           style: const TextStyle(fontSize: 13),
           decoration: InputDecoration(
-            hintText: 'Search MT5 brokers',
+            hintText: _l10n.syncSearchBrokers,
             suffixIcon: Icon(Icons.search, size: 16, color: AppColors.faint),
           ),
         ),
@@ -506,9 +499,9 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (demo.isNotEmpty) _serverRow('DEMO', demo),
+          if (demo.isNotEmpty) _serverRow(_l10n.syncDemo, demo),
           if (demo.isNotEmpty && live.isNotEmpty) const SizedBox(height: 5),
-          if (live.isNotEmpty) _serverRow('LIVE', live),
+          if (live.isNotEmpty) _serverRow(_l10n.syncLive, live),
         ],
       ),
     );
@@ -576,8 +569,10 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
     final server = asString(_connection['server']) ?? '—';
     final account = asString(_connection['account']);
     return Text(
-      'Last attempt: $broker · $server'
-      '${account == null || account.isEmpty ? '' : ' · $account'}',
+      _l10n.syncLastAttempt(
+        '$broker · $server'
+        '${account == null || account.isEmpty ? '' : ' · $account'}',
+      ),
       style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
     );
   }
@@ -591,7 +586,7 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Connect automatically',
+                _l10n.syncConnectTitle,
                 style: TextStyle(
                   color: AppColors.text,
                   fontSize: 15,
@@ -600,9 +595,7 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 4),
               Text(
-                'No PC needed. Enter the account details once and every closed '
-                'trade lands in your journal. The first connection can take a '
-                'few minutes while we download your trade history.',
+                _l10n.syncConnectBody,
                 style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 11.5,
@@ -617,19 +610,19 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
               const SizedBox(height: 14),
               _brokerField(),
               const SizedBox(height: 10),
-              _field(_server, 'Server', 'e.g., ICMarketsSC-Live12'),
+              _field(_server, _l10n.syncServer, 'e.g., ICMarketsSC-Live12'),
               _serverSuggestions(),
               const SizedBox(height: 10),
               _field(
                 _login,
-                'Account number',
+                _l10n.syncAccountNumber,
                 'e.g., 12345678',
                 keyboard: TextInputType.number,
               ),
               const SizedBox(height: 10),
               _field(
                 _password,
-                'Investor (read-only) password',
+                _l10n.syncInvestorPassword,
                 '••••••••',
                 obscure: true,
               ),
@@ -645,10 +638,7 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Use the investor password, never your trading password: '
-                  'MT5 → Settings → your account → Change investor password. '
-                  'It cannot trade, it is stored encrypted, and changing it in '
-                  'MT5 instantly cuts our access.',
+                  _l10n.syncInvestorNote,
                   style: TextStyle(
                     color: AppColors.faint,
                     fontSize: 11,
@@ -671,13 +661,11 @@ class _SyncScreenState extends State<SyncScreen> with WidgetsBindingObserver {
                     color: AppColors.ink,
                   ),
                 )
-              : const Text('Connect account'),
+              : Text(_l10n.syncConnectAction),
         ),
         const SizedBox(height: 8),
         Text(
-          'After you connect, you can close the app. The first sync can take a '
-          'few minutes, and we send a notification when it is live — or if the '
-          'password is wrong.',
+          _l10n.syncAfterConnect,
           style: TextStyle(color: AppColors.faint, fontSize: 11, height: 1.45),
         ),
       ],
@@ -734,6 +722,8 @@ class _BrokerSheet extends StatefulWidget {
 }
 
 class _BrokerSheetState extends State<_BrokerSheet> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
   late final TextEditingController _search = TextEditingController(
     text: widget.selected ?? '',
   );
@@ -794,7 +784,7 @@ class _BrokerSheetState extends State<_BrokerSheet> {
                 controller: _search,
                 autofocus: false,
                 decoration: InputDecoration(
-                  hintText: 'Search MT5 brokers',
+                  hintText: _l10n.syncSearchBrokers,
                   prefixIcon: Icon(
                     Icons.search,
                     size: 18,
@@ -827,14 +817,13 @@ class _BrokerSheetState extends State<_BrokerSheet> {
                         if (typed.isNotEmpty)
                           _BrokerTile(
                             name: typed,
-                            detail: 'Use what you typed',
+                            detail: _l10n.syncUseTyped,
                             onTap: () => Navigator.pop(context, typed),
                           ),
                         if (matches.isEmpty && typed.isEmpty)
-                          const EmptyState(
-                            title: 'Broker list unavailable',
-                            body:
-                                'Type the broker name in the field and it will be used as is.',
+                          EmptyState(
+                            title: _l10n.syncBrokersUnavailableTitle,
+                            body: _l10n.syncBrokersUnavailableBody,
                             icon: Icons.search_off,
                           )
                         else
@@ -842,7 +831,7 @@ class _BrokerSheetState extends State<_BrokerSheet> {
                             (broker) => _BrokerTile(
                               name: broker.name,
                               detail: broker.servers.isEmpty
-                                  ? 'Type the server name'
+                                  ? _l10n.syncTypeServer
                                   : broker.servers.first,
                               selected: broker.name == widget.selected,
                               onTap: () => Navigator.pop(context, broker.name),
@@ -854,7 +843,7 @@ class _BrokerSheetState extends State<_BrokerSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
               child: Text(
-                '${widget.brokers.length} MT5 brokers · any broker works, even one not listed',
+                _l10n.syncBrokerCount(widget.brokers.length),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.faint, fontSize: 9.5),
               ),

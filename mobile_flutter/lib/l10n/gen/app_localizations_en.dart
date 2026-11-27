@@ -1974,4 +1974,1182 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unpin => 'Remove from favorites';
+
+  @override
+  String get keepAction => 'Keep';
+
+  @override
+  String get doneAction => 'Done';
+
+  @override
+  String get importTitle => 'Import trades';
+
+  @override
+  String get importUnreadableFile =>
+      'Could not read that file. Try picking it again.';
+
+  @override
+  String importFileTooLarge(String size) {
+    return 'That file is $size MB. Imports are limited to 20 MB — split the report and import it in parts.';
+  }
+
+  @override
+  String get importNoClosedTrades =>
+      'No closed trades were found. Make sure the file is an MT5 or broker history export — open positions are skipped.';
+
+  @override
+  String get importNoReadableData =>
+      'No readable data in this file. Export it as CSV from MT5 or your broker and try again.';
+
+  @override
+  String get importUnknownFile => 'Unknown file';
+
+  @override
+  String get importDeleteTitle => 'Delete this import?';
+
+  @override
+  String importDeleteBody(int count, String filename) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count trades from $filename will be removed from your journal. This cannot be undone.',
+      one:
+          '1 trade from $filename will be removed from your journal. This cannot be undone.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importDeleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted $count imported trades.',
+      one: 'Deleted 1 imported trade.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importImporting => 'Importing…';
+
+  @override
+  String importAction(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Import $count trades',
+      one: 'Import 1 trade',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importChooseAnother => 'Choose another file';
+
+  @override
+  String get importReadingFile => 'Reading file…';
+
+  @override
+  String get importChooseFile => 'Choose a trade history file';
+
+  @override
+  String get importFileTypes =>
+      'MT5 XML report, CSV, TSV, an Excel .xlsx/.xls export, or a broker CSV.';
+
+  @override
+  String get importSkippedNote =>
+      'Already-imported tickets are skipped, so importing the same statement twice does not double your journal.';
+
+  @override
+  String get importSelectedFile => 'Selected file';
+
+  @override
+  String get importNoTradesFound => 'No closed trades found';
+
+  @override
+  String importFileStats(int trades, int wins, int losses) {
+    String _temp0 = intl.Intl.pluralLogic(
+      trades,
+      locale: localeName,
+      other: '$trades trades',
+      one: '1 trade',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      wins,
+      locale: localeName,
+      other: '$wins wins',
+      one: '1 win',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      losses,
+      locale: localeName,
+      other: '$losses losses',
+      one: '1 loss',
+    );
+    return '$_temp0 · $_temp1 · $_temp2';
+  }
+
+  @override
+  String get importRemoveFile => 'Remove file';
+
+  @override
+  String get importNetPnl => 'Net P&L';
+
+  @override
+  String get importDateRange => 'Date range';
+
+  @override
+  String get importPreview => 'Preview';
+
+  @override
+  String importPreviewSub(int shown, int total) {
+    return 'First $shown of $total';
+  }
+
+  @override
+  String importPreviewLine(String type, String lot) {
+    return '$type · $lot lots';
+  }
+
+  @override
+  String get importNothingNew => 'Nothing new to import';
+
+  @override
+  String get importComplete => 'Import complete';
+
+  @override
+  String importAlreadyInJournal(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades are already in your journal.',
+      one: '1 trade is already in your journal.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades added to your journal.',
+      one: '1 trade added to your journal.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importDuplicatesSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count duplicates skipped.',
+      one: '1 duplicate skipped.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importAnother => 'Import another file';
+
+  @override
+  String get importClearBody =>
+      'Every trade — imported or logged by hand — will be deleted. This cannot be undone.';
+
+  @override
+  String get importClearAction => 'Clear journal';
+
+  @override
+  String get importJournalCleared => 'Journal cleared.';
+
+  @override
+  String get importHistoryTitle => 'Import history';
+
+  @override
+  String get importHistorySub => 'Statements imported from this device.';
+
+  @override
+  String get importHistoryEmpty => 'No imports yet.';
+
+  @override
+  String importHistoryLine(int count, String when) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades',
+      one: '1 trade',
+    );
+    return '$_temp0 · $when';
+  }
+
+  @override
+  String get importDeleteTooltip => 'Delete this import';
+
+  @override
+  String get importHowToTitle => 'How to export from MT5';
+
+  @override
+  String get importHowToSteps =>
+      '1. Open MetaTrader 5 → History tab.\n2. Right-click → All History, then select the trades.\n3. Right-click → Report / Export and save as CSV or the XML report (ReportHistory files).\n4. Pick that file above.';
+
+  @override
+  String get importNetNote =>
+      'P&L is stored net: MT5 profit plus commission and swap. Excel .xlsx and .xls exports work too — .xls up to 4 MB is read on our server, so larger ones should be saved as .xlsx or CSV.';
+
+  @override
+  String get syncTitle => 'MT5 Sync';
+
+  @override
+  String get syncSubmitting =>
+      'Signing in now. The first sync can take a few minutes — we will notify you when it is live.';
+
+  @override
+  String get syncDisconnectTitle => 'Disconnect account?';
+
+  @override
+  String get syncDisconnectBody =>
+      'We delete the stored password and stop syncing. Your trades stay in your journal.';
+
+  @override
+  String get syncDisconnectAction => 'Disconnect';
+
+  @override
+  String get syncNotYet => 'not yet';
+
+  @override
+  String syncSecondsAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '${count}s ago',
+      one: '1s ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncMinutesAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '${count}m ago',
+      one: '1m ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncHoursAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '${count}h ago',
+      one: '1h ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String syncDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '${count}d ago',
+      one: '1d ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncStatusConnected => 'Connected';
+
+  @override
+  String get syncStatusConnecting => 'Connecting…';
+
+  @override
+  String get syncStatusFailed => 'Connection failed';
+
+  @override
+  String get syncStatusDisconnected => 'Disconnected';
+
+  @override
+  String get syncCurrent => 'Current connection';
+
+  @override
+  String get syncBroker => 'Broker';
+
+  @override
+  String get syncServer => 'Server';
+
+  @override
+  String get syncAccount => 'Account';
+
+  @override
+  String get syncLastTrade => 'Last trade';
+
+  @override
+  String get syncHintConnected =>
+      'Closed trades arrive automatically, even with the app shut.';
+
+  @override
+  String syncHintStalledError(String error) {
+    return 'Still not connected. The sync host reported: $error';
+  }
+
+  @override
+  String get syncHintStalledConnecting =>
+      'Still signing in. The first sync reads up to a year of closed trades from the terminal, so it can take several minutes. Leave it connected and pull down to refresh.';
+
+  @override
+  String get syncHintStalled =>
+      'Still not connected after two minutes, and nothing has reported a sign-in attempt. The sync service is probably not running — start it, then disconnect here and connect again.';
+
+  @override
+  String get syncHintConnecting =>
+      'Signing in and reading your closed trades. A first sync can take a few minutes while the terminal downloads history. You can close the app: we send a notification when sync is live, or if the password is wrong.';
+
+  @override
+  String get syncHintPending =>
+      'Waiting for a sync session to pick this account up. If it stays here, check the account number, server and investor password.';
+
+  @override
+  String get syncMailFailed => 'Could not open your mail app.';
+
+  @override
+  String get syncContactSupport => 'Contact support';
+
+  @override
+  String get syncDisconnectLong => 'Disconnect and delete password';
+
+  @override
+  String get syncSearchBrokers => 'Search MT5 brokers';
+
+  @override
+  String get syncDemo => 'DEMO';
+
+  @override
+  String get syncLive => 'LIVE';
+
+  @override
+  String syncLastAttempt(String details) {
+    return 'Last attempt: $details';
+  }
+
+  @override
+  String get syncConnectTitle => 'Connect automatically';
+
+  @override
+  String get syncConnectBody =>
+      'No PC needed. Enter the account details once and every closed trade lands in your journal. The first connection can take a few minutes while we download your trade history.';
+
+  @override
+  String get syncAccountNumber => 'Account number';
+
+  @override
+  String get syncInvestorPassword => 'Investor (read-only) password';
+
+  @override
+  String get syncInvestorNote =>
+      'Use the investor password, never your trading password: MT5 → Settings → your account → Change investor password. It cannot trade, it is stored encrypted, and changing it in MT5 instantly cuts our access.';
+
+  @override
+  String get syncConnectAction => 'Connect account';
+
+  @override
+  String get syncAfterConnect =>
+      'After you connect, you can close the app. The first sync can take a few minutes, and we send a notification when it is live — or if the password is wrong.';
+
+  @override
+  String get syncUseTyped => 'Use what you typed';
+
+  @override
+  String get syncBrokersUnavailableTitle => 'Broker list unavailable';
+
+  @override
+  String get syncBrokersUnavailableBody =>
+      'Type the broker name in the field and it will be used as is.';
+
+  @override
+  String get syncTypeServer => 'Type the server name';
+
+  @override
+  String syncBrokerCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count MT5 brokers',
+      one: '1 MT5 broker',
+    );
+    return '$_temp0 · any broker works, even one not listed';
+  }
+
+  @override
+  String get backtestTitle => 'Backtest';
+
+  @override
+  String get backtestIntro =>
+      'Replay your own rules over your own MT5 bar data, with costs and the fill assumptions printed on the result.';
+
+  @override
+  String get backtestCustom => 'Custom backtest';
+
+  @override
+  String get backtestFileUnreadable =>
+      'Could not read that file. Try picking it again.';
+
+  @override
+  String get backtestFileTooLarge =>
+      'That file is over 4 MB. Export a shorter range.';
+
+  @override
+  String get backtestNeedData => 'Upload or paste the bar data first.';
+
+  @override
+  String get backtestRunSaved => 'Run complete and saved.';
+
+  @override
+  String get backtestRunUnsaved => 'Run complete — the archive write failed.';
+
+  @override
+  String get backtestRunFailed => 'The run could not be completed. Try again.';
+
+  @override
+  String get backtestLoadRunFailed => 'Could not load that run.';
+
+  @override
+  String get backtestDeleteTitle => 'Delete this saved run?';
+
+  @override
+  String get backtestThisRun => 'This run';
+
+  @override
+  String get backtestRunDeleted => 'Run deleted.';
+
+  @override
+  String get backtestDeleteFailed => 'Could not delete the run.';
+
+  @override
+  String get backtestSimulating => 'Simulating…';
+
+  @override
+  String get backtestRunAction => 'Run backtest';
+
+  @override
+  String get backtestBarsTitle => '1. Bar data';
+
+  @override
+  String get backtestChooseCsv => 'Choose a CSV or paste below';
+
+  @override
+  String get clearAction => 'Clear';
+
+  @override
+  String get backtestBarsHint =>
+      'Up to 60,000 bars. In MT5: select the chart with Ctrl+A, copy, paste into a text file.';
+
+  @override
+  String get backtestRulesTitle => '2. Rules';
+
+  @override
+  String get backtestRunName => 'Run name';
+
+  @override
+  String get backtestRunNameHint => 'e.g. EURUSD M1 SMA cross';
+
+  @override
+  String get backtestSymbol => 'Symbol';
+
+  @override
+  String get backtestTimeframe => 'Timeframe';
+
+  @override
+  String get backtestRulesLabel => 'Rules';
+
+  @override
+  String get backtestCompiledRules => 'Compiled rules';
+
+  @override
+  String get backtestUseBuiltIn => 'Use a built-in rule set instead';
+
+  @override
+  String get backtestCostsTitle => '3. Sizing and costs';
+
+  @override
+  String get backtestStartingBalance => 'Starting balance';
+
+  @override
+  String get backtestRiskPercent => 'Risk per trade %';
+
+  @override
+  String get backtestContractSize => 'Contract size';
+
+  @override
+  String get backtestMaxLeverage => 'Max leverage';
+
+  @override
+  String get backtestSpread => 'Spread (price)';
+
+  @override
+  String get backtestSlippage => 'Slippage (price)';
+
+  @override
+  String get backtestCommission => 'Commission / trade';
+
+  @override
+  String get backtestInSampleShare => 'In-sample share';
+
+  @override
+  String get backtestClockOffset => 'Server clock offset (min)';
+
+  @override
+  String get backtestEmptyTitle => 'No run yet';
+
+  @override
+  String get backtestEmptyBody =>
+      'Upload a history export, choose the rules and the cost model, and the report appears here with its assumptions.';
+
+  @override
+  String get backtestReturn => 'Return';
+
+  @override
+  String get backtestSharpe => 'Sharpe';
+
+  @override
+  String get backtestExposure => 'Exposure';
+
+  @override
+  String get backtestAvgR => 'Avg R';
+
+  @override
+  String backtestBarsLine(String bars, String range, String timeframe) {
+    return '$bars bars · $range · $timeframe';
+  }
+
+  @override
+  String get backtestEquity => 'Equity';
+
+  @override
+  String get backtestSplitTitle => 'In-sample vs out-of-sample';
+
+  @override
+  String get backtestSplitBody =>
+      'Two independent runs from the same balance. The second window knows nothing the first produced — the closest thing to an out-of-sample test one file can give you.';
+
+  @override
+  String get backtestColWindow => 'Window';
+
+  @override
+  String get backtestColTrades => 'Trades';
+
+  @override
+  String get backtestColNet => 'Net';
+
+  @override
+  String get backtestColWin => 'Win';
+
+  @override
+  String get backtestColMaxDd => 'Max DD';
+
+  @override
+  String get backtestInSample => 'In-sample';
+
+  @override
+  String get backtestOutOfSample => 'Out-of-sample';
+
+  @override
+  String get backtestAssumptions => 'Assumptions';
+
+  @override
+  String backtestTradesTitle(int count) {
+    return 'Trades ($count)';
+  }
+
+  @override
+  String get backtestColSide => 'Side';
+
+  @override
+  String get backtestColEntry => 'Entry';
+
+  @override
+  String get backtestColLots => 'Lots';
+
+  @override
+  String get backtestColPnl => 'P&L';
+
+  @override
+  String get backtestColWhy => 'Why';
+
+  @override
+  String get backtestSavedRuns => 'Saved runs';
+
+  @override
+  String get backtestSavedSub => 'Runs from this account, on any device.';
+
+  @override
+  String get backtestNoSavedRuns => 'No saved runs yet.';
+
+  @override
+  String backtestRunFallback(String symbol) {
+    return '$symbol run';
+  }
+
+  @override
+  String backtestDeleteTooltip(String name) {
+    return 'Delete $name';
+  }
+
+  @override
+  String get cbIntro =>
+      'Write the setup in your own words. The server turns it into a rule set, shows you the rules in plain English, and only then can you run them over your bar data.';
+
+  @override
+  String get cbGalleryFailed =>
+      'Could not open the gallery. Check the photo permission and try again.';
+
+  @override
+  String get cbUseImage => 'Use a PNG, JPEG or WebP screenshot.';
+
+  @override
+  String cbReadFailed(String name) {
+    return 'Could not read $name. Try picking it again.';
+  }
+
+  @override
+  String cbTooManyCharts(int max) {
+    return 'Up to $max charts.';
+  }
+
+  @override
+  String get cbChartTooLarge =>
+      'That screenshot is over 4 MB. Crop it to the setup.';
+
+  @override
+  String get cbChartsBudget =>
+      'Those charts are too large to send together. Remove one, or crop it.';
+
+  @override
+  String get cbNothingRecorded =>
+      'Nothing was recorded. Hold on, speak, then stop.';
+
+  @override
+  String get cbVoiceAdded => 'Voice note added to the description.';
+
+  @override
+  String get cbRecordingFailed =>
+      'Could not use that recording. Type the explanation instead.';
+
+  @override
+  String get cbDescribeFirst =>
+      'Describe the setup in at least a sentence — what has to happen before you take the trade?';
+
+  @override
+  String get cbCompileFailed =>
+      'The description could not be compiled. Check your connection and try again.';
+
+  @override
+  String get cbStepSetup => '1. The setup';
+
+  @override
+  String get cbDescriptionHint =>
+      'e.g. Wait for the London open, then buy when price closes above the previous 20-bar high and the 200 EMA is rising. Exit at 2R or when the 20 high is lost.';
+
+  @override
+  String get cbSymbolOptional => 'Symbol (optional)';
+
+  @override
+  String get cbStopOptional => 'Stop rule (optional)';
+
+  @override
+  String get cbCriteriaLabel => 'Your definition of a valid setup (optional)';
+
+  @override
+  String get cbCompiling => 'Compiling rules…';
+
+  @override
+  String get cbCompileAction => 'Compile rules';
+
+  @override
+  String get cbNoChartsSent => 'no charts sent';
+
+  @override
+  String cbChartsSent(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count charts sent',
+      one: '1 chart sent',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String cbRulesLine(String timeframe, String charts) {
+    return '$timeframe · $charts · check every line before you run it';
+  }
+
+  @override
+  String cbCompiledWith(String model) {
+    return 'Compiled with $model';
+  }
+
+  @override
+  String get cbUseRules => 'Use these rules';
+
+  @override
+  String get cbCompileAgain => 'Compile again';
+
+  @override
+  String get cbAddChart => 'Add chart';
+
+  @override
+  String cbAddChartCount(int current, int max) {
+    return 'Add chart ($current/$max)';
+  }
+
+  @override
+  String cbStopRecording(int seconds) {
+    return 'Stop · ${seconds}s';
+  }
+
+  @override
+  String get cbTranscribing => 'Transcribing…';
+
+  @override
+  String get cbVoiceNote => 'Voice note';
+
+  @override
+  String cbAttachmentsNote(int max) {
+    return 'Up to $max chart screenshots and a 60-second voice note. The charts are sent to the model with the description; the note is transcribed into the description and never stored.';
+  }
+
+  @override
+  String get cbTimeframe => 'Timeframe';
+
+  @override
+  String get cbConfirmation => 'Confirmation (optional)';
+
+  @override
+  String get cbNone => 'None';
+
+  @override
+  String get chartDrawingTools => 'Drawing tools';
+
+  @override
+  String get chartMarketReplay => 'Market replay';
+
+  @override
+  String get chartStyle => 'Chart style';
+
+  @override
+  String chartMagnetTooltip(String mode) {
+    return 'Magnet: $mode';
+  }
+
+  @override
+  String get chartHideBuySell => 'Hide buy and sell';
+
+  @override
+  String get chartBuySell => 'Buy / sell';
+
+  @override
+  String chartTitle(String symbol) {
+    return '$symbol · chart';
+  }
+
+  @override
+  String get chartFullscreen => 'Fullscreen';
+
+  @override
+  String get chartExitFullscreen => 'Exit fullscreen';
+
+  @override
+  String get chartExitTimeBeforeEntry =>
+      'The exit time is before the entry time.';
+
+  @override
+  String get chartHeadsUp => 'You can still save it — this is only a heads-up.';
+
+  @override
+  String get chartDragLevel => 'Drag a level line to move it and its time';
+
+  @override
+  String get chartCrosshairOn => 'Crosshair mode on';
+
+  @override
+  String get chartCrosshairOff => 'Crosshair mode off';
+
+  @override
+  String get chartStopBuyBelow => 'For a BUY the stop is normally below entry.';
+
+  @override
+  String get chartStopSellAbove =>
+      'For a SELL the stop is normally above entry.';
+
+  @override
+  String get chartTargetBuyAbove =>
+      'For a BUY the target is normally above entry.';
+
+  @override
+  String get chartTargetSellBelow =>
+      'For a SELL the target is normally below entry.';
+
+  @override
+  String get chartUnreachableAccount =>
+      'This chart could not reach your account. The levels on this device are unaffected.';
+
+  @override
+  String chartIntervalRefused(String interval) {
+    return '$interval candles are not served by this chart feed yet — showing 1M.';
+  }
+
+  @override
+  String get chartNoCandlesWindow =>
+      'No candles in that time frame. Try a wider window.';
+
+  @override
+  String get chartPlacementMove => 'Move to size it, then lift to finish';
+
+  @override
+  String get chartPlacementLift => 'Lift to place';
+
+  @override
+  String get chartPlacementTapFirst => 'Tap to set the first point';
+
+  @override
+  String get chartPlacementTap => 'Tap to place';
+
+  @override
+  String chartPlacedOfTotal(int placed, int total) {
+    return '$placed of $total';
+  }
+
+  @override
+  String chartMagnetSuffix(String mode) {
+    return '$mode magnet';
+  }
+
+  @override
+  String get chartKeepDrawingOn => 'Keep drawing on';
+
+  @override
+  String get chartKeepDrawingOff => 'Keep drawing off';
+
+  @override
+  String get chartPutToolAway => 'Put the tool away';
+
+  @override
+  String get chartMoreActions => 'More actions';
+
+  @override
+  String get chartClone => 'Clone';
+
+  @override
+  String get chartColour => 'Colour';
+
+  @override
+  String get chartLineWidth => 'Line width';
+
+  @override
+  String get chartLineStyle => 'Line style';
+
+  @override
+  String get chartLock => 'Lock';
+
+  @override
+  String get chartUnlock => 'Unlock';
+
+  @override
+  String get chartShow => 'Show';
+
+  @override
+  String get chartHide => 'Hide';
+
+  @override
+  String get chartRemove => 'Remove';
+
+  @override
+  String chartAddAlertAt(String symbol, String price) {
+    return 'Add alert on $symbol at $price';
+  }
+
+  @override
+  String get chartAlertSubtitle =>
+      'A line that fires when price reaches this level';
+
+  @override
+  String get chartPinLevel => 'Pin a level here';
+
+  @override
+  String get chartPinSubtitle => 'A plain line, no notification';
+
+  @override
+  String get chartUseAsEntry => 'Use as entry';
+
+  @override
+  String get chartUseAsEntrySub =>
+      'Fills the entry price and this candle’s time';
+
+  @override
+  String get chartCopyPrice => 'Copy price';
+
+  @override
+  String chartAlertSet(String price) {
+    return 'Alert set at $price.';
+  }
+
+  @override
+  String chartLevelPinned(String price) {
+    return 'Level pinned at $price.';
+  }
+
+  @override
+  String chartPriceCopied(String price) {
+    return '$price copied.';
+  }
+
+  @override
+  String get chartReplayFromDate => 'Replay from a date';
+
+  @override
+  String chartNoCandlesFor(String date) {
+    return 'No candles for $date.';
+  }
+
+  @override
+  String chartFeedDown(String at) {
+    return 'Feed down — showing this window from the copy saved $at.';
+  }
+
+  @override
+  String get chartNoEarlierCandles => 'No earlier candles for this range.';
+
+  @override
+  String get chartProIntervals =>
+      '5s, 10s and 15s candles are a Pro feature. Basic charts run from 30s up.';
+
+  @override
+  String get chartBasicIntervals =>
+      '30s and 45s candles are part of Basic. Free charts run from 1m up.';
+
+  @override
+  String get chartPinUpgrade =>
+      'Pinning entry, stop and target on the chart is part of Basic. Upgrade to pin your levels — the chart itself and every other drawing tool stay free.';
+
+  @override
+  String get chartReplayUpgrade =>
+      'Market replay is a Pro feature. Upgrade to Pro to use it.';
+
+  @override
+  String get chartLoadEarlier => 'Load earlier candles';
+
+  @override
+  String get chartPreviousBar => 'Previous bar';
+
+  @override
+  String get chartNextBar => 'Next bar';
+
+  @override
+  String get chartPauseReplay => 'Pause replay';
+
+  @override
+  String get chartPlayReplay => 'Play replay';
+
+  @override
+  String get chartJumpToDate => 'Jump to a date';
+
+  @override
+  String get chartExitReplay => 'Exit';
+
+  @override
+  String get chartNoteHint => 'Note on the chart';
+
+  @override
+  String get chartAdd => 'Add';
+
+  @override
+  String get chartAlertLine => 'Alert line';
+
+  @override
+  String get chartAlertLineFired => 'Alert line — fired';
+
+  @override
+  String chartTextWith(String body) {
+    return 'Text — $body';
+  }
+
+  @override
+  String chartPositionSummary(
+      String entry, String stop, String target, String risk) {
+    return 'Entry $entry · Stop $stop · Target $target$risk';
+  }
+
+  @override
+  String get chartObjectLockedBody => 'Let the finger move it again';
+
+  @override
+  String get chartObjectUnlockedBody => 'Hold it exactly where it is';
+
+  @override
+  String get chartHideBody => 'Clear it off the chart, keep the idea';
+
+  @override
+  String chartObjectsOnChart(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count objects on this chart',
+      one: '1 object on this chart',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chartObjectHidden => 'Object hidden.';
+
+  @override
+  String get chartUndoAction => 'Undo';
+
+  @override
+  String get chartWorkspace => 'WORKSPACE';
+
+  @override
+  String get chartToolsLabel => 'TOOLS';
+
+  @override
+  String get chartNoLayoutSaved =>
+      'No layout saved yet — Save keeps this chart exactly as it looks.';
+
+  @override
+  String chartLayoutName(String name) {
+    return 'Layout: $name';
+  }
+
+  @override
+  String get chartLayouts => 'Layouts';
+
+  @override
+  String chartLayoutsSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count saved',
+      one: '1 saved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chartSettings => 'Settings';
+
+  @override
+  String get chartSaveShort => 'Save';
+
+  @override
+  String get chartThisChart => 'This chart';
+
+  @override
+  String get chartOpen => 'Open';
+
+  @override
+  String get chartFromLibrary => 'From library';
+
+  @override
+  String get chartNew => 'New';
+
+  @override
+  String get chartBlankChart => 'Blank chart';
+
+  @override
+  String get chartType => 'Type';
+
+  @override
+  String get chartIndicators => 'Indicators';
+
+  @override
+  String get chartNone => 'None';
+
+  @override
+  String chartStudiesOn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count on',
+      one: '1 on',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chartAlerts => 'Alerts';
+
+  @override
+  String get chartLevelTouches => 'Level touches';
+
+  @override
+  String get chartReplay => 'Replay';
+
+  @override
+  String chartObjectsShort(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count objects',
+      one: '1 object',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chartTimeZone => 'Time zone';
+
+  @override
+  String get chartEvents => 'Events';
+
+  @override
+  String get chartSaveLayoutTitle => 'Save layout';
+
+  @override
+  String get chartUpdateLayoutTitle => 'Update layout';
+
+  @override
+  String get chartLayoutNameLabel => 'Layout name';
+
+  @override
+  String get chartSave => 'Save';
+
+  @override
+  String get chartUpdate => 'Update';
+
+  @override
+  String chartSavedName(String name) {
+    return 'Saved “$name”.';
+  }
+
+  @override
+  String chartOpenedLayout(String name) {
+    return 'Opened “$name”.';
+  }
+
+  @override
+  String chartOpenedLayoutOn(String name, String symbol) {
+    return 'Opened “$name” on $symbol — the palette and candle size came with it.';
+  }
+
+  @override
+  String get chartA11yQuickActions => 'Quick actions at this price';
+
+  @override
+  String get chartA11yFitScale => 'Fit the price scale';
+
+  @override
+  String get chartA11yFinishDrawing => 'Finish drawing';
+
+  @override
+  String get chartTimeZoneTitle => 'Chart time zone';
+
+  @override
+  String get chartSearchZone => 'Search a city or zone';
 }

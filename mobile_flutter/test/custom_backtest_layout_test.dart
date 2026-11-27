@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mtl_trader_mobile/l10n/gen/app_localizations.dart';
 import 'package:mtl_trader_mobile/screens/custom_backtest_screen.dart';
 import 'package:mtl_trader_mobile/ui/theme.dart';
 
@@ -12,6 +13,9 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: buildFlatTheme(AppPalette.dark),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(

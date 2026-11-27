@@ -45,28 +45,33 @@ String _imageMime(String mimeType) {
   return mime == 'image/jpg' ? 'image/jpeg' : mime;
 }
 
+/// Why a picture cannot join the set of charts sent with a compile.
+///
+/// A code rather than a sentence, so the screen can say it in the trader's own
+/// language.
+enum ChartRejection { format, tooMany, tooLarge, budget }
+
 /// Why this picture cannot join the set, or null when it can.
 ///
 /// [usedBytes] is the decoded size of the charts already attached; [count] is
-/// how many there are. The returned sentence is written for the trader and shown
-/// beside the picker.
-String? chartRejection({
+/// how many there are.
+ChartRejection? chartRejection({
   required int count,
   required int usedBytes,
   required int candidateBytes,
   required String mimeType,
 }) {
   if (!compileImageMimes.contains(_imageMime(mimeType))) {
-    return 'Use a PNG, JPEG or WebP screenshot.';
+    return ChartRejection.format;
   }
   if (count >= maxCompileCharts) {
-    return 'Up to $maxCompileCharts charts.';
+    return ChartRejection.tooMany;
   }
   if (candidateBytes > maxCompileChartBytes) {
-    return 'That screenshot is over 4 MB. Crop it to the setup.';
+    return ChartRejection.tooLarge;
   }
   if (usedBytes + candidateBytes > compileChartBudgetBytes) {
-    return 'Those charts are too large to send together. Remove one, or crop it.';
+    return ChartRejection.budget;
   }
   return null;
 }

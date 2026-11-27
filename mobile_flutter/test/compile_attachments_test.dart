@@ -25,7 +25,7 @@ void main() {
         candidateBytes: 100,
         mimeType: 'image/png',
       ),
-      contains('Up to'),
+      ChartRejection.tooMany,
     );
     expect(
       chartRejection(
@@ -34,7 +34,7 @@ void main() {
         candidateBytes: maxCompileChartBytes + 1,
         mimeType: 'image/png',
       ),
-      contains('4 MB'),
+      ChartRejection.tooLarge,
     );
     expect(
       chartRejection(
@@ -43,7 +43,7 @@ void main() {
         candidateBytes: 100,
         mimeType: 'image/png',
       ),
-      contains('too large'),
+      ChartRejection.budget,
     );
   });
 
