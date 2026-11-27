@@ -159,7 +159,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
 
   /// Candle under the crosshair, so the header can show its O H L C the way a
   /// desktop chart does while the pointer travels.
-  Candle? _hover;
 
   /// When the candles on screen are the device's last copy rather than a live
   /// read, this is the moment they were fetched. Null means what is painted is
@@ -1511,10 +1510,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       crosshairMode: _crosshairMode,
       onFinishPlacement: _disarmTool,
       magnet: _magnet,
-      onCrosshair: (candle) {
-        if (identical(candle, _hover)) return;
-        setState(() => _hover = candle);
-      },
       onPlacing: (down) {
         if (down == _placing) return;
         setState(() => _placing = down);
@@ -5322,37 +5317,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
               // to give way when the pills and a doubled text size leave no
               // room, and a Spacer only reports the overflow.
               Expanded(
-                // While the crosshair is out, the legend reads that candle
-                // instead of the clock: O H L C is what a trader measures a
-                // level against, and it is where a desk puts it.
-                child: _hover == null
-                    ? (_updated == null
-                        ? const SizedBox.shrink()
-                        : Text(
-                            'Updated '
-                            '${DateFormat('HH:mm:ss').format(_updated!)}',
-                            textAlign: TextAlign.right,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: tabular.copyWith(
-                              color: AppColors.faint,
-                              fontSize: 9.5,
-                            ),
-                          ))
+                // The OHLC readout lives in the chart's own header bar now, so
+                // this strip keeps the one thing that bar cannot say: when the
+                // candles last arrived.
+                child: _updated == null
+                    ? const SizedBox.shrink()
                     : Text(
-                        'O ${_hover!.open.toStringAsFixed(_decimals)}'
-                        '  H ${_hover!.high.toStringAsFixed(_decimals)}'
-                        '  L ${_hover!.low.toStringAsFixed(_decimals)}'
-                        '  C ${_hover!.close.toStringAsFixed(_decimals)}',
+                        'Updated '
+                        '${DateFormat('HH:mm:ss').format(_updated!)}',
                         textAlign: TextAlign.right,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: tabular.copyWith(
-                          color: _hover!.isUp
-                              ? AppColors.success
-                              : AppColors.danger,
+                          color: AppColors.faint,
                           fontSize: 9.5,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
               ),
@@ -5838,7 +5816,6 @@ class _ChartCanvas extends StatefulWidget {
     this.onFinishPlacement,
     required this.onDrawingCreated,
     this.magnet = MagnetMode.weak,
-    this.onCrosshair,
     this.onPlacing,
     this.onQuickAction,
   });
@@ -5898,7 +5875,6 @@ class _ChartCanvas extends StatefulWidget {
 
   /// The candle under the crosshair, or null when the crosshair is away. The
   /// screen uses it for the O H L C legend in the header.
-  final ValueChanged<Candle?>? onCrosshair;
 
   /// True once the finger has put down the first point of the object being
   /// placed, so the banner can count.
@@ -6366,8 +6342,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
         _crosshairPinned = false;
       });
       widget.onPlacing?.call(false);
-      widget.onCrosshair?.call(null);
-      return;
+        return;
     }
     setState(() {
       _preview = null;
@@ -6377,7 +6352,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
       _crosshairPinned = false;
     });
     widget.onPlacing?.call(false);
-    widget.onCrosshair?.call(null);
     if (placed != null) widget.onDrawingCreated(placed);
   }
 
@@ -6392,7 +6366,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
       _crosshair = null;
     });
     widget.onPlacing?.call(false);
-    widget.onCrosshair?.call(null);
   }
 
   /// Whether a press has landed on the object that is already selected.
@@ -6541,7 +6514,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
         _crosshairPinned = false;
         _crosshair = null;
       });
-      _reportCrosshair(null);
     }
     final panes = TradingChartPainter.paneLayout(_size.height, widget.style);
     final inPricePane =
@@ -6572,7 +6544,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
         _crosshairPinned = false;
         _crosshair = null;
       });
-      _reportCrosshair(null);
     }
     _lastTouch = details.localFocalPoint;
     // Every gesture keeps these, so a pinch that starts on an object still has
@@ -6676,7 +6647,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
     }
     if (_drawingIndex != null) {
       _endDrag(_lastTouch);
-      _reportCrosshair(null);
       return;
     }
     // A pinned crosshair survives the lift-off that follows its long press; a
@@ -6684,7 +6654,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
     // position stays put, which is what a desk does.
     if (!_crosshairPinned && !widget.crosshairMode) {
       setState(() => _crosshair = null);
-      _reportCrosshair(null);
     }
     // A zoom drag ends where the finger lifts: there is no throw to hand on.
     if (_axisDrag != _AxisDrag.none) {
@@ -6805,27 +6774,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
       }
       _crosshair = showCrosshair ? details.localFocalPoint : null;
     });
-    _reportCrosshair(showCrosshair ? details.localFocalPoint : null);
-  }
-
-  /// Tells the screen which candle the crosshair is over. The chart itself has
-  /// no legend to write into, and the header does.
-  void _reportCrosshair(Offset? local) {
-    final report = widget.onCrosshair;
-    if (report == null) return;
-    final plotW = _size.width - TradingChartPainter.axisWidth;
-    if (local == null || widget.candles.isEmpty || plotW <= 0) {
-      report(null);
-      return;
-    }
-    final chartW = chartCandleWidth(plotW);
-    if (chartW <= 0) {
-      report(null);
-      return;
-    }
-    final ratio = (local.dx / chartW).clamp(0.0, 1.0).toDouble();
-    final index = _view.indexAt(ratio, widget.candles.length);
-    report(widget.candles[index.clamp(0, widget.candles.length - 1)]);
   }
 
   Marker? _nearestLevel(Offset local) {
@@ -7190,7 +7138,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
     // actions beside it unreachable.
     if (marker == null && _crosshair != null) {
       setState(() => _crosshairPinned = true);
-      _reportCrosshair(_crosshair);
       return;
     }
     setState(() {
@@ -7234,12 +7181,45 @@ class _ChartCanvasState extends State<_ChartCanvas>
   }
 
   Widget _sized(double height, ({double min, double max}) bounds) {
+    // The OHLC legend gets a slim strip above the plot instead of a chip on the
+    // canvas. Drawn on top it sat under the target badge at the top of the range
+    // and over the bar being measured, which is the one thing the trader is
+    // looking at while a level is pinned.
+    const header = 24.0;
+    // Sized rather than Expanded: a caller can hand this a short box, and a
+    // negative flex is a layout crash rather than a small chart.
+    final plotHeight = math.max(0.0, height - header - 0.6);
     return SizedBox(
       height: height,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          _size = Size(constraints.maxWidth, height);
-          return GestureDetector(
+      child: ColoredBox(
+        color: widget.style.background,
+        child: Column(
+          children: [
+            SizedBox(
+              height: header,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  6,
+                  2,
+                  TradingChartPainter.axisWidth,
+                  2,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: IgnorePointer(child: _readout()),
+                ),
+              ),
+            ),
+            Container(height: 0.6, color: widget.style.axis),
+            SizedBox(
+              height: plotHeight,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _size = Size(
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                  );
+                  return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: (details) {
               _tapDownAt = details.localPosition;
@@ -7301,12 +7281,6 @@ class _ChartCanvasState extends State<_ChartCanvas>
                       symbol: widget.symbol,
                     ),
                   ),
-                ),
-                Positioned(
-                  left: 6,
-                  top: 6,
-                  right: TradingChartPainter.axisWidth + 6,
-                  child: IgnorePointer(child: _readout()),
                 ),
                 // The quick-action button sits on the price the crosshair is
                 // showing, exactly where the eye already is. It only exists
@@ -7461,8 +7435,12 @@ class _ChartCanvasState extends State<_ChartCanvas>
                   ),
               ],
             ),
-          );
-        },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -7497,17 +7475,13 @@ class _ChartCanvasState extends State<_ChartCanvas>
       }
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: widget.style.background.withAlpha(190),
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: Text.rich(
+    // No pill any more: it is a bar, not an overlay, so the text sits on the
+    // canvas background and only the candle colours distinguish it.
+    return Text.rich(
         TextSpan(
           children: [
             TextSpan(
-              text: '· ${widget.interval.key}  ',
+              text: '${widget.interval.key}  ',
               style: TextStyle(
                 color: widget.style.muted,
                 fontSize: 9,
@@ -7549,8 +7523,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-      ),
-    );
+      );
   }
 }
 

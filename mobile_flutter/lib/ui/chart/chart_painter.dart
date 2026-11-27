@@ -733,18 +733,18 @@ class TradingChartPainter extends CustomPainter {
             ..style = PaintingStyle.fill,
         );
       }
-      _chip(
-        canvas,
-        '$label ${price.toStringAsFixed(decimals)}',
-        Offset(4, ly - 7),
-        color,
-      );
+      // The letter rides on the axis badge instead of a chip at the left edge.
+      // That chip sat under the OHLC header near the top of the range and on
+      // the time axis near the bottom, and it duplicated a number that was
+      // already printed two centimetres to its right. One label, on the axis
+      // the price belongs to, clamped so it cannot slide off into the time
+      // strip.
       _axisTag(
         canvas,
         size,
         plotW,
-        ly,
-        price.toStringAsFixed(decimals),
+        ly.clamp(topPad + 7, topPad + plotH - 7),
+        '$label ${price.toStringAsFixed(decimals)}',
         color,
       );
     }
