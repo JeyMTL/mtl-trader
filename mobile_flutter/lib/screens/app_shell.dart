@@ -212,7 +212,11 @@ class _AppShellState extends State<AppShell>
         return;
       }
       if (!at.isAfter(_lastSyncedAt!)) return;
-      _lastSyncedAt = at;
+      // `_onJournaled` advances this cursor itself. Advancing it here first made
+      // the call below compare the row against itself and return, so the poll
+      // never refreshed anything: on a project where the trades table is not in
+      // the realtime publication, a closed trade sat unseen until the trader
+      // pulled down or reopened the app.
       _onJournaled(row);
     } catch (_) {
       // A failed poll is not worth a message; the next one retries.
@@ -220,24 +224,30 @@ class _AppShellState extends State<AppShell>
   }
 
   void _onJournaled(Map<String, dynamic> row) {
-    // A first sync backfills the whole history, and the banner would name
-    // whichever of those old rows arrived last instead of the trade the trader
-    // just closed.
-    if (!isJustJournaled(row)) return;
     final at = _parseTime(row['created_at']) ?? DateTime.now().toUtc();
     if (_lastSyncedAt != null && !at.isAfter(_lastSyncedAt!)) return;
     _lastSyncedAt = at;
     if (!mounted) return;
 
-    // Refresh the tabs in place and keep the reminder on screen until it is
-    // opened or dismissed. One rebuild per burst: a first sync can insert
-    // dozens of rows, and reloading every screen for each of them would both
-    // stutter and hammer the database.
-    _needsDetails = row;
+    // Refresh the tabs in place on every new row, however old the trade is. A
+    // close the supervisor only pushed after a reconnect or a reconcile pass is
+    // still new to the ledger, and the freshness test below is about the
+    // *banner*, not the numbers: skipping the refresh is how a late close left
+    // yesterday's balance on the desk until the trader pulled down on it.
+    //
+    // One rebuild per burst: a first sync can insert dozens of rows, and
+    // reloading every screen for each of them would both stutter and hammer the
+    // database.
     _invalidateDebounce?.cancel();
     _invalidateDebounce = Timer(const Duration(milliseconds: 500), () {
       if (mounted) _invalidate();
     });
+
+    // A first sync backfills the whole history, and the banner would name
+    // whichever of those old rows arrived last instead of the trade the trader
+    // just closed.
+    if (!isJustJournaled(row)) return;
+    _needsDetails = row;
     _announceSynced(row);
   }
 
