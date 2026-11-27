@@ -81,7 +81,14 @@ List<DailyPnlPoint> recentDays(
   final anchor = now ?? DateTime.now();
   final today = DateTime(anchor.year, anchor.month, anchor.day);
   return List<DailyPnlPoint>.generate(days, (index) {
-    final date = today.subtract(Duration(days: days - 1 - index));
+    // The day number, not a Duration: subtracting 24 hours across a DST change
+    // lands at 23:00 of the day before, which repeats one date and drops
+    // another from the strip twice a year.
+    final date = DateTime(
+      today.year,
+      today.month,
+      today.day - (days - 1 - index),
+    );
     final key = isoDay(date);
     return byDay[key] ?? DailyPnlPoint(day: key, pnl: 0, trades: 0);
   });

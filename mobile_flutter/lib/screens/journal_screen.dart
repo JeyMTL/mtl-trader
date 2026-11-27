@@ -168,10 +168,9 @@ class _JournalScreenState extends State<JournalScreen> {
     }
     if (!mounted || requestId != _requestId || count <= 0) return;
     setState(
-      () => _error =
-          'Your $count trade${count == 1 ? '' : 's'} this month are saved, but '
-          'the list came back empty — most often a dropped session. Pull down '
-          'to try again.',
+      () => _error = 'Your ${countNoun(count, 'trade')} this month '
+          '${count == 1 ? 'is' : 'are'} saved, but the list came back empty — '
+          'most often a dropped session. Pull down to try again.',
     );
   }
 

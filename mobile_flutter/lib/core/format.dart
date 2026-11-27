@@ -29,8 +29,12 @@ DateFormat _date(String pattern) {
 
 String money(num value) => _money.format(value);
 
+/// Money with the sign a change carries: `+$120.00`, `-$40.00`, `$0.00`.
+///
+/// A flat day gets no sign. `+$0.00` reads as a gain, which is exactly what a
+/// break-even day is not.
 String signedMoney(num value) =>
-    '${value >= 0 ? '+' : ''}${_money.format(value)}';
+    '${value > 0 ? '+' : ''}${_money.format(value)}';
 
 String compactMoney(num value) => _compact.format(value);
 

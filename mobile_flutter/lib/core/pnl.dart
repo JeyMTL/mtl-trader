@@ -116,12 +116,10 @@ double pipSize(String symbol) {
   final s = normalizeSymbol(symbol);
   if (s.isEmpty) return 0.0001;
   if (s.endsWith('JPY')) return 0.01;
-  if (s.startsWith('XAU') ||
-      s.startsWith('GOLD') ||
-      s.startsWith('XAG') ||
-      s.startsWith('SILVER')) {
-    return 0.1;
-  }
+  // Silver quotes around 30.000, so its pip is a cent, not a tenth: grouping it
+  // with gold made every silver trade read a hundredth of the pips it made.
+  if (s.startsWith('XAG') || s.startsWith('SILVER')) return 0.01;
+  if (s.startsWith('XAU') || s.startsWith('GOLD')) return 0.1;
   if (pointValue(s) == 1) return 1;
   if (pointValue(s) == 1000 && !s.endsWith('JPY')) return 0.01;
   return 0.0001;

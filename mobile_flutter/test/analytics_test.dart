@@ -53,6 +53,20 @@ void main() {
       expect(days[2].trades, 2);
       expect(days.last.trades, 0);
     });
+
+    test('walks calendar days, never repeating one across a clock change', () {
+      // The strip is built from the date, not from 24-hour steps: a step lands
+      // at 23:00 on the evening a clock goes back and repeats that date.
+      final days = recentDays(
+        const [],
+        days: 40,
+        now: DateTime(2026, 11, 15),
+      );
+
+      expect(days.map((day) => day.day).toSet().length, 40);
+      expect(days.first.day, '2026-10-07');
+      expect(days.last.day, '2026-11-15');
+    });
   });
 
   group('best and worst day', () {

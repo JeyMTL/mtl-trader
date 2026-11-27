@@ -61,4 +61,10 @@ void main() {
     expect(countNoun(1, 'entry', plural: 'entries'), '1 entry');
     expect(countNoun(3, 'entry', plural: 'entries'), '3 entries');
   });
+
+  test('a break-even amount carries no plus sign', () {
+    expect(signedMoney(0), r'$0.00');
+    expect(signedMoney(12.5), r'+$12.50');
+    expect(signedMoney(-12.5), r'-$12.50');
+  });
 }

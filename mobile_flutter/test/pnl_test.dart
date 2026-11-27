@@ -58,4 +58,16 @@ void main() {
     );
     expect(pnl, closeTo(100, 0.0001));
   });
+
+  test('sizes a pip for metal, index and crypto symbols', () {
+    expect(pipSize('EURUSD'), 0.0001);
+    expect(pipSize('GBPUSD'), 0.0001);
+    expect(pipSize('USDJPY'), 0.01);
+    expect(pipSize('XAUUSD'), 0.1);
+    // Silver trades near 30.000, so a pip is a cent: 0.50 is fifty pips, not
+    // five, and grouping it with gold was the bug.
+    expect(pipSize('XAGUSD'), 0.01);
+    expect(pipSize('US30'), 1);
+    expect(pipSize('BTCUSD'), 1);
+  });
 }

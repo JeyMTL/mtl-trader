@@ -1047,6 +1047,16 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       );
       return;
     }
+    // The exit is read from this symbol's candles. A name the list does not
+    // recognise resolves no candles at all, and the lookup returned without a
+    // word, so Save looked like a dead button.
+    if (inferInstrument(_symbol.text) == null) {
+      setState(
+        () => _error = 'Pick the symbol from the list — the exit is read from '
+            'its candles.',
+      );
+      return;
+    }
     // The exit is read from the market, never typed. A saved trade that was
     // reopened keeps its broker exit and needs no second lookup.
     if (_exitPrice == null) {
