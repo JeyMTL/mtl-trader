@@ -33,7 +33,11 @@ import {
   trialRemaining,
   TRIAL_DAYS,
 } from '@/lib/subscription'
-import { MARKET_CHARTS_ENABLED, MT5_SYNC_ENABLED } from '@/lib/features'
+import {
+  MARKET_CHARTS_ENABLED,
+  MARKET_WIDGET_ENABLED,
+  MT5_SYNC_ENABLED,
+} from '@/lib/features'
 import { Logo } from '@/components/logo'
 import LockGate from '@/components/lock-gate'
 import { Avatar } from '@/components/avatar'
@@ -46,7 +50,7 @@ const navigation = [
   { name: 'Trades', href: '/dashboard/trades', icon: TrendingUp },
   { name: 'Import', href: '/dashboard/import', icon: Upload },
   { name: 'MT5 Sync', href: '/dashboard/sync', icon: RefreshCw },
-  { name: 'Chart', href: '/dashboard/chart', icon: CandlestickChart },
+  { name: MARKET_CHARTS_ENABLED ? 'Chart' : 'Market', href: '/dashboard/chart', icon: CandlestickChart },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Backtest', href: '/dashboard/backtest', icon: FlaskConical },
   { name: 'Rules', href: '/dashboard/playbook', icon: BookOpenCheck },
@@ -60,7 +64,7 @@ const PRO_ONLY_HREFS = ['/dashboard/backtest']
 
 /** Everything that does not fit in five bottom tabs lives in the sheet. */
 const moreNavigation = [
-  { name: 'Chart', href: '/dashboard/chart', icon: CandlestickChart },
+  { name: MARKET_CHARTS_ENABLED ? 'Chart' : 'Market', href: '/dashboard/chart', icon: CandlestickChart },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Import trades', href: '/dashboard/import', icon: Upload },
   { name: 'MT5 auto sync', href: '/dashboard/sync', icon: RefreshCw },
@@ -265,7 +269,8 @@ export default function DashboardLayout({
   const hiddenHrefs = [
     ...(MT5_SYNC_ENABLED ? [] : ['/dashboard/sync']),
     // Charting is off until a feed licenses redistribution (see features.ts).
-    ...(MARKET_CHARTS_ENABLED ? [] : ['/dashboard/chart']),
+    // The entry survives on the free market view, which needs no licence.
+    ...(MARKET_CHARTS_ENABLED || MARKET_WIDGET_ENABLED ? [] : ['/dashboard/chart']),
   ]
   const isVisible = (href: string) =>
     (proTools || !PRO_ONLY_HREFS.includes(href)) && !hiddenHrefs.includes(href)
@@ -309,7 +314,7 @@ export default function DashboardLayout({
     '/dashboard/settings': 'Settings',
     '/dashboard/payment': 'Payment',
     '/dashboard/playbook': 'Rules',
-    '/dashboard/chart': 'Chart',
+    '/dashboard/chart': MARKET_CHARTS_ENABLED ? 'Chart' : 'Market',
   }
   const subRouteTitle = pathname.startsWith('/dashboard/trades/') && pathname.endsWith('/edit')
     ? 'Edit trade'

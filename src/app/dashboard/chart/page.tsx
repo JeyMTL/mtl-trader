@@ -4,7 +4,8 @@ import { ChartWorkspace, type ChartDrawingRow } from '@/components/chart-workspa
 import { loadAccount } from '@/lib/plan-guard'
 import { hasPaidPlan, hasProTools } from '@/lib/subscription'
 import { isSoloOwner } from '@/lib/solo'
-import { MARKET_CHARTS_ENABLED } from '@/lib/features'
+import { MARKET_CHARTS_ENABLED, MARKET_WIDGET_ENABLED } from '@/lib/features'
+import { MarketView } from '@/components/market-view'
 
 /**
  * Web chart desk.
@@ -21,7 +22,14 @@ export const dynamic = 'force-dynamic'
 export default async function ChartPage() {
   // Off while there is no licensed feed: a bookmark or an old link lands on the
   // dashboard rather than on a chart the deployment cannot legally draw.
-  if (!MARKET_CHARTS_ENABLED) redirect('/dashboard')
+  if (!MARKET_CHARTS_ENABLED) {
+    // The licensed feed is gone; the free market view is not. Same URL, same
+    // nav entry, different picture: no candle of ours is drawn, so there is
+    // nothing to license.
+    if (!MARKET_WIDGET_ENABLED) redirect('/dashboard')
+    await requireServerUser()
+    return <MarketView />
+  }
   const user = await requireServerUser()
   const supabase = await createServerSupabase()
   // The seconds sizes split across the paid plans: 5s/10s/15s are Pro, 30s and

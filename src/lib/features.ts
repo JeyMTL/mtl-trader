@@ -37,3 +37,14 @@ export const MT5_HOSTED_SYNC_ENABLED = false
  * licensed feed is the whole switch back.
  */
 export const MARKET_CHARTS_ENABLED = false
+
+/**
+ * The free market view that holds the chart's place meanwhile.
+ *
+ * TradingView serves the prices inside its own iframe under its own terms, so
+ * nothing here is redistribution and no vendor key is spent. No seconds, no
+ * overlays we compute, no drawings: see `src/lib/market-widget.ts`. It does not
+ * depend on `MARKET_CHARTS_ENABLED`; with a licensed feed back on, the desk
+ * chart returns at the same URL and this is no longer rendered.
+ */
+export const MARKET_WIDGET_ENABLED = true

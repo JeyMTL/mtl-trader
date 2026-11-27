@@ -42,6 +42,20 @@ describe('security headers', () => {
     expect(csp).not.toContain("default-src *")
   })
 
+  it('frames only the vendors that serve their own content', async () => {
+    const global = (await rules()).find((rule) => rule.source === '/(.*)') as HeaderRule
+    const frameSrc =
+      (valuesFor(global).get('content-security-policy') ?? '')
+        .split(';')
+        .map((directive) => directive.trim())
+        .find((directive) => directive.startsWith('frame-src')) ?? ''
+
+    // The market view is a TradingView iframe; nothing else may be framed, and
+    // the app may still not be framed by anyone.
+    expect(frameSrc).toContain('https://*.tradingview.com')
+    expect(frameSrc).not.toContain("'self'")
+  })
+
   it('denies capabilities a journal never needs', async () => {
     const global = (await rules()).find((rule) => rule.source === '/(.*)') as HeaderRule
     const policy = valuesFor(global).get('permissions-policy') ?? ''

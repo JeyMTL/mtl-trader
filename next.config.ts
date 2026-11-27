@@ -27,7 +27,10 @@ const CONTENT_SECURITY_POLICY = [
   "media-src 'self' blob: https://*.supabase.co",
   "font-src 'self' data: https://fonts.gstatic.com",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paddle.com https://*.profitwell.com https://accounts.google.com",
-  "frame-src https://*.paddle.com https://accounts.google.com",
+  // The market view is a TradingView widget in their own frame (see
+  // src/lib/market-widget.ts); their prices never enter our document, so this
+  // is the only directive it needs.
+  "frame-src https://*.paddle.com https://accounts.google.com https://*.tradingview.com",
   "form-action 'self' https://www.paypal.com https://*.paddle.com",
   // Blocks inline onclick=/onerror= attributes even though the bootstrap
   // scripts still need 'unsafe-inline'. React attaches listeners, so the app
