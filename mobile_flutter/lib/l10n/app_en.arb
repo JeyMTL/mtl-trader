@@ -92,7 +92,7 @@
   "peakToTrough": "Peak to trough",
   "expectancy": "Expectancy",
   "thisMonth": "This month",
-  "monthTrades": "{count} trades",
+  "monthTrades": "{count, plural, =1{1 trade} other{{count} trades}}",
   "@monthTrades": {
     "placeholders": {
       "count": {

@@ -579,10 +579,13 @@ class _BalanceHero extends StatelessWidget {
                     Expanded(
                       child: _MiniStat(
                         label: l10n.bestTrade,
-                        value: summary.totalTrades > 0
+                        // A "best" trade that is still a loss is not a green
+                        // number: an all-losing account showed its smallest
+                        // loss as if it had won one.
+                        value: summary.bestTrade > 0
                             ? signedMoney(summary.bestTrade)
                             : '—',
-                        tone: summary.totalTrades > 0
+                        tone: summary.bestTrade > 0
                             ? Tone.positive
                             : Tone.muted,
                       ),
@@ -591,10 +594,11 @@ class _BalanceHero extends StatelessWidget {
                     Expanded(
                       child: _MiniStat(
                         label: l10n.worstTrade,
-                        value: summary.totalTrades > 0
+                        // The mirror of the best-trade rule: only a loss is red.
+                        value: summary.worstTrade < 0
                             ? signedMoney(summary.worstTrade)
                             : '—',
-                        tone: summary.totalTrades > 0
+                        tone: summary.worstTrade < 0
                             ? Tone.negative
                             : Tone.muted,
                       ),
@@ -682,9 +686,14 @@ class _EquityChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The curve starts at the deposit rather than at the first close. With one
+    // trade the chart drew a lone point and the line looked broken, and a flat
+    // account had no shape at all; point 0 is the opening balance, so every
+    // account reads as a line from where it started to where it is now.
     final spots = <FlSpot>[
+      FlSpot(0, deposits),
       for (var index = 0; index < points.length; index++)
-        FlSpot(index.toDouble(), deposits + points[index].cumulative),
+        FlSpot((index + 1).toDouble(), deposits + points[index].cumulative),
     ];
     final values = spots.map((spot) => spot.y).toList();
     final minValue = values.reduce((a, b) => math.min(a, b));
@@ -692,7 +701,12 @@ class _EquityChart extends StatelessWidget {
     final padding = math.max((maxValue - minValue) * 0.12, 1.0);
     final profit = (spots.last.y - spots.first.y) >= 0;
     final color = profit ? AppColors.success : AppColors.danger;
-    final interval = math.max(1.0, (points.length / 4).floorToDouble());
+    final dayStep = math.max(1.0, (spots.length / 4).floorToDouble());
+    // fl_chart chooses its own left-axis step, and on a flat account that step
+    // is fine enough to print "$938" twice, on top of itself. Four divisions
+    // over the card's height puts the labels at least 24px apart, and a step of
+    // at least one currency unit keeps two of them from rounding together.
+    final moneyStep = _moneyAxisStep((maxValue - minValue + padding * 2) / 4);
 
     return LineChart(
       LineChartData(
@@ -710,7 +724,8 @@ class _EquityChart extends StatelessWidget {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 42,
+              reservedSize: 46,
+              interval: moneyStep,
               getTitlesWidget: (value, meta) => Text(
                 compactMoney(value),
                 style: TextStyle(color: AppColors.faint, fontSize: 10.5),
@@ -721,16 +736,17 @@ class _EquityChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 20,
-              interval: interval,
+              interval: dayStep,
               getTitlesWidget: (value, meta) {
                 final index = value.round();
-                if (index < 0 || index >= points.length) {
+                // 0 is the deposit, not a trading day, so it carries no date.
+                if (index < 1 || index > points.length) {
                   return const SizedBox.shrink();
                 }
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    isoDayLabel(points[index].day),
+                    isoDayLabel(points[index - 1].day),
                     style: TextStyle(color: AppColors.faint, fontSize: 10.5),
                   ),
                 );
@@ -762,6 +778,22 @@ class _EquityChart extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A round money step for the equity axis: 1, 2 or 5 × 10ⁿ, and never below
+/// one currency unit.
+///
+/// The floor of one is what stops duplicate labels — two ticks a fraction of a
+/// dollar apart both print as the same rounded balance.
+double _moneyAxisStep(double raw) {
+  if (!raw.isFinite || raw <= 1) return 1;
+  final magnitude =
+      math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
+  for (final factor in const [1.0, 2.0, 5.0]) {
+    final step = factor * magnitude;
+    if (step >= raw) return step < 1 ? 1 : step;
+  }
+  return magnitude * 10;
 }
 
 class _HourChart extends StatelessWidget {

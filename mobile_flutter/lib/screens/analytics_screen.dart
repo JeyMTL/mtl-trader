@@ -282,21 +282,29 @@ class _SummaryGrid extends StatelessWidget {
       ),
       (
         l10n.summaryAverageTrade,
-        signedMoney(summary.averageTrade),
+        // With nothing closed yet the figure is a flat zero, which reads as an
+        // achievement in green. Empty is empty: the dash says so.
+        summary.totalTrades > 0 ? signedMoney(summary.averageTrade) : '—',
         l10n.summaryNetFoot(signedMoney(summary.totalPnl)),
-        summary.averageTrade >= 0 ? Tone.positive : Tone.negative,
+        summary.totalTrades == 0
+            ? Tone.muted
+            : (summary.averageTrade >= 0 ? Tone.positive : Tone.negative),
       ),
       (
         l10n.bestTrade,
-        signedMoney(summary.bestTrade),
+        // An all-losing account has a "best" trade that is still a loss, and it
+        // was being painted green. Until one closes positive the card is empty.
+        summary.bestTrade > 0 ? signedMoney(summary.bestTrade) : '—',
         l10n.summaryBestTradeFoot(signedMoney(summary.worstTrade)),
-        Tone.positive,
+        summary.bestTrade > 0 ? Tone.positive : Tone.muted,
       ),
       (
         l10n.thisMonth,
         signedMoney(summary.monthPnl),
         l10n.summaryMonthFoot(summary.monthWinningDays),
-        summary.monthPnl >= 0 ? Tone.positive : Tone.negative,
+        summary.monthPnl == 0
+            ? Tone.muted
+            : (summary.monthPnl > 0 ? Tone.positive : Tone.negative),
       ),
     ];
 

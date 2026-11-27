@@ -469,7 +469,7 @@ abstract class AppLocalizations {
   /// No description provided for @monthTrades.
   ///
   /// In en, this message translates to:
-  /// **'{count} trades'**
+  /// **'{count, plural, =1{1 trade} other{{count} trades}}'**
   String monthTrades(int count);
 
   /// No description provided for @greenDays.

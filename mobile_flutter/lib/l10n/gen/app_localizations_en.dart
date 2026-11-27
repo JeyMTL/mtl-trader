@@ -209,7 +209,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String monthTrades(int count) {
-    return '$count trades';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades',
+      one: '1 trade',
+    );
+    return '$_temp0';
   }
 
   @override
