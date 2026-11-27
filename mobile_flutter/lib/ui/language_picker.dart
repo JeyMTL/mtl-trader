@@ -71,14 +71,19 @@ class LanguagePicker extends StatelessWidget {
     );
   }
 
-  Future<void> _openSheet(BuildContext context) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (_) => const _LanguageSheet(),
-    );
-  }
+  Future<void> _openSheet(BuildContext context) => showLanguageSheet(context);
+}
+
+/// The language sheet on its own, for surfaces that offer the choice without
+/// room for the full card — the signed-out screen, which is the one place a
+/// person who cannot read English has nowhere else to turn.
+Future<void> showLanguageSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppColors.surface,
+    builder: (_) => const _LanguageSheet(),
+  );
 }
 
 /// The searchable list. Flag and native name on every row, with the English name

@@ -10,7 +10,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/config.dart';
 import '../l10n/gen/app_localizations.dart';
+import '../core/locale.dart';
 import '../ui/brand.dart';
+import '../ui/language_picker.dart';
 import '../ui/password_reset_sheet.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -474,7 +476,7 @@ class _Hero extends StatelessWidget {
           children: [
             const _BrandBadge(),
             const SizedBox(width: 10),
-            Flexible(
+            Expanded(
               child: Text(
                 l10n.brandName.toUpperCase(),
                 maxLines: 1,
@@ -487,6 +489,10 @@ class _Hero extends StatelessWidget {
                 ),
               ),
             ),
+            // The 33 translated packs were only reachable from Settings, i.e.
+            // after signing in: someone who cannot read the English login has
+            // to get past it first. The flag opens the same searchable sheet.
+            const _LanguageButton(),
           ],
         ),
         const SizedBox(height: 18),
@@ -543,6 +549,37 @@ class _BrandBadge extends StatelessWidget {
             kBrandIconAsset,
             fit: BoxFit.cover,
             filterQuality: FilterQuality.medium,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageButton extends StatelessWidget {
+  const _LanguageButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final active = LocaleController.languageFor(LocaleController.instance.code);
+    return Tooltip(
+      message: l10n.language,
+      child: InkWell(
+        onTap: () => showLanguageSheet(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Text(
+            active?.flag ?? '🌐',
+            style: const TextStyle(fontSize: 18),
           ),
         ),
       ),
