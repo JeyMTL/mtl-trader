@@ -1084,40 +1084,6 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Developer and behind-the-scenes detail, kept together at the
-                // bottom instead of sitting at the same weight as the settings a
-                // trader actually changes.
-                _sectionLabel(_l10n.sectionAbout),
-                FlatCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SectionTitle(
-                        title: _l10n.accountAbout,
-                        subtitle: _l10n.accountAboutBody,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _l10n.accountPrivateMedia,
-                        style: TextStyle(
-                          color: AppColors.text,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _l10n.accountPrivateMediaBody,
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 11,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
 
                 OutlinedButton(
                   onPressed: _signOut,
