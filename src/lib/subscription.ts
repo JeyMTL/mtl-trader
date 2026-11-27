@@ -353,6 +353,41 @@ export function isProTimeframe(key: string): boolean {
   return (PRO_TIMEFRAMES as readonly string[]).includes(key)
 }
 
+/**
+ * The sub-minute sizes Basic buys. The free plan's chart runs from a minute up,
+ * so a second-based size is always either Basic or Pro — never free.
+ */
+export const BASIC_TIMEFRAMES = ['30s', '45s'] as const
+
+/** Whether a candle size is one Basic pays for. */
+export function isBasicTimeframe(key: string): boolean {
+  return (BASIC_TIMEFRAMES as readonly string[]).includes(key)
+}
+
+/** Whether a candle size is open to an account with the given access. */
+export function isTimeframeOpen(
+  key: string,
+  access: { pro: boolean; paid: boolean }
+): boolean {
+  if (isProTimeframe(key)) return access.pro
+  if (isBasicTimeframe(key)) return access.paid
+  return true
+}
+
+/**
+ * Whether the account holds any paid access right now: a running trial, or an
+ * active paid period on Basic or Pro.
+ *
+ * `hasProTools` answers the narrower question the Pro features ask. The chart's
+ * seconds sizes split across both paid plans, so they need this one: Basic pays
+ * for 30s and 45s, and a trial counts as either plan while it runs.
+ */
+export function hasPaidPlan(account: AccountState, now: Date = new Date()): boolean {
+  if (isTrialActive(account, now)) return true
+  if (!isSubscriptionActive(account, now)) return false
+  return planRank(account.subscription_tier) >= planRank('basic')
+}
+
 export type FeatureRefusal = 'ok' | 'trial' | 'subscription_required' | 'pro_required'
 
 export interface FeatureAccess {

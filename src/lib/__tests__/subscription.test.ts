@@ -18,6 +18,8 @@ import {
   formatTrialRemaining,
   trialRemaining,
   subscriptionState,
+  hasPaidPlan,
+  isTimeframeOpen,
   TRIAL_DAYS,
   PERIOD_DAYS,
 } from '@/lib/subscription'
@@ -25,6 +27,38 @@ import {
 const NOW = new Date('2026-06-01T12:00:00.000Z')
 const day = (n: number) => new Date(NOW.getTime() + n * 24 * 60 * 60 * 1000)
 const iso = (d: Date) => d.toISOString()
+
+describe('chart candle sizes by plan', () => {
+  const active = (tier: string) => ({
+    subscription_status: 'active',
+    subscription_tier: tier,
+    current_period_end: iso(day(9)),
+  })
+
+  it('keeps the free chart from a minute up', () => {
+    const access = { pro: false, paid: false }
+    expect(isTimeframeOpen('30s', access)).toBe(false)
+    expect(isTimeframeOpen('45s', access)).toBe(false)
+    expect(isTimeframeOpen('1m', access)).toBe(true)
+    expect(isTimeframeOpen('1d', access)).toBe(true)
+  })
+
+  it('sells 30s and 45s with Basic and the seconds sizes with Pro', () => {
+    const basic = { pro: false, paid: true }
+    expect(isTimeframeOpen('30s', basic)).toBe(true)
+    expect(isTimeframeOpen('15s', basic)).toBe(false)
+    expect(isTimeframeOpen('15s', { pro: true, paid: true })).toBe(true)
+  })
+
+  it('counts a live trial as paid, and a lapsed plan as not', () => {
+    expect(hasPaidPlan({ subscription_status: 'trial', trial_ends_at: iso(day(2)) }, NOW)).toBe(true)
+    expect(hasPaidPlan(active('basic'), NOW)).toBe(true)
+    // The stored tier can still say pro long after the period ended.
+    expect(
+      hasPaidPlan({ ...active('pro'), current_period_end: iso(day(-1)) }, NOW)
+    ).toBe(false)
+  })
+})
 
 describe('maxTradesForPlan', () => {
   it('maps each plan id to its allowance', () => {

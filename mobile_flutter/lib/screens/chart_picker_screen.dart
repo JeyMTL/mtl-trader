@@ -2170,7 +2170,34 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
   Future<bool> _hasPaidPlan() async =>
       (await _subscription())?.hasAccess ?? false;
 
-    /// The position objects pin entry, stop and target to the chart.
+    /// Whether this candle size is part of the account's plan.
+  ///
+  /// 5s/10s/15s are Pro, 30s and 45s are Basic, and the free chart runs from a
+  /// minute up — the same split the web desk uses (`isTimeframeOpen` in
+  /// `src/lib/subscription.ts`). A refused size says which plan would open it,
+  /// because the sheet deliberately keeps every size visible.
+  Future<bool> _intervalAllowed(ChartInterval interval) async {
+    final pro = isProTimeFrame(interval);
+    if (!pro && !isBasicTimeFrame(interval)) return true;
+
+    final plan = await _subscription();
+    final allowed = pro ? (plan?.proTools ?? false) : (plan?.hasAccess ?? false);
+    if (allowed) return true;
+
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          pro
+              ? '5s, 10s and 15s candles are a Pro feature. Basic charts run from 30s up.'
+              : '30s and 45s candles are part of Basic. Free charts run from 1m up.',
+        ),
+      ),
+    );
+    return false;
+  }
+
+  /// The position objects pin entry, stop and target to the chart.
   ///
   /// Unlike replay and the fast candle sizes this is a Basic feature, not a Pro
   /// one, which is why it reads `_hasPaidPlan` and not `_hasProTools`.
@@ -5354,21 +5381,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       refused: _refusedIntervals,
     );
     if (choice == null || !mounted) return;
-    // 5s, 10s and 15s are sold with Pro. The picker lists them either way; the
-    // refusal happens here so the answer names the plan instead of switching to
-    // a size the feed would serve but the account has not paid for.
+    // The seconds sizes are sold, and split across the paid plans. The picker
+    // lists them either way; the refusal happens here so the answer names the
+    // plan instead of switching to a size the feed would serve but the account
+    // has not paid for.
     final picked = choice.interval;
-    if (picked != null && isProTimeFrame(picked) && !await _hasProTools()) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '5s, 10s and 15s candles are a Pro feature. Basic charts run from 30s up.',
-          ),
-        ),
-      );
-      return;
-    }
+    if (picked != null && !await _intervalAllowed(picked)) return;
     // The picker only returns the live tail, but the type still carries a
     // window: a caller that builds one keeps working instead of silently
     // ignoring its dates.

@@ -47,7 +47,7 @@ export const PLANS: SubscriptionPlan[] = [
       '30 trades a month after the trial',
       'Prop-firm simulator: daily loss, drawdown, target and consistency rules',
       'Journal with photos, voice notes, tags, setups and mistakes',
-      'Chart desk from 30s to daily candles, with every drawing tool except position pinning',
+      'Chart desk from 1m to daily candles, with every drawing tool except position pinning',
       'Time edge and setup matrix on your own trades',
       'Import your full MT5 history at any time',
     ],

@@ -1,7 +1,7 @@
 import { createServerSupabase, requireServerUser } from '@/lib/supabase-server'
 import { ChartWorkspace, type ChartDrawingRow } from '@/components/chart-workspace'
 import { loadAccount } from '@/lib/plan-guard'
-import { hasProTools } from '@/lib/subscription'
+import { hasPaidPlan, hasProTools } from '@/lib/subscription'
 
 /**
  * Web chart desk.
@@ -18,9 +18,13 @@ export const dynamic = 'force-dynamic'
 export default async function ChartPage() {
   const user = await requireServerUser()
   const supabase = await createServerSupabase()
-  // The 5s/10s/15s sizes are Pro (a live trial counts). The page decides once so
-  // the first paint does not flash a locked size; the component only draws it.
-  const proTimeframes = hasProTools((await loadAccount(user.id)) ?? {})
+  // The seconds sizes split across the paid plans: 5s/10s/15s are Pro, 30s and
+  // 45s are Basic, and the free chart runs from a minute up. The page decides
+  // once so the first paint does not flash a locked size; the component only
+  // draws it.
+  const account = (await loadAccount(user.id)) ?? {}
+  const proTimeframes = hasProTools(account)
+  const paidTimeframes = hasPaidPlan(account)
 
   let drawings: ChartDrawingRow[] = []
   let tableMissing = false
@@ -90,6 +94,7 @@ export default async function ChartPage() {
         initialDrawings={drawings}
         defaultSymbol="EUR_USD"
         proTimeframes={proTimeframes}
+        paidTimeframes={paidTimeframes}
       />
     </div>
   )

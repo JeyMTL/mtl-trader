@@ -33,6 +33,16 @@ const Set<String> proTimeFrameKeys = {'5s', '10s', '15s'};
 bool isProTimeFrame(ChartInterval interval) =>
     proTimeFrameKeys.contains(interval.key);
 
+/// The sub-minute sizes Basic buys. The free chart runs from a minute up, so a
+/// seconds size is always either Basic or Pro — never free. Tagged on the sheet
+/// for the same reason the Pro sizes are: the trader should see the price of
+/// the size before choosing it.
+const Set<String> basicTimeFrameKeys = {'30s', '45s'};
+
+/// Whether this candle size needs Basic (or Pro).
+bool isBasicTimeFrame(ChartInterval interval) =>
+    basicTimeFrameKeys.contains(interval.key);
+
 /// What the trader chose: the live tail, or an explicit window and candle size.
 ///
 /// The window is kept as a type because the loader still understands it, but
@@ -139,7 +149,9 @@ class _TimeFrameSheet extends StatelessWidget {
                       interval: entry,
                       selected: entry == interval,
                       refused: refused.contains(entry),
-                      pro: isProTimeFrame(entry),
+                      badge: isProTimeFrame(entry)
+                          ? 'PRO'
+                          : (isBasicTimeFrame(entry) ? 'BASIC' : null),
                       onTap: refused.contains(entry)
                           ? null
                           : () => Navigator.of(context).pop(
@@ -164,16 +176,17 @@ class _TimeFrameRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.refused = false,
-    this.pro = false,
+    this.badge,
   });
 
   final ChartInterval interval;
   final bool selected;
   final bool refused;
 
-  /// Sold with Pro. The row still answers: the caller refuses and explains, so
-  /// the trader learns the price instead of finding a dead row.
-  final bool pro;
+  /// The plan that sells this size (`PRO` or `BASIC`), or null when it is free.
+  /// The row still answers: the caller refuses and explains, so the trader
+  /// learns the price instead of finding a dead row.
+  final String? badge;
   final VoidCallback? onTap;
 
   @override
@@ -221,7 +234,7 @@ class _TimeFrameRow extends StatelessWidget {
                 ),
               ),
             ),
-            if (pro && !refused)
+            if (badge != null && !refused)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
@@ -229,7 +242,7 @@ class _TimeFrameRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'PRO',
+                  badge!,
                   style: TextStyle(
                     color: AppColors.primaryLight,
                     fontSize: 8.5,
@@ -238,7 +251,7 @@ class _TimeFrameRow extends StatelessWidget {
                   ),
                 ),
               ),
-            if (pro && !refused) const SizedBox(width: 6),
+            if (badge != null && !refused) const SizedBox(width: 6),
             if (selected && !refused)
               Icon(Icons.check, size: 16, color: AppColors.primaryLight),
           ],

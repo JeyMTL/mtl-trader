@@ -4,10 +4,31 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mtl_trader_mobile/core/instruments.dart';
 import 'package:mtl_trader_mobile/screens/chart_picker_screen.dart';
+import 'package:mtl_trader_mobile/screens/time_frame_sheet.dart';
+import 'package:mtl_trader_mobile/services/market_data.dart';
 import 'package:mtl_trader_mobile/ui/theme.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('the seconds sizes split across the paid plans, never the free one', () {
+    // Free runs from a minute up, Basic buys 30s and 45s, Pro buys 5s/10s/15s.
+    for (final interval in chartTimeFrames) {
+      final pro = isProTimeFrame(interval);
+      final basic = isBasicTimeFrame(interval);
+      expect(pro && basic, isFalse, reason: '${interval.key} cannot be both');
+      if (interval.key.endsWith('s')) {
+        expect(pro || basic, isTrue, reason: '${interval.key} is a paid size');
+      } else {
+        expect(pro || basic, isFalse, reason: '${interval.key} is free');
+      }
+    }
+    expect(isBasicTimeFrame(ChartInterval.thirtySeconds), isTrue);
+    expect(isBasicTimeFrame(ChartInterval.fortyFiveSeconds), isTrue);
+    expect(isProTimeFrame(ChartInterval.fiveSeconds), isTrue);
+    expect(isProTimeFrame(ChartInterval.oneMinute), isFalse);
+    expect(isBasicTimeFrame(ChartInterval.oneMinute), isFalse);
+  });
 
   testWidgets('tapping the time frame card opens the picker', (tester) async {
     SharedPreferences.setMockInitialValues({});
