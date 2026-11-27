@@ -1435,6 +1435,38 @@ class SlotResetTests(unittest.TestCase):
 
         self.assertFalse(sup.slot_seed_file(terminal).exists())
 
+    def test_a_hand_login_made_while_the_fleet_was_down_becomes_the_seed(self):
+        # MT5 will not take the first login on a portable folder from a program,
+        # so the runbook asks for one login by hand. That login has to survive
+        # the next failed attempt, which restores the seed.
+        terminal, account = self._slot()
+        sup.keep_slot_seed(terminal)
+        seed = sup.slot_seed_file(terminal)
+        os.utime(seed, (1_600_000_000, 1_600_000_000))
+        account.write_bytes(b"logged in by hand")
+        os.utime(account, (1_700_000_000, 1_700_000_000))
+
+        self.assertTrue(sup.adopt_hand_login(terminal))
+        self.assertEqual(seed.read_bytes(), b"logged in by hand")
+
+        account.write_bytes(b"the account a failed attempt tried")
+        with mock.patch.object(sup, "stop_terminal_process", lambda path: None):
+            sup.reset_slot(terminal)
+
+        self.assertEqual(account.read_bytes(), b"logged in by hand")
+
+    def test_an_account_file_no_newer_than_the_seed_is_not_adopted(self):
+        # The file reset_slot writes back has the seed's timestamp, so a restored
+        # slot must not be mistaken for a fresh hand login.
+        terminal, account = self._slot()
+        sup.keep_slot_seed(terminal)
+
+        self.assertFalse(sup.adopt_hand_login(terminal))
+        self.assertEqual(
+            sup.slot_seed_file(terminal).read_bytes(),
+            b"authenticated before the run",
+        )
+
     def test_a_terminal_that_will_not_close_keeps_its_account_file(self):
         # Writing over accounts.dat under a live terminal is what leaves a slot
         # answering IPC timeout for every later account, not just this one.

@@ -1829,6 +1829,39 @@ def refresh_slot_seed(terminal):
         print(f"  [warn] could not refresh the seed of {account}: {error}", flush=True)
 
 
+def adopt_hand_login(terminal):
+    """Keep a login made by hand while this supervisor was not running.
+
+    MT5 will not take the first login on a portable folder from a program: the
+    folder boots into its own "open an account" wizard and answers every
+    `initialize` with `IPC timeout` until a person logs in once. That login is
+    written to `config\\accounts.dat`, which is newer than the seed `reset_slot`
+    falls back to — so a failed attempt straight afterwards copied the older seed
+    back over it and the folder went back to the wizard. That is why a hand login
+    looked like it did not stick. Only called with the terminal stopped, because
+    MT5 writes that file on its way out and a copy taken earlier can be half
+    written.
+    """
+    if not terminal:
+        return False
+    account, seed = slot_account_file(terminal), slot_seed_file(terminal)
+    try:
+        if not account.exists() or not seed.exists():
+            return False
+        if account.stat().st_mtime <= seed.stat().st_mtime:
+            return False
+        shutil.copy2(account, seed)
+    except OSError as error:
+        print(f"  [warn] could not keep the account file of {account}: {error}", flush=True)
+        return False
+    print(
+        f"  [slot] {account} was written after its seed; keeping it as the one "
+        "to fall back to",
+        flush=True,
+    )
+    return True
+
+
 def reset_slot(terminal):
     """Close a failed slot's terminal and put its account file back.
 
@@ -1935,6 +1968,12 @@ def open_session(row, terminal=None, reuse_running=False):
                     # fallback must not stay at the pre-run snapshot and undo a
                     # working login.
                     refresh_slot_seed(path)
+        else:
+            # Nobody is holding the folder, so an account file newer than the
+            # seed was written while this supervisor was down - the one hand
+            # login MT5 insists on. Take it before any reset can put the older
+            # seed back over it.
+            adopt_hand_login(path)
 
         for attempt in range(2):  # one retry: a stale terminal often clears on shutdown
             # Attach without credentials first. On a terminal that has

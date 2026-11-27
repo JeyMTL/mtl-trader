@@ -106,7 +106,25 @@ not the account, refused the login`), so its closes keep arriving. The folder is
 tried again after 30 minutes. One that keeps refusing needs the single login MT5
 will not accept from a program — `terminal64.exe /portable` in that slot's
 directory, log in, close it — and a host whose copies were all made from a
-terminal that never authenticated will need that once per slot.
+terminal that never authenticated needs that once.
+
+That login is not thrown away any more. A failure restores the slot's
+`accounts.dat.seed`, and the seed used to be the file from before the folder ever
+logged in, so the next attempt put the wizard back and the login looked like it
+had not stuck. A slot whose account file is newer than its seed now adopts it
+(`[slot] … was written after its seed; keeping it as the one to fall back to`),
+so the state restored after a failure is the logged-in one. Since every slot boots
+from the same installer demo, one hand login can be copied over the rest of the
+fleet while it is stopped:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\MTL\supervisor\deploy\spread-slot-login.ps1 -Source C:\MT5-Fleet\slot-01
+```
+
+It writes the source slot's `config\accounts.dat` into every other slot's
+`accounts.dat` **and** its seed, and refuses to run while a fleet terminal is
+still open. Restart the task afterwards; each slot then starts authenticated and
+switches to the account the row asks for.
 
 ### The slot's saved account is never trusted
 
