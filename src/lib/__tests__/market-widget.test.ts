@@ -20,6 +20,8 @@ describe('tradingViewSymbol', () => {
     expect(tradingViewSymbol('BTCUSD')).toBe('COINBASE:BTCUSD')
     expect(tradingViewSymbol('NAS100')).toBe('CAPITALCOM:US100')
     expect(tradingViewSymbol('US30')).toBe('CAPITALCOM:US30')
+    // Capital.com spells the Nikkei J225: CAPITALCOM:JP225 is a 404 on TV.
+    expect(tradingViewSymbol('JP225')).toBe('CAPITALCOM:J225')
   })
 
   it('reads the spellings brokers actually store', () => {

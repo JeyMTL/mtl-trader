@@ -74,7 +74,8 @@ const PINNED: Record<string, string> = {
   GER40: 'CAPITALCOM:DE40',
   DE40: 'CAPITALCOM:DE40',
   UK100: 'CAPITALCOM:UK100',
-  JP225: 'CAPITALCOM:JP225',
+  // Capital.com lists the Nikkei as J225, not JP225; the 225 alias is a 404.
+  JP225: 'CAPITALCOM:J225',
 }
 
 const CURRENCIES = new Set([
