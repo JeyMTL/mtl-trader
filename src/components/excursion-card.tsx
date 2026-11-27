@@ -67,10 +67,18 @@ export function ExcursionCard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    let cancelled = false
+  // The range buttons start the next read. Setting the flag from the effect
+  // instead painted one frame of the previous range's numbers under the new
+  // heading, which is why the hook rule flags it.
+  const chooseRange = (next: number) => {
+    if (next === days) return
+    setDays(next)
     setLoading(true)
     setError('')
+  }
+
+  useEffect(() => {
+    let cancelled = false
     void (async () => {
       try {
         const res = await fetch(`/api/analytics/excursion?days=${days}`, {
@@ -112,7 +120,7 @@ export function ExcursionCard() {
             <button
               key={range.days}
               type="button"
-              onClick={() => setDays(range.days)}
+              onClick={() => chooseRange(range.days)}
               aria-pressed={days === range.days}
               className={`min-h-8 rounded-md px-2.5 text-[11px] font-semibold ${
                 days === range.days

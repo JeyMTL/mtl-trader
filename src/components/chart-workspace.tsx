@@ -186,10 +186,17 @@ export function ChartWorkspace({
   // A saved layout or desk preference can name a size this account cannot use
   // any more. Falling back to the smallest size the plan actually serves keeps
   // the chart drawing rather than polling a feed the plan does not include.
-  useEffect(() => {
-    if (isTimeframeOpen(interval, { pro: proTimeframes, paid: paidTimeframes })) return
-    setIntervalKey(paidTimeframes ? '30s' : '1m')
-  }, [paidTimeframes, proTimeframes, interval])
+  //
+  // Adjusted during render, which is React's own answer for state that has to
+  // follow a prop: it re-renders before paint. Doing it in an effect painted one
+  // frame of a size this account cannot fetch first.
+  if (!isTimeframeOpen(interval, { pro: proTimeframes, paid: paidTimeframes })) {
+    const fallback = paidTimeframes ? '30s' : '1m'
+    // Guarded so a size that is closed for everyone cannot bounce forever.
+    if (interval !== fallback && isTimeframeOpen(fallback, { pro: proTimeframes, paid: paidTimeframes })) {
+      setIntervalKey(fallback)
+    }
+  }
   const [candles, setCandles] = useState<Candle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
