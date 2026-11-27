@@ -6744,11 +6744,11 @@ class _ChartCanvasState extends State<_ChartCanvas>
       } else if (_axisDrag != _AxisDrag.none) {
         _axisDragDelta += details.focalPointDelta;
         if (_axisDrag == _AxisDrag.time) {
-          // Along the timestamp strip, right widens the bars and left packs
-          // them together, with the newest bar held in place so the live edge
-          // does not walk out from under the trader.
+          // Along the timestamp strip, right pulls more history into view and
+          // left widens the bars, with the newest bar held in place so the
+          // live edge does not walk out from under the trader.
           _view.zoomAround(
-            scale: axisDragZoom(_axisDragDelta.dx / chartW),
+            scale: timeAxisDragZoom(_axisDragDelta.dx / chartW),
             anchorRatio: 1,
             count: widget.candles.length,
             baseSpan: _baseSpan,

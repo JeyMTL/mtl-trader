@@ -173,6 +173,7 @@ class _EventCard extends StatelessWidget {
       AlertKind.dailyStop => (Icons.shield_outlined, AppColors.danger),
       AlertKind.levelTouch => (Icons.show_chart, AppColors.primaryLight),
       AlertKind.journalReminder => (Icons.edit_note, AppColors.success),
+      AlertKind.unscheduled => (Icons.notifications_off_outlined, AppColors.muted),
     };
     final stamp = DateFormat('EEE d MMM · HH:mm').format(event.at.toLocal());
     return Container(

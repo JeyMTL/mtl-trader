@@ -12,6 +12,19 @@ const double axisDragGain = 2.5;
 double axisDragZoom(double fraction, {bool invert = false}) =>
     math.exp((invert ? -fraction : fraction) * axisDragGain);
 
+/// The scale for a drag along the timestamp strip.
+///
+/// Pulling the strip to the right stretches the window over more history — the
+/// bars pack together, which is zooming out — and pushing it left widens them.
+/// That is the direction the axis reads as a ruler: it was inverted, so a drag
+/// right widened the bars and a drag left pulled months of candles into a
+/// smear.
+///
+/// The strip is dragged along its own length, which is why the sign is inverted
+/// here rather than at the call site: one place to get it wrong, one place to
+/// test it.
+double timeAxisDragZoom(double fraction) => axisDragZoom(fraction, invert: true);
+
 /// The visible window over a candle list: `start` is the index of the first
 /// visible candle (fractional while panning), `span` how many candles fit.
 /// Kept free of Flutter so the pan/zoom maths can be unit tested.

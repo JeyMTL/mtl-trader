@@ -16,7 +16,7 @@ import '../core/chart_zone.dart';
 import '../core/session_schedule.dart';
 
 /// What an alert was about.
-enum AlertKind { dailyStop, levelTouch, journalReminder }
+enum AlertKind { dailyStop, levelTouch, journalReminder, unscheduled }
 
 /// One alert the phone produced, kept whether or not the system chose to show
 /// it, so the in-app list can explain itself later.
@@ -368,6 +368,18 @@ class Alerts {
       );
     } catch (_) {
       // A refused alarm is reported in the list as a muted event, not thrown.
+      await _recordOnce(
+        AlertEvent(
+          kind: AlertKind.unscheduled,
+          title: 'Journal reminder not scheduled',
+          body: 'The phone refused the daily journal reminder.',
+          reason: 'Notifications are switched off for the app, or the system '
+              'blocked scheduled alarms. The reminder is set but cannot fire.',
+          at: DateTime.now(),
+          delivered: false,
+          muted: true,
+        ),
+      );
     }
   }
 
@@ -382,8 +394,26 @@ class Alerts {
       await _plugin.cancel(id: _sessionIdBase + slot);
     }
     if (reminders.isEmpty) return;
-    if (!await permissionGranted()) return;
+    if (!await permissionGranted()) {
+      // The playbook says these are on; the phone is going to stay silent. Say
+      // so once in the alert list rather than leaving a switch that lies.
+      await _recordOnce(
+        AlertEvent(
+          kind: AlertKind.unscheduled,
+          title: 'Session reminders not scheduled',
+          body: '${reminders.length} session reminders are set but the phone '
+              'will not post them.',
+          reason: 'Notifications are switched off for the app, so nothing was '
+              'scheduled.',
+          at: DateTime.now(),
+          delivered: false,
+          muted: true,
+        ),
+      );
+      return;
+    }
 
+    var refused = 0;
     for (var index = 0; index < reminders.length && index < _sessionSlots; index += 1) {
       final reminder = reminders[index];
       try {
@@ -410,7 +440,23 @@ class Alerts {
         );
       } catch (_) {
         // One refused alarm must not stop the rest of the week's schedule.
+        refused += 1;
       }
+    }
+    if (refused > 0) {
+      await _recordOnce(
+        AlertEvent(
+          kind: AlertKind.unscheduled,
+          title: 'Session reminders not scheduled',
+          body: '$refused of ${reminders.length} session reminders were '
+              'refused by the phone.',
+          reason: 'The system blocked the scheduled alarms, most often because '
+              'battery or exact-alarm settings keep the app from waking.',
+          at: DateTime.now(),
+          delivered: false,
+          muted: true,
+        ),
+      );
     }
   }
 
@@ -600,6 +646,21 @@ class Alerts {
     } catch (_) {
       // Nothing to clear, or no permission to: either way the list stays empty.
     }
+  }
+
+  /// Records [event] unless the newest entry already says the same thing.
+  ///
+  /// Reminders are re-scheduled on every launch and every playbook save, so a
+  /// phone with notifications off would otherwise write the same refusal into
+  /// the history each time and bury the alert that actually fired.
+  Future<void> _recordOnce(AlertEvent event) async {
+    final existing = await history();
+    if (existing.isNotEmpty &&
+        existing.first.kind == event.kind &&
+        existing.first.reason == event.reason) {
+      return;
+    }
+    await _record(event);
   }
 
   Future<void> _record(AlertEvent event) async {

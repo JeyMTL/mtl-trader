@@ -151,7 +151,8 @@ void main() {
     });
 
     test('an axis-strip drag zooms the axis it started on', () {
-      // Right along the timestamp strip widens bars, left packs them.
+      // The raw helper: a positive fraction magnifies, a negative one widens
+      // the window. Which drag direction that is belongs to the axis.
       expect(axisDragZoom(0.2), greaterThan(1));
       expect(axisDragZoom(-0.2), lessThan(1));
       // Equal distance either way is the same zoom, mirrored.
@@ -161,6 +162,14 @@ void main() {
       // Up stretches the price scale, down compresses it.
       expect(axisDragZoom(0.2, invert: true), lessThan(1));
       expect(axisDragZoom(-0.2, invert: true), greaterThan(1));
+    });
+
+    test('a drag right along the time strip zooms out, not in', () {
+      // The strip behaves like a ruler: pulling it right stretches the window
+      // over more candles (smaller scale), pushing it left widens the bars.
+      expect(timeAxisDragZoom(0.2), lessThan(1));
+      expect(timeAxisDragZoom(-0.2), greaterThan(1));
+      expect(timeAxisDragZoom(0), 1);
     });
 
     test('visible returns a non-empty clamped range', () {

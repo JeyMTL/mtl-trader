@@ -487,9 +487,19 @@ class _AppShellState extends State<AppShell>
         children: [
           if (_needsDetails != null) _journaledBanner(),
           Expanded(
-            child: FadeTransition(
-              opacity: _fade,
-              child: IndexedStack(index: _index, children: screens),
+            // Back from a tab returns to the desk, the way the bottom bar
+            // reads: the tab sits on top of the desk, not beside it. Only the
+            // desk itself closes the app.
+            child: PopScope(
+              canPop: _index == 0,
+              onPopInvokedWithResult: (didPop, _) {
+                if (didPop || _index == 0) return;
+                _select(0);
+              },
+              child: FadeTransition(
+                opacity: _fade,
+                child: IndexedStack(index: _index, children: screens),
+              ),
             ),
           ),
         ],
