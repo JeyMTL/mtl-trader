@@ -999,5 +999,86 @@
         "type": "String"
       }
     }
-  }
+  },
+  "toolLong": "Long position",
+  "toolShort": "Short position",
+  "toolTrendLine": "Trend line",
+  "toolRay": "Horizontal ray",
+  "toolVertical": "Vertical line",
+  "toolRectangle": "Rectangle",
+  "toolEllipse": "Ellipse",
+  "toolFibRetracement": "Fib retracement",
+  "toolFibExtension": "Fib extension",
+  "toolMeasure": "Measure",
+  "toolText": "Text",
+  "toolArrowUp": "Arrow up",
+  "toolArrowDown": "Arrow down",
+  "toolBrush": "Brush",
+  "catAll": "All",
+  "catPositions": "Position",
+  "catTrend": "Trend",
+  "catShapes": "Shapes",
+  "catFib": "Fib",
+  "catNotes": "Notes",
+  "catMeasure": "Measure",
+  "toolsSearchHint": "Search tools",
+  "toolsNoMatch": "No tool matches “{query}”.",
+  "@toolsNoMatch": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "toolsPinnedHeader": "PINNED",
+  "toolsPinHint": "Long-press a tool to pin it",
+  "toolsUnpinHint": "Long-press to remove",
+  "toolsPinnedA11y": "{tool}, pinned",
+  "@toolsPinnedA11y": {
+    "placeholders": {
+      "tool": {
+        "type": "String"
+      }
+    }
+  },
+  "toolsPinnedNotice": "{tool} pinned to the top",
+  "@toolsPinnedNotice": {
+    "placeholders": {
+      "tool": {
+        "type": "String"
+      }
+    }
+  },
+  "toolsUnpinnedNotice": "{tool} unpinned",
+  "@toolsUnpinnedNotice": {
+    "placeholders": {
+      "tool": {
+        "type": "String"
+      }
+    }
+  },
+  "magnetLabel": "Magnet",
+  "magnetOff": "Off",
+  "magnetWeak": "Weak",
+  "magnetStrong": "Strong",
+  "continuousLabel": "Continuous",
+  "switchOn": "On",
+  "switchOff": "Off",
+  "closeAction": "Close",
+  "chartToolsTitle": "Chart tools",
+  "chartToolsBody": "Pick a tool and it lands on the chart — drag it to calibrate the levels. Tap any object for edit, clone or delete.",
+  "selectedObject": "SELECTED OBJECT",
+  "objectEdit": "Edit",
+  "objectEditSub": "Set levels",
+  "objectClone": "Clone",
+  "objectCloneSub": "Copy it",
+  "objectDelete": "Delete",
+  "objectDeleteSub": "Remove",
+  "manageSection": "MANAGE",
+  "undoLast": "Undo last change",
+  "redoAction": "Redo",
+  "objectTree": "Object tree",
+  "analysisHub": "Analysis hub",
+  "analysisHubSub": "Layouts, settings, studies, alerts",
+  "clearDrawings": "Clear all drawings"
 }

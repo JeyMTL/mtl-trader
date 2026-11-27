@@ -1726,4 +1726,172 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0 · $winRate win';
   }
+
+  @override
+  String get toolLong => 'Long position';
+
+  @override
+  String get toolShort => 'Short position';
+
+  @override
+  String get toolTrendLine => 'Trend line';
+
+  @override
+  String get toolRay => 'Horizontal ray';
+
+  @override
+  String get toolVertical => 'Vertical line';
+
+  @override
+  String get toolRectangle => 'Rectangle';
+
+  @override
+  String get toolEllipse => 'Ellipse';
+
+  @override
+  String get toolFibRetracement => 'Fib retracement';
+
+  @override
+  String get toolFibExtension => 'Fib extension';
+
+  @override
+  String get toolMeasure => 'Measure';
+
+  @override
+  String get toolText => 'Text';
+
+  @override
+  String get toolArrowUp => 'Arrow up';
+
+  @override
+  String get toolArrowDown => 'Arrow down';
+
+  @override
+  String get toolBrush => 'Brush';
+
+  @override
+  String get catAll => 'All';
+
+  @override
+  String get catPositions => 'Position';
+
+  @override
+  String get catTrend => 'Trend';
+
+  @override
+  String get catShapes => 'Shapes';
+
+  @override
+  String get catFib => 'Fib';
+
+  @override
+  String get catNotes => 'Notes';
+
+  @override
+  String get catMeasure => 'Measure';
+
+  @override
+  String get toolsSearchHint => 'Search tools';
+
+  @override
+  String toolsNoMatch(String query) {
+    return 'No tool matches “$query”.';
+  }
+
+  @override
+  String get toolsPinnedHeader => 'PINNED';
+
+  @override
+  String get toolsPinHint => 'Long-press a tool to pin it';
+
+  @override
+  String get toolsUnpinHint => 'Long-press to remove';
+
+  @override
+  String toolsPinnedA11y(String tool) {
+    return '$tool, pinned';
+  }
+
+  @override
+  String toolsPinnedNotice(String tool) {
+    return '$tool pinned to the top';
+  }
+
+  @override
+  String toolsUnpinnedNotice(String tool) {
+    return '$tool unpinned';
+  }
+
+  @override
+  String get magnetLabel => 'Magnet';
+
+  @override
+  String get magnetOff => 'Off';
+
+  @override
+  String get magnetWeak => 'Weak';
+
+  @override
+  String get magnetStrong => 'Strong';
+
+  @override
+  String get continuousLabel => 'Continuous';
+
+  @override
+  String get switchOn => 'On';
+
+  @override
+  String get switchOff => 'Off';
+
+  @override
+  String get closeAction => 'Close';
+
+  @override
+  String get chartToolsTitle => 'Chart tools';
+
+  @override
+  String get chartToolsBody =>
+      'Pick a tool and it lands on the chart — drag it to calibrate the levels. Tap any object for edit, clone or delete.';
+
+  @override
+  String get selectedObject => 'SELECTED OBJECT';
+
+  @override
+  String get objectEdit => 'Edit';
+
+  @override
+  String get objectEditSub => 'Set levels';
+
+  @override
+  String get objectClone => 'Clone';
+
+  @override
+  String get objectCloneSub => 'Copy it';
+
+  @override
+  String get objectDelete => 'Delete';
+
+  @override
+  String get objectDeleteSub => 'Remove';
+
+  @override
+  String get manageSection => 'MANAGE';
+
+  @override
+  String get undoLast => 'Undo last change';
+
+  @override
+  String get redoAction => 'Redo';
+
+  @override
+  String get objectTree => 'Object tree';
+
+  @override
+  String get analysisHub => 'Analysis hub';
+
+  @override
+  String get analysisHubSub => 'Layouts, settings, studies, alerts';
+
+  @override
+  String get clearDrawings => 'Clear all drawings';
 }

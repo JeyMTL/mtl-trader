@@ -17,6 +17,7 @@ import '../core/chart_scale.dart';
 import '../core/chart_sessions.dart';
 import '../core/chart_theme.dart';
 import '../core/chart_view.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../core/chart_zone.dart';
 import '../core/indicators.dart';
 import '../core/level_touch.dart';
@@ -2406,6 +2407,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
   /// immediately and the trader drags it into place — which is what stops a
   /// stray tap on the chart from starting a point.
   Future<void> _openDrawingTools() async {
+    final l10n = AppLocalizations.of(context);
     final selected = _selectedDrawing;
     final hasSelection =
         selected != null && selected >= 0 && selected < _drawings.length;
@@ -2438,7 +2440,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 Row(
                   children: [
                     Text(
-                      'Chart tools',
+                      l10n.chartToolsTitle,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 15,
@@ -2448,7 +2450,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     ),
                     const Spacer(),
                     IconButton(
-                      tooltip: 'Close',
+                      tooltip: l10n.closeAction,
                       onPressed: () => pick('close'),
                       icon: Icon(
                         Icons.close,
@@ -2459,8 +2461,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   ],
                 ),
                 Text(
-                  'Pick a tool and it lands on the chart — drag it to calibrate '
-                  'the levels. Tap any object for edit, clone or delete.',
+                  l10n.chartToolsBody,
                   style: TextStyle(
                     color: AppColors.muted,
                     fontSize: 10.5,
@@ -2478,15 +2479,15 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 ),
                 if (hasSelection) ...[
                   const SizedBox(height: 14),
-                  _sheetLabel('SELECTED OBJECT'),
+                  _sheetLabel(l10n.selectedObject),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Expanded(
                         child: _toolCard(
                           icon: Icons.edit_outlined,
-                          label: 'Edit',
-                          subtitle: 'Set levels',
+                          label: l10n.objectEdit,
+                          subtitle: l10n.objectEditSub,
                           onTap: () => pick('edit'),
                         ),
                       ),
@@ -2494,8 +2495,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                       Expanded(
                         child: _toolCard(
                           icon: Icons.copy_all_outlined,
-                          label: 'Clone',
-                          subtitle: 'Copy it',
+                          label: l10n.objectClone,
+                          subtitle: l10n.objectCloneSub,
                           onTap: () => pick('clone'),
                         ),
                       ),
@@ -2503,8 +2504,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                       Expanded(
                         child: _toolCard(
                           icon: Icons.delete_outline,
-                          label: 'Delete',
-                          subtitle: 'Remove',
+                          label: l10n.objectDelete,
+                          subtitle: l10n.objectDeleteSub,
                           tone: AppColors.danger,
                           onTap: () => pick('delete'),
                         ),
@@ -2513,12 +2514,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   ),
                 ],
                 const SizedBox(height: 14),
-                _sheetLabel('MANAGE'),
+                _sheetLabel(l10n.manageSection),
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.undo, size: 20),
-                  title: const Text('Undo last change'),
+                  title: Text(l10n.undoLast),
                   enabled: _drawings.isNotEmpty,
                   onTap: () => pick('undo'),
                 ),
@@ -2526,7 +2527,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.redo, size: 20),
-                  title: const Text('Redo'),
+                  title: Text(l10n.redoAction),
                   enabled: _redo.isNotEmpty,
                   onTap: () => pick('redo'),
                 ),
@@ -2534,7 +2535,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.account_tree_outlined, size: 20),
-                  title: const Text('Object tree'),
+                  title: Text(l10n.objectTree),
                   enabled: _drawings.isNotEmpty,
                   onTap: () => pick('tree'),
                 ),
@@ -2542,15 +2543,15 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.more_horiz, size: 20),
-                  title: const Text('Analysis hub'),
-                  subtitle: const Text('Layouts, settings, studies, alerts'),
+                  title: Text(l10n.analysisHub),
+                  subtitle: Text(l10n.analysisHubSub),
                   onTap: () => pick('hub'),
                 ),
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.delete_sweep_outlined, size: 20),
-                  title: const Text('Clear all drawings'),
+                  title: Text(l10n.clearDrawings),
                   enabled: _drawings.isNotEmpty,
                   onTap: () => pick('clear'),
                 ),
@@ -3488,7 +3489,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 Row(
                   children: [
                     Text(
-                      'Chart tools',
+                      AppLocalizations.of(sheetContext).analysisHub,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 15,
@@ -3497,7 +3498,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     ),
                     const Spacer(),
                     IconButton(
-                      tooltip: 'Close',
+                      tooltip: AppLocalizations.of(sheetContext).closeAction,
                       onPressed: () => Navigator.of(sheetContext).pop(),
                       icon: Icon(Icons.close, size: 18, color: AppColors.muted),
                     ),

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mtl_trader_mobile/core/chart_magnet.dart';
+import 'package:mtl_trader_mobile/l10n/gen/app_localizations.dart';
 import 'package:mtl_trader_mobile/core/chart_tools.dart';
 import 'package:mtl_trader_mobile/ui/chart/drawings_sheet.dart';
 import 'package:mtl_trader_mobile/ui/theme.dart';
@@ -59,6 +60,9 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           theme: buildFlatTheme(AppPalette.dark),
           home: Scaffold(
             body: SingleChildScrollView(
@@ -125,6 +129,9 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           theme: buildFlatTheme(AppPalette.dark),
           home: Scaffold(
             body: SingleChildScrollView(
@@ -162,6 +169,9 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: buildFlatTheme(AppPalette.dark),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(

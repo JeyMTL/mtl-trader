@@ -1761,4 +1761,179 @@ class AppLocalizationsPack extends AppLocalizations {
     if (template == null) return _en.edgeCardFoot(trades, winRate);
     return _fill(template, <String, Object?>{'trades': trades, 'winRate': winRate});
   }
+
+  @override
+  String get toolLong => _read('toolLong') ?? _en.toolLong;
+
+  @override
+  String get toolShort => _read('toolShort') ?? _en.toolShort;
+
+  @override
+  String get toolTrendLine => _read('toolTrendLine') ?? _en.toolTrendLine;
+
+  @override
+  String get toolRay => _read('toolRay') ?? _en.toolRay;
+
+  @override
+  String get toolVertical => _read('toolVertical') ?? _en.toolVertical;
+
+  @override
+  String get toolRectangle => _read('toolRectangle') ?? _en.toolRectangle;
+
+  @override
+  String get toolEllipse => _read('toolEllipse') ?? _en.toolEllipse;
+
+  @override
+  String get toolFibRetracement => _read('toolFibRetracement') ?? _en.toolFibRetracement;
+
+  @override
+  String get toolFibExtension => _read('toolFibExtension') ?? _en.toolFibExtension;
+
+  @override
+  String get toolMeasure => _read('toolMeasure') ?? _en.toolMeasure;
+
+  @override
+  String get toolText => _read('toolText') ?? _en.toolText;
+
+  @override
+  String get toolArrowUp => _read('toolArrowUp') ?? _en.toolArrowUp;
+
+  @override
+  String get toolArrowDown => _read('toolArrowDown') ?? _en.toolArrowDown;
+
+  @override
+  String get toolBrush => _read('toolBrush') ?? _en.toolBrush;
+
+  @override
+  String get catAll => _read('catAll') ?? _en.catAll;
+
+  @override
+  String get catPositions => _read('catPositions') ?? _en.catPositions;
+
+  @override
+  String get catTrend => _read('catTrend') ?? _en.catTrend;
+
+  @override
+  String get catShapes => _read('catShapes') ?? _en.catShapes;
+
+  @override
+  String get catFib => _read('catFib') ?? _en.catFib;
+
+  @override
+  String get catNotes => _read('catNotes') ?? _en.catNotes;
+
+  @override
+  String get catMeasure => _read('catMeasure') ?? _en.catMeasure;
+
+  @override
+  String get toolsSearchHint => _read('toolsSearchHint') ?? _en.toolsSearchHint;
+
+  @override
+  String toolsNoMatch(String query) {
+    final template = _read('toolsNoMatch');
+    if (template == null) return _en.toolsNoMatch(query);
+    return _fill(template, <String, Object?>{'query': query});
+  }
+
+  @override
+  String get toolsPinnedHeader => _read('toolsPinnedHeader') ?? _en.toolsPinnedHeader;
+
+  @override
+  String get toolsPinHint => _read('toolsPinHint') ?? _en.toolsPinHint;
+
+  @override
+  String get toolsUnpinHint => _read('toolsUnpinHint') ?? _en.toolsUnpinHint;
+
+  @override
+  String toolsPinnedA11y(String tool) {
+    final template = _read('toolsPinnedA11y');
+    if (template == null) return _en.toolsPinnedA11y(tool);
+    return _fill(template, <String, Object?>{'tool': tool});
+  }
+
+  @override
+  String toolsPinnedNotice(String tool) {
+    final template = _read('toolsPinnedNotice');
+    if (template == null) return _en.toolsPinnedNotice(tool);
+    return _fill(template, <String, Object?>{'tool': tool});
+  }
+
+  @override
+  String toolsUnpinnedNotice(String tool) {
+    final template = _read('toolsUnpinnedNotice');
+    if (template == null) return _en.toolsUnpinnedNotice(tool);
+    return _fill(template, <String, Object?>{'tool': tool});
+  }
+
+  @override
+  String get magnetLabel => _read('magnetLabel') ?? _en.magnetLabel;
+
+  @override
+  String get magnetOff => _read('magnetOff') ?? _en.magnetOff;
+
+  @override
+  String get magnetWeak => _read('magnetWeak') ?? _en.magnetWeak;
+
+  @override
+  String get magnetStrong => _read('magnetStrong') ?? _en.magnetStrong;
+
+  @override
+  String get continuousLabel => _read('continuousLabel') ?? _en.continuousLabel;
+
+  @override
+  String get switchOn => _read('switchOn') ?? _en.switchOn;
+
+  @override
+  String get switchOff => _read('switchOff') ?? _en.switchOff;
+
+  @override
+  String get closeAction => _read('closeAction') ?? _en.closeAction;
+
+  @override
+  String get chartToolsTitle => _read('chartToolsTitle') ?? _en.chartToolsTitle;
+
+  @override
+  String get chartToolsBody => _read('chartToolsBody') ?? _en.chartToolsBody;
+
+  @override
+  String get selectedObject => _read('selectedObject') ?? _en.selectedObject;
+
+  @override
+  String get objectEdit => _read('objectEdit') ?? _en.objectEdit;
+
+  @override
+  String get objectEditSub => _read('objectEditSub') ?? _en.objectEditSub;
+
+  @override
+  String get objectClone => _read('objectClone') ?? _en.objectClone;
+
+  @override
+  String get objectCloneSub => _read('objectCloneSub') ?? _en.objectCloneSub;
+
+  @override
+  String get objectDelete => _read('objectDelete') ?? _en.objectDelete;
+
+  @override
+  String get objectDeleteSub => _read('objectDeleteSub') ?? _en.objectDeleteSub;
+
+  @override
+  String get manageSection => _read('manageSection') ?? _en.manageSection;
+
+  @override
+  String get undoLast => _read('undoLast') ?? _en.undoLast;
+
+  @override
+  String get redoAction => _read('redoAction') ?? _en.redoAction;
+
+  @override
+  String get objectTree => _read('objectTree') ?? _en.objectTree;
+
+  @override
+  String get analysisHub => _read('analysisHub') ?? _en.analysisHub;
+
+  @override
+  String get analysisHubSub => _read('analysisHubSub') ?? _en.analysisHubSub;
+
+  @override
+  String get clearDrawings => _read('clearDrawings') ?? _en.clearDrawings;
 }

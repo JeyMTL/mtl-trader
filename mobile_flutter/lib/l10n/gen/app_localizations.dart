@@ -2932,6 +2932,324 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{trades, plural, =1{1 trade} other{{trades} trades}} · {winRate} win'**
   String edgeCardFoot(int trades, String winRate);
+
+  /// No description provided for @toolLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Long position'**
+  String get toolLong;
+
+  /// No description provided for @toolShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Short position'**
+  String get toolShort;
+
+  /// No description provided for @toolTrendLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Trend line'**
+  String get toolTrendLine;
+
+  /// No description provided for @toolRay.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal ray'**
+  String get toolRay;
+
+  /// No description provided for @toolVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical line'**
+  String get toolVertical;
+
+  /// No description provided for @toolRectangle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rectangle'**
+  String get toolRectangle;
+
+  /// No description provided for @toolEllipse.
+  ///
+  /// In en, this message translates to:
+  /// **'Ellipse'**
+  String get toolEllipse;
+
+  /// No description provided for @toolFibRetracement.
+  ///
+  /// In en, this message translates to:
+  /// **'Fib retracement'**
+  String get toolFibRetracement;
+
+  /// No description provided for @toolFibExtension.
+  ///
+  /// In en, this message translates to:
+  /// **'Fib extension'**
+  String get toolFibExtension;
+
+  /// No description provided for @toolMeasure.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure'**
+  String get toolMeasure;
+
+  /// No description provided for @toolText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get toolText;
+
+  /// No description provided for @toolArrowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow up'**
+  String get toolArrowUp;
+
+  /// No description provided for @toolArrowDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrow down'**
+  String get toolArrowDown;
+
+  /// No description provided for @toolBrush.
+  ///
+  /// In en, this message translates to:
+  /// **'Brush'**
+  String get toolBrush;
+
+  /// No description provided for @catAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get catAll;
+
+  /// No description provided for @catPositions.
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get catPositions;
+
+  /// No description provided for @catTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Trend'**
+  String get catTrend;
+
+  /// No description provided for @catShapes.
+  ///
+  /// In en, this message translates to:
+  /// **'Shapes'**
+  String get catShapes;
+
+  /// No description provided for @catFib.
+  ///
+  /// In en, this message translates to:
+  /// **'Fib'**
+  String get catFib;
+
+  /// No description provided for @catNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get catNotes;
+
+  /// No description provided for @catMeasure.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure'**
+  String get catMeasure;
+
+  /// No description provided for @toolsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search tools'**
+  String get toolsSearchHint;
+
+  /// No description provided for @toolsNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No tool matches “{query}”.'**
+  String toolsNoMatch(String query);
+
+  /// No description provided for @toolsPinnedHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'PINNED'**
+  String get toolsPinnedHeader;
+
+  /// No description provided for @toolsPinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Long-press a tool to pin it'**
+  String get toolsPinHint;
+
+  /// No description provided for @toolsUnpinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Long-press to remove'**
+  String get toolsUnpinHint;
+
+  /// No description provided for @toolsPinnedA11y.
+  ///
+  /// In en, this message translates to:
+  /// **'{tool}, pinned'**
+  String toolsPinnedA11y(String tool);
+
+  /// No description provided for @toolsPinnedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{tool} pinned to the top'**
+  String toolsPinnedNotice(String tool);
+
+  /// No description provided for @toolsUnpinnedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{tool} unpinned'**
+  String toolsUnpinnedNotice(String tool);
+
+  /// No description provided for @magnetLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Magnet'**
+  String get magnetLabel;
+
+  /// No description provided for @magnetOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get magnetOff;
+
+  /// No description provided for @magnetWeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak'**
+  String get magnetWeak;
+
+  /// No description provided for @magnetStrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong'**
+  String get magnetStrong;
+
+  /// No description provided for @continuousLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous'**
+  String get continuousLabel;
+
+  /// No description provided for @switchOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get switchOn;
+
+  /// No description provided for @switchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get switchOff;
+
+  /// No description provided for @closeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeAction;
+
+  /// No description provided for @chartToolsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart tools'**
+  String get chartToolsTitle;
+
+  /// No description provided for @chartToolsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a tool and it lands on the chart — drag it to calibrate the levels. Tap any object for edit, clone or delete.'**
+  String get chartToolsBody;
+
+  /// No description provided for @selectedObject.
+  ///
+  /// In en, this message translates to:
+  /// **'SELECTED OBJECT'**
+  String get selectedObject;
+
+  /// No description provided for @objectEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get objectEdit;
+
+  /// No description provided for @objectEditSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Set levels'**
+  String get objectEditSub;
+
+  /// No description provided for @objectClone.
+  ///
+  /// In en, this message translates to:
+  /// **'Clone'**
+  String get objectClone;
+
+  /// No description provided for @objectCloneSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy it'**
+  String get objectCloneSub;
+
+  /// No description provided for @objectDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get objectDelete;
+
+  /// No description provided for @objectDeleteSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get objectDeleteSub;
+
+  /// No description provided for @manageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'MANAGE'**
+  String get manageSection;
+
+  /// No description provided for @undoLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo last change'**
+  String get undoLast;
+
+  /// No description provided for @redoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get redoAction;
+
+  /// No description provided for @objectTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Object tree'**
+  String get objectTree;
+
+  /// No description provided for @analysisHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis hub'**
+  String get analysisHub;
+
+  /// No description provided for @analysisHubSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Layouts, settings, studies, alerts'**
+  String get analysisHubSub;
+
+  /// No description provided for @clearDrawings.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all drawings'**
+  String get clearDrawings;
 }
 
 class _AppLocalizationsDelegate

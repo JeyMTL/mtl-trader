@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/chart_magnet.dart';
 import '../../core/chart_tools.dart';
+import '../../l10n/gen/app_localizations.dart';
 import '../theme.dart';
 
 /// One drawing tool as the sheet lists it. `id` is what the chart screen maps
@@ -20,8 +21,9 @@ class _Tool {
   /// "trend" finds both lines without the label having to contain them.
   final List<String> aliases;
 
-  bool matches(String query) {
+  bool matches(String query, String displayLabel) {
     final needle = query.trim().toLowerCase();
+    if (displayLabel.toLowerCase().contains(needle)) return true;
     if (needle.isEmpty) return true;
     if (label.toLowerCase().contains(needle)) return true;
     for (final alias in aliases) {
@@ -73,6 +75,77 @@ const List<(String, String)> _categories = <(String, String)>[
   ('Annotation', 'Notes'),
   ('Measure', 'Measure'),
 ];
+
+/// The name a tool shows, in the reader's language.
+///
+/// Ids are the contract — the chart screen maps them onto creation methods and
+/// `ToolFavourites` stores them — so the label is looked up at paint time and
+/// the English one stays only as a fallback for an id this build does not know.
+String _toolLabel(AppLocalizations l10n, _Tool tool) {
+  switch (tool.id) {
+    case 'long':
+      return l10n.toolLong;
+    case 'short':
+      return l10n.toolShort;
+    case 'trend':
+      return l10n.toolTrendLine;
+    case 'ray':
+      return l10n.toolRay;
+    case 'vline':
+      return l10n.toolVertical;
+    case 'rectangle':
+      return l10n.toolRectangle;
+    case 'ellipse':
+      return l10n.toolEllipse;
+    case 'fib':
+      return l10n.toolFibRetracement;
+    case 'fibExtension':
+      return l10n.toolFibExtension;
+    case 'measure':
+      return l10n.toolMeasure;
+    case 'text':
+      return l10n.toolText;
+    case 'arrowUp':
+      return l10n.toolArrowUp;
+    case 'arrowDown':
+      return l10n.toolArrowDown;
+    case 'brush':
+      return l10n.toolBrush;
+  }
+  return tool.label;
+}
+
+/// The short category pill, keyed by the id the strip filters on.
+String _categoryLabel(AppLocalizations l10n, String id, String fallback) {
+  switch (id) {
+    case 'All':
+      return l10n.catAll;
+    case 'Positions':
+      return l10n.catPositions;
+    case 'Trend':
+      return l10n.catTrend;
+    case 'Shapes':
+      return l10n.catShapes;
+    case 'Fibonacci':
+      return l10n.catFib;
+    case 'Annotation':
+      return l10n.catNotes;
+    case 'Measure':
+      return l10n.catMeasure;
+  }
+  return fallback;
+}
+
+String _magnetLabel(AppLocalizations l10n, MagnetMode mode) {
+  switch (mode) {
+    case MagnetMode.off:
+      return l10n.magnetOff;
+    case MagnetMode.weak:
+      return l10n.magnetWeak;
+    case MagnetMode.strong:
+      return l10n.magnetStrong;
+  }
+}
 
 _Tool? _toolById(String id) {
   for (final tool in _tools) {
@@ -161,13 +234,16 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
     setState(() => _pinned = next);
     await ToolFavourites.save(next);
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    final tool = _toolById(id);
+    final label = tool == null ? id : _toolLabel(l10n, tool);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(milliseconds: 1200),
         content: Text(
           wasPinned
-              ? '${_toolById(id)?.label ?? 'Tool'} unpinned'
-              : '${_toolById(id)?.label ?? 'Tool'} pinned to the top',
+              ? l10n.toolsUnpinnedNotice(label)
+              : l10n.toolsPinnedNotice(label),
         ),
       ),
     );
@@ -180,12 +256,13 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final query = _search.text;
     final searching = query.trim().isNotEmpty;
     final visible = [
       for (final tool in _tools)
         if ((searching || _category == 'All' || tool.category == _category) &&
-            tool.matches(query))
+            tool.matches(query, _toolLabel(l10n, tool)))
           tool,
     ];
 
@@ -197,7 +274,7 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
           onChanged: (_) => setState(() {}),
           style: TextStyle(color: AppColors.text, fontSize: 12.5),
           decoration: InputDecoration(
-            hintText: 'Search tools',
+            hintText: l10n.toolsSearchHint,
             prefixIcon: Icon(Icons.search, size: 17, color: AppColors.faint),
             isDense: true,
           ),
@@ -212,7 +289,7 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
             padding: const EdgeInsets.symmetric(vertical: 18),
             child: Center(
               child: Text(
-                'No tool matches “${query.trim()}”.',
+                l10n.toolsNoMatch(query.trim()),
                 style: TextStyle(color: AppColors.faint, fontSize: 11.5),
               ),
             ),
@@ -254,7 +331,7 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
             Icon(Icons.push_pin, size: 11, color: AppColors.primary),
             const SizedBox(width: 5),
             Text(
-              'PINNED',
+              AppLocalizations.of(context).toolsPinnedHeader,
               style: TextStyle(
                 color: AppColors.primaryLight,
                 fontSize: 9.5,
@@ -268,8 +345,8 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
             Expanded(
               child: Text(
                 tools.isEmpty
-                    ? 'Long-press a tool to pin it'
-                    : 'Long-press to remove',
+                    ? AppLocalizations.of(context).toolsPinHint
+                    : AppLocalizations.of(context).toolsUnpinHint,
                 textAlign: TextAlign.right,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -303,6 +380,7 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
   /// The categories, with the right edge faded out so a clipped pill reads as
   /// "there is more to the right" rather than as a layout bug.
   Widget _categoryStrip() {
+    final l10n = AppLocalizations.of(context);
     return ShaderMask(
       shaderCallback: (rect) => const LinearGradient(
         begin: Alignment.centerLeft,
@@ -317,7 +395,7 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
           children: [
             for (final (id, label) in _categories) ...[
               _CategoryChip(
-                label: label,
+                label: _categoryLabel(l10n, id, label),
                 selected: id == _category,
                 onTap: () => setState(() => _category = id),
               ),
@@ -332,6 +410,7 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
   /// Magnet and Continuous, fixed under the grid the way a desk puts its mode
   /// switches at the foot of the tool palette.
   Widget _modeBar() {
+    final l10n = AppLocalizations.of(context);
     final magnet = widget.magnet;
     final showContinuous = widget.onKeepDrawingChanged != null;
     final showMagnet = widget.onMagnetChanged != null;
@@ -350,8 +429,8 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
             Expanded(
               child: _ModeToggle(
                 icon: Icons.grid_on,
-                label: 'Magnet',
-                value: magnet.label,
+                label: l10n.magnetLabel,
+                value: _magnetLabel(l10n, magnet),
                 active: magnet != MagnetMode.off,
                 onTap: () => widget.onMagnetChanged?.call(magnet.next),
               ),
@@ -361,8 +440,8 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
             Expanded(
               child: _ModeToggle(
                 icon: Icons.repeat,
-                label: 'Continuous',
-                value: _keepDrawing ? 'On' : 'Off',
+                label: l10n.continuousLabel,
+                value: _keepDrawing ? l10n.switchOn : l10n.switchOff,
                 active: _keepDrawing,
                 onTap: () => _setKeepDrawing(!_keepDrawing),
               ),
@@ -386,9 +465,10 @@ class _FavouriteChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Semantics(
       button: true,
-      label: '${tool.label}, pinned',
+      label: l10n.toolsPinnedA11y(_toolLabel(l10n, tool)),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -407,7 +487,7 @@ class _FavouriteChip extends StatelessWidget {
               Icon(tool.icon, size: 15, color: AppColors.primaryLight),
               const SizedBox(width: 6),
               Text(
-                tool.label,
+                _toolLabel(l10n, tool),
                 style: TextStyle(
                   color: AppColors.text,
                   fontSize: 10.5,
@@ -479,9 +559,11 @@ class _ToolTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final label = _toolLabel(l10n, tool);
     return Semantics(
       button: true,
-      label: pinned ? '${tool.label}, pinned' : tool.label,
+      label: pinned ? l10n.toolsPinnedA11y(label) : label,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -508,7 +590,7 @@ class _ToolTile extends StatelessWidget {
                     // text size the label, not the tile, has to give way.
                     Flexible(
                       child: Text(
-                        tool.label,
+                        label,
                         maxLines: 2,
                         textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
