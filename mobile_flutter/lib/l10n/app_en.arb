@@ -81,7 +81,7 @@
   "profitFactor": "Profit factor",
   "maxDrawdown": "Max drawdown",
   "avgPerTrade": "Avg / trade",
-  "winnersCount": "{count} winners",
+  "winnersCount": "{count, plural, =1{1 winner} other{{count} winners}}",
   "@winnersCount": {
     "placeholders": {
       "count": {
@@ -100,7 +100,7 @@
       }
     }
   },
-  "greenDays": "{count} green days",
+  "greenDays": "{count, plural, =1{1 green day} other{{count} green days}}",
   "@greenDays": {
     "placeholders": {
       "count": {
@@ -128,7 +128,7 @@
   "bestSession": "Best session",
   "weakestSession": "Weakest session",
   "needsMoreTrades": "Needs 3+ trades",
-  "periodStats": "{trades} trades · {winRate} win",
+  "periodStats": "{trades, plural, =1{1 trade} other{{trades} trades}} · {winRate} win",
   "@periodStats": {
     "placeholders": {
       "trades": {
@@ -186,7 +186,7 @@
     }
   },
   "a11yHourChart": "Profit and loss by entry hour.",
-  "a11yScreenshots": "{count} screenshots attached",
+  "a11yScreenshots": "{count, plural, =1{1 screenshot attached} other{{count} screenshots attached}}",
   "@a11yScreenshots": {
     "placeholders": {
       "count": {
@@ -194,7 +194,7 @@
       }
     }
   },
-  "a11yVoiceNotes": "{count} voice notes attached",
+  "a11yVoiceNotes": "{count, plural, =1{1 voice note attached} other{{count} voice notes attached}}",
   "@a11yVoiceNotes": {
     "placeholders": {
       "count": {
@@ -214,7 +214,7 @@
   "journalFilterWins": "Wins",
   "journalFilterLosses": "Losses",
   "journalLoading": "Loading…",
-  "journalCountSummary": "{count} trades · {pnl}",
+  "journalCountSummary": "{count, plural, =1{1 trade} other{{count} trades}} · {pnl}",
   "@journalCountSummary": {
     "placeholders": {
       "count": {
@@ -315,7 +315,7 @@
       }
     }
   },
-  "summaryMonthFoot": "{count} winning days",
+  "summaryMonthFoot": "{count, plural, =1{1 winning day} other{{count} winning days}}",
   "@summaryMonthFoot": {
     "placeholders": {
       "count": {
@@ -381,7 +381,7 @@
     }
   },
   "a11yRunningCurve": "Running profit and loss for the last 30 days.",
-  "a11yHeatmapDay": "{day}: {pnl}, {trades} trades",
+  "a11yHeatmapDay": "{day}: {pnl}, {trades, plural, =1{1 trade} other{{trades} trades}}",
   "@a11yHeatmapDay": {
     "placeholders": {
       "day": {

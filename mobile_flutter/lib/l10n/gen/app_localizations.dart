@@ -445,7 +445,7 @@ abstract class AppLocalizations {
   /// No description provided for @winnersCount.
   ///
   /// In en, this message translates to:
-  /// **'{count} winners'**
+  /// **'{count, plural, =1{1 winner} other{{count} winners}}'**
   String winnersCount(int count);
 
   /// No description provided for @peakToTrough.
@@ -475,7 +475,7 @@ abstract class AppLocalizations {
   /// No description provided for @greenDays.
   ///
   /// In en, this message translates to:
-  /// **'{count} green days'**
+  /// **'{count, plural, =1{1 green day} other{{count} green days}}'**
   String greenDays(int count);
 
   /// No description provided for @monthWinRate.
@@ -541,7 +541,7 @@ abstract class AppLocalizations {
   /// No description provided for @periodStats.
   ///
   /// In en, this message translates to:
-  /// **'{trades} trades · {winRate} win'**
+  /// **'{trades, plural, =1{1 trade} other{{trades} trades}} · {winRate} win'**
   String periodStats(int trades, String winRate);
 
   /// No description provided for @thinSampleNote.
@@ -661,13 +661,13 @@ abstract class AppLocalizations {
   /// No description provided for @a11yScreenshots.
   ///
   /// In en, this message translates to:
-  /// **'{count} screenshots attached'**
+  /// **'{count, plural, =1{1 screenshot attached} other{{count} screenshots attached}}'**
   String a11yScreenshots(int count);
 
   /// No description provided for @a11yVoiceNotes.
   ///
   /// In en, this message translates to:
-  /// **'{count} voice notes attached'**
+  /// **'{count, plural, =1{1 voice note attached} other{{count} voice notes attached}}'**
   String a11yVoiceNotes(int count);
 
   /// No description provided for @languageSubtitle.
@@ -745,7 +745,7 @@ abstract class AppLocalizations {
   /// No description provided for @journalCountSummary.
   ///
   /// In en, this message translates to:
-  /// **'{count} trades · {pnl}'**
+  /// **'{count, plural, =1{1 trade} other{{count} trades}} · {pnl}'**
   String journalCountSummary(int count, String pnl);
 
   /// No description provided for @journalLoadMore.
@@ -919,7 +919,7 @@ abstract class AppLocalizations {
   /// No description provided for @summaryMonthFoot.
   ///
   /// In en, this message translates to:
-  /// **'{count} winning days'**
+  /// **'{count, plural, =1{1 winning day} other{{count} winning days}}'**
   String summaryMonthFoot(int count);
 
   /// No description provided for @monthlyPnlTitle.
@@ -1022,7 +1022,7 @@ abstract class AppLocalizations {
   /// No description provided for @a11yHeatmapDay.
   ///
   /// In en, this message translates to:
-  /// **'{day}: {pnl}, {trades} trades'**
+  /// **'{day}: {pnl}, {trades, plural, =1{1 trade} other{{trades} trades}}'**
   String a11yHeatmapDay(String day, String pnl, int trades);
 
   /// No description provided for @a11yHeatmapEmpty.

@@ -195,7 +195,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String winnersCount(int count) {
-    return '$count winners';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count winners',
+      one: '1 winner',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -220,7 +226,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String greenDays(int count) {
-    return '$count green days';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count green days',
+      one: '1 green day',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -258,7 +270,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String periodStats(int trades, String winRate) {
-    return '$trades trades · $winRate win';
+    String _temp0 = intl.Intl.pluralLogic(
+      trades,
+      locale: localeName,
+      other: '$trades trades',
+      one: '1 trade',
+    );
+    return '$_temp0 · $winRate win';
   }
 
   @override
@@ -332,12 +350,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String a11yScreenshots(int count) {
-    return '$count screenshots attached';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count screenshots attached',
+      one: '1 screenshot attached',
+    );
+    return '$_temp0';
   }
 
   @override
   String a11yVoiceNotes(int count) {
-    return '$count voice notes attached';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count voice notes attached',
+      one: '1 voice note attached',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -379,7 +409,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String journalCountSummary(int count, String pnl) {
-    return '$count trades · $pnl';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades',
+      one: '1 trade',
+    );
+    return '$_temp0 · $pnl';
   }
 
   @override
@@ -489,7 +525,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String summaryMonthFoot(int count) {
-    return '$count winning days';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count winning days',
+      one: '1 winning day',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -550,7 +592,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String a11yHeatmapDay(String day, String pnl, int trades) {
-    return '$day: $pnl, $trades trades';
+    String _temp0 = intl.Intl.pluralLogic(
+      trades,
+      locale: localeName,
+      other: '$trades trades',
+      one: '1 trade',
+    );
+    return '$day: $pnl, $_temp0';
   }
 
   @override

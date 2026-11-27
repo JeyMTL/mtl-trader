@@ -21,14 +21,83 @@ class AppLocalizationsPack extends AppLocalizations {
   String? _read(String key) => _messages[key];
 
   /// Substitutes `{name}` with a value the screen already formatted, so
-  /// money, percentages and dates keep the shape the caller chose.
+  /// money, percentages and dates keep the shape the caller chose, and
+  /// resolves the one ICU form the app uses — `{count, plural, …}`.
+  ///
+  /// A pack is generated from the English ARB, so a translated pack can hold
+  /// either the English plural shape or a plain template; both render here.
   static String _fill(String template, Map<String, Object?> values) {
     var text = template;
+    for (var pass = 0; pass < 5; pass++) {
+      final plural = _icuPlural.firstMatch(text);
+      if (plural == null) break;
+      final name = plural.group(1)!;
+      var open = plural.start;
+      if (open < 0) break;
+      var depth = 0;
+      var close = open;
+      for (; close < text.length; close++) {
+        if (text[close] == '{') depth++;
+        if (text[close] == '}') {
+          depth--;
+          if (depth == 0) break;
+        }
+      }
+      if (close >= text.length) break;
+      final count = (values[name] as num?)?.toInt() ?? 0;
+      final body = text.substring(plural.end, close);
+      text = text.replaceRange(plural.start, close + 1, _pluralChoice(body, count));
+    }
     for (final entry in values.entries) {
       text = text.replaceAll('{${entry.key}}', '${entry.value}');
     }
     return text;
   }
+
+  /// The start of a plural construct: `{count, plural,` in any position.
+  static final RegExp _icuPlural =
+      RegExp(r'\{\s*(\w+)\s*,\s*plural\s*,', dotAll: true);
+
+  /// The option that applies to [count]: an exact `=N` first, then `one` for
+  /// a count of one, then `other`.
+  static String _pluralChoice(String body, int count) {
+    final options = <String, String>{};
+    var i = 0;
+    while (i < body.length) {
+      final key = _pluralOption.matchAsPrefix(body, i);
+      if (key == null) {
+        i++;
+        continue;
+      }
+      var open = key.end;
+      while (open < body.length && body[open].trim().isEmpty) {
+        open++;
+      }
+      if (open >= body.length || body[open] != '{') {
+        i = key.end;
+        continue;
+      }
+      var depth = 0;
+      var close = open;
+      for (; close < body.length; close++) {
+        if (body[close] == '{') depth++;
+        if (body[close] == '}') {
+          depth--;
+          if (depth == 0) break;
+        }
+      }
+      if (close >= body.length) break;
+      options[key.group(0)!] = body.substring(open + 1, close);
+      i = close + 1;
+    }
+    return options['=$count'] ??
+        options[count == 1 ? 'one' : 'other'] ??
+        options['other'] ??
+        '';
+  }
+
+  static final RegExp _pluralOption =
+      RegExp(r'(=\d+|zero|one|two|few|many|other)');
 
   @override
   String get appTitle => _read('appTitle') ?? _en.appTitle;
