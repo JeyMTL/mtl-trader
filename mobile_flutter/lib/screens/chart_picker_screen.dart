@@ -144,8 +144,12 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
 
   /// Off → weak → strong → off, saved immediately so the next open matches the
   /// icon the trader is looking at.
-  void _cycleMagnet() {
-    setState(() => _style = _style.copyWith(magnet: _style.magnet.next));
+  void _cycleMagnet() => _setMagnet(_style.magnet.next);
+
+  /// Sets the magnet mode and stores it with the rest of the chart style, so
+  /// the sheet's toggle and the rail button agree after a restart.
+  void _setMagnet(MagnetMode mode) {
+    setState(() => _style = _style.copyWith(magnet: mode));
     unawaited(ChartStyle.saveLayout(widget.instrument.symbol, _style));
   }
 
@@ -2417,6 +2421,20 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // The handle is the sheet's "this is dismissible" cue; without
+                // it a dark panel running to both edges reads as a page rather
+                // than a sheet laid over the chart.
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.borderStrong,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
                 Row(
                   children: [
                     Text(
@@ -2455,6 +2473,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                   keepDrawing: _keepDrawing,
                   onKeepDrawingChanged: (value) =>
                       setState(() => _keepDrawing = value),
+                  magnet: _magnet,
+                  onMagnetChanged: _setMagnet,
                 ),
                 if (hasSelection) ...[
                   const SizedBox(height: 14),
