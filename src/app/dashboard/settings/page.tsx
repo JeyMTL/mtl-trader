@@ -327,6 +327,18 @@ export default function SettingsPage() {
 
   const totalBalance = deposits.reduce((acc, d) => acc + d.amount, 0)
 
+  // The database allows one balance change a calendar month (a restrictive RLS
+  // policy on deposits). Mirroring it here only spares the customer a failed
+  // save after typing an amount; the policy is what makes the rule true, for
+  // this page and the app alike.
+  const monthStart = new Date()
+  monthStart.setUTCDate(1)
+  monthStart.setUTCHours(0, 0, 0, 0)
+  const changedThisMonth = deposits.some((d) => new Date(d.created_at) >= monthStart)
+  const nextBalanceChange = new Date(
+    Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1)
+  )
+
   /** Card renewal through Paddle: the checkout is hosted, so no card data here. */
   const handleCheckout = async (planId: string) => {
     setCheckoutLoading(planId)
@@ -581,13 +593,19 @@ export default function SettingsPage() {
                   <div className="flex items-end">
                     <button
                       onClick={handleAddDeposit}
-                      disabled={depLoading || !depAmount}
+                      disabled={depLoading || !depAmount || changedThisMonth}
                       className="w-full px-4 py-2 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white rounded-lg transition-colors text-sm font-medium"
                     >
                       {depLoading ? 'Adding...' : 'Add'}
                     </button>
                   </div>
                 </div>
+
+                <p className="text-xs text-gray-400 mb-4">
+                  {changedThisMonth
+                    ? `You can change your balance once a month. This month's change is used — the next one opens on ${nextBalanceChange.toLocaleDateString()}.`
+                    : "You can change your balance once a month. This month's change is still available."}
+                </p>
 
                 {deposits.length > 0 ? (
                   <div className="space-y-2">

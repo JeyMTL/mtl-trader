@@ -204,6 +204,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deposits => 'Deposits';
 
   @override
+  String get balanceAction => 'Add balance';
+
+  @override
+  String get balanceTitle => 'Change your balance';
+
+  @override
+  String get balanceBody =>
+      'The desk reads your balance as your deposits plus this journal\'s profit and loss. It can be changed once a month, so a losing run cannot be reset by topping up.';
+
+  @override
+  String get balanceAmount => 'Amount to add';
+
+  @override
+  String get balanceNote => 'Note';
+
+  @override
+  String get balanceNoteHint => 'e.g. monthly deposit';
+
+  @override
+  String get balanceAvailable => 'This month\'s change is still available.';
+
+  @override
+  String balanceUsed(String date) {
+    return 'This month\'s change is already used. The next one opens on $date.';
+  }
+
+  @override
+  String get balanceSave => 'Save balance';
+
+  @override
+  String get balanceSaved => 'Balance updated.';
+
+  @override
+  String get balanceAmountInvalid => 'Enter an amount above zero.';
+
+  @override
+  String balanceFailed(String error) {
+    return 'Could not save the balance: $error';
+  }
+
+  @override
   String get bestTrade => 'Best trade';
 
   @override

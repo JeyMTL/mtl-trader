@@ -291,6 +291,50 @@ class AppLocalizationsPack extends AppLocalizations {
   String get deposits => _read('deposits') ?? _en.deposits;
 
   @override
+  String get balanceAction => _read('balanceAction') ?? _en.balanceAction;
+
+  @override
+  String get balanceTitle => _read('balanceTitle') ?? _en.balanceTitle;
+
+  @override
+  String get balanceBody => _read('balanceBody') ?? _en.balanceBody;
+
+  @override
+  String get balanceAmount => _read('balanceAmount') ?? _en.balanceAmount;
+
+  @override
+  String get balanceNote => _read('balanceNote') ?? _en.balanceNote;
+
+  @override
+  String get balanceNoteHint => _read('balanceNoteHint') ?? _en.balanceNoteHint;
+
+  @override
+  String get balanceAvailable => _read('balanceAvailable') ?? _en.balanceAvailable;
+
+  @override
+  String balanceUsed(String date) {
+    final template = _read('balanceUsed');
+    if (template == null) return _en.balanceUsed(date);
+    return _fill(template, <String, Object?>{'date': date});
+  }
+
+  @override
+  String get balanceSave => _read('balanceSave') ?? _en.balanceSave;
+
+  @override
+  String get balanceSaved => _read('balanceSaved') ?? _en.balanceSaved;
+
+  @override
+  String get balanceAmountInvalid => _read('balanceAmountInvalid') ?? _en.balanceAmountInvalid;
+
+  @override
+  String balanceFailed(String error) {
+    final template = _read('balanceFailed');
+    if (template == null) return _en.balanceFailed(error);
+    return _fill(template, <String, Object?>{'error': error});
+  }
+
+  @override
   String get bestTrade => _read('bestTrade') ?? _en.bestTrade;
 
   @override

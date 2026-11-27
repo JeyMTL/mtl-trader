@@ -77,6 +77,43 @@ class JournalApi {
     return asDouble(data);
   }
 
+  /// When the balance was last changed, or null if it never was.
+  ///
+  /// The desk reads the balance as the logged deposits plus the journal's P&L,
+  /// and the database accepts one change a calendar month. Reading the last row
+  /// is what lets the sheet name the month that is already used instead of
+  /// letting a save fail on the policy afterwards.
+  Future<DateTime?> lastBalanceChange() async {
+    final id = userId;
+    if (id == null) return null;
+    final row = await _db
+        .from('deposits')
+        .select('created_at')
+        .eq('user_id', id)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    if (row == null) return null;
+    final at = asString(asMap(row)['created_at']);
+    return at == null ? null : DateTime.tryParse(at)?.toUtc();
+  }
+
+  /// Add to the account balance, once a calendar month.
+  ///
+  /// The insert throws when the month is already used: the rule lives in the
+  /// database policy, and this only carries the amount and the note.
+  Future<void> addBalance(double amount, {String? note}) async {
+    final id = userId;
+    if (id == null) throw StateError('not signed in');
+    final trimmed = (note ?? '').trim();
+    await _db.from('deposits').insert({
+      'user_id': id,
+      'amount': amount,
+      'type': 'deposit',
+      'description': trimmed.isEmpty ? null : trimmed,
+    });
+  }
+
   /// Trades, wins and P&L for each UTC window, from `session_stats`
   /// (migration 20261105) — one request instead of one per session, and the
   /// same buckets the journal filter uses.

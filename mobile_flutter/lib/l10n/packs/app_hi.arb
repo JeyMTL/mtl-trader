@@ -860,5 +860,17 @@
   "resetBody": "अपने खाते का ईमेल दर्ज करें और हम एक रिकवरी लिंक भेजेंगे।",
   "resetSend": "लिंक भेजें",
   "resetSent": "यदि {email} का खाता है, तो रिकवरी लिंक भेज दिया गया है।",
-  "resetFailed": "लिंक नहीं भेजा जा सका। थोड़ी देर में पुनः प्रयास करें।"
+  "resetFailed": "लिंक नहीं भेजा जा सका। थोड़ी देर में पुनः प्रयास करें।",
+  "balanceAction": "Add balance",
+  "balanceTitle": "Change your balance",
+  "balanceBody": "The desk reads your balance as your deposits plus this journal's profit and loss. It can be changed once a month, so a losing run cannot be reset by topping up.",
+  "balanceAmount": "Amount to add",
+  "balanceNote": "Note",
+  "balanceNoteHint": "e.g. monthly deposit",
+  "balanceAvailable": "This month's change is still available.",
+  "balanceUsed": "This month's change is already used. The next one opens on {date}.",
+  "balanceSave": "Save balance",
+  "balanceSaved": "Balance updated.",
+  "balanceAmountInvalid": "Enter an amount above zero.",
+  "balanceFailed": "Could not save the balance: {error}"
 }

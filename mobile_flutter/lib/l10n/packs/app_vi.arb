@@ -860,5 +860,17 @@
   "resetBody": "Nhập email của tài khoản, chúng tôi sẽ gửi liên kết khôi phục.",
   "resetSend": "Gửi liên kết",
   "resetSent": "Nếu {email} có tài khoản, liên kết khôi phục đang được gửi đi.",
-  "resetFailed": "Không gửi được liên kết. Thử lại sau một lát."
+  "resetFailed": "Không gửi được liên kết. Thử lại sau một lát.",
+  "balanceAction": "Add balance",
+  "balanceTitle": "Change your balance",
+  "balanceBody": "The desk reads your balance as your deposits plus this journal's profit and loss. It can be changed once a month, so a losing run cannot be reset by topping up.",
+  "balanceAmount": "Amount to add",
+  "balanceNote": "Note",
+  "balanceNoteHint": "e.g. monthly deposit",
+  "balanceAvailable": "This month's change is still available.",
+  "balanceUsed": "This month's change is already used. The next one opens on {date}.",
+  "balanceSave": "Save balance",
+  "balanceSaved": "Balance updated.",
+  "balanceAmountInvalid": "Enter an amount above zero.",
+  "balanceFailed": "Could not save the balance: {error}"
 }

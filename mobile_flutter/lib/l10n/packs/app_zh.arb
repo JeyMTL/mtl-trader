@@ -860,5 +860,17 @@
   "resetBody": "输入账户邮箱，我们会发送一条恢复链接。",
   "resetSend": "发送链接",
   "resetSent": "如果 {email} 有账户，恢复链接已在发送中。",
-  "resetFailed": "无法发送链接。请稍后再试。"
+  "resetFailed": "无法发送链接。请稍后再试。",
+  "balanceAction": "Add balance",
+  "balanceTitle": "Change your balance",
+  "balanceBody": "The desk reads your balance as your deposits plus this journal's profit and loss. It can be changed once a month, so a losing run cannot be reset by topping up.",
+  "balanceAmount": "Amount to add",
+  "balanceNote": "Note",
+  "balanceNoteHint": "e.g. monthly deposit",
+  "balanceAvailable": "This month's change is still available.",
+  "balanceUsed": "This month's change is already used. The next one opens on {date}.",
+  "balanceSave": "Save balance",
+  "balanceSaved": "Balance updated.",
+  "balanceAmountInvalid": "Enter an amount above zero.",
+  "balanceFailed": "Could not save the balance: {error}"
 }

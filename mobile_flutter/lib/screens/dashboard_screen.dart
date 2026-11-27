@@ -11,6 +11,7 @@ import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/a11y.dart';
+import '../ui/balance_sheet.dart';
 import '../ui/motion.dart';
 import '../ui/shimmer.dart';
 import '../ui/theme.dart';
@@ -72,6 +73,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
     if (!mounted) return;
     setState(() => _plan = _loadPlan());
+  }
+
+  /// The balance is a setting, not a trade: one change a month, explained in
+  /// the sheet and enforced by the database policy behind it.
+  Future<void> _addBalance() async {
+    final changed = await showBalanceSheet(context, widget.api);
+    if (changed != true || !mounted) return;
+    await _refresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context).balanceSaved)),
+    );
   }
 
   Future<void> _refresh() async {
@@ -157,6 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onOpenEdge: widget.onOpenEdge,
               onEdit: widget.onEdit,
               onOpenImport: widget.onOpenImport,
+              onAddBalance: _addBalance,
             ),
           );
         },
@@ -171,6 +185,7 @@ class _DashboardBody extends StatefulWidget {
     required this.data,
     required this.onOpenEdge,
     required this.onEdit,
+    required this.onAddBalance,
     this.onOpenImport,
   });
 
@@ -178,6 +193,10 @@ class _DashboardBody extends StatefulWidget {
   final DashboardData data;
   final VoidCallback onOpenEdge;
   final ValueChanged<String> onEdit;
+
+  /// Opens the monthly balance sheet. Lives on the shell's state because the
+  /// desk has to reload once a change is stored.
+  final VoidCallback onAddBalance;
   final VoidCallback? onOpenImport;
 
   @override
@@ -316,6 +335,7 @@ class _DashboardBodyState extends State<_DashboardBody> {
           child: _BalanceHero(
             data: data,
             summary: summary,
+            onAddBalance: widget.onAddBalance,
             onOpenImport: onOpenImport,
             window: window,
             startBalance: startBalance,
@@ -562,6 +582,7 @@ class _BalanceHero extends StatelessWidget {
   const _BalanceHero({
     required this.data,
     required this.summary,
+    required this.onAddBalance,
     this.onOpenImport,
     this.window,
     this.startBalance,
@@ -570,6 +591,7 @@ class _BalanceHero extends StatelessWidget {
 
   final DashboardData data;
   final TradeSummary summary;
+  final VoidCallback onAddBalance;
   final VoidCallback? onOpenImport;
 
   /// The part of the equity curve the selected timeframe covers, and the
@@ -715,6 +737,7 @@ class _BalanceHero extends StatelessWidget {
                       child: _MiniStat(
                         label: l10n.deposits,
                         value: money(data.deposits),
+                        onTap: onAddBalance,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -872,11 +895,18 @@ class _EquityChartState extends State<_EquityChart> {
     // over the card's height puts the labels at least 24px apart, and a step of
     // at least one currency unit keeps two of them from rounding together.
     final moneyStep = _moneyAxisStep((maxValue - minValue + padding * 2) / 4);
+    // Ticks are drawn from `minY` upward in steps of `moneyStep`, so an
+    // arbitrary minimum put the labels on values like $1.23K, and the one at
+    // the bottom fell outside the plot. Snapping the range to whole steps makes
+    // every label a round number and keeps the highest and lowest inside the
+    // chart.
+    final axisMin = ((minValue - padding) / moneyStep).floorToDouble() * moneyStep;
+    final axisMax = ((maxValue + padding) / moneyStep).ceilToDouble() * moneyStep;
 
     return LineChart(
       LineChartData(
-        minY: minValue - padding,
-        maxY: maxValue + padding,
+        minY: axisMin,
+        maxY: axisMax == axisMin ? axisMin + moneyStep : axisMax,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
@@ -1396,27 +1426,44 @@ class _MiniStat extends StatelessWidget {
     required this.label,
     required this.value,
     this.tone = Tone.neutral,
+    this.onTap,
   });
 
   final String label;
   final String value;
   final Tone tone;
 
+  /// Set on a stat that opens something. The deposits figure is the balance's
+  /// entry point: the only place a customer can add to it.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label.toUpperCase(),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: AppColors.faint,
-            fontSize: kMinLabelSize,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-          ),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: onTap == null ? AppColors.faint : AppColors.primaryLight,
+                  fontSize: kMinLabelSize,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+            // The plus is the affordance: a label that only looks tappable is
+            // a tap most customers never make.
+            if (onTap != null) ...[
+              const SizedBox(width: 3),
+              Icon(Icons.add_rounded, size: 12, color: AppColors.primary),
+            ],
+          ],
         ),
         const SizedBox(height: 3),
         FittedBox(
@@ -1432,6 +1479,15 @@ class _MiniStat extends StatelessWidget {
           ),
         ),
       ],
+    );
+    if (onTap == null) return body;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: body,
+      ),
     );
   }
 }

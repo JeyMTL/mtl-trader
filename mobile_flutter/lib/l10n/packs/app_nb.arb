@@ -860,5 +860,17 @@
   "resetBody": "Skriv inn e-posten på kontoen din, så sender vi en gjenopprettingslenke.",
   "resetSend": "Send lenken",
   "resetSent": "Hvis {email} har en konto, er gjenopprettingslenken på vei.",
-  "resetFailed": "Kunne ikke sende lenken. Prøv igjen om et øyeblikk."
+  "resetFailed": "Kunne ikke sende lenken. Prøv igjen om et øyeblikk.",
+  "balanceAction": "Add balance",
+  "balanceTitle": "Change your balance",
+  "balanceBody": "The desk reads your balance as your deposits plus this journal's profit and loss. It can be changed once a month, so a losing run cannot be reset by topping up.",
+  "balanceAmount": "Amount to add",
+  "balanceNote": "Note",
+  "balanceNoteHint": "e.g. monthly deposit",
+  "balanceAvailable": "This month's change is still available.",
+  "balanceUsed": "This month's change is already used. The next one opens on {date}.",
+  "balanceSave": "Save balance",
+  "balanceSaved": "Balance updated.",
+  "balanceAmountInvalid": "Enter an amount above zero.",
+  "balanceFailed": "Could not save the balance: {error}"
 }

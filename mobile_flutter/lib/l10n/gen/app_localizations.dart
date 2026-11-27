@@ -460,6 +460,78 @@ abstract class AppLocalizations {
   /// **'Deposits'**
   String get deposits;
 
+  /// No description provided for @balanceAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add balance'**
+  String get balanceAction;
+
+  /// No description provided for @balanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change your balance'**
+  String get balanceTitle;
+
+  /// No description provided for @balanceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The desk reads your balance as your deposits plus this journal\'s profit and loss. It can be changed once a month, so a losing run cannot be reset by topping up.'**
+  String get balanceBody;
+
+  /// No description provided for @balanceAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount to add'**
+  String get balanceAmount;
+
+  /// No description provided for @balanceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get balanceNote;
+
+  /// No description provided for @balanceNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. monthly deposit'**
+  String get balanceNoteHint;
+
+  /// No description provided for @balanceAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This month\'s change is still available.'**
+  String get balanceAvailable;
+
+  /// No description provided for @balanceUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'This month\'s change is already used. The next one opens on {date}.'**
+  String balanceUsed(String date);
+
+  /// No description provided for @balanceSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save balance'**
+  String get balanceSave;
+
+  /// No description provided for @balanceSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance updated.'**
+  String get balanceSaved;
+
+  /// No description provided for @balanceAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount above zero.'**
+  String get balanceAmountInvalid;
+
+  /// No description provided for @balanceFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the balance: {error}'**
+  String balanceFailed(String error);
+
   /// No description provided for @bestTrade.
   ///
   /// In en, this message translates to:
