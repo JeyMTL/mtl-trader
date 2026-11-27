@@ -9,6 +9,7 @@ import '../core/instruments.dart';
 import '../core/pnl.dart';
 import '../core/strategy_colors.dart';
 import '../core/trade_exit.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../services/market_data.dart';
@@ -182,7 +183,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not load this trade: $error';
+        _error = AppLocalizations.of(context).tradeLoadFailed('$error');
       });
     }
   }
@@ -242,18 +243,18 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     final buy = _type == 'BUY';
     if (stop != null) {
       if (buy && stop >= entry) {
-        return 'For a BUY the stop loss must be below the entry.';
+        return AppLocalizations.of(context).tradeLevelBuyStop;
       }
       if (!buy && stop <= entry) {
-        return 'For a SELL the stop loss must be above the entry.';
+        return AppLocalizations.of(context).tradeLevelSellStop;
       }
     }
     if (take != null) {
       if (buy && take <= entry) {
-        return 'For a BUY the take profit must be above the entry.';
+        return AppLocalizations.of(context).tradeLevelBuyTake;
       }
       if (!buy && take >= entry) {
-        return 'For a SELL the take profit must be below the entry.';
+        return AppLocalizations.of(context).tradeLevelSellTake;
       }
     }
     return null;
@@ -261,8 +262,9 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
 
   /// Levels are optional (the trade is then marked at the latest price), but
   /// saying so up front beats an exit that looks missing.
-  String? get _levelsHint => _valueOf(_stop) == null && _valueOf(_take) == null
-      ? 'Add a stop loss or a take profit, or the exit is marked at the latest price.'
+  String? get _levelsHint =>
+      _valueOf(_stop) == null && _valueOf(_take) == null
+          ? AppLocalizations.of(context).tradeLevelsHint
       : null;
 
   /// What the trade loses at the stop and stands to make at the target, in
@@ -297,26 +299,24 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
   /// is nothing here yet": both leave risk and reward at zero, but telling a
   /// trader to add a level they have already typed makes the form look deaf.
   ({String text, bool warning})? get _riskHint {
+    final l10n = AppLocalizations.of(context);
     final preview = _riskPreview;
-    const empty = (
-      text: 'Add an entry, a level and a size to preview the risk.',
-      warning: false,
-    );
+    final empty = (text: l10n.riskHintEmpty, warning: false);
     if (preview == null) return empty;
     final isBuy = _type.toUpperCase() != 'SELL';
     if (preview.stopWrongSide) {
       return (
         text: isBuy
-            ? 'A buy\'s stop sits below the entry — this one is above it.'
-            : 'A sell\'s stop sits above the entry — this one is below it.',
+            ? l10n.riskStopWrongBuy
+            : l10n.riskStopWrongSell,
         warning: true,
       );
     }
     if (preview.takeWrongSide) {
       return (
         text: isBuy
-            ? 'A buy\'s target sits above the entry — this one is below it.'
-            : 'A sell\'s target sits below the entry — this one is above it.',
+            ? l10n.riskTakeWrongBuy
+            : l10n.riskTakeWrongSell,
         warning: true,
       );
     }
@@ -332,6 +332,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     final reward = preview?.reward ?? 0;
     final r = preview?.r;
     final hint = _riskHint;
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
@@ -346,12 +347,12 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
           Row(
             children: [
               _riskCell(
-                'RISK',
+                l10n.riskLabel,
                 risk > 0 ? '-${money(risk)}' : '—',
                 risk > 0 ? AppColors.danger : AppColors.faint,
               ),
               _riskCell(
-                'REWARD',
+                l10n.riskRewardLabel,
                 reward > 0 ? '+${money(reward)}' : '—',
                 reward > 0 ? AppColors.success : AppColors.faint,
               ),
@@ -428,11 +429,12 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     if (entry == null || instrument == null || opened == null) {
       if (announce) {
         setState(() {
+          final l10n = AppLocalizations.of(context);
           _error = instrument == null
-              ? 'Pick a symbol from the list first, then find the exit.'
+              ? l10n.tradePickSymbolToFindExit
               : opened == null
-                  ? 'Set the opened time — the candles after it decide the exit.'
-                  : 'Enter the entry price first.';
+                  ? l10n.tradeSetOpenedTime
+                  : l10n.tradeEnterEntryFirst;
         });
       }
       return false;
@@ -442,7 +444,8 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     final from = opened.toUtc();
     if (!from.isBefore(to)) {
       setState(
-          () => _error = 'The opened time is in the future. Pick a past time.');
+        () => _error = AppLocalizations.of(context).tradeOpenedInFuture,
+      );
       return false;
     }
 
@@ -499,9 +502,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       if (!mounted) return false;
       if (resolved == null) {
         setState(() {
-          _error =
-              'No candles were returned for that time. Check the symbol and '
-              'the opened time, then try again.';
+          _error = AppLocalizations.of(context).tradeNoCandles;
         });
         return false;
       }
@@ -523,8 +524,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _error = 'The candles could not be read. Check your connection '
-              'and try again.',
+          () => _error = AppLocalizations.of(context).tradeCandlesUnreadable,
         );
       }
       return false;
@@ -540,8 +540,9 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       _closeTime!.isBefore(_openTime!);
 
   String get _windowDuration {
-    if (_windowInvalid) return 'Exit before entry';
-    if (_openTime == null || _closeTime == null) return 'Set both times';
+    final l10n = AppLocalizations.of(context);
+    if (_windowInvalid) return l10n.tradeExitBeforeEntry;
+    if (_openTime == null || _closeTime == null) return l10n.tradeSetBothTimes;
     return durationText(_closeTime!.difference(_openTime!).inMinutes);
   }
 
@@ -825,7 +826,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'The file was removed here but could not be deleted from storage: $error',
+              AppLocalizations.of(context).tradeRemovePendingFailed('$error'),
             ),
           ),
         );
@@ -837,20 +838,20 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove this file?'),
+        title: Text(AppLocalizations.of(context).tradeRemoveFileTitle),
         content: Text(
-          'It is deleted from storage as well as from this entry.',
+          AppLocalizations.of(context).tradeRemoveFileBody,
           style: TextStyle(color: AppColors.muted, fontSize: 12.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
-              'Remove',
+              AppLocalizations.of(context).tradeRemove,
               style: TextStyle(color: AppColors.danger),
             ),
           ),
@@ -864,7 +865,11 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not remove that file: $error')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).tradeRemoveFailed('$error'),
+            ),
+          ),
         );
       }
     }
@@ -929,9 +934,25 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     if (_levelsHint == null) unawaited(_resolveExitFromMarket());
   }
 
+/// The exit reason in the reader's language.
+///
+/// `ExitReason.label` stays English because it lives in `core`, which has no
+/// localisations; the screen maps it here instead of editing the core enum.
+String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
+  switch (reason) {
+    case ExitReason.takeProfit:
+      return l10n.tradeExitTakeProfit;
+    case ExitReason.stopLoss:
+      return l10n.tradeExitStopLoss;
+    case ExitReason.latestPrice:
+      return l10n.tradeExitLatestPrice;
+  }
+}
+
   /// The exit, as the market delivered it. It is not a text field on purpose:
   /// a typed exit is where a losing sell turns into a "profit".
   Widget _exitRow() {
+    final l10n = AppLocalizations.of(context);
     final price = _exitPrice;
     final reason = _exitReason;
     return Container(
@@ -946,7 +967,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
         children: [
           Text(
             price == null
-                ? 'Not found yet'
+                ? l10n.tradeNotFoundYet
                 : chartPrice(
                     price,
                     inferInstrument(_symbol.text) ?? inferInstrument('EURUSD')!,
@@ -960,9 +981,8 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
           const SizedBox(height: 2),
           Text(
             price == null
-                ? 'The app reads the candles after entry and takes whichever '
-                    'of the two levels the market hit first.'
-                : '${reason?.label ?? 'Saved exit'}'
+                ? l10n.tradeExitReadsCandles
+                : '${reason == null ? l10n.tradeSavedExit : _exitReasonText(l10n, reason)}'
                     '${_closeTime == null ? '' : ' · ${dayOf(_closeTime)} ${timeOf(_closeTime)}'}',
             style: TextStyle(
               color: price == null ? AppColors.faint : AppColors.muted,
@@ -985,7 +1005,9 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   )
                 : TextButton(
                     onPressed: () => _resolveExitFromMarket(announce: true),
-                    child: Text(price == null ? 'Find exit' : 'Find again'),
+                    child: Text(
+                      price == null ? l10n.tradeFindExit : l10n.tradeFindAgain,
+                    ),
                   ),
           ),
         ],
@@ -1025,7 +1047,9 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     if (_saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_windowInvalid) {
-      setState(() => _error = 'The exit time cannot be before the entry time.');
+      setState(
+        () => _error = AppLocalizations.of(context).tradeExitBeforeEntryError,
+      );
       return;
     }
     final levelError = _levelError;
@@ -1035,7 +1059,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     }
     final userId = _userId;
     if (userId == null) {
-      setState(() => _error = 'Your session expired. Sign in again.');
+      setState(() => _error = AppLocalizations.of(context).tradeSessionExpired);
       return;
     }
 
@@ -1043,7 +1067,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     final lots = _valueOf(_lots);
     if (entry == null || lots == null) {
       setState(
-        () => _error = 'Enter the entry price and the size before saving.',
+        () => _error = AppLocalizations.of(context).tradeEnterEntryAndSize,
       );
       return;
     }
@@ -1052,8 +1076,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     // word, so Save looked like a dead button.
     if (inferInstrument(_symbol.text) == null) {
       setState(
-        () => _error = 'Pick the symbol from the list — the exit is read from '
-            'its candles.',
+        () => _error = AppLocalizations.of(context).tradePickSymbolFirst,
       );
       return;
     }
@@ -1062,9 +1085,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     if (_exitPrice == null) {
       if (_openTime == null) {
         setState(
-          () =>
-              _error = 'Set the opened time — the candles after it decide the '
-                  'exit price and time.',
+          () => _error = AppLocalizations.of(context).tradeSetOpenedTime,
         );
         return;
       }
@@ -1136,13 +1157,14 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       final savedNote = _createdTradeId != null
-          ? ' The trade itself was saved — press Save again to retry the media.'
+          ? ' ${l10n.tradeMediaSavedNote}'
           : '';
       final message = error is TimeoutException
-          ? 'The save request timed out. Check your connection and press Save again.'
+          ? l10n.tradeSaveTimedOut
           : friendlyError(error);
-      setState(() => _error = 'Could not save: $message$savedNote');
+      setState(() => _error = l10n.tradeSaveFailed('$message$savedNote'));
     } finally {
       // Never leave the Save button spinning: every exit path lands here.
       if (mounted && !_saved) setState(() => _saving = false);
@@ -1159,6 +1181,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
 
     final pnl = _pnl;
     final pips = _pips;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -1168,11 +1191,11 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                 child: Material(
                   type: MaterialType.transparency,
                   child: Text(
-                    _symbol.text.isEmpty ? 'Edit entry' : _symbol.text,
+                    _symbol.text.isEmpty ? l10n.tradeEditEntry : _symbol.text,
                   ),
                 ),
               )
-            : const Text('New entry'),
+            : Text(l10n.tradeNewEntry),
         actions: [
           TextButton(
             onPressed: _saving || _uploading || _recording ? null : _save,
@@ -1182,7 +1205,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                     height: 15,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(l10n.commonSave),
           ),
           const SizedBox(width: 4),
         ],
@@ -1203,16 +1226,16 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionTitle(title: 'Instrument'),
+                  SectionTitle(title: l10n.tradeInstrument),
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: _symbol,
                     textCapitalization: TextCapitalization.characters,
                     decoration: InputDecoration(
-                      labelText: 'Symbol',
+                      labelText: l10n.tradeSymbol,
                       hintText: 'EURUSD',
                       suffixIcon: IconButton(
-                        tooltip: 'Pick an instrument',
+                        tooltip: l10n.tradePickInstrument,
                         onPressed: _pickSymbol,
                         icon: Icon(
                           Icons.expand_more,
@@ -1223,7 +1246,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                     ),
                     onChanged: (_) => setState(() {}),
                     validator: (value) => (value ?? '').trim().isEmpty
-                        ? 'A symbol is required.'
+                        ? l10n.tradeSymbolRequired
                         : null,
                   ),
                   const SizedBox(height: 8),
@@ -1231,7 +1254,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                     children: [
                       Expanded(
                         child: _TypeButton(
-                          label: 'BUY',
+                          label: l10n.tradeBuy,
                           active: _type == 'BUY',
                           positive: true,
                           onTap: () => setState(() => _type = 'BUY'),
@@ -1240,7 +1263,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _TypeButton(
-                          label: 'SELL',
+                          label: l10n.tradeSell,
                           active: _type == 'SELL',
                           positive: false,
                           onTap: () => setState(() => _type = 'SELL'),
@@ -1258,7 +1281,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       Icons.candlestick_chart_outlined,
                       size: 17,
                     ),
-                    label: const Text('Pin levels from chart'),
+                    label: Text(l10n.tradePinLevels),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(44),
                       backgroundColor: AppColors.primary.withAlpha(22),
@@ -1278,12 +1301,12 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                     onChanged: (_) => setState(() => _strategyOpen = true),
                     onTap: () => setState(() => _strategyOpen = true),
                     decoration: InputDecoration(
-                      labelText: 'Strategy',
+                      labelText: l10n.tradeStrategy,
                       hintText: 'London breakout',
                       suffixIcon: _strategyLabels.isEmpty
                           ? null
                           : IconButton(
-                              tooltip: 'Saved strategies',
+                              tooltip: l10n.tradeSavedStrategies,
                               icon: Icon(
                                 _strategyOpen
                                     ? Icons.arrow_drop_up
@@ -1368,8 +1391,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   if (_similarStrategy != null) ...[
                     const SizedBox(height: 6),
                     Text(
-                      'You already use “$_similarStrategy”. Pick the existing '
-                      'spelling so its statistics stay together.',
+                      l10n.tradeSimilarStrategy(_similarStrategy!),
                       style: TextStyle(
                         color: AppColors.primary,
                         fontSize: kMinLabelSize,
@@ -1385,25 +1407,25 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionTitle(title: 'Execution'),
+                  SectionTitle(title: l10n.tradeExecution),
                   const SizedBox(height: 10),
                   // Prices, levels, size and costs are three different questions.
                   // Laid out as one 2x4 grid they read as a single block of
                   // numbers, and the broker costs were mixed in with the trade.
-                  _fieldGroup('Prices'),
+                  _fieldGroup(l10n.tradePrices),
                   _NumberField(
                     controller: _entry,
-                    label: 'Entry price',
+                    label: l10n.tradeEntryPrice,
                     positive: true,
                     onChanged: () => setState(() {}),
                   ),
-                  _fieldGroup('Stop & target'),
+                  _fieldGroup(l10n.tradeStopTarget),
                   Row(
                     children: [
                       Expanded(
                         child: _NumberField(
                           controller: _stop,
-                          label: 'Stop loss',
+                          label: l10n.tradeStopLoss,
                           onChanged: () => setState(() {}),
                         ),
                       ),
@@ -1411,7 +1433,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       Expanded(
                         child: _NumberField(
                           controller: _take,
-                          label: 'Take profit',
+                          label: l10n.tradeTakeProfit,
                           onChanged: () => setState(() {}),
                         ),
                       ),
@@ -1443,10 +1465,10 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                     ),
                   _fieldGroup('Exit'),
                   _exitRow(),
-                  _fieldGroup('Size & costs'),
+                  _fieldGroup(l10n.tradeSizeCosts),
                   _NumberField(
                     controller: _lots,
-                    label: 'Size (lots)',
+                    label: l10n.tradeSizeLots,
                     positive: true,
                     onChanged: () => setState(() {}),
                   ),
@@ -1456,7 +1478,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       Expanded(
                         child: _NumberField(
                           controller: _commission,
-                          label: 'Commission',
+                          label: l10n.tradeCommission,
                           signed: true,
                           onChanged: () => setState(() {}),
                         ),
@@ -1465,7 +1487,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       Expanded(
                         child: _NumberField(
                           controller: _swap,
-                          label: 'Swap',
+                          label: l10n.tradeSwap,
                           signed: true,
                           onChanged: () => setState(() {}),
                         ),
@@ -1482,16 +1504,15 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionTitle(
-                    title: 'Time window',
-                    subtitle:
-                        'Entry and exit time drive the hour and session report.',
+                  SectionTitle(
+                    title: l10n.tradeTimeWindow,
+                    subtitle: l10n.tradeTimeWindowSub,
                   ),
                   const SizedBox(height: 8),
                   _WindowRow(
-                    label: 'Opened',
+                    label: l10n.tradeOpened,
                     value: _openTime == null
-                        ? 'Not set'
+                        ? l10n.tradeNotSet
                         : '${dayOf(_openTime)} · ${timeOf(_openTime)}',
                     onTap: () => _pickWindow(open: true),
                     onClear: _openTime == null
@@ -1502,9 +1523,9 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                   // The close is not picked by hand: it is the candle on which
                   // the stop or the target was reached.
                   _WindowRow(
-                    label: 'Closed',
+                    label: l10n.tradeClosed,
                     value: _closeTime == null
-                        ? 'Found with the exit'
+                        ? l10n.tradeFoundWithExit
                         : '${dayOf(_closeTime)} · ${timeOf(_closeTime)}',
                     onTap: () => _resolveExitFromMarket(announce: true),
                   ),
@@ -1519,7 +1540,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(
-                          'Time in market',
+                          l10n.tradeTimeInMarket,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1557,24 +1578,22 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionTitle(
-                    title: 'Journal',
-                    subtitle:
-                        'What was the setup, and what did you actually do?',
+                  SectionTitle(
+                    title: l10n.tradeJournal,
+                    subtitle: l10n.tradeJournalSub,
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: _notes,
                     maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'The idea, the trigger, how you managed it.',
+                    decoration: InputDecoration(
+                      hintText: l10n.tradeJournalHint,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const SectionTitle(
-                    title: 'Photos & voice notes',
-                    subtitle:
-                        'A chart screenshot and a spoken note are worth more than a paragraph later.',
+                  SectionTitle(
+                    title: l10n.tradeMedia,
+                    subtitle: l10n.tradeMediaSub,
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -1587,7 +1606,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                           Icons.photo_library_outlined,
                           size: 15,
                         ),
-                        label: const Text('Gallery'),
+                        label: Text(l10n.tradeGallery),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 38),
                           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1596,7 +1615,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       OutlinedButton.icon(
                         onPressed: _uploading || _saving ? null : _takePhoto,
                         icon: const Icon(Icons.photo_camera_outlined, size: 15),
-                        label: const Text('Camera'),
+                        label: Text(l10n.tradeCamera),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 38),
                           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1612,8 +1631,10 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                         ),
                         label: Text(
                           _recording
-                              ? 'Stop ${clockText(_recordSeconds)}'
-                              : 'Record',
+                              ? l10n.tradeStopRecording(
+                                  clockText(_recordSeconds),
+                                )
+                              : l10n.tradeRecord,
                           style: TextStyle(
                             color: _recording ? AppColors.danger : null,
                           ),
@@ -1631,7 +1652,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                       OutlinedButton.icon(
                         onPressed: _uploading || _saving ? null : _addAudioFile,
                         icon: const Icon(Icons.audio_file_outlined, size: 15),
-                        label: const Text('Audio file'),
+                        label: Text(l10n.tradeAudioFile),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 38),
                           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1650,7 +1671,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                         ),
                         SizedBox(width: 7),
                         Text(
-                          'Uploading…',
+                          l10n.tradeUploading,
                           style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 10.5,
@@ -1670,11 +1691,11 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  const SectionTitle(title: 'Tags'),
+                  SectionTitle(title: l10n.tradeTags),
                   const SizedBox(height: 6),
                   if (_tags.isEmpty)
                     Text(
-                      'No tags yet — they drive the edge report.',
+                      l10n.tradeNoTags,
                       style: TextStyle(color: AppColors.faint, fontSize: 10.5),
                     )
                   else
@@ -1734,8 +1755,8 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                         child: TextField(
                           controller: _tagDraft,
                           maxLength: 24,
-                          decoration: const InputDecoration(
-                            hintText: 'Add a tag and press enter',
+                          decoration: InputDecoration(
+                            hintText: l10n.tradeAddTagHint,
                             counterText: '',
                           ),
                           onSubmitted: (_) => _addTag(),
@@ -1763,7 +1784,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SectionTitle(title: 'Live ticket'),
+                  SectionTitle(title: l10n.tradeLiveTicket),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -1772,7 +1793,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'ESTIMATED P&L',
+                              l10n.tradeEstimatedPnl,
                               style: TextStyle(
                                 color: AppColors.muted,
                                 fontSize: 9,
@@ -1809,7 +1830,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                             Text(
                               pips == null
                                   ? '—'
-                                  : '${pips.toStringAsFixed(1)} pips',
+                                  : l10n.tradePips(pips.toStringAsFixed(1)),
                               textAlign: TextAlign.right,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1848,12 +1869,12 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
                         color: AppColors.ink,
                       ),
                     )
-                  : Text(_isEdit ? 'Save changes' : 'Save entry'),
+                  : Text(_isEdit ? l10n.tradeSaveChanges : l10n.tradeSaveEntry),
             ),
             const SizedBox(height: 6),
             TextButton(
               onPressed: _saving ? null : () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
           ],
         ),
@@ -1891,13 +1912,14 @@ class _NumberField extends StatelessWidget {
       autovalidateMode: AutovalidateMode.onUserInteraction,
       onChanged: (_) => onChanged(),
       validator: (value) {
+        final l10n = AppLocalizations.of(context);
         final text = (value ?? '').trim();
         if (text.isEmpty) {
-          return positive ? 'Required' : null;
+          return positive ? l10n.tradeRequired : null;
         }
         final parsed = double.tryParse(text.replaceAll(',', '.'));
-        if (parsed == null) return 'Number';
-        if (positive && parsed <= 0) return 'Must be > 0';
+        if (parsed == null) return l10n.tradeNumber;
+        if (positive && parsed <= 0) return l10n.tradeMustBePositive;
         return null;
       },
     );
@@ -2031,7 +2053,7 @@ class _MediaGrid extends StatelessWidget {
       children: [
         if (images.isNotEmpty || existingImages.isNotEmpty) ...[
           Text(
-            'SCREENSHOTS',
+            AppLocalizations.of(context).tradeScreenshots,
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 9,
@@ -2061,7 +2083,7 @@ class _MediaGrid extends StatelessWidget {
         ],
         if (audio.isNotEmpty || existingAudio.isNotEmpty) ...[
           Text(
-            'VOICE NOTES',
+            AppLocalizations.of(context).tradeVoiceNotes,
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 9,
@@ -2082,7 +2104,7 @@ class _MediaGrid extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 5),
               child: _AudioTile(
-                label: item.fileName ?? 'Voice note',
+                label: item.fileName ?? AppLocalizations.of(context).tradeVoiceNote,
                 meta: '${clockText(item.durationSeconds)}'
                     '${item.sizeBytes != null ? ' · ${fileSize(item.sizeBytes!)}' : ''}',
                 storagePath: item.storagePath,
@@ -2182,7 +2204,9 @@ class _RemoteImageThumbState extends State<_RemoteImageThumb> {
               : () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => MediaViewerScreen(
-                        title: widget.attachment.fileName ?? 'Screenshot',
+                        title:
+                            widget.attachment.fileName ??
+                            AppLocalizations.of(context).tradeScreenshots,
                         imageUrl: url,
                       ),
                     ),
@@ -2277,8 +2301,10 @@ class _PendingAudioRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return _AudioFrame(
       label: attachment.fileName,
-      meta:
-          '${clockText(attachment.durationSeconds)} · ${fileSize(attachment.sizeBytes)} · uploads on save',
+      meta: AppLocalizations.of(context).tradeUploadsOnSave(
+        clockText(attachment.durationSeconds),
+        fileSize(attachment.sizeBytes),
+      ),
       onRemove: onRemove,
       trailing: Icon(
         Icons.cloud_upload_outlined,
@@ -2359,7 +2385,11 @@ class _AudioTileState extends State<_AudioTile> {
       if (url == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open that recording.')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context).tradeRecordingOpenFailed,
+              ),
+            ),
           );
         }
         return;
@@ -2379,7 +2409,11 @@ class _AudioTileState extends State<_AudioTile> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not play that recording.')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).tradeRecordingPlayFailed,
+            ),
+          ),
         );
       }
     } finally {

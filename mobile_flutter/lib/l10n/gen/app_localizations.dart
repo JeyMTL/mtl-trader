@@ -2026,6 +2026,624 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Trial · {days}d'**
   String planTrialDays(int days);
+
+  /// No description provided for @tradeNewEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'New entry'**
+  String get tradeNewEntry;
+
+  /// No description provided for @tradeEditEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit entry'**
+  String get tradeEditEntry;
+
+  /// No description provided for @tradeSaveChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get tradeSaveChanges;
+
+  /// No description provided for @tradeSaveEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Save entry'**
+  String get tradeSaveEntry;
+
+  /// No description provided for @tradeInstrument.
+  ///
+  /// In en, this message translates to:
+  /// **'Instrument'**
+  String get tradeInstrument;
+
+  /// No description provided for @tradeSymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbol'**
+  String get tradeSymbol;
+
+  /// No description provided for @tradePickInstrument.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an instrument'**
+  String get tradePickInstrument;
+
+  /// No description provided for @tradeSymbolRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'A symbol is required.'**
+  String get tradeSymbolRequired;
+
+  /// No description provided for @tradeBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'BUY'**
+  String get tradeBuy;
+
+  /// No description provided for @tradeSell.
+  ///
+  /// In en, this message translates to:
+  /// **'SELL'**
+  String get tradeSell;
+
+  /// No description provided for @tradePinLevels.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin levels from chart'**
+  String get tradePinLevels;
+
+  /// No description provided for @tradeStrategy.
+  ///
+  /// In en, this message translates to:
+  /// **'Strategy'**
+  String get tradeStrategy;
+
+  /// No description provided for @tradeSavedStrategies.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved strategies'**
+  String get tradeSavedStrategies;
+
+  /// No description provided for @tradeSimilarStrategy.
+  ///
+  /// In en, this message translates to:
+  /// **'You already use “{name}”. Pick the existing spelling so its statistics stay together.'**
+  String tradeSimilarStrategy(String name);
+
+  /// No description provided for @tradeExecution.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution'**
+  String get tradeExecution;
+
+  /// No description provided for @tradePrices.
+  ///
+  /// In en, this message translates to:
+  /// **'Prices'**
+  String get tradePrices;
+
+  /// No description provided for @tradeEntryPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry price'**
+  String get tradeEntryPrice;
+
+  /// No description provided for @tradeStopTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop & target'**
+  String get tradeStopTarget;
+
+  /// No description provided for @tradeStopLoss.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop loss'**
+  String get tradeStopLoss;
+
+  /// No description provided for @tradeTakeProfit.
+  ///
+  /// In en, this message translates to:
+  /// **'Take profit'**
+  String get tradeTakeProfit;
+
+  /// No description provided for @tradeExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get tradeExit;
+
+  /// No description provided for @tradeSizeCosts.
+  ///
+  /// In en, this message translates to:
+  /// **'Size & costs'**
+  String get tradeSizeCosts;
+
+  /// No description provided for @tradeSizeLots.
+  ///
+  /// In en, this message translates to:
+  /// **'Size (lots)'**
+  String get tradeSizeLots;
+
+  /// No description provided for @tradeCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission'**
+  String get tradeCommission;
+
+  /// No description provided for @tradeSwap.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap'**
+  String get tradeSwap;
+
+  /// No description provided for @tradeNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get tradeNotSet;
+
+  /// No description provided for @tradeFoundWithExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Found with the exit'**
+  String get tradeFoundWithExit;
+
+  /// No description provided for @tradeNotFoundYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found yet'**
+  String get tradeNotFoundYet;
+
+  /// No description provided for @tradeExitReadsCandles.
+  ///
+  /// In en, this message translates to:
+  /// **'The app reads the candles after entry and takes whichever of the two levels the market hit first.'**
+  String get tradeExitReadsCandles;
+
+  /// No description provided for @tradeFindExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Find exit'**
+  String get tradeFindExit;
+
+  /// No description provided for @tradeFindAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Find again'**
+  String get tradeFindAgain;
+
+  /// No description provided for @tradeSavedExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved exit'**
+  String get tradeSavedExit;
+
+  /// No description provided for @tradeExitTakeProfit.
+  ///
+  /// In en, this message translates to:
+  /// **'Take profit hit first'**
+  String get tradeExitTakeProfit;
+
+  /// No description provided for @tradeExitStopLoss.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop loss hit first'**
+  String get tradeExitStopLoss;
+
+  /// No description provided for @tradeExitLatestPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Neither level reached · marked at the latest price'**
+  String get tradeExitLatestPrice;
+
+  /// No description provided for @tradeTimeWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Time window'**
+  String get tradeTimeWindow;
+
+  /// No description provided for @tradeTimeWindowSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry and exit time drive the hour and session report.'**
+  String get tradeTimeWindowSub;
+
+  /// No description provided for @tradeOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened'**
+  String get tradeOpened;
+
+  /// No description provided for @tradeClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get tradeClosed;
+
+  /// No description provided for @tradeTimeInMarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Time in market'**
+  String get tradeTimeInMarket;
+
+  /// No description provided for @tradeSetBothTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'Set both times'**
+  String get tradeSetBothTimes;
+
+  /// No description provided for @tradeExitBeforeEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit before entry'**
+  String get tradeExitBeforeEntry;
+
+  /// No description provided for @tradeJournal.
+  ///
+  /// In en, this message translates to:
+  /// **'Journal'**
+  String get tradeJournal;
+
+  /// No description provided for @tradeJournalSub.
+  ///
+  /// In en, this message translates to:
+  /// **'What was the setup, and what did you actually do?'**
+  String get tradeJournalSub;
+
+  /// No description provided for @tradeJournalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The idea, the trigger, how you managed it.'**
+  String get tradeJournalHint;
+
+  /// No description provided for @tradeMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos & voice notes'**
+  String get tradeMedia;
+
+  /// No description provided for @tradeMediaSub.
+  ///
+  /// In en, this message translates to:
+  /// **'A chart screenshot and a spoken note are worth more than a paragraph later.'**
+  String get tradeMediaSub;
+
+  /// No description provided for @tradeGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get tradeGallery;
+
+  /// No description provided for @tradeCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get tradeCamera;
+
+  /// No description provided for @tradeRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get tradeRecord;
+
+  /// No description provided for @tradeStopRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {time}'**
+  String tradeStopRecording(String time);
+
+  /// No description provided for @tradeAudioFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio file'**
+  String get tradeAudioFile;
+
+  /// No description provided for @tradeUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading…'**
+  String get tradeUploading;
+
+  /// No description provided for @tradeUploadsOnSave.
+  ///
+  /// In en, this message translates to:
+  /// **'{duration} · {size} · uploads on save'**
+  String tradeUploadsOnSave(String duration, String size);
+
+  /// No description provided for @tradeVoiceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice note'**
+  String get tradeVoiceNote;
+
+  /// No description provided for @tradeScreenshots.
+  ///
+  /// In en, this message translates to:
+  /// **'SCREENSHOTS'**
+  String get tradeScreenshots;
+
+  /// No description provided for @tradeVoiceNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'VOICE NOTES'**
+  String get tradeVoiceNotes;
+
+  /// No description provided for @tradeRemoveFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this file?'**
+  String get tradeRemoveFileTitle;
+
+  /// No description provided for @tradeRemoveFileBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It is deleted from storage as well as from this entry.'**
+  String get tradeRemoveFileBody;
+
+  /// No description provided for @tradeRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get tradeRemove;
+
+  /// No description provided for @tradeTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get tradeTags;
+
+  /// No description provided for @tradeNoTags.
+  ///
+  /// In en, this message translates to:
+  /// **'No tags yet — they drive the edge report.'**
+  String get tradeNoTags;
+
+  /// No description provided for @tradeAddTagHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a tag and press enter'**
+  String get tradeAddTagHint;
+
+  /// No description provided for @tradeLiveTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Live ticket'**
+  String get tradeLiveTicket;
+
+  /// No description provided for @tradeEstimatedPnl.
+  ///
+  /// In en, this message translates to:
+  /// **'ESTIMATED P&L'**
+  String get tradeEstimatedPnl;
+
+  /// No description provided for @tradePips.
+  ///
+  /// In en, this message translates to:
+  /// **'{pips} pips'**
+  String tradePips(String pips);
+
+  /// No description provided for @tradeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get tradeRequired;
+
+  /// No description provided for @tradeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Number'**
+  String get tradeNumber;
+
+  /// No description provided for @tradeMustBePositive.
+  ///
+  /// In en, this message translates to:
+  /// **'Must be > 0'**
+  String get tradeMustBePositive;
+
+  /// No description provided for @tradeLevelsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a stop loss or a take profit, or the exit is marked at the latest price.'**
+  String get tradeLevelsHint;
+
+  /// No description provided for @tradeLevelBuyStop.
+  ///
+  /// In en, this message translates to:
+  /// **'For a BUY the stop loss must be below the entry.'**
+  String get tradeLevelBuyStop;
+
+  /// No description provided for @tradeLevelBuyTake.
+  ///
+  /// In en, this message translates to:
+  /// **'For a BUY the take profit must be above the entry.'**
+  String get tradeLevelBuyTake;
+
+  /// No description provided for @tradeLevelSellStop.
+  ///
+  /// In en, this message translates to:
+  /// **'For a SELL the stop loss must be above the entry.'**
+  String get tradeLevelSellStop;
+
+  /// No description provided for @tradeLevelSellTake.
+  ///
+  /// In en, this message translates to:
+  /// **'For a SELL the take profit must be below the entry.'**
+  String get tradeLevelSellTake;
+
+  /// No description provided for @riskLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'RISK'**
+  String get riskLabel;
+
+  /// No description provided for @riskRewardLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'REWARD'**
+  String get riskRewardLabel;
+
+  /// No description provided for @riskHintEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an entry, a level and a size to preview the risk.'**
+  String get riskHintEmpty;
+
+  /// No description provided for @riskStopWrongBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'A buy\'s stop sits below the entry — this one is above it.'**
+  String get riskStopWrongBuy;
+
+  /// No description provided for @riskStopWrongSell.
+  ///
+  /// In en, this message translates to:
+  /// **'A sell\'s stop sits above the entry — this one is below it.'**
+  String get riskStopWrongSell;
+
+  /// No description provided for @riskTakeWrongBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'A buy\'s target sits above the entry — this one is below it.'**
+  String get riskTakeWrongBuy;
+
+  /// No description provided for @riskTakeWrongSell.
+  ///
+  /// In en, this message translates to:
+  /// **'A sell\'s target sits below the entry — this one is above it.'**
+  String get riskTakeWrongSell;
+
+  /// No description provided for @tradeLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this trade: {message}'**
+  String tradeLoadFailed(String message);
+
+  /// No description provided for @tradeSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save: {message}'**
+  String tradeSaveFailed(String message);
+
+  /// No description provided for @tradeSaveTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'The save request timed out. Check your connection and press Save again.'**
+  String get tradeSaveTimedOut;
+
+  /// No description provided for @tradeMediaSavedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The trade itself was saved — press Save again to retry the media.'**
+  String get tradeMediaSavedNote;
+
+  /// No description provided for @tradeExitBeforeEntryError.
+  ///
+  /// In en, this message translates to:
+  /// **'The exit time cannot be before the entry time.'**
+  String get tradeExitBeforeEntryError;
+
+  /// No description provided for @tradeSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session expired. Sign in again.'**
+  String get tradeSessionExpired;
+
+  /// No description provided for @tradeEnterEntryAndSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the entry price and the size before saving.'**
+  String get tradeEnterEntryAndSize;
+
+  /// No description provided for @tradeSetOpenedTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the opened time — the candles after it decide the exit price and time.'**
+  String get tradeSetOpenedTime;
+
+  /// No description provided for @tradePickSymbolFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the symbol from the list — the exit is read from its candles.'**
+  String get tradePickSymbolFirst;
+
+  /// No description provided for @tradeOpenedInFuture.
+  ///
+  /// In en, this message translates to:
+  /// **'The opened time is in the future. Pick a past time.'**
+  String get tradeOpenedInFuture;
+
+  /// No description provided for @tradeEnterEntryFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the entry price first.'**
+  String get tradeEnterEntryFirst;
+
+  /// No description provided for @tradePickSymbolToFindExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a symbol from the list first, then find the exit.'**
+  String get tradePickSymbolToFindExit;
+
+  /// No description provided for @tradeNoCandles.
+  ///
+  /// In en, this message translates to:
+  /// **'No candles were returned for that time. Check the symbol and the opened time, then try again.'**
+  String get tradeNoCandles;
+
+  /// No description provided for @tradeCandlesUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'The candles could not be read. Check your connection and try again.'**
+  String get tradeCandlesUnreadable;
+
+  /// No description provided for @tradeRemovePendingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file was removed here but could not be deleted from storage: {message}'**
+  String tradeRemovePendingFailed(String message);
+
+  /// No description provided for @tradeRemoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not remove that file: {message}'**
+  String tradeRemoveFailed(String message);
+
+  /// No description provided for @tradeRecordingOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open that recording.'**
+  String get tradeRecordingOpenFailed;
+
+  /// No description provided for @tradeRecordingPlayFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not play that recording.'**
+  String get tradeRecordingPlayFailed;
+
+  /// No description provided for @journalRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not refresh: {message}'**
+  String journalRefreshFailed(String message);
+
+  /// No description provided for @journalRescueBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Your {count, plural, =1{1 trade is} other{{count} trades are}} saved, but the list came back empty — most often a dropped session. Pull down to try again.'**
+  String journalRescueBanner(int count);
+
+  /// No description provided for @journalRowLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{date} · {entry} → {exit} · {lots} lots'**
+  String journalRowLine(String date, String entry, String exit, String lots);
+
+  /// No description provided for @journalResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get journalResult;
 }
 
 class _AppLocalizationsDelegate

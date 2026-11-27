@@ -1166,4 +1166,367 @@ class AppLocalizationsEn extends AppLocalizations {
   String planTrialDays(int days) {
     return 'Trial · ${days}d';
   }
+
+  @override
+  String get tradeNewEntry => 'New entry';
+
+  @override
+  String get tradeEditEntry => 'Edit entry';
+
+  @override
+  String get tradeSaveChanges => 'Save changes';
+
+  @override
+  String get tradeSaveEntry => 'Save entry';
+
+  @override
+  String get tradeInstrument => 'Instrument';
+
+  @override
+  String get tradeSymbol => 'Symbol';
+
+  @override
+  String get tradePickInstrument => 'Pick an instrument';
+
+  @override
+  String get tradeSymbolRequired => 'A symbol is required.';
+
+  @override
+  String get tradeBuy => 'BUY';
+
+  @override
+  String get tradeSell => 'SELL';
+
+  @override
+  String get tradePinLevels => 'Pin levels from chart';
+
+  @override
+  String get tradeStrategy => 'Strategy';
+
+  @override
+  String get tradeSavedStrategies => 'Saved strategies';
+
+  @override
+  String tradeSimilarStrategy(String name) {
+    return 'You already use “$name”. Pick the existing spelling so its statistics stay together.';
+  }
+
+  @override
+  String get tradeExecution => 'Execution';
+
+  @override
+  String get tradePrices => 'Prices';
+
+  @override
+  String get tradeEntryPrice => 'Entry price';
+
+  @override
+  String get tradeStopTarget => 'Stop & target';
+
+  @override
+  String get tradeStopLoss => 'Stop loss';
+
+  @override
+  String get tradeTakeProfit => 'Take profit';
+
+  @override
+  String get tradeExit => 'Exit';
+
+  @override
+  String get tradeSizeCosts => 'Size & costs';
+
+  @override
+  String get tradeSizeLots => 'Size (lots)';
+
+  @override
+  String get tradeCommission => 'Commission';
+
+  @override
+  String get tradeSwap => 'Swap';
+
+  @override
+  String get tradeNotSet => 'Not set';
+
+  @override
+  String get tradeFoundWithExit => 'Found with the exit';
+
+  @override
+  String get tradeNotFoundYet => 'Not found yet';
+
+  @override
+  String get tradeExitReadsCandles =>
+      'The app reads the candles after entry and takes whichever of the two levels the market hit first.';
+
+  @override
+  String get tradeFindExit => 'Find exit';
+
+  @override
+  String get tradeFindAgain => 'Find again';
+
+  @override
+  String get tradeSavedExit => 'Saved exit';
+
+  @override
+  String get tradeExitTakeProfit => 'Take profit hit first';
+
+  @override
+  String get tradeExitStopLoss => 'Stop loss hit first';
+
+  @override
+  String get tradeExitLatestPrice =>
+      'Neither level reached · marked at the latest price';
+
+  @override
+  String get tradeTimeWindow => 'Time window';
+
+  @override
+  String get tradeTimeWindowSub =>
+      'Entry and exit time drive the hour and session report.';
+
+  @override
+  String get tradeOpened => 'Opened';
+
+  @override
+  String get tradeClosed => 'Closed';
+
+  @override
+  String get tradeTimeInMarket => 'Time in market';
+
+  @override
+  String get tradeSetBothTimes => 'Set both times';
+
+  @override
+  String get tradeExitBeforeEntry => 'Exit before entry';
+
+  @override
+  String get tradeJournal => 'Journal';
+
+  @override
+  String get tradeJournalSub =>
+      'What was the setup, and what did you actually do?';
+
+  @override
+  String get tradeJournalHint => 'The idea, the trigger, how you managed it.';
+
+  @override
+  String get tradeMedia => 'Photos & voice notes';
+
+  @override
+  String get tradeMediaSub =>
+      'A chart screenshot and a spoken note are worth more than a paragraph later.';
+
+  @override
+  String get tradeGallery => 'Gallery';
+
+  @override
+  String get tradeCamera => 'Camera';
+
+  @override
+  String get tradeRecord => 'Record';
+
+  @override
+  String tradeStopRecording(String time) {
+    return 'Stop $time';
+  }
+
+  @override
+  String get tradeAudioFile => 'Audio file';
+
+  @override
+  String get tradeUploading => 'Uploading…';
+
+  @override
+  String tradeUploadsOnSave(String duration, String size) {
+    return '$duration · $size · uploads on save';
+  }
+
+  @override
+  String get tradeVoiceNote => 'Voice note';
+
+  @override
+  String get tradeScreenshots => 'SCREENSHOTS';
+
+  @override
+  String get tradeVoiceNotes => 'VOICE NOTES';
+
+  @override
+  String get tradeRemoveFileTitle => 'Remove this file?';
+
+  @override
+  String get tradeRemoveFileBody =>
+      'It is deleted from storage as well as from this entry.';
+
+  @override
+  String get tradeRemove => 'Remove';
+
+  @override
+  String get tradeTags => 'Tags';
+
+  @override
+  String get tradeNoTags => 'No tags yet — they drive the edge report.';
+
+  @override
+  String get tradeAddTagHint => 'Add a tag and press enter';
+
+  @override
+  String get tradeLiveTicket => 'Live ticket';
+
+  @override
+  String get tradeEstimatedPnl => 'ESTIMATED P&L';
+
+  @override
+  String tradePips(String pips) {
+    return '$pips pips';
+  }
+
+  @override
+  String get tradeRequired => 'Required';
+
+  @override
+  String get tradeNumber => 'Number';
+
+  @override
+  String get tradeMustBePositive => 'Must be > 0';
+
+  @override
+  String get tradeLevelsHint =>
+      'Add a stop loss or a take profit, or the exit is marked at the latest price.';
+
+  @override
+  String get tradeLevelBuyStop =>
+      'For a BUY the stop loss must be below the entry.';
+
+  @override
+  String get tradeLevelBuyTake =>
+      'For a BUY the take profit must be above the entry.';
+
+  @override
+  String get tradeLevelSellStop =>
+      'For a SELL the stop loss must be above the entry.';
+
+  @override
+  String get tradeLevelSellTake =>
+      'For a SELL the take profit must be below the entry.';
+
+  @override
+  String get riskLabel => 'RISK';
+
+  @override
+  String get riskRewardLabel => 'REWARD';
+
+  @override
+  String get riskHintEmpty =>
+      'Add an entry, a level and a size to preview the risk.';
+
+  @override
+  String get riskStopWrongBuy =>
+      'A buy\'s stop sits below the entry — this one is above it.';
+
+  @override
+  String get riskStopWrongSell =>
+      'A sell\'s stop sits above the entry — this one is below it.';
+
+  @override
+  String get riskTakeWrongBuy =>
+      'A buy\'s target sits above the entry — this one is below it.';
+
+  @override
+  String get riskTakeWrongSell =>
+      'A sell\'s target sits below the entry — this one is above it.';
+
+  @override
+  String tradeLoadFailed(String message) {
+    return 'Could not load this trade: $message';
+  }
+
+  @override
+  String tradeSaveFailed(String message) {
+    return 'Could not save: $message';
+  }
+
+  @override
+  String get tradeSaveTimedOut =>
+      'The save request timed out. Check your connection and press Save again.';
+
+  @override
+  String get tradeMediaSavedNote =>
+      'The trade itself was saved — press Save again to retry the media.';
+
+  @override
+  String get tradeExitBeforeEntryError =>
+      'The exit time cannot be before the entry time.';
+
+  @override
+  String get tradeSessionExpired => 'Your session expired. Sign in again.';
+
+  @override
+  String get tradeEnterEntryAndSize =>
+      'Enter the entry price and the size before saving.';
+
+  @override
+  String get tradeSetOpenedTime =>
+      'Set the opened time — the candles after it decide the exit price and time.';
+
+  @override
+  String get tradePickSymbolFirst =>
+      'Pick the symbol from the list — the exit is read from its candles.';
+
+  @override
+  String get tradeOpenedInFuture =>
+      'The opened time is in the future. Pick a past time.';
+
+  @override
+  String get tradeEnterEntryFirst => 'Enter the entry price first.';
+
+  @override
+  String get tradePickSymbolToFindExit =>
+      'Pick a symbol from the list first, then find the exit.';
+
+  @override
+  String get tradeNoCandles =>
+      'No candles were returned for that time. Check the symbol and the opened time, then try again.';
+
+  @override
+  String get tradeCandlesUnreadable =>
+      'The candles could not be read. Check your connection and try again.';
+
+  @override
+  String tradeRemovePendingFailed(String message) {
+    return 'The file was removed here but could not be deleted from storage: $message';
+  }
+
+  @override
+  String tradeRemoveFailed(String message) {
+    return 'Could not remove that file: $message';
+  }
+
+  @override
+  String get tradeRecordingOpenFailed => 'Could not open that recording.';
+
+  @override
+  String get tradeRecordingPlayFailed => 'Could not play that recording.';
+
+  @override
+  String journalRefreshFailed(String message) {
+    return 'Could not refresh: $message';
+  }
+
+  @override
+  String journalRescueBanner(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades are',
+      one: '1 trade is',
+    );
+    return 'Your $_temp0 saved, but the list came back empty — most often a dropped session. Pull down to try again.';
+  }
+
+  @override
+  String journalRowLine(String date, String entry, String exit, String lots) {
+    return '$date · $entry → $exit · $lots lots';
+  }
+
+  @override
+  String get journalResult => 'Result';
 }

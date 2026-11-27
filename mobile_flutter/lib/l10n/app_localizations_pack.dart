@@ -1224,4 +1224,357 @@ class AppLocalizationsPack extends AppLocalizations {
     if (template == null) return _en.planTrialDays(days);
     return _fill(template, <String, Object?>{'days': days});
   }
+
+  @override
+  String get tradeNewEntry => _read('tradeNewEntry') ?? _en.tradeNewEntry;
+
+  @override
+  String get tradeEditEntry => _read('tradeEditEntry') ?? _en.tradeEditEntry;
+
+  @override
+  String get tradeSaveChanges => _read('tradeSaveChanges') ?? _en.tradeSaveChanges;
+
+  @override
+  String get tradeSaveEntry => _read('tradeSaveEntry') ?? _en.tradeSaveEntry;
+
+  @override
+  String get tradeInstrument => _read('tradeInstrument') ?? _en.tradeInstrument;
+
+  @override
+  String get tradeSymbol => _read('tradeSymbol') ?? _en.tradeSymbol;
+
+  @override
+  String get tradePickInstrument => _read('tradePickInstrument') ?? _en.tradePickInstrument;
+
+  @override
+  String get tradeSymbolRequired => _read('tradeSymbolRequired') ?? _en.tradeSymbolRequired;
+
+  @override
+  String get tradeBuy => _read('tradeBuy') ?? _en.tradeBuy;
+
+  @override
+  String get tradeSell => _read('tradeSell') ?? _en.tradeSell;
+
+  @override
+  String get tradePinLevels => _read('tradePinLevels') ?? _en.tradePinLevels;
+
+  @override
+  String get tradeStrategy => _read('tradeStrategy') ?? _en.tradeStrategy;
+
+  @override
+  String get tradeSavedStrategies => _read('tradeSavedStrategies') ?? _en.tradeSavedStrategies;
+
+  @override
+  String tradeSimilarStrategy(String name) {
+    final template = _read('tradeSimilarStrategy');
+    if (template == null) return _en.tradeSimilarStrategy(name);
+    return _fill(template, <String, Object?>{'name': name});
+  }
+
+  @override
+  String get tradeExecution => _read('tradeExecution') ?? _en.tradeExecution;
+
+  @override
+  String get tradePrices => _read('tradePrices') ?? _en.tradePrices;
+
+  @override
+  String get tradeEntryPrice => _read('tradeEntryPrice') ?? _en.tradeEntryPrice;
+
+  @override
+  String get tradeStopTarget => _read('tradeStopTarget') ?? _en.tradeStopTarget;
+
+  @override
+  String get tradeStopLoss => _read('tradeStopLoss') ?? _en.tradeStopLoss;
+
+  @override
+  String get tradeTakeProfit => _read('tradeTakeProfit') ?? _en.tradeTakeProfit;
+
+  @override
+  String get tradeExit => _read('tradeExit') ?? _en.tradeExit;
+
+  @override
+  String get tradeSizeCosts => _read('tradeSizeCosts') ?? _en.tradeSizeCosts;
+
+  @override
+  String get tradeSizeLots => _read('tradeSizeLots') ?? _en.tradeSizeLots;
+
+  @override
+  String get tradeCommission => _read('tradeCommission') ?? _en.tradeCommission;
+
+  @override
+  String get tradeSwap => _read('tradeSwap') ?? _en.tradeSwap;
+
+  @override
+  String get tradeNotSet => _read('tradeNotSet') ?? _en.tradeNotSet;
+
+  @override
+  String get tradeFoundWithExit => _read('tradeFoundWithExit') ?? _en.tradeFoundWithExit;
+
+  @override
+  String get tradeNotFoundYet => _read('tradeNotFoundYet') ?? _en.tradeNotFoundYet;
+
+  @override
+  String get tradeExitReadsCandles => _read('tradeExitReadsCandles') ?? _en.tradeExitReadsCandles;
+
+  @override
+  String get tradeFindExit => _read('tradeFindExit') ?? _en.tradeFindExit;
+
+  @override
+  String get tradeFindAgain => _read('tradeFindAgain') ?? _en.tradeFindAgain;
+
+  @override
+  String get tradeSavedExit => _read('tradeSavedExit') ?? _en.tradeSavedExit;
+
+  @override
+  String get tradeExitTakeProfit => _read('tradeExitTakeProfit') ?? _en.tradeExitTakeProfit;
+
+  @override
+  String get tradeExitStopLoss => _read('tradeExitStopLoss') ?? _en.tradeExitStopLoss;
+
+  @override
+  String get tradeExitLatestPrice => _read('tradeExitLatestPrice') ?? _en.tradeExitLatestPrice;
+
+  @override
+  String get tradeTimeWindow => _read('tradeTimeWindow') ?? _en.tradeTimeWindow;
+
+  @override
+  String get tradeTimeWindowSub => _read('tradeTimeWindowSub') ?? _en.tradeTimeWindowSub;
+
+  @override
+  String get tradeOpened => _read('tradeOpened') ?? _en.tradeOpened;
+
+  @override
+  String get tradeClosed => _read('tradeClosed') ?? _en.tradeClosed;
+
+  @override
+  String get tradeTimeInMarket => _read('tradeTimeInMarket') ?? _en.tradeTimeInMarket;
+
+  @override
+  String get tradeSetBothTimes => _read('tradeSetBothTimes') ?? _en.tradeSetBothTimes;
+
+  @override
+  String get tradeExitBeforeEntry => _read('tradeExitBeforeEntry') ?? _en.tradeExitBeforeEntry;
+
+  @override
+  String get tradeJournal => _read('tradeJournal') ?? _en.tradeJournal;
+
+  @override
+  String get tradeJournalSub => _read('tradeJournalSub') ?? _en.tradeJournalSub;
+
+  @override
+  String get tradeJournalHint => _read('tradeJournalHint') ?? _en.tradeJournalHint;
+
+  @override
+  String get tradeMedia => _read('tradeMedia') ?? _en.tradeMedia;
+
+  @override
+  String get tradeMediaSub => _read('tradeMediaSub') ?? _en.tradeMediaSub;
+
+  @override
+  String get tradeGallery => _read('tradeGallery') ?? _en.tradeGallery;
+
+  @override
+  String get tradeCamera => _read('tradeCamera') ?? _en.tradeCamera;
+
+  @override
+  String get tradeRecord => _read('tradeRecord') ?? _en.tradeRecord;
+
+  @override
+  String tradeStopRecording(String time) {
+    final template = _read('tradeStopRecording');
+    if (template == null) return _en.tradeStopRecording(time);
+    return _fill(template, <String, Object?>{'time': time});
+  }
+
+  @override
+  String get tradeAudioFile => _read('tradeAudioFile') ?? _en.tradeAudioFile;
+
+  @override
+  String get tradeUploading => _read('tradeUploading') ?? _en.tradeUploading;
+
+  @override
+  String tradeUploadsOnSave(String duration, String size) {
+    final template = _read('tradeUploadsOnSave');
+    if (template == null) return _en.tradeUploadsOnSave(duration, size);
+    return _fill(template, <String, Object?>{'duration': duration, 'size': size});
+  }
+
+  @override
+  String get tradeVoiceNote => _read('tradeVoiceNote') ?? _en.tradeVoiceNote;
+
+  @override
+  String get tradeScreenshots => _read('tradeScreenshots') ?? _en.tradeScreenshots;
+
+  @override
+  String get tradeVoiceNotes => _read('tradeVoiceNotes') ?? _en.tradeVoiceNotes;
+
+  @override
+  String get tradeRemoveFileTitle => _read('tradeRemoveFileTitle') ?? _en.tradeRemoveFileTitle;
+
+  @override
+  String get tradeRemoveFileBody => _read('tradeRemoveFileBody') ?? _en.tradeRemoveFileBody;
+
+  @override
+  String get tradeRemove => _read('tradeRemove') ?? _en.tradeRemove;
+
+  @override
+  String get tradeTags => _read('tradeTags') ?? _en.tradeTags;
+
+  @override
+  String get tradeNoTags => _read('tradeNoTags') ?? _en.tradeNoTags;
+
+  @override
+  String get tradeAddTagHint => _read('tradeAddTagHint') ?? _en.tradeAddTagHint;
+
+  @override
+  String get tradeLiveTicket => _read('tradeLiveTicket') ?? _en.tradeLiveTicket;
+
+  @override
+  String get tradeEstimatedPnl => _read('tradeEstimatedPnl') ?? _en.tradeEstimatedPnl;
+
+  @override
+  String tradePips(String pips) {
+    final template = _read('tradePips');
+    if (template == null) return _en.tradePips(pips);
+    return _fill(template, <String, Object?>{'pips': pips});
+  }
+
+  @override
+  String get tradeRequired => _read('tradeRequired') ?? _en.tradeRequired;
+
+  @override
+  String get tradeNumber => _read('tradeNumber') ?? _en.tradeNumber;
+
+  @override
+  String get tradeMustBePositive => _read('tradeMustBePositive') ?? _en.tradeMustBePositive;
+
+  @override
+  String get tradeLevelsHint => _read('tradeLevelsHint') ?? _en.tradeLevelsHint;
+
+  @override
+  String get tradeLevelBuyStop => _read('tradeLevelBuyStop') ?? _en.tradeLevelBuyStop;
+
+  @override
+  String get tradeLevelBuyTake => _read('tradeLevelBuyTake') ?? _en.tradeLevelBuyTake;
+
+  @override
+  String get tradeLevelSellStop => _read('tradeLevelSellStop') ?? _en.tradeLevelSellStop;
+
+  @override
+  String get tradeLevelSellTake => _read('tradeLevelSellTake') ?? _en.tradeLevelSellTake;
+
+  @override
+  String get riskLabel => _read('riskLabel') ?? _en.riskLabel;
+
+  @override
+  String get riskRewardLabel => _read('riskRewardLabel') ?? _en.riskRewardLabel;
+
+  @override
+  String get riskHintEmpty => _read('riskHintEmpty') ?? _en.riskHintEmpty;
+
+  @override
+  String get riskStopWrongBuy => _read('riskStopWrongBuy') ?? _en.riskStopWrongBuy;
+
+  @override
+  String get riskStopWrongSell => _read('riskStopWrongSell') ?? _en.riskStopWrongSell;
+
+  @override
+  String get riskTakeWrongBuy => _read('riskTakeWrongBuy') ?? _en.riskTakeWrongBuy;
+
+  @override
+  String get riskTakeWrongSell => _read('riskTakeWrongSell') ?? _en.riskTakeWrongSell;
+
+  @override
+  String tradeLoadFailed(String message) {
+    final template = _read('tradeLoadFailed');
+    if (template == null) return _en.tradeLoadFailed(message);
+    return _fill(template, <String, Object?>{'message': message});
+  }
+
+  @override
+  String tradeSaveFailed(String message) {
+    final template = _read('tradeSaveFailed');
+    if (template == null) return _en.tradeSaveFailed(message);
+    return _fill(template, <String, Object?>{'message': message});
+  }
+
+  @override
+  String get tradeSaveTimedOut => _read('tradeSaveTimedOut') ?? _en.tradeSaveTimedOut;
+
+  @override
+  String get tradeMediaSavedNote => _read('tradeMediaSavedNote') ?? _en.tradeMediaSavedNote;
+
+  @override
+  String get tradeExitBeforeEntryError => _read('tradeExitBeforeEntryError') ?? _en.tradeExitBeforeEntryError;
+
+  @override
+  String get tradeSessionExpired => _read('tradeSessionExpired') ?? _en.tradeSessionExpired;
+
+  @override
+  String get tradeEnterEntryAndSize => _read('tradeEnterEntryAndSize') ?? _en.tradeEnterEntryAndSize;
+
+  @override
+  String get tradeSetOpenedTime => _read('tradeSetOpenedTime') ?? _en.tradeSetOpenedTime;
+
+  @override
+  String get tradePickSymbolFirst => _read('tradePickSymbolFirst') ?? _en.tradePickSymbolFirst;
+
+  @override
+  String get tradeOpenedInFuture => _read('tradeOpenedInFuture') ?? _en.tradeOpenedInFuture;
+
+  @override
+  String get tradeEnterEntryFirst => _read('tradeEnterEntryFirst') ?? _en.tradeEnterEntryFirst;
+
+  @override
+  String get tradePickSymbolToFindExit => _read('tradePickSymbolToFindExit') ?? _en.tradePickSymbolToFindExit;
+
+  @override
+  String get tradeNoCandles => _read('tradeNoCandles') ?? _en.tradeNoCandles;
+
+  @override
+  String get tradeCandlesUnreadable => _read('tradeCandlesUnreadable') ?? _en.tradeCandlesUnreadable;
+
+  @override
+  String tradeRemovePendingFailed(String message) {
+    final template = _read('tradeRemovePendingFailed');
+    if (template == null) return _en.tradeRemovePendingFailed(message);
+    return _fill(template, <String, Object?>{'message': message});
+  }
+
+  @override
+  String tradeRemoveFailed(String message) {
+    final template = _read('tradeRemoveFailed');
+    if (template == null) return _en.tradeRemoveFailed(message);
+    return _fill(template, <String, Object?>{'message': message});
+  }
+
+  @override
+  String get tradeRecordingOpenFailed => _read('tradeRecordingOpenFailed') ?? _en.tradeRecordingOpenFailed;
+
+  @override
+  String get tradeRecordingPlayFailed => _read('tradeRecordingPlayFailed') ?? _en.tradeRecordingPlayFailed;
+
+  @override
+  String journalRefreshFailed(String message) {
+    final template = _read('journalRefreshFailed');
+    if (template == null) return _en.journalRefreshFailed(message);
+    return _fill(template, <String, Object?>{'message': message});
+  }
+
+  @override
+  String journalRescueBanner(int count) {
+    final template = _read('journalRescueBanner');
+    if (template == null) return _en.journalRescueBanner(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String journalRowLine(String date, String entry, String exit, String lots) {
+    final template = _read('journalRowLine');
+    if (template == null) return _en.journalRowLine(date, entry, exit, lots);
+    return _fill(template, <String, Object?>{'date': date, 'entry': entry, 'exit': exit, 'lots': lots});
+  }
+
+  @override
+  String get journalResult => _read('journalResult') ?? _en.journalResult;
 }

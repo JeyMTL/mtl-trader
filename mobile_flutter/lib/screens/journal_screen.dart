@@ -134,7 +134,11 @@ class _JournalScreenState extends State<JournalScreen> {
         // an error page the trader reads as "my trades are gone".
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not refresh: $message')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).journalRefreshFailed(message),
+            ),
+          ),
         );
       } else {
         setState(() {
@@ -168,9 +172,7 @@ class _JournalScreenState extends State<JournalScreen> {
     }
     if (!mounted || requestId != _requestId || count <= 0) return;
     setState(
-      () => _error = 'Your ${countNoun(count, 'trade')} this month '
-          '${count == 1 ? 'is' : 'are'} saved, but the list came back empty — '
-          'most often a dropped session. Pull down to try again.',
+      () => _error = AppLocalizations.of(context).journalRescueBanner(count),
     );
   }
 
@@ -451,7 +453,7 @@ class _JournalScreenState extends State<JournalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _filterLabel('Result'),
+          _filterLabel(AppLocalizations.of(context).journalResult),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -650,7 +652,10 @@ class _TradeCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Flexible(
                   child: Pill(
-                    text: trade.type,
+                    text: _typeLabel(
+                      AppLocalizations.of(context),
+                      trade.type,
+                    ),
                     tone: trade.type == 'BUY' ? Tone.positive : Tone.negative,
                   ),
                 ),
@@ -674,8 +679,12 @@ class _TradeCard extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             Text(
-              '${dayOf(trade.tradedAt)} · ${price(trade.entryPrice)} → '
-              '${price(trade.exitPrice)} · ${price(trade.lotSize, decimals: 2)} lots',
+              AppLocalizations.of(context).journalRowLine(
+                dayOf(trade.tradedAt),
+                price(trade.entryPrice),
+                price(trade.exitPrice),
+                price(trade.lotSize, decimals: 2),
+              ),
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: kMinLabelSize,
@@ -994,3 +1003,10 @@ class _FilterTab extends StatelessWidget {
     );
   }
 }
+
+/// `BUY` / `SELL` as the reader's language writes them.
+///
+/// The stored value stays English because the database and the sync use it;
+/// only the pill is translated.
+String _typeLabel(AppLocalizations l10n, String type) =>
+    type.toUpperCase() == 'SELL' ? l10n.tradeSell : l10n.tradeBuy;
