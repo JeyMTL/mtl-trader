@@ -2148,7 +2148,10 @@ class RejectedBatchNamingTests(unittest.TestCase):
             chunk, {"imported": 1, "skipped": 0, "invalid": 1, "suppressed": 0}, {1: 12.5}
         )
 
-        self.assertEqual(count, 2)
+        # The count is what the journal took, not the size of the batch: the
+        # batch length is what was read, and reporting it as stored is what hid
+        # a refused batch behind "44 position(s)".
+        self.assertEqual(count, 1)
         self.assertIn("position 1002 XAUUSD SELL PnL -42.10 is not in the journal", output)
         # It must not accuse the row that did land.
         self.assertNotIn("position 1001", output)
@@ -2176,18 +2179,24 @@ class RejectedBatchNamingTests(unittest.TestCase):
         sup.journal_pnl = journal_pnl
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            sup.push("u-12345678", chunk)
+            count = sup.push("u-12345678", chunk)
 
+        self.assertEqual(count, 2)
         self.assertEqual(out.getvalue(), "")
 
     def test_a_suppressed_row_is_a_deletion_not_a_rejection(self):
         chunk = [self.trade(1, 1.0), self.trade(2, 2.0)]
 
-        _, output, asked = self.run_push(
+        count, output, asked = self.run_push(
             chunk, {"imported": 0, "skipped": 0, "invalid": 0, "suppressed": 2}, {}
         )
 
-        self.assertEqual(output, "")
+        # A customer's own deletion is said out loud — a silent 200 is how "the
+        # sync is connected but my journal never gets my trades" stayed invisible
+        # for hours — but it is never reported as a rejection.
+        self.assertIn("2 of 2 position(s) were deleted from the journal earlier", output)
+        self.assertNotIn("did not land", output)
+        self.assertEqual(count, 0)
         self.assertEqual(asked, [])
 
     def test_an_unreadable_journal_does_not_call_every_row_rejected(self):
@@ -2199,6 +2208,119 @@ class RejectedBatchNamingTests(unittest.TestCase):
 
         self.assertIn("the journal could not be read to name them", output)
         self.assertNotIn("is not in the journal", output)
+
+
+class CursorStopsTests(unittest.TestCase):
+    """A batch the journal did not take must not move the read cursor.
+
+    `/api/sync` answers 200 with a count for rows it suppresses, so a read that
+    found trades can store none of them. Advancing `last_sync_at` there is how a
+    close is lost for good: the cursor then never looks back at it again.
+    """
+
+    def setUp(self):
+        self.saved = {
+            name: getattr(sup, name)
+            for name in (
+                "server_offset",
+                "backfill_retry",
+                "position_trades",
+                "push",
+                "announce_connected",
+                "mark",
+            )
+        }
+        self.addCleanup(self._restore)
+        sup.server_offset = lambda row: 0
+        sup.backfill_retry = lambda user_id: None
+        sup.position_trades = lambda since, offset: [
+            {"position_id": 7, "symbol": "XAUUSD"}
+        ]
+        sup.announce_connected = lambda *args, **kwargs: None
+        self.marks = []
+
+        def mark(user_id, status, error=None, synced_at=None):
+            self.marks.append({"status": status, "error": error, "synced_at": synced_at})
+
+        sup.mark = mark
+
+    def _restore(self):
+        for name, value in self.saved.items():
+            setattr(sup, name, value)
+
+    def row(self):
+        return {
+            "user_id": "u-12345678",
+            "server": "Exness",
+            "status": "connected",
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def test_rows_the_ingest_rejected_leave_the_cursor_where_it_was(self):
+        sup.push = lambda user_id, trades: sup.Stored(0, 1)
+
+        sup.read_closed(self.row())
+
+        self.assertEqual(self.marks[-1]["status"], "connected")
+        self.assertIsNone(self.marks[-1]["synced_at"])
+
+    def test_a_batch_the_journal_settled_moves_the_cursor(self):
+        # Suppressed as a customer deletion: it will never land, so holding the
+        # cursor there would re-read the same history on every cycle.
+        sup.push = lambda user_id, trades: sup.Stored(0, 0)
+
+        sup.read_closed(self.row())
+
+        self.assertIsNotNone(self.marks[-1]["synced_at"])
+
+    def test_a_batch_that_stored_rows_moves_the_cursor(self):
+        sup.push = lambda user_id, trades: 1
+
+        sup.read_closed(self.row())
+
+        self.assertIsNotNone(self.marks[-1]["synced_at"])
+
+
+class CatchUpReadTests(unittest.TestCase):
+    """A held session reads its cursor again without waiting for a reconnect."""
+
+    def setUp(self):
+        self.saved = {
+            name: getattr(sup, name) for name in ("connection_state", "read_closed")
+        }
+        self.addCleanup(self._restore)
+        self.seen = []
+        sup.read_closed = lambda row: self.seen.append(dict(row))
+
+    def _restore(self):
+        for name, value in self.saved.items():
+            setattr(sup, name, value)
+
+    def row(self):
+        return {
+            "user_id": "u-12345678",
+            "server": "Exness",
+            "status": "connected",
+            "last_sync_at": "2026-11-27T14:00:00+00:00",
+        }
+
+    def test_the_cursor_comes_from_the_database_not_the_watch_start(self):
+        sup.connection_state = lambda user_id: {
+            "status": "connected",
+            "last_sync_at": "2026-11-27T15:00:00+00:00",
+        }
+
+        sup.reconcile(self.row())
+
+        self.assertEqual(self.seen[0]["last_sync_at"], "2026-11-27T15:00:00+00:00")
+        self.assertEqual(self.seen[0]["status"], "connected")
+
+    def test_an_unreadable_connection_falls_back_to_the_row_it_has(self):
+        sup.connection_state = lambda user_id: None
+
+        sup.reconcile(self.row())
+
+        self.assertEqual(self.seen[0]["last_sync_at"], "2026-11-27T14:00:00+00:00")
 
 
 class HistoryAuditTests(unittest.TestCase):

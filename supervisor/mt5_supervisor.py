@@ -56,6 +56,8 @@ Environment:
                            terminal to finish downloading history)
     WATCH_SECONDS         (default 2 - poll interval while watching the single
                            connected account; 0 disables the watch mode)
+    RECONCILE_SECONDS     (default 300 - how often a held session re-reads its
+                           cursor, so a close the poll missed still lands)
 
 Run:
     python supervisor/mt5_supervisor.py --once
@@ -141,6 +143,14 @@ _capacity_warned_at = 0.0
 # watch falls back to the normal rotation.
 WATCH_SECONDS = float(os.environ.get("WATCH_SECONDS", "1"))
 WATCH_WINDOW = timedelta(minutes=30)
+# How often a held session reads history from its cursor again. The per-second
+# tick only sees deals the terminal has already downloaded, so a close that
+# arrived late, a position whose build failed, or a batch the ingest did not
+# store had no second chance until the customer pressed Reconnect — and a trader
+# who has to notice and reconnect is a trade that never reaches the journal.
+# Reading again is idempotent (every row is an upsert), so a quiet catch-up costs
+# one history read and changes nothing. 0 disables it.
+RECONCILE_SECONDS = int(os.environ.get("RECONCILE_SECONDS", "300"))
 # The daily stop, as this host can enforce it. The server decides whether the day
 # is locked (`/api/ea/lock`, the same answer the guard EA gets); this process can
 # only do what a client-side program can do, which is remove resting orders. It
@@ -690,6 +700,22 @@ def journal_pnl(user_id, positions):
     return stored
 
 
+class Stored(int):
+    """How many rows the journal took, plus whether any row is still missing.
+
+    An `int` so every caller that only wants a count keeps working, and
+    `unexplained` is the part the cursor needs: a row the ingest suppressed as a
+    customer deletion is settled and will never land, while a rejected row is not
+    and has to be read again. Treating both as "did not store, so retry" holds
+    the cursor over a deleted history forever and re-reads it every cycle.
+    """
+
+    def __new__(cls, imported, unexplained=0):
+        value = super().__new__(cls, imported)
+        value.unexplained = unexplained
+        return value
+
+
 def name_short_batch(user_id, chunk, response):
     """Name the rows a chunk did not store, and any P&L that disagrees.
 
@@ -703,6 +729,10 @@ def name_short_batch(user_id, chunk, response):
     Comparing the journal's own P&L for the batch against what the terminal
     reported names the row either way: absent, or present with a different
     number.
+
+    Returns how many rows the journal took, which is what `push` reports: the
+    batch length is what was *read*, and printing that as if it were stored is
+    how "44 position(s)" read as success on a batch the ingest refused.
     """
     try:
         body = response.json()
@@ -710,15 +740,24 @@ def name_short_batch(user_id, chunk, response):
         skipped = int(body.get("skipped") or 0)
         suppressed = int(body.get("suppressed") or 0)
     except (ValueError, TypeError, AttributeError):
-        return
+        # A 200 whose body cannot be read stored nothing we can vouch for.
+        return Stored(0, len(chunk))
+    if suppressed:
+        # Not a rejection: these are positions the customer deleted, and the
+        # ingest keeps them out on purpose. Saying so is the difference between
+        # "the sync is quiet" and "the sync is silently dropping my history".
+        print(
+            f"  [info] {user_id[:8]}… {suppressed} of {len(chunk)} position(s) were "
+            "deleted from the journal earlier, so the ingest keeps them out"
+        )
     unexplained = len(chunk) - imported - skipped - suppressed
     if unexplained <= 0:
-        return
+        return Stored(imported)
     label = f"  [warn] {user_id[:8]}… {unexplained} of {len(chunk)} position(s) did not land"
     stored = journal_pnl(user_id, [trade.get("position_id") for trade in chunk])
     if stored is None:
         print(f"{label}; the journal could not be read to name them")
-        return
+        return Stored(imported, unexplained)
 
     named = set()
     for trade in chunk:
@@ -741,9 +780,19 @@ def name_short_batch(user_id, chunk, response):
                 f"{label}: position {trade.get('ticket')} {trade.get('symbol')} PnL differs: "
                 f"journal {stored[position]:.2f}, broker {broker:.2f}"
             )
+    return Stored(imported, unexplained)
 
 
 def push(user_id, trades):
+    """Send a batch and return how many rows the journal actually took.
+
+    Returning `len(trades)` made every caller report the size of the read as if
+    it were the size of the write: a batch the ingest suppressed or rejected
+    printed the same line as a batch it stored, and `announce_connected` told the
+    customer that N trades had been imported when none had.
+    """
+    imported = 0
+    unexplained = 0
     for start in range(0, len(trades), CHUNK):
         chunk = trades[start:start + CHUNK]
         response = requests.post(
@@ -754,8 +803,21 @@ def push(user_id, trades):
         )
         if response.status_code not in (200, 202):
             raise RuntimeError(f"ingest rejected ({response.status_code}): {response.text[:160]}")
-        name_short_batch(user_id, chunk, response)
-    return len(trades)
+        result = name_short_batch(user_id, chunk, response)
+        imported += int(result)
+        unexplained += getattr(result, "unexplained", 0)
+    return Stored(imported, unexplained)
+
+
+def settled(stored):
+    """Whether the read cursor may move past this batch.
+
+    Zero stored is fine when the ingest accounted for every row — a customer's
+    deletion, or a row already present — because those will never land and
+    holding the cursor there only re-reads them forever. A rejected row is not
+    settled: it has to be read again, so the cursor stays where it is.
+    """
+    return bool(stored) or not getattr(stored, "unexplained", 0)
 
 
 def notify(user_id, title, body):
@@ -2030,18 +2092,34 @@ def read_closed(row):
     else:
         trades = position_trades(since, offset)
 
-    synced = push(user_id, trades) if trades else 0
+    stored = push(user_id, trades) if trades else 0
     if start is not None and trades:
         # Only a read that delivered trades counts. An empty read may just be a
         # history still downloading, so it is repeated instead of spending a pass.
         step_backfill(user_id)
-    mark(user_id, "connected", error="", synced_at=datetime.now(timezone.utc).isoformat())
+    # The cursor is what stops a trade being read twice, and moving it over a
+    # batch that did not land is how a close is lost for good: `/api/sync`
+    # answers 200 for rows it suppressed, so "the read found trades" is not the
+    # same as "the journal has them". Only a settled batch — stored, already
+    # present, or deleted by the customer — may move it. A rejected one is read
+    # again from the same place.
+    if trades and not settled(stored):
+        mark(user_id, "connected", error="")
+    else:
+        mark(
+            user_id,
+            "connected",
+            error="",
+            synced_at=datetime.now(timezone.utc).isoformat(),
+        )
     # Only a row that was not already live is news: a stale `connected` row is
     # refreshed every cycle and must not ring the phone each time.
     if row.get("status") != "connected":
-        announce_connected(row, synced)
-    print(f"  {user_id[:8]}… {row['server']} -> {synced} position(s)")
-    return synced
+        announce_connected(row, stored)
+    print(
+        f"  {user_id[:8]}… {row['server']} -> {stored} new of {len(trades)} position(s)"
+    )
+    return stored
 
 
 def sync_one(row, terminal=None):
@@ -2118,7 +2196,7 @@ def connection_state(user_id):
             f"{SUPABASE_URL}/rest/v1/broker_connections",
             headers=REST_HEADERS,
             params={
-                "select": "status,credential_cipher",
+                "select": "status,credential_cipher,last_sync_at",
                 "user_id": f"eq.{user_id}",
                 "limit": "1",
             },
@@ -2152,6 +2230,24 @@ def must_release(user_id, state, claimed):
     )
 
 
+def reconcile(row):
+    """Read the account's history again from its cursor, while the session is up.
+
+    The tick loop only sees deals the terminal has already downloaded, so a close
+    that arrived late, a position whose build failed, or a batch the ingest did
+    not store had no second chance until the customer pressed Reconnect. A trader
+    who has to notice the gap and reconnect is a trade that never reaches the
+    journal. Every row is an upsert, so reading again is free of duplicates; the
+    cursor comes from the database rather than the row this watch started with,
+    or every catch-up would re-read the whole session.
+    """
+    state = connection_state(row["user_id"]) or {}
+    fresh = {**row, "status": "connected"}
+    if state.get("last_sync_at"):
+        fresh["last_sync_at"] = state["last_sync_at"]
+    return read_closed(fresh)
+
+
 def watch(row, terminal=None, contended=True, should_yield=None):
     """
     Stay logged in and journal a close within `WATCH_SECONDS`.
@@ -2178,9 +2274,13 @@ def watch(row, terminal=None, contended=True, should_yield=None):
         # rest of the position closes.
         trades = position_trades(since, offset)
         if trades:
-            push(user_id, trades)
-            mark(user_id, "connected", error="", synced_at=now.isoformat())
-            print(f"  {user_id[:8]}… {row['server']} -> {len(trades)} position(s)")
+            stored = push(user_id, trades)
+            if settled(stored):
+                mark(user_id, "connected", error="", synced_at=now.isoformat())
+            print(
+                f"  {user_id[:8]}… {row['server']} -> {stored} new of "
+                f"{len(trades)} position(s)"
+            )
             # Those trades can be the ones that ended the day; check now, not at
             # the next poll.
             enforce_lock(row, force=True)
@@ -2198,6 +2298,7 @@ def watch(row, terminal=None, contended=True, should_yield=None):
         )
 
         last_claim = time.monotonic()
+        last_reconcile = time.monotonic()
         while True:
             time.sleep(WATCH_SECONDS)
             enforce_lock(row)
@@ -2219,8 +2320,9 @@ def watch(row, terminal=None, contended=True, should_yield=None):
 
             if fresh:
                 fresh.sort(key=lambda item: item["close_time"])
-                push(user_id, fresh)
-                mark(user_id, "connected", error="", synced_at=tick.isoformat())
+                stored = push(user_id, fresh)
+                if settled(stored):
+                    mark(user_id, "connected", error="", synced_at=tick.isoformat())
                 for trade in fresh:
                     print(
                         f"  {user_id[:8]}… closed {trade['symbol']} "
@@ -2229,6 +2331,16 @@ def watch(row, terminal=None, contended=True, should_yield=None):
                 # The close that breaches the stop is journaled above, so the
                 # lock acts in the same tick rather than up to a poll later.
                 enforce_lock(row, force=True)
+
+            # A close the tick loop could not see is still a close. This is the
+            # second chance that keeps a gap from waiting for a customer to
+            # notice it and press Reconnect.
+            if RECONCILE_SECONDS and time.monotonic() - last_reconcile >= RECONCILE_SECONDS:
+                last_reconcile = time.monotonic()
+                try:
+                    reconcile(row)
+                except Exception as error:  # noqa: BLE001 - the watch must survive it
+                    print(f"  [warn] catch-up read failed: {error}", flush=True)
 
             if time.monotonic() - last_claim >= CYCLE_SECONDS:
                 last_claim = time.monotonic()

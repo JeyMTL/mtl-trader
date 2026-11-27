@@ -115,6 +115,7 @@ What the 2 GB tuning does, and why:
 | `CYCLE_SECONDS` | `30` | new sign-ins are claimed every 30s instead of 15s; one constant query either way |
 | `REFRESH_SECONDS` | `180` | this is the cost that grows with customers; 3 minutes keeps a small host inside its budget |
 | `WATCH_SECONDS` | `1` | a close is journaled about a second after it happens; MT5 has no deal push |
+| `RECONCILE_SECONDS` | `300` | a held session re-reads its cursor every 5 minutes, so a close the poll missed still lands without a reconnect |
 | `LOCK_POLL_SECONDS` | `10` | a close is checked for the lock immediately; this only catches a rule edited in the app |
 | `MAX_ACCOUNTS` | `6` | a single cycle cannot run for minutes; least recently synced accounts go first |
 | `APP_URL` | `https://mtlledger.com` | the VPS does not run Next.js |
@@ -174,6 +175,10 @@ Checklist:
   disabled` when the account was saved with its investor (read-only) password,
   so the daily-stop lock's resting-order deletion needs a master password. The
   log says so once instead of failing silently.
+* **A trade deleted in the app stays deleted.** `/api/sync` records deleted
+  position ids and refuses them on every later sync, so re-importing an account
+  whose journal was cleared does not bring the old rows back. The slot log says
+  `N of M position(s) were deleted from the journal earlier` when this bites.
 * **A hard lock's EA still needs a chart.** The supervisor covers nothing of
   the lock; only the guard EA acts on it, and it cannot block the initial click —
   it deletes resting orders and closes the fill. Only the broker can refuse it.
