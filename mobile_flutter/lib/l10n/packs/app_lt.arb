@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Uždaryti",
+  "loginFooterEncrypted": "Nuo pradžios iki galo užšifruoti sandorių žurnalai",
+  "termsLabel": "Sąlygos",
+  "privacyLabel": "Privatumas",
+  "orSeparator": "arba",
+  "forgotPassword": "Pamiršote slaptažodį?",
+  "resetTitle": "Slaptažodžio atstatymas",
+  "resetBody": "Įveskite paskyros el. pašto adresą ir atsiųsime atkūrimo nuorodą.",
+  "resetSend": "Siųsti nuorodą",
+  "resetSent": "Jei {email} turi paskyrą, atkūrimo nuoroda jau išsiųsta.",
+  "resetFailed": "Nepavyko išsiųsti nuorodos. Bandykite vėliau."
 }

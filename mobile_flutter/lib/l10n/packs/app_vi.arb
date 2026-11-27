@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Đóng",
+  "loginFooterEncrypted": "Nhật ký giao dịch mã hóa đầu cuối",
+  "termsLabel": "Điều khoản",
+  "privacyLabel": "Quyền riêng tư",
+  "orSeparator": "hoặc",
+  "forgotPassword": "Quên mật khẩu?",
+  "resetTitle": "Đặt lại mật khẩu",
+  "resetBody": "Nhập email của tài khoản, chúng tôi sẽ gửi liên kết khôi phục.",
+  "resetSend": "Gửi liên kết",
+  "resetSent": "Nếu {email} có tài khoản, liên kết khôi phục đang được gửi đi.",
+  "resetFailed": "Không gửi được liên kết. Thử lại sau một lát."
 }

@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Chiudi",
+  "loginFooterEncrypted": "Registro operazioni crittografato end-to-end",
+  "termsLabel": "Termini",
+  "privacyLabel": "Privacy",
+  "orSeparator": "o",
+  "forgotPassword": "Password dimenticata?",
+  "resetTitle": "Reimposta la password",
+  "resetBody": "Inserisci l'email del tuo account per ricevere un link di recupero.",
+  "resetSend": "Invia il link",
+  "resetSent": "Se a {email} è associato un account, il link di recupero è in arrivo.",
+  "resetFailed": "Impossibile inviare il link. Riprova tra un momento."
 }

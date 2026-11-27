@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Sluiten",
+  "loginFooterEncrypted": "End-to-end versleutelde tradelogs",
+  "termsLabel": "Voorwaarden",
+  "privacyLabel": "Privacy",
+  "orSeparator": "of",
+  "forgotPassword": "Wachtwoord vergeten?",
+  "resetTitle": "Wachtwoord opnieuw instellen",
+  "resetBody": "Voer het e-mailadres van je account in en we sturen een herstellink.",
+  "resetSend": "Link versturen",
+  "resetSent": "Als {email} een account heeft, is de herstellink onderweg.",
+  "resetFailed": "Kon de link niet versturen. Probeer het zometeen opnieuw."
 }

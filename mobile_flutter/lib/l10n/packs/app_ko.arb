@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "닫기",
+  "loginFooterEncrypted": "종단간 암호화된 매매 기록",
+  "termsLabel": "이용약관",
+  "privacyLabel": "개인정보 처리방침",
+  "orSeparator": "또는",
+  "forgotPassword": "비밀번호를 잊으셨나요?",
+  "resetTitle": "비밀번호 재설정",
+  "resetBody": "계정에 등록된 이메일을 입력하시면 재설정 링크를 보내드립니다.",
+  "resetSend": "링크 전송",
+  "resetSent": "{email} 계정이 존재하는 경우 재설정 링크를 보냈습니다.",
+  "resetFailed": "링크를 보낼 수 없습니다. 잠시 후 다시 시도해주세요."
 }

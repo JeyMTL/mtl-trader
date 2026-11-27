@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Tutup",
+  "loginFooterEncrypted": "Log trading terenkripsi end-to-end",
+  "termsLabel": "Ketentuan",
+  "privacyLabel": "Privasi",
+  "orSeparator": "atau",
+  "forgotPassword": "Lupa kata sandi?",
+  "resetTitle": "Atur ulang kata sandi",
+  "resetBody": "Masukkan email akun Anda dan kami akan mengirimkan tautan pemulihan.",
+  "resetSend": "Kirim tautan",
+  "resetSent": "Jika {email} memiliki akun, tautan pemulihan telah dikirim.",
+  "resetFailed": "Gagal mengirim tautan. Coba lagi sebentar lagi."
 }

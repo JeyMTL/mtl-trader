@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Κλείσιμο",
+  "loginFooterEncrypted": "Άκρο προς άκρο κρυπτογραφημένες καταγραφές συναλλαγών",
+  "termsLabel": "Όροι",
+  "privacyLabel": "Απόρρητο",
+  "orSeparator": "ή",
+  "forgotPassword": "Ξεχάσατε τον κωδικό πρόσβασης;",
+  "resetTitle": "Επαναφορά κωδικού πρόσβασης",
+  "resetBody": "Εισαγάγετε το email του λογαριασμού σας και θα σας στείλουμε έναν σύνδεσμο ανάκτησης.",
+  "resetSend": "Αποστολή συνδέσμου",
+  "resetSent": "Αν το {email} διαθέτει λογαριασμό, ο σύνδεσμος ανάκτησης βρίσκεται καθ' οδόν.",
+  "resetFailed": "Δεν ήταν δυνατή η αποστολή του συνδέσμου. Δοκιμάστε ξανά σε λίγο."
 }

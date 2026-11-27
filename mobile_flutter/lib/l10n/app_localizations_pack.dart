@@ -109,6 +109,9 @@ class AppLocalizationsPack extends AppLocalizations {
   String get cancel => _read('cancel') ?? _en.cancel;
 
   @override
+  String get closeLabel => _read('closeLabel') ?? _en.closeLabel;
+
+  @override
   String get refresh => _read('refresh') ?? _en.refresh;
 
   @override
@@ -218,6 +221,40 @@ class AppLocalizationsPack extends AppLocalizations {
 
   @override
   String get loginFootnote => _read('loginFootnote') ?? _en.loginFootnote;
+
+  @override
+  String get loginFooterEncrypted => _read('loginFooterEncrypted') ?? _en.loginFooterEncrypted;
+
+  @override
+  String get termsLabel => _read('termsLabel') ?? _en.termsLabel;
+
+  @override
+  String get privacyLabel => _read('privacyLabel') ?? _en.privacyLabel;
+
+  @override
+  String get orSeparator => _read('orSeparator') ?? _en.orSeparator;
+
+  @override
+  String get forgotPassword => _read('forgotPassword') ?? _en.forgotPassword;
+
+  @override
+  String get resetTitle => _read('resetTitle') ?? _en.resetTitle;
+
+  @override
+  String get resetBody => _read('resetBody') ?? _en.resetBody;
+
+  @override
+  String get resetSend => _read('resetSend') ?? _en.resetSend;
+
+  @override
+  String resetSent(String email) {
+    final template = _read('resetSent');
+    if (template == null) return _en.resetSent(email);
+    return _fill(template, <String, Object?>{'email': email});
+  }
+
+  @override
+  String get resetFailed => _read('resetFailed') ?? _en.resetFailed;
 
   @override
   String get googleOpenFailed => _read('googleOpenFailed') ?? _en.googleOpenFailed;

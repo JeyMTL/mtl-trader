@@ -112,6 +112,12 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get cancel;
 
+  /// No description provided for @closeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeLabel;
+
   /// No description provided for @refresh.
   ///
   /// In en, this message translates to:
@@ -333,6 +339,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Google sign-in needs no email confirmation. Email sign-ups must confirm the address before the journal opens.'**
   String get loginFootnote;
+
+  /// No description provided for @loginFooterEncrypted.
+  ///
+  /// In en, this message translates to:
+  /// **'End-to-end encrypted trade logs'**
+  String get loginFooterEncrypted;
+
+  /// No description provided for @termsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get termsLabel;
+
+  /// No description provided for @privacyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get privacyLabel;
+
+  /// No description provided for @orSeparator.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get orSeparator;
+
+  /// No description provided for @forgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get forgotPassword;
+
+  /// No description provided for @resetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset your password'**
+  String get resetTitle;
+
+  /// No description provided for @resetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the email on your account and we\'ll send a recovery link.'**
+  String get resetBody;
+
+  /// No description provided for @resetSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the link'**
+  String get resetSend;
+
+  /// No description provided for @resetSent.
+  ///
+  /// In en, this message translates to:
+  /// **'If {email} has an account, its recovery link is on the way.'**
+  String resetSent(String email);
+
+  /// No description provided for @resetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send the link. Try again in a moment.'**
+  String get resetFailed;
 
   /// No description provided for @googleOpenFailed.
   ///

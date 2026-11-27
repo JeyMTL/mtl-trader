@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Закрити",
+  "loginFooterEncrypted": "Журнали угод із наскрізним шифруванням",
+  "termsLabel": "Умови",
+  "privacyLabel": "Конфіденційність",
+  "orSeparator": "або",
+  "forgotPassword": "Забули пароль?",
+  "resetTitle": "Скидання пароля",
+  "resetBody": "Введіть пошту свого акаунта, і ми надішлемо посилання для відновлення.",
+  "resetSend": "Надіслати посилання",
+  "resetSent": "Якщо {email} має акаунт, посилання для відновлення вже в дорозі.",
+  "resetFailed": "Не вдалося надіслати посилання. Спробуйте ще раз за мить."
 }

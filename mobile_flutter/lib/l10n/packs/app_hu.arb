@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Bezárás",
+  "loginFooterEncrypted": "Végpontok között titkosított kereskedési naplók",
+  "termsLabel": "Feltételek",
+  "privacyLabel": "Adatvédelem",
+  "orSeparator": "vagy",
+  "forgotPassword": "Elfelejtett jelszó?",
+  "resetTitle": "Jelszó visszaállítása",
+  "resetBody": "Add meg a fiókodhoz tartozó e-mail-címet, és küldünk egy helyreállítási hivatkozást.",
+  "resetSend": "Hivatkozás küldése",
+  "resetSent": "Ha a(z) {email} címhez tartozik fiók, a helyreállítási hivatkozást elküldtük.",
+  "resetFailed": "A hivatkozást nem sikerült elküldeni. Próbáld újra később."
 }

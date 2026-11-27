@@ -116,31 +116,6 @@ export default function SignupPage() {
             </div>
           )}
 
-          <GoogleSignInButton
-            text="signup_with"
-            disabled={loading}
-            onStart={() => {
-              setLoading(true)
-              setError('')
-              setSuccess('')
-            }}
-            onError={(message) => {
-              setError(message)
-              setLoading(false)
-            }}
-          />
-
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-[11px] uppercase tracking-wider text-gray-500">or with email</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <p className="text-center text-gray-500 text-xs leading-relaxed">
-            Google sign-in needs no email verification step, because Google has
-            already verified the address.
-          </p>
-
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
             <div className="relative">
@@ -194,6 +169,28 @@ export default function SignupPage() {
           >
             {loading ? 'Creating account...' : `Start ${TRIAL_DAYS}-Day Free Trial`}
           </button>
+
+          {/* Google lives under the form, after the action it is an
+              alternative to: at the top it read as a prerequisite. */}
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] uppercase tracking-wider text-gray-500">or</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <GoogleSignInButton
+            text="signup_with"
+            disabled={loading}
+            onStart={() => {
+              setLoading(true)
+              setError('')
+              setSuccess('')
+            }}
+            onError={(message) => {
+              setError(message)
+              setLoading(false)
+            }}
+          />
 
           <p className="text-center text-xs leading-relaxed text-gray-500">
             By creating an account you agree to our{' '}

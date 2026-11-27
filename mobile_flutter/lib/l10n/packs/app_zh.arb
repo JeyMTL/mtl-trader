@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "关闭",
+  "loginFooterEncrypted": "端到端加密的交易记录",
+  "termsLabel": "条款",
+  "privacyLabel": "隐私",
+  "orSeparator": "或",
+  "forgotPassword": "忘记密码？",
+  "resetTitle": "重置密码",
+  "resetBody": "输入账户邮箱，我们会发送一条恢复链接。",
+  "resetSend": "发送链接",
+  "resetSent": "如果 {email} 有账户，恢复链接已在发送中。",
+  "resetFailed": "无法发送链接。请稍后再试。"
 }

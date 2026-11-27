@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "إغلاق",
+  "loginFooterEncrypted": "سجلات تداول مشفرة بالكامل",
+  "termsLabel": "الشروط",
+  "privacyLabel": "الخصوصية",
+  "orSeparator": "أو",
+  "forgotPassword": "نسيت كلمة المرور؟",
+  "resetTitle": "إعادة ضبط كلمة المرور",
+  "resetBody": "أدخل البريد الإلكتروني المرتبط بحسابك وسنرسل لك رابط الاستعادة.",
+  "resetSend": "إرسال الرابط",
+  "resetSent": "إذا كان لـ {email} حساب، فإن رابط الاستعادة في طريقه إليك.",
+  "resetFailed": "تعذر إرسال الرابط. يرجى المحاولة مرة أخرى بعد قليل."
 }

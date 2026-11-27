@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Aizvērt",
+  "loginFooterEncrypted": "Gala-līdz-gala šifrēti darījumu žurnāli",
+  "termsLabel": "Noteikumi",
+  "privacyLabel": "Privātums",
+  "orSeparator": "vai",
+  "forgotPassword": "Aizmirsi paroli?",
+  "resetTitle": "Atiestatīt paroli",
+  "resetBody": "Ievadi sava konta e-pastu, un mēs nosūtīsim atjaunošanas saiti.",
+  "resetSend": "Nosūtīt saiti",
+  "resetSent": "Ja {email} ir reģistrēts konts, atjaunošanas saite ir ceļā.",
+  "resetFailed": "Neizdevās nosūtīt saiti. Mēģini vēlreiz pēc brīža."
 }

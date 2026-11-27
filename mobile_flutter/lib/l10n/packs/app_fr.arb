@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Fermer",
+  "loginFooterEncrypted": "Journaux de trading chiffrés de bout en bout",
+  "termsLabel": "Conditions",
+  "privacyLabel": "Confidentialité",
+  "orSeparator": "ou",
+  "forgotPassword": "Mot de passe oublié ?",
+  "resetTitle": "Réinitialiser votre mot de passe",
+  "resetBody": "Saisissez l'e-mail de votre compte et nous vous enverrons un lien de récupération.",
+  "resetSend": "Envoyer le lien",
+  "resetSent": "Si un compte est associé à {email}, son lien de récupération est en route.",
+  "resetFailed": "Impossible d'envoyer le lien. Réessayez dans un instant."
 }

@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Закрыть",
+  "loginFooterEncrypted": "Журналы сделок со сквозным шифрованием",
+  "termsLabel": "Условия",
+  "privacyLabel": "Конфиденциальность",
+  "orSeparator": "или",
+  "forgotPassword": "Забыли пароль?",
+  "resetTitle": "Сброс пароля",
+  "resetBody": "Введите почту вашего аккаунта, и мы отправим ссылку для восстановления.",
+  "resetSend": "Отправить ссылку",
+  "resetSent": "Если аккаунт {email} существует, ссылка для восстановления уже в пути.",
+  "resetFailed": "Не удалось отправить ссылку. Попробуйте ещё раз через минуту."
 }

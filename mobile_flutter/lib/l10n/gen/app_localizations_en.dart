@@ -18,6 +18,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancel => 'Cancel';
 
   @override
+  String get closeLabel => 'Close';
+
+  @override
   String get refresh => 'Refresh';
 
   @override
@@ -130,6 +133,39 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get loginFootnote =>
       'Google sign-in needs no email confirmation. Email sign-ups must confirm the address before the journal opens.';
+
+  @override
+  String get loginFooterEncrypted => 'End-to-end encrypted trade logs';
+
+  @override
+  String get termsLabel => 'Terms';
+
+  @override
+  String get privacyLabel => 'Privacy';
+
+  @override
+  String get orSeparator => 'or';
+
+  @override
+  String get forgotPassword => 'Forgot password?';
+
+  @override
+  String get resetTitle => 'Reset your password';
+
+  @override
+  String get resetBody =>
+      'Enter the email on your account and we\'ll send a recovery link.';
+
+  @override
+  String get resetSend => 'Send the link';
+
+  @override
+  String resetSent(String email) {
+    return 'If $email has an account, its recovery link is on the way.';
+  }
+
+  @override
+  String get resetFailed => 'Could not send the link. Try again in a moment.';
 
   @override
   String get googleOpenFailed =>

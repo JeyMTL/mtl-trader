@@ -3,6 +3,7 @@
   "appTitle": "MTL Ledger",
   "retry": "Retry",
   "cancel": "Cancel",
+  "closeLabel": "Close",
   "refresh": "Refresh",
   "language": "Language",
   "languageSystem": "System",
@@ -40,6 +41,23 @@
   "emailInvalid": "Enter a valid email address.",
   "passwordTooShort": "Use at least 6 characters.",
   "loginFootnote": "Google sign-in needs no email confirmation. Email sign-ups must confirm the address before the journal opens.",
+  "loginFooterEncrypted": "End-to-end encrypted trade logs",
+  "termsLabel": "Terms",
+  "privacyLabel": "Privacy",
+  "orSeparator": "or",
+  "forgotPassword": "Forgot password?",
+  "resetTitle": "Reset your password",
+  "resetBody": "Enter the email on your account and we'll send a recovery link.",
+  "resetSend": "Send the link",
+  "resetSent": "If {email} has an account, its recovery link is on the way.",
+  "@resetSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "resetFailed": "Could not send the link. Try again in a moment.",
   "googleOpenFailed": "Could not open Google sign-in. Check that a browser is available, then try again.",
   "googleTimedOut": "Google sign-in timed out. Check your connection and try again.",
   "googleStartFailed": "Could not start Google sign-in. Try again.",

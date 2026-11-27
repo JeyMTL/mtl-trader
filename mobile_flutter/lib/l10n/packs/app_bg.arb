@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Затвори",
+  "loginFooterEncrypted": "Криптиран от край до край дневник на сделките",
+  "termsLabel": "Условия",
+  "privacyLabel": "Поверителност",
+  "orSeparator": "или",
+  "forgotPassword": "Забравена парола?",
+  "resetTitle": "Нулиране на паролата",
+  "resetBody": "Въведете имейла на профила си и ще ви изпратим връзка за възстановяване.",
+  "resetSend": "Изпрати връзката",
+  "resetSent": "Ако {email} има профил, връзката за възстановяване е изпратена.",
+  "resetFailed": "Връзката не можа да бъде изпратена. Опитайте отново след малко."
 }

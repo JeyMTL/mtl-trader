@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Stäng",
+  "loginFooterEncrypted": "Änd-till-änd-krypterade trade-loggar",
+  "termsLabel": "Villkor",
+  "privacyLabel": "Integritet",
+  "orSeparator": "eller",
+  "forgotPassword": "Glömt lösenordet?",
+  "resetTitle": "Återställ lösenordet",
+  "resetBody": "Ange e-postadressen till ditt konto så skickar vi en återställningslänk.",
+  "resetSend": "Skicka länken",
+  "resetSent": "Om {email} har ett konto är återställningslänken på väg.",
+  "resetFailed": "Det gick inte att skicka länken. Försök igen om en stund."
 }

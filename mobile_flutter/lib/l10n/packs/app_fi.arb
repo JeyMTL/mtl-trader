@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Sulje",
+  "loginFooterEncrypted": "Päästä päähän salatut kaupankäyntilokit",
+  "termsLabel": "Ehdot",
+  "privacyLabel": "Tietosuoja",
+  "orSeparator": "tai",
+  "forgotPassword": "Unohditko salasanan?",
+  "resetTitle": "Nollaa salasanasi",
+  "resetBody": "Syötä tiliisi liitetty sähköpostiosoite, niin lähetämme palautuslinkin.",
+  "resetSend": "Lähetä linkki",
+  "resetSent": "Jos osoitteella {email} on tili, palautuslinkki on matkalla.",
+  "resetFailed": "Linkkiä ei voitu lähettää. Yritä hetken kuluttua uudelleen."
 }

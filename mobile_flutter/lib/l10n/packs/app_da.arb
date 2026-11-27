@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Luk",
+  "loginFooterEncrypted": "Ende-til-ende-krypterede handelslogfiler",
+  "termsLabel": "Vilkår",
+  "privacyLabel": "Privatliv",
+  "orSeparator": "eller",
+  "forgotPassword": "Glemt adgangskode?",
+  "resetTitle": "Nulstil din adgangskode",
+  "resetBody": "Indtast e-mailen til din konto, så sender vi et genoprettelseslink.",
+  "resetSend": "Send linket",
+  "resetSent": "Hvis {email} har en konto, er genoprettelseslinket på vej.",
+  "resetFailed": "Kunne ikke sende linket. Prøv igen om et øjeblik."
 }

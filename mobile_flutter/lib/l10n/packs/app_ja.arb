@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "閉じる",
+  "loginFooterEncrypted": "エンドツーエンドで暗号化された取引ログ",
+  "termsLabel": "利用規約",
+  "privacyLabel": "プライバシーポリシー",
+  "orSeparator": "または",
+  "forgotPassword": "パスワードをお忘れですか？",
+  "resetTitle": "パスワードのリセット",
+  "resetBody": "アカウントのメールアドレスを入力してください。再設定リンクをお送りします。",
+  "resetSend": "リンクを送信",
+  "resetSent": "{email} のアカウントが存在する場合、再設定リンクをお送りしました。",
+  "resetFailed": "リンクを送信できませんでした。しばらくしてから再試行してください。"
 }

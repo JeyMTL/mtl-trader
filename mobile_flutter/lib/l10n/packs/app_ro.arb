@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Închide",
+  "loginFooterEncrypted": "Jurnale de tranzacționare criptate integral",
+  "termsLabel": "Termeni",
+  "privacyLabel": "Confidențialitate",
+  "orSeparator": "sau",
+  "forgotPassword": "Ai uitat parola?",
+  "resetTitle": "Resetează-ți parola",
+  "resetBody": "Introdu e-mailul contului tău și îți trimitem un link de recuperare.",
+  "resetSend": "Trimite linkul",
+  "resetSent": "Dacă {email} are un cont, linkul de recuperare este pe drum.",
+  "resetFailed": "Linkul nu a putut fi trimis. Încearcă din nou într-o clipă."
 }

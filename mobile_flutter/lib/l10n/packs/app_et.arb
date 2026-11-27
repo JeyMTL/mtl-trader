@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Sulge",
+  "loginFooterEncrypted": "Läbivalt krüpteeritud tehingulogid",
+  "termsLabel": "Tingimused",
+  "privacyLabel": "Privaatsus",
+  "orSeparator": "või",
+  "forgotPassword": "Unustasid parooli?",
+  "resetTitle": "Lähtesta oma parool",
+  "resetBody": "Sisesta oma konto e-posti aadress ja me saadame taastamislingi.",
+  "resetSend": "Saada link",
+  "resetSent": "Kui aadressiga {email} on seotud konto, on taastamislink teel.",
+  "resetFailed": "Lingi saatmine ebaõnnestus. Proovi hetke pärast uuesti."
 }

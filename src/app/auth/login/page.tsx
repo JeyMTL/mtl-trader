@@ -99,26 +99,6 @@ function LoginForm() {
             </div>
           )}
 
-          <GoogleSignInButton
-            text="continue_with"
-            disabled={loading}
-            onStart={() => {
-              setLoading(true)
-              setError('')
-              setSuccess('')
-            }}
-            onError={(message) => {
-              setError(message)
-              setLoading(false)
-            }}
-          />
-
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-[11px] uppercase tracking-wider text-gray-500">or with email</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
             <div className="relative">
@@ -166,6 +146,29 @@ function LoginForm() {
             {loading ? 'Logging in...' : 'Login'}
           </button>
 
+          {/* Social sign-in sits after the form, not before it. Above the
+              email field it read as part of the form's header and asked a
+              third-party question before the user had stated their intent. */}
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-[11px] uppercase tracking-wider text-gray-500">or</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <GoogleSignInButton
+            text="continue_with"
+            disabled={loading}
+            onStart={() => {
+              setLoading(true)
+              setError('')
+              setSuccess('')
+            }}
+            onError={(message) => {
+              setError(message)
+              setLoading(false)
+            }}
+          />
+
           <button
             type="button"
             onClick={resendVerification}
@@ -174,11 +177,6 @@ function LoginForm() {
           >
             Resend verification email
           </button>
-
-          <p className="text-center text-gray-500 text-xs leading-relaxed">
-            Google accounts skip the verification email: Google has already
-            confirmed the address.
-          </p>
 
           <p className="text-center text-gray-400 text-sm">
             Don&apos;t have an account?{' '}

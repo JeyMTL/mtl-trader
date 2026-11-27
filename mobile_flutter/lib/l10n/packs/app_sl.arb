@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Zapri",
+  "loginFooterEncrypted": "Dnevniki poslov s šifriranjem od konca do konca",
+  "termsLabel": "Pogoji",
+  "privacyLabel": "Zasebnost",
+  "orSeparator": "ali",
+  "forgotPassword": "Ste pozabili geslo?",
+  "resetTitle": "Ponastavitev gesla",
+  "resetBody": "Vnesite e-pošto svojega računa in poslali vam bomo povezavo za obnovitev.",
+  "resetSend": "Pošlji povezavo",
+  "resetSent": "Če ima {email} račun, je povezava za obnovitev na poti.",
+  "resetFailed": "Povezave ni bilo mogoče poslati. Poskusite znova čez trenutek."
 }

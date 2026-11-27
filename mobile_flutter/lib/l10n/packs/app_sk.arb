@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Zavrieť",
+  "loginFooterEncrypted": "Záznamy obchodov so šifrovaním end-to-end",
+  "termsLabel": "Podmienky",
+  "privacyLabel": "Súkromie",
+  "orSeparator": "alebo",
+  "forgotPassword": "Zabudli ste heslo?",
+  "resetTitle": "Obnovenie hesla",
+  "resetBody": "Zadajte e-mail svojho účtu a pošleme vám odkaz na obnovenie.",
+  "resetSend": "Odoslať odkaz",
+  "resetSent": "Ak má {email} účet, odkaz na obnovenie je na ceste.",
+  "resetFailed": "Odkaz sa nepodarilo odoslať. Skúste to znova o chvíľu."
 }

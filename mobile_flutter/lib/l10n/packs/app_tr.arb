@@ -849,5 +849,16 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "closeLabel": "Kapat",
+  "loginFooterEncrypted": "Uçtan uca şifrelenmiş işlem kayıtları",
+  "termsLabel": "Koşullar",
+  "privacyLabel": "Gizlilik",
+  "orSeparator": "veya",
+  "forgotPassword": "Parolanızı mı unuttunuz?",
+  "resetTitle": "Parolanızı sıfırlayın",
+  "resetBody": "Hesabınızın e-postasını girin, size bir kurtarma bağlantısı gönderelim.",
+  "resetSend": "Bağlantıyı gönder",
+  "resetSent": "{email} bir hesaba sahipse kurtarma bağlantısı yolda.",
+  "resetFailed": "Bağlantı gönderilemedi. Birazdan tekrar deneyin."
 }

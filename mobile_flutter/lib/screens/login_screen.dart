@@ -3,15 +3,26 @@ import 'dart:async';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/config.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../ui/brand.dart';
+import '../ui/password_reset_sheet.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
+/// The first screen of the app, and the only one a new account sees before it
+/// has any data.
+///
+/// Order is the design: the brand lockup and the promise first, then the
+/// intent switch, then the fields, then one gold action, and only after that
+/// the third-party route. Signing in with Google used to sit *above* the
+/// Sign in / Create account tabs, which read as if the tabs belonged to the
+/// Google button; the tab is now what a tap lands on first.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -181,6 +192,27 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Switching tabs is the one moment the form changes shape under the finger,
+  /// so it ticks. The error belongs to the mode that produced it and goes with
+  /// it.
+  void _setMode(bool signUp) {
+    if (signUp == _signUp) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _signUp = signUp;
+      _error = null;
+      _notice = null;
+    });
+  }
+
+  Future<void> _openLegal(String path) async {
+    final base = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    await launchUrl(
+      Uri.parse('$base$path'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -188,208 +220,163 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // The card runs the app's black to its own edge, and the gold
-                  // line is the card's outline — the mark inside carries no rim,
-                  // so there is one luminous line around everything, not two.
-                  Container(
-                    constraints: const BoxConstraints(minHeight: 168),
-                    padding: const EdgeInsets.all(1.6),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: kRimGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withAlpha(60),
-                          blurRadius: 26,
-                          spreadRadius: 1,
-                        ),
-                        BoxShadow(
-                          color: AppColors.primary.withAlpha(30),
-                          blurRadius: 34,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16.5),
-                        color: const Color(0xFF0E1414),
-                      ),
-                      // The bloom lights the mark from behind, centred, so the
-                      // black reads as one panel rather than a stamp beside it.
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 168,
-                            height: 168,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  AppColors.primary.withAlpha(58),
-                                  AppColors.primary.withAlpha(0),
-                                ],
-                              ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // The hero's visual evidence, drawn rather than boxed: a
+                      // rising equity line fading into an audio waveform, at the
+                      // opacity of a watermark. It says "trades, screenshots,
+                      // voice notes" without spending a single pixel of layout.
+                      Positioned(
+                        top: -26,
+                        left: -40,
+                        right: -40,
+                        height: 210,
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: _AuthMotifPainter(
+                              color: AppColors.primary,
+                              isLight: AppColors.palette.isLight,
                             ),
                           ),
-                          const BrandMark(
-                            fontSize: 84,
-                            showDate: false,
-                            showRim: false,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      _Hero(l10n: l10n),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    l10n.loginHeadline,
-                    style: TextStyle(
-                      color: AppColors.text,
-                      fontSize: 30,
-                      height: 1.1,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.loginTagline,
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 13,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 22),
                   FlatCard(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
                     child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          OutlinedButton.icon(
-                            onPressed: _loading ? null : _google,
-                            icon: const Text(
-                              'G',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            label: Text(l10n.continueWithGoogle),
-                          ),
-                          const SizedBox(height: 12),
-                          // Each tab takes half the width and wraps onto a
-                          // second line instead of pushing the other one off
-                          // the card: "Créer un compte" at 2x is wider than
-                          // the space two side-by-side tabs used to have.
-                          // IntrinsicHeight, not a bare stretch: the Row sits
-                          // in a Column with unbounded height, so stretching
-                          // without a bounded box throws. This keeps the two
-                          // tabs the same height even when one wraps.
-                          IntrinsicHeight(
-                            child: Row(
+                          _ModeSwitch(signUp: _signUp, onChanged: _setMode),
+                          const SizedBox(height: 18),
+                          AutofillGroup(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: _ModeTab(
-                                    label: l10n.signIn,
-                                    active: !_signUp,
-                                    onTap: () => setState(() {
-                                      _signUp = false;
-                                      _error = null;
-                                    }),
+                                TextFormField(
+                                  controller: _email,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  // `username` is the hint password managers
+                                  // key a saved login on; sign-up asks for a new
+                                  // address instead.
+                                  autofillHints: [
+                                    _signUp
+                                        ? AutofillHints.email
+                                        : AutofillHints.username,
+                                  ],
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  decoration: InputDecoration(
+                                    labelText: l10n.emailLabel,
+                                    hintText: l10n.emailHint,
+                                    prefixIcon: Icon(
+                                      Icons.alternate_email,
+                                      size: 18,
+                                      color: AppColors.faint,
+                                    ),
                                   ),
+                                  validator: (value) {
+                                    final text = value?.trim() ?? '';
+                                    if (text.isEmpty || !text.contains('@')) {
+                                      return l10n.emailInvalid;
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _ModeTab(
-                                    label: l10n.createAccount,
-                                    active: _signUp,
-                                    onTap: () => setState(() {
-                                      _signUp = true;
-                                      _error = null;
-                                    }),
+                                const SizedBox(height: 10),
+                                TextFormField(
+                                  controller: _password,
+                                  obscureText: _obscure,
+                                  autofillHints: [
+                                    _signUp
+                                        ? AutofillHints.newPassword
+                                        : AutofillHints.password,
+                                  ],
+                                  decoration: InputDecoration(
+                                    labelText: l10n.passwordLabel,
+                                    prefixIcon: Icon(
+                                      Icons.lock_outline,
+                                      size: 18,
+                                      color: AppColors.faint,
+                                    ),
+                                    suffixIcon: IconButton(
+                                      tooltip: _obscure
+                                          ? l10n.showPassword
+                                          : l10n.hidePassword,
+                                      onPressed: () => setState(
+                                        () => _obscure = !_obscure,
+                                      ),
+                                      icon: Icon(
+                                        _obscure
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        size: 18,
+                                        color: AppColors.faint,
+                                      ),
+                                    ),
                                   ),
+                                  validator: (value) {
+                                    if ((value ?? '').length < 6) {
+                                      return l10n.passwordTooShort;
+                                    }
+                                    return null;
+                                  },
+                                  onFieldSubmitted: (_) => _submit(),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          TextFormField(
-                            controller: _email,
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: const [AutofillHints.email],
-                            decoration: InputDecoration(
-                              labelText: l10n.emailLabel,
-                              hintText: l10n.emailHint,
-                            ),
-                            validator: (value) {
-                              final text = value?.trim() ?? '';
-                              if (text.isEmpty || !text.contains('@')) {
-                                return l10n.emailInvalid;
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            controller: _password,
-                            obscureText: _obscure,
-                            autofillHints: const [AutofillHints.password],
-                            decoration: InputDecoration(
-                              labelText: l10n.passwordLabel,
-                              suffixIcon: IconButton(
-                                tooltip: _obscure
-                                    ? l10n.showPassword
-                                    : l10n.hidePassword,
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
-                                icon: Icon(
-                                  _obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  size: 18,
-                                  color: AppColors.faint,
+                          // Recovery sits under the field it recovers, not in a
+                          // menu or on the website: the moment a sign-in fails,
+                          // this is the next thing the trader needs.
+                          if (!_signUp)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: _ForgotLink(
+                                label: l10n.forgotPassword,
+                                onTap: () => showPasswordResetSheet(
+                                  context,
+                                  initialEmail: _email.text.trim(),
                                 ),
                               ),
                             ),
-                            validator: (value) {
-                              if ((value ?? '').length < 6) {
-                                return l10n.passwordTooShort;
-                              }
-                              return null;
-                            },
-                            onFieldSubmitted: (_) => _submit(),
-                          ),
                           if (_error != null) ...[
                             const SizedBox(height: 12),
-                            Text(
-                              _error!,
-                              style: TextStyle(
-                                color: AppColors.danger,
-                                fontSize: 12,
-                                height: 1.4,
+                            Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  color: AppColors.danger,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
                               ),
                             ),
                           ],
                           if (_notice != null) ...[
                             const SizedBox(height: 12),
-                            Text(
-                              _notice!,
-                              style: TextStyle(
-                                color: AppColors.success,
-                                fontSize: 12,
-                                height: 1.4,
+                            Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                _notice!,
+                                style: TextStyle(
+                                  color: AppColors.success,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
                               ),
                             ),
                           ],
@@ -409,25 +396,225 @@ class _LoginScreenState extends State<LoginScreen> {
                                     _signUp ? l10n.createAccount : l10n.signIn,
                                   ),
                           ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              const Expanded(child: _Rule()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                child: Text(
+                                  l10n.orSeparator,
+                                  style: TextStyle(
+                                    color: AppColors.faint,
+                                    fontSize: kMinLabelSize,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(child: _Rule()),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          OutlinedButton.icon(
+                            onPressed: _loading ? null : _google,
+                            icon: const Text(
+                              'G',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            label: Text(l10n.continueWithGoogle),
+                          ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text(
-                    l10n.loginFootnote,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.faint,
-                      fontSize: kMinLabelSize,
-                      height: 1.45,
+                  if (_signUp)
+                    Text(
+                      l10n.loginFootnote,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.faint,
+                        fontSize: kMinLabelSize,
+                        height: 1.45,
+                      ),
+                    )
+                  else
+                    _SignInFooter(
+                      onTerms: () => _openLegal('/terms'),
+                      onPrivacy: () => _openLegal('/privacy'),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Brand, promise, and the two lines that carry the product story.
+class _Hero extends StatelessWidget {
+  const _Hero({required this.l10n});
+
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const _BrandBadge(),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                l10n.brandName.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.primaryLight,
+                  fontSize: kMinLabelSize,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.8,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(
+          l10n.loginHeadline,
+          style: TextStyle(
+            color: AppColors.text,
+            fontSize: 30,
+            height: 1.12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          l10n.loginTagline,
+          style: TextStyle(
+            color: AppColors.muted,
+            fontSize: 13.5,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The mark at 34px — the same icon the launcher shows, with the gold rim the
+/// old 168px hero spent a third of the screen on.
+class _BrandBadge extends StatelessWidget {
+  const _BrandBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Container(
+        width: 34,
+        height: 34,
+        padding: const EdgeInsets.all(1.3),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: kRimGradient,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withAlpha(46),
+              blurRadius: 12,
+              spreadRadius: 0.5,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8.7),
+          child: Image.asset(
+            kBrandIconAsset,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Sign in / Create account, as one control with a sliding gold edge.
+class _ModeSwitch extends StatelessWidget {
+  const _ModeSwitch({required this.signUp, required this.onChanged});
+
+  final bool signUp;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final duration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.field),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedAlign(
+              alignment: signUp ? Alignment.centerRight : Alignment.centerLeft,
+              duration: duration,
+              curve: Curves.easeOutCubic,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(
+                      AppColors.palette.isLight ? 34 : 26,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.field - 3),
+                    border: Border.all(
+                      color: AppColors.primary.withAlpha(96),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _ModeTab(
+                  label: l10n.signIn,
+                  active: !signUp,
+                  onTap: () => onChanged(false),
+                ),
+              ),
+              Expanded(
+                child: _ModeTab(
+                  label: l10n.createAccount,
+                  active: signUp,
+                  onTap: () => onChanged(true),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -446,29 +633,221 @@ class _ModeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: active ? AppColors.primary.withAlpha(26) : Colors.transparent,
-          border: Border.all(
-            color: active ? AppColors.primary.withAlpha(90) : AppColors.border,
-          ),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: active ? AppColors.primaryLight : AppColors.muted,
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
+    return Semantics(
+      button: true,
+      selected: active,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.field - 3),
+        // 44dp tall plus the switch's 3dp padding clears the 48dp target.
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            // Two lines, not an ellipsis: "Créer un compte" at 2x text is wider
+            // than half the card and must not lose its last word.
+            maxLines: 2,
+            style: TextStyle(
+              color: active ? AppColors.primaryLight : AppColors.muted,
+              fontSize: 12,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              height: 1.2,
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _ForgotLink extends StatelessWidget {
+  const _ForgotLink({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: AppColors.primaryLight,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Rule extends StatelessWidget {
+  const _Rule();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(height: 1, color: AppColors.border);
+  }
+}
+
+class _SignInFooter extends StatelessWidget {
+  const _SignInFooter({required this.onTerms, required this.onPrivacy});
+
+  final VoidCallback onTerms;
+  final VoidCallback onPrivacy;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final base = TextStyle(
+      color: AppColors.faint,
+      fontSize: kMinLabelSize,
+      height: 1.45,
+    );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      children: [
+        Text(l10n.loginFooterEncrypted, style: base, textAlign: TextAlign.center),
+        Text('·', style: base),
+        _LegalLink(label: l10n.termsLabel, onTap: onTerms),
+        Text('·', style: base),
+        _LegalLink(label: l10n.privacyLabel, onTap: onPrivacy),
+      ],
+    );
+  }
+}
+
+class _LegalLink extends StatelessWidget {
+  const _LegalLink({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: AppColors.primaryLight,
+            fontSize: kMinLabelSize,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Watermark behind the hero: an equity curve climbing out of a waveform.
+///
+/// Purely decorative — no semantics, no hit testing, and drawn at the alpha of
+/// a paper watermark so the headline keeps its contrast on every palette.
+class _AuthMotifPainter extends CustomPainter {
+  const _AuthMotifPainter({required this.color, required this.isLight});
+
+  final Color color;
+  final bool isLight;
+
+  /// Alpha for the theme, doubled on the dark ground where a low-opacity gold
+  /// would disappear entirely.
+  int _alpha(double dark, double light) =>
+      (isLight ? light : dark).round().clamp(0, 255);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+
+    // Ambient glow, top-left, the light the old rim used to cast.
+    final centre = Offset(size.width * 0.22, size.height * 0.42);
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [color.withAlpha(_alpha(30, 18)), color.withAlpha(0)],
+        ).createShader(
+          Rect.fromCircle(center: centre, radius: size.width * 0.62),
+        ),
+    );
+
+    // Equity line: eleven points, the shape of a good month rather than a
+    // straight line, because a straight line is a logo and this is a journal.
+    final samples = <double>[
+      0.78, 0.72, 0.8, 0.62, 0.66, 0.52, 0.46, 0.55, 0.36, 0.3, 0.18,
+    ];
+    final left = size.width * 0.3;
+    final width = size.width * 0.66;
+    final top = size.height * 0.16;
+    final height = size.height * 0.5;
+
+    final line = Path();
+    for (var i = 0; i < samples.length; i++) {
+      final x = left + width * (i / (samples.length - 1));
+      final y = top + height * samples[i];
+      if (i == 0) {
+        line.moveTo(x, y);
+      } else {
+        line.lineTo(x, y);
+      }
+    }
+
+    final fill = Path.from(line)
+      ..lineTo(left + width, top + height)
+      ..lineTo(left, top + height)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withAlpha(_alpha(24, 14)), color.withAlpha(0)],
+        ).createShader(Rect.fromLTWH(left, top, width, height)),
+    );
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = color.withAlpha(_alpha(70, 44))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // The end of the line becomes a waveform: the voice notes the tagline
+    // promises, at the same muted strength as the curve.
+    final barPaint = Paint()
+      ..color = color.withAlpha(_alpha(58, 38))
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2.2;
+    const bars = <double>[0.34, 0.62, 0.44, 0.86, 0.5, 0.7, 0.3];
+    final barLeft = left + width * 0.72;
+    final barTop = top + height * 0.18;
+    for (var i = 0; i < bars.length; i++) {
+      final x = barLeft + i * 5.4;
+      final half = height * 0.09 * bars[i];
+      canvas.drawLine(Offset(x, barTop - half * 2), Offset(x, barTop + half), barPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AuthMotifPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.isLight != isLight;
 }
