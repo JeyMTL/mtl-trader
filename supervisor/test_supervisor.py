@@ -2023,6 +2023,29 @@ class SlotLoginDialogTests(unittest.TestCase):
             "credential_cipher": "v1:x:y:z",
         }
 
+    def test_a_slot_that_has_just_logged_in_is_not_restarted(self):
+        # `sync_one` ends with `mt5.shutdown()`, which detaches the API and leaves
+        # the terminal running. The watch that follows opens the same slot again;
+        # closing that terminal to log in a second time is what turned a folder
+        # that had just synced into one that answered `IPC timeout`.
+        sup.terminal_running = lambda path: True
+        sup.mt5 = FakeMt5([("ok", None)])
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            used = sup.open_session(self.row(), self.exe, reuse_running=True)
+
+        self.assertEqual(used, self.exe)
+        self.assertEqual(self.stopped, [])
+
+    def test_a_stale_terminal_is_still_closed_by_default(self):
+        sup.terminal_running = lambda path: True
+        sup.mt5 = FakeMt5([("ok", None)])
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            sup.open_session(self.row(), self.exe)
+
+        self.assertEqual(self.stopped, [self.exe])
+
     def test_starts_the_slot_with_the_account_on_the_command_line(self):
         spawned = []
         sup.mt5 = SeededMt5(486046720)

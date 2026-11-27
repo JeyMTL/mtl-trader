@@ -1881,7 +1881,7 @@ def release_quarantined(quarantined, terminals):
     return released
 
 
-def open_session(row, terminal=None):
+def open_session(row, terminal=None, reuse_running=False):
     """Attach to MT5 and log in, trying every installed terminal until one can.
 
     Raises with a message the customer can act on, listing what was tried. A
@@ -1891,6 +1891,9 @@ def open_session(row, terminal=None):
 
     `terminal` pins the attempt to one terminal64.exe, which is what a fleet
     slot does: that directory is this account's terminal and nothing else's.
+    `reuse_running` says the terminal found running in that folder is this
+    process's own logged-in session, which `sync_one` detached from but did not
+    end, so it is attached to instead of restarted.
     """
     password = decrypt_credential(row["credential_cipher"])
 
@@ -1916,12 +1919,22 @@ def open_session(row, terminal=None):
         # loses nothing: a terminal's account is saved when it logs in, not when
         # it exits. This is the hand login the runbook asks for, left open.
         if terminal_running(path):
-            print(f"  closing the terminal already running from {path}")
-            if stop_terminal_process(path):
-                # It has just flushed its account file on exit, and that file is
-                # the state this folder can still log in from. The fallback must
-                # not stay at the pre-run snapshot and undo a working login.
-                refresh_slot_seed(path)
+            if reuse_running:
+                # The watch that follows a sync opens the slot again. That
+                # terminal is this process's own, already logged in: `sync_one`
+                # shut the API down, not the terminal. Restarting it cost a full
+                # terminal start on every successful sync, and the folder it was
+                # told to boot again is exactly the one that then answered
+                # `IPC timeout` while the account's closes went unread.
+                print(f"  reusing the terminal still running from {path}")
+            else:
+                print(f"  closing the terminal already running from {path}")
+                if stop_terminal_process(path):
+                    # It has just flushed its account file on exit, and that file
+                    # is the state this folder can still log in from. The
+                    # fallback must not stay at the pre-run snapshot and undo a
+                    # working login.
+                    refresh_slot_seed(path)
 
         for attempt in range(2):  # one retry: a stale terminal often clears on shutdown
             # Attach without credentials first. On a terminal that has
@@ -2435,7 +2448,9 @@ def watch(row, terminal=None, contended=True, should_yield=None):
     """
     user_id = row["user_id"]
     try:
-        open_session(row, terminal)
+        # A fleet slot has just opened and logged in this terminal in `sync_one`;
+        # the session to keep is that one, not a second start of the same folder.
+        open_session(row, terminal, reuse_running=terminal is not None)
         offset = server_offset(row)
         now = datetime.now(timezone.utc)
         since = None
