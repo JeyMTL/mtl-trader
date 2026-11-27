@@ -3866,7 +3866,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
   }
 
   Future<void> _openStyleSheet(
-      {_SettingsPage start = _SettingsPage.home}) async {
+      {_SettingsPage start = _SettingsPage.canvas}) async {
     var page = start;
     // Everything below edits a draft. Nothing reaches the chart until Ok, which
     // is the whole point of a Cancel button: a trader tries a light canvas, sees
@@ -3904,7 +3904,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                 page: page,
                 onNavigate: (next) => setSheetState(() => page = next),
                 onClose: () => Navigator.of(sheetContext).pop(),
-                footer: _settingsFooter(
+                onTemplates: () => _openTemplates(
                   presets: presets,
                   onApply: (next) => setSheetState(() => draft = next),
                   onSaveAs: () async {
@@ -3935,6 +3935,8 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
                     if (!mounted) return;
                     setSheetState(() {});
                   },
+                ),
+                footer: _settingsFooter(
                   onCancel: () => Navigator.of(sheetContext).pop(),
                   onOk: () {
                     commit(draft);
@@ -3949,12 +3951,10 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     );
   }
 
-  /// The bottom bar of every settings page: templates, Cancel, Ok.
+  /// The fixed bar at the base of the sheet: Cancel and Apply, the same width
+  /// each, 48pt tall. Nothing here is a shortcut — the arrow goes back to the
+  /// chart unchanged, the gold button commits the draft.
   Widget _settingsFooter({
-    required List<ChartPreset> presets,
-    required ValueChanged<ChartStyle> onApply,
-    required Future<void> Function() onSaveAs,
-    required Future<void> Function(ChartPreset preset) onDeletePreset,
     required VoidCallback onCancel,
     required VoidCallback onOk,
   }) {
@@ -3963,41 +3963,26 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(6, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          IconButton(
-            tooltip: 'Templates',
-            onPressed: () => _openTemplates(
-              presets: presets,
-              onApply: onApply,
-              onSaveAs: onSaveAs,
-              onDeletePreset: onDeletePreset,
-            ),
-            icon: Icon(Icons.more_horiz, size: 20, color: AppColors.muted),
-          ),
-          const Spacer(),
-          // Both buttons give way at large system text instead of forcing the
-          // bar wider than the phone: a Cancel nobody can reach is not a choice.
-          Flexible(
-            child: TextButton(
+          Expanded(
+            child: OutlinedButton(
               onPressed: onCancel,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.muted,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                foregroundColor: AppColors.text,
+                side: BorderSide(color: AppColors.borderStrong),
               ),
               child: const Text('Cancel', maxLines: 1),
             ),
           ),
-          const SizedBox(width: 6),
-          Flexible(
+          const SizedBox(width: 10),
+          Expanded(
             child: FilledButton(
               onPressed: onOk,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(48, 40),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: const Text('Ok', maxLines: 1),
+              style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+              child: const Text('Apply', maxLines: 1),
             ),
           ),
         ],
@@ -4111,17 +4096,16 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     return name;
   }
 
-  /// The chart settings sheet, laid out the way TradingView does it: a short
-  /// list of groups that open into a page of their own, every row naming the
-  /// setting with its live value on the right. The previous sheet was one long
-  /// scroll of switches, so finding a setting meant hunting by feel; the group
-  /// list is the map.
+  /// The chart settings sheet. The pages are tabs across the top rather than a
+  /// list of groups, so any setting is one tap from the chart, and the sheet
+  /// never opens on a screen with nothing on it.
   Widget _styleSheet(
     ChartStyle style,
     ValueChanged<ChartStyle> onChanged, {
     required _SettingsPage page,
     required ValueChanged<_SettingsPage> onNavigate,
     required VoidCallback onClose,
+    required VoidCallback onTemplates,
     required Widget footer,
   }) {
     return SafeArea(
@@ -4129,23 +4113,27 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _settingsHeader(page, onNavigate, onClose),
-          Flexible(
-            child: page == _SettingsPage.home
-                ? _settingsHome(style, onChanged, onNavigate)
-                : _settingsBody(page, style, onChanged),
-          ),
+          _settingsHeader(onClose: onClose, onTemplates: onTemplates),
+          _SettingsTabs(page: page, onNavigate: onNavigate),
+          Flexible(child: _settingsBody(page, style, onChanged)),
           footer,
         ],
       ),
     );
   }
 
-  Widget _settingsHeader(
-    _SettingsPage page,
-    ValueChanged<_SettingsPage> onNavigate,
-    VoidCallback onClose,
-  ) {
+  String _eventsSummary(ChartStyle style) {
+    final parts = <String>[
+      if (style.showSessions) 'Sessions',
+      if (style.showSeparators) '${style.separatorGrain.label} lines',
+    ];
+    return parts.isEmpty ? 'Off' : parts.join(' · ');
+  }
+
+  Widget _settingsHeader({
+    required VoidCallback onClose,
+    required VoidCallback onTemplates,
+  }) {
     return Container(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
@@ -4162,33 +4150,27 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 2, 8, 2),
+            padding: const EdgeInsets.fromLTRB(20, 2, 4, 2),
             child: Row(
               children: [
-                // A subpage gets the back chevron the spec asks for; the close
-                // X on the right is the way out from anywhere, so the two are
-                // never the same button wearing two icons.
-                if (page != _SettingsPage.home)
-                  IconButton(
-                    tooltip: 'Back',
-                    onPressed: () => onNavigate(_SettingsPage.home),
-                    icon: Icon(
-                      Icons.arrow_back,
-                      size: 20,
-                      color: AppColors.text,
-                    ),
-                  )
-                else
-                  const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    page.title,
+                    'Chart settings',
                     style: TextStyle(
                       color: AppColors.text,
-                      fontSize: 16,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
+                      letterSpacing: -0.3,
                     ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Templates',
+                  onPressed: onTemplates,
+                  icon: Icon(
+                    Icons.dashboard_customize_outlined,
+                    size: 20,
+                    color: AppColors.muted,
                   ),
                 ),
                 IconButton(
@@ -4201,118 +4183,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _settingsHome(
-    ChartStyle style,
-    ValueChanged<ChartStyle> onChanged,
-    ValueChanged<_SettingsPage> onNavigate,
-  ) {
-    final studies = style.studies;
-    return ListView(
-      padding: const EdgeInsets.only(top: 4, bottom: 26),
-      children: [
-        _settingsEntry(
-          _SettingsPage.symbol,
-          Icons.style_outlined,
-          '$_decimals decimals · ${style.zone.describe()}',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.canvas,
-          Icons.layers_outlined,
-          '${style.backgroundTo == null ? 'Flat' : 'Gradient'} · '
-          '${style.crosshairStyle.label.toLowerCase()} crosshair',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.appearance,
-          Icons.palette_outlined,
-          '${style.chartType.label} · ${style.name}',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.scales,
-          Icons.straighten,
-          style.logScale ? 'Logarithmic' : 'Linear',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.grid,
-          Icons.grid_4x4,
-          style.showGrid ? 'On' : 'Off',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.watermark,
-          Icons.branding_watermark_outlined,
-          style.showWatermark ? 'On' : 'Off',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.alerts,
-          Icons.notifications_active_outlined,
-          style.onlyActiveAlerts ? 'Active only' : 'All lines',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.events,
-          Icons.event_note_outlined,
-          _eventsSummary(style),
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.indicators,
-          Icons.show_chart,
-          studies.isEmpty ? 'None' : '${studies.length} on',
-          onNavigate,
-        ),
-        _settingsDivider(),
-        _settingsEntry(
-          _SettingsPage.timeZone,
-          Icons.schedule,
-          style.zone.describe(),
-          onNavigate,
-        ),
-        const SizedBox(height: 22),
-        _settingsDivider(),
-        _settingsAction(
-          'Reset settings',
-          Icons.restart_alt,
-          onTap: () => onChanged(ChartStyle.ink.copyWith(zoneId: style.zoneId)),
-        ),
-      ],
-    );
-  }
-
-  String _eventsSummary(ChartStyle style) {
-    final parts = <String>[
-      if (style.showSessions) 'Sessions',
-      if (style.showSeparators) '${style.separatorGrain.label} lines',
-    ];
-    return parts.isEmpty ? 'Off' : parts.join(' · ');
-  }
-
-  Widget _settingsEntry(
-    _SettingsPage page,
-    IconData icon,
-    String value,
-    ValueChanged<_SettingsPage> onNavigate,
-  ) {
-    return _settingsRow(
-      title: page.title,
-      value: value,
-      leading: Icon(icon, size: 20, color: AppColors.muted),
-      onTap: () => onNavigate(page),
     );
   }
 
@@ -4342,8 +4212,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
         return _indicatorSettings(style, onChanged);
       case _SettingsPage.timeZone:
         return _timeZoneSettings(style, onChanged);
-      case _SettingsPage.home:
-        return const SizedBox.shrink();
     }
   }
 
@@ -5023,22 +4891,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
       title: title,
       subtitle: subtitle,
       onTap: () => onChanged(!value),
-      trailing: SizedBox(
-        width: 48,
-        height: 28,
-        child: FittedBox(
-          child: Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.primary,
-            inactiveThumbColor: AppColors.muted,
-            inactiveTrackColor: AppColors.surfaceAlt,
-            trackOutlineColor: WidgetStateProperty.all(AppColors.borderStrong),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ),
-      ),
+      trailing: _TogglePill(value: value, onChanged: onChanged),
     );
   }
 
@@ -5059,33 +4912,6 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
           const SizedBox(height: 8),
           control,
         ],
-      ),
-    );
-  }
-
-  Widget _settingsAction(
-    String title,
-    IconData icon, {
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-        child: Row(
-          children: [
-            Icon(icon, size: 19, color: AppColors.danger),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                color: AppColors.danger,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -8032,6 +7858,169 @@ class _WheelDot extends StatelessWidget {
   }
 }
 
+/// The switch of the settings pages: a 46pt pill with a white thumb, gold
+/// when on. Reachable at 46pt wide, which the platform switch drawn at 28pt
+/// inside a FittedBox was not.
+class _TogglePill extends StatelessWidget {
+  const _TogglePill({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      toggled: value,
+      child: GestureDetector(
+        onTap: () => onChanged(!value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: 46,
+          height: 28,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: value ? AppColors.primary : AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: value ? AppColors.primary : AppColors.borderStrong,
+            ),
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 140),
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The settings tab strip: icons over short names, scrolling sideways because
+/// ten tabs are wider than a phone. The selected tab carries the gold rule and
+/// the strip scrolls it into view when a page is opened from a chart shortcut.
+class _SettingsTabs extends StatefulWidget {
+  const _SettingsTabs({required this.page, required this.onNavigate});
+
+  final _SettingsPage page;
+  final ValueChanged<_SettingsPage> onNavigate;
+
+  @override
+  State<_SettingsTabs> createState() => _SettingsTabsState();
+}
+
+class _SettingsTabsState extends State<_SettingsTabs> {
+  final Map<_SettingsPage, GlobalKey> _keys = {
+    for (final page in _SettingsPage.values) page: GlobalKey(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _reveal(widget.page, animate: false);
+  }
+
+  @override
+  void didUpdateWidget(_SettingsTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.page != widget.page) _reveal(widget.page, animate: true);
+  }
+
+  void _reveal(_SettingsPage page, {required bool animate}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _keys[page]?.currentContext;
+      if (target == null) return;
+      Scrollable.ensureVisible(
+        target,
+        alignment: 0.5,
+        duration: animate ? const Duration(milliseconds: 180) : Duration.zero,
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // The strip is as tall as its tallest label, not a fixed 54: at 2x text the
+    // names grow and a fixed height clips the icon or the second line.
+    final labelHeight = MediaQuery.textScalerOf(context).scale(11.5) * 1.3;
+    return Container(
+      height: math.max(54, 18 + 3 + labelHeight + 13),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        children: [
+          for (final page in _SettingsPage.values)
+            _SettingsTab(
+              key: _keys[page],
+              page: page,
+              selected: page == widget.page,
+              onTap: () => widget.onNavigate(page),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsTab extends StatelessWidget {
+  const _SettingsTab({
+    super.key,
+    required this.page,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _SettingsPage page;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.primary : AppColors.muted;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: selected ? AppColors.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(page.icon, size: 18, color: color),
+            const SizedBox(height: 3),
+            Text(
+              page.title,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: 11.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ColorDot extends StatelessWidget {
   const _ColorDot({
     required this.color,
@@ -8049,8 +8038,8 @@ class _ColorDot extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        width: 28,
-        height: 28,
+        width: 32,
+        height: 32,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
@@ -8182,19 +8171,19 @@ class _ZoneSheetState extends State<_ZoneSheet> {
 /// A page in the chart settings sheet. TradingView groups chart settings the
 /// same way: a short list of names, each opening its own page.
 enum _SettingsPage {
-  home('Chart settings'),
-  canvas('Canvas'),
-  symbol('Symbol'),
-  alerts('Alerts'),
-  appearance('Appearance'),
-  scales('Scales'),
-  grid('Grid'),
-  watermark('Watermark'),
-  events('Events'),
-  indicators('Indicators'),
-  timeZone('Time zone');
+  symbol('Symbol', Icons.style_outlined),
+  canvas('Canvas', Icons.layers_outlined),
+  appearance('Appearance', Icons.palette_outlined),
+  scales('Scales', Icons.straighten),
+  grid('Grid', Icons.grid_4x4),
+  watermark('Watermark', Icons.branding_watermark_outlined),
+  alerts('Alerts', Icons.notifications_active_outlined),
+  events('Events', Icons.event_note_outlined),
+  indicators('Indicators', Icons.show_chart),
+  timeZone('Time zone', Icons.schedule);
 
-  const _SettingsPage(this.title);
+  const _SettingsPage(this.title, this.icon);
 
   final String title;
+  final IconData icon;
 }
