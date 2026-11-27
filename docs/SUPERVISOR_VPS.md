@@ -97,6 +97,24 @@ works in a folder that has never authenticated. So a slot that times out is
 reopened with its own login instead of being reported as failed, and nobody has
 to log in by hand on the host.
 
+### The slot's saved account is never trusted
+
+A portable terminal boots from `config\accounts.dat`, which remembers the account
+*and password* of whichever login was saved there last. A slot that a person
+signed into once — the setup hand login, usually with the **master** password —
+therefore comes up already authenticated, and `account_info()` reports the very
+account the row asks for. Same number, same deals, so matching on the login alone
+reported `connected` while the investor password in the app was never presented:
+a session that can also trade, behind a read-only promise.
+
+So a matching account is not a matching credential. The supervisor re-authenticates
+in place with the password stored in the row (one auth round trip), and if the
+terminal refuses it reopens the slot with `/login:`/`/password:` on the command
+line. Only a session opened with that password is reported as connected; when
+neither works the account is marked failed with the reason, rather than left on a
+session nothing in the app can vouch for. A restart of the supervisor costs one
+re-authentication per account and no terminal restart.
+
 ## 5. Apply the small-host settings
 
 Copy `supervisor/deploy/small-vps.env` over `C:\MTLSync\.env` and fill in the
@@ -174,7 +192,9 @@ Checklist:
 * **Investor passwords cannot cancel orders.** MT5 answers `10017 Trade
   disabled` when the account was saved with its investor (read-only) password,
   so the daily-stop lock's resting-order deletion needs a master password. The
-  log says so once instead of failing silently.
+  log says so once instead of failing silently, and says the opposite once too:
+  `[info] account … is signed in with a login that can trade`, which is what a
+  master password, or a hand login the slot still remembers, looks like.
 * **A trade deleted in the app stays deleted.** `/api/sync` records deleted
   position ids and refuses them on every later sync, so re-importing an account
   whose journal was cleared does not bring the old rows back. The slot log says

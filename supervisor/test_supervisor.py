@@ -294,9 +294,17 @@ class TerminalResolutionTests(unittest.TestCase):
         os.environ["MT5_PATHS"] = second
         try:
             sup.mt5 = FakeMt5([("ok", None), ("ok", None)])
+
             # A terminal that stays on its own account even after the switch is
-            # asked for: it must be closed and the next candidate used.
-            sup.mt5.login_ok = False
+            # asked for: it must be closed and the next candidate used. The one
+            # that does hold the right account still has to take the password.
+            def login(login=None, password=None, server=None):
+                if sup.mt5.calls[-1][0] == first:
+                    return False
+                sup.mt5._account = login
+                return True
+
+            sup.mt5.login = login
             sup.mt5.account_info = lambda: types.SimpleNamespace(
                 login=11111111 if sup.mt5.calls[-1][0] == first else 35476861
             )
@@ -1033,17 +1041,24 @@ class AccountZeroLoginTests(unittest.TestCase):
 
     def terminal(self, logins):
         answers = list(logins)
+        live = {"account": 0}
 
         def initialize(path=None, portable=False, timeout=0, **session):
             self.calls.append((path, session.get("login")))
             return True
 
         def account_info():
-            return types.SimpleNamespace(login=answers.pop(0) if answers else None)
+            live["account"] = answers.pop(0) if answers else None
+            return types.SimpleNamespace(login=live["account"])
+
+        def login(login=None, password=None, server=None):
+            """Only a terminal that has authorised once can take a credential."""
+            return live["account"] not in (None, 0) and login == live["account"]
 
         return types.SimpleNamespace(
             initialize=initialize,
             account_info=account_info,
+            login=login,
             shutdown=lambda: True,
             last_error=lambda: (0, "ok"),
         )
@@ -1817,6 +1832,7 @@ class SlotLoginDialogTests(unittest.TestCase):
                 "stop_terminal_process",
                 "warn_if_never_authenticated",
                 "warn_if_no_algo_trading",
+                "_credential_sessions",
                 "mt5",
             )
         }
@@ -1826,6 +1842,7 @@ class SlotLoginDialogTests(unittest.TestCase):
         sup.stop_terminal_process = lambda path: self.stopped.append(path)
         sup.warn_if_never_authenticated = lambda *a, **k: None
         sup.warn_if_no_algo_trading = lambda path: None
+        sup._credential_sessions = set()
         sup.time.sleep = lambda seconds: None
         self.addCleanup(self.restore)
 
@@ -1896,6 +1913,55 @@ class SlotLoginDialogTests(unittest.TestCase):
         self.assertEqual(called[0][0][:4], (self.exe, 486046720, "pw", "Exness-MT5Trial10"))
         self.assertTrue(called[0][1]["portable"])
 
+    def attached_to(self, login=486046720):
+        """A slot that comes up already signed in, the way a saved account does."""
+        sup.mt5 = FakeMt5([("ok", None), ("ok", None)])
+        sup.mt5.account_info = lambda: types.SimpleNamespace(login=login)
+        return sup.mt5
+
+    def test_a_saved_login_is_replaced_with_the_apps_password(self):
+        """Yesterday's hand login is not the credential the app was given."""
+        mt5 = self.attached_to()
+
+        self.assertEqual(sup.open_session(self.row(), self.exe), self.exe)
+
+        self.assertEqual(mt5.logins, [(486046720, "Exness-MT5Trial10")])
+
+    def test_the_same_session_is_not_re_authenticated_every_claim(self):
+        mt5 = self.attached_to()
+
+        sup.open_session(self.row(), self.exe)
+        sup.open_session(self.row(), self.exe)
+
+        self.assertEqual(len(mt5.logins), 1)
+
+    def test_a_refused_password_on_a_saved_login_is_reported(self):
+        """The account number matching must not turn a rejected password into a connect."""
+        mt5 = self.attached_to()
+
+        def refused(login=None, password=None, server=None):
+            mt5._last = (-6, "Terminal: Authorization failed")
+            return False
+
+        mt5.login = refused
+
+        with self.assertRaises(sup.WrongPassword) as caught:
+            sup.open_session(self.row(), self.exe)
+
+        self.assertIn("password is incorrect", str(caught.exception))
+
+    def test_a_saved_session_this_app_cannot_open_is_not_connected(self):
+        mt5 = self.attached_to()
+        mt5.login = lambda login=None, password=None, server=None: False
+        saved = sup.login_via_command_line
+        self.addCleanup(setattr, sup, "login_via_command_line", saved)
+        sup.login_via_command_line = lambda *a, **k: False
+
+        with self.assertRaises(RuntimeError) as caught:
+            sup.open_session(self.row(), self.exe)
+
+        self.assertIn("did not accept this app's password", str(caught.exception))
+
 
 class AlgoTradingWarningTests(unittest.TestCase):
     """A host that cannot trade must say so rather than cancel nothing forever."""
@@ -1924,8 +1990,13 @@ class AlgoTradingWarningTests(unittest.TestCase):
             sup.warn_if_no_algo_trading(r"C:\MT5-Fleet\slot-01\terminal64.exe")
         return out.getvalue()
 
-    def test_silent_when_the_host_can_trade(self):
-        self.assertEqual(self.said(), "")
+    def test_names_a_login_that_can_trade(self):
+        """A master login on a slot must not pass for the investor one."""
+        first = self.said()
+
+        self.assertIn("can trade", first)
+        self.assertIn("486046720", first)
+        self.assertEqual(self.said(), "")  # said once, not every cycle
 
     def test_names_the_terminal_setting_once(self):
         self.terminal = types.SimpleNamespace(trade_allowed=False)

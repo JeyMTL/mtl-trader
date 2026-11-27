@@ -66,6 +66,7 @@ Run:
 
 import argparse
 import base64
+import hashlib
 import json
 import multiprocessing as mp
 import os
@@ -1595,6 +1596,49 @@ def switch_account(login, password, server, settle_seconds=15.0):
     return False
 
 
+# Sessions this process opened by presenting a password, keyed by
+# `credential_session_key`. Anything not listed here came up on its own, from the
+# account the terminal saved, and cannot be assumed to use the app's password.
+_credential_sessions = set()
+
+
+def credential_session_key(path, login, password, server):
+    """Identify a session this process opened with one specific password.
+
+    The password is part of the key on purpose: the same account reconnected
+    with the investor password after a hand login with the master one is a
+    different session and has to be opened again. A digest keeps it out of the
+    set, and SHA-256 keeps two passwords for one account from colliding into a
+    "this one is already ours".
+    """
+    digest = hashlib.sha256((password or "").encode("utf-8")).hexdigest()[:32]
+    where = os.path.abspath(path) if path else ""
+    return f"{where}|{login}|{server}|{digest}"
+
+
+def adopt_credential_session(path, login, password, server):
+    """Make the slot's live session one this app opened with its own password.
+
+    A portable terminal boots from `config\\accounts.dat`, which remembers the
+    account of whichever login was saved there last - after the setup hand
+    login, usually the master password. `initialize()` then attaches to that
+    session and `account_info()` reports the requested account, so the old code
+    returned "connected" without ever presenting the investor password the
+    customer typed: the same deals, but a session that can also trade.
+
+    Re-authenticating in place is one auth round trip and makes the stored
+    password the one in force. False means the terminal would not take it, and
+    the caller must not report a connection it cannot account for.
+    """
+    key = credential_session_key(path, login, password, server)
+    if key in _credential_sessions:
+        return True
+    if switch_account(login, password, server):
+        _credential_sessions.add(key)
+        return True
+    return False
+
+
 def login_via_command_line(path, login, password, server, portable=True, settle_seconds=None):
     """Start the terminal already logged in, without a person doing it.
 
@@ -1636,6 +1680,9 @@ def login_via_command_line(path, login, password, server, portable=True, settle_
             continue
         info = mt5.account_info()
         if info is not None and int(getattr(info, "login", 0) or 0) == int(login):
+            _credential_sessions.add(
+                credential_session_key(path, login, password, server)
+            )
             warn_if_no_algo_trading(path)
             return True
         mt5.shutdown()
@@ -1803,8 +1850,36 @@ def open_session(row, terminal=None):
                 info = mt5.account_info()
                 actual = getattr(info, "login", None)
                 if actual is not None and int(actual) == login:
-                    warn_if_no_algo_trading(path)
-                    return path or ""
+                    # The slot came up already signed in - from its saved account
+                    # file, not from this app's password. Same account number is
+                    # not the same credential, so make ours the one in force
+                    # before calling it connected.
+                    if adopt_credential_session(path, login, password, server):
+                        warn_if_no_algo_trading(path)
+                        return path or ""
+                    error = mt5.last_error()
+                    if is_wrong_password(error):
+                        stop_terminal_process(path)
+                        raise WrongPassword(
+                            f"{WRONG_PASSWORD_MESSAGE} for account {login} on {server}"
+                        )
+                    # Refused for a reason that is not the password: reopen the
+                    # slot with the credential on the command line rather than
+                    # keep a session nothing in this app can vouch for.
+                    if terminal and path and login_via_command_line(
+                        path, login, password, server, portable=bool(portable)
+                    ):
+                        warn_if_no_algo_trading(path)
+                        return path or ""
+                    attempts.append(
+                        (
+                            path or "default install",
+                            f"came up on the saved account {login} and did not "
+                            "accept this app's password",
+                        )
+                    )
+                    stop_terminal_process(path)
+                    break
                 if switch_account(login, password, server):
                     warn_if_no_algo_trading(path)
                     return path or ""
@@ -1947,11 +2022,24 @@ def warn_if_no_algo_trading(path):
         account = mt5.account_info()
     except Exception:  # noqa: BLE001
         return
-    if account is None or getattr(account, "trade_allowed", True):
+    if account is None:
+        return
+    login = getattr(account, "login", "?")
+    if getattr(account, "trade_allowed", True):
+        # A master login, usually the one a hand login left saved in the slot.
+        # The sync is identical, but this session can also trade, so the customer
+        # has to be told instead of being left to assume the investor login.
+        _algo_warned.add(key)
+        print(
+            f"[info] account {login} on {where} is signed in with a login that can "
+            "trade (the master password, not the investor one). Disconnect in the "
+            "app and connect again with the investor password for a read-only "
+            "session."
+        )
         return
     _algo_warned.add(key)
     print(
-        f"[warn] account {getattr(account, 'login', '?')} is read-only (investor "
+        f"[warn] account {login} is read-only (investor "
         "password), so the daily stop cannot cancel anything on it either. Save the "
         "account's master password to let the lock act."
     )
