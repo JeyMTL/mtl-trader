@@ -2142,23 +2142,55 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     _enterReplay();
   }
 
-  /// Whether this account holds Pro right now, from the server's own billing
-  /// columns. A trial counts, and a stale `pro` label cannot outlive its period.
+  /// This account's plan, from the server's own billing columns. A trial counts,
+  /// and a stale `pro` label cannot outlive its period.
   ///
-  /// The same source the replay and the Pro candle sizes read, so the two cannot
-  /// disagree about what the trader owns.
-  Future<bool> _hasProTools() async {
+  /// One source for every chart gate — replay, the Pro candle sizes and the
+  /// position objects — so no two of them can disagree about what is owned.
+  Future<SubscriptionInfo?> _subscription() async {
     try {
       final profile = await JournalApi().profile();
-      return SubscriptionInfo.fromProfile(profile).proTools;
+      return SubscriptionInfo.fromProfile(profile);
     } catch (_) {
-      // Offline, or a schema still missing the billing columns: answer no rather
-      // than pretending the feature is paid for.
-      return false;
+      // Offline, or a schema still missing the billing columns: null, so each
+      // caller answers no rather than pretending the feature is paid for.
+      return null;
     }
   }
 
-  /// Replay is sold with Pro.
+  /// Whether this account holds Pro right now.
+  Future<bool> _hasProTools() async =>
+      (await _subscription())?.proTools ?? false;
+
+  /// Whether the chart's paid objects are open: a live trial or any paid plan.
+  ///
+  /// The position objects are sold with Basic, so this asks the wider question
+  /// `_hasProTools` does not: Basic pays for pinning levels, Pro pays for the
+  /// analysis on top of it.
+  Future<bool> _hasPaidPlan() async =>
+      (await _subscription())?.hasAccess ?? false;
+
+    /// The position objects pin entry, stop and target to the chart.
+  ///
+  /// Unlike replay and the fast candle sizes this is a Basic feature, not a Pro
+  /// one, which is why it reads `_hasPaidPlan` and not `_hasProTools`.
+  Future<bool> _pinAllowed() async {
+    if (await _hasPaidPlan()) return true;
+
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Pinning entry, stop and target on the chart is part of Basic. '
+          'Upgrade to pin your levels — the chart itself and every other '
+          'drawing tool stay free.',
+        ),
+      ),
+    );
+    return false;
+  }
+
+  /// Replay is sold with Pro.
   ///
   /// This check is the upgrade prompt, not the enforcement: candles are served
   /// to every plan, and replay is a way of drawing on them. It lives here
@@ -2489,12 +2521,18 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     if (!mounted || action == null || action == 'close') return;
     // The position tools arm like every other tool: the entry lands where the
     // trader presses, and the drag sets how far forward the box runs.
-    if (action == 'long') {
-      _armTool(DrawingKind.position, side: PositionSide.long);
-      return;
-    }
-    if (action == 'short') {
-      _armTool(DrawingKind.position, side: PositionSide.short);
+    //
+    // They are also the two objects that pin entry, stop and target to the
+    // chart, and pinning is sold with Basic. Everything else on this screen —
+    // every other tool, and every candle size but the Pro seconds — is free, so
+    // the refusal is here, at the tap, and names the plan: a free trader should
+    // learn what the object costs rather than find it silently skipped.
+    if (action == 'long' || action == 'short') {
+      if (!await _pinAllowed()) return;
+      _armTool(
+        DrawingKind.position,
+        side: action == 'long' ? PositionSide.long : PositionSide.short,
+      );
       return;
     }
     if (action == 'trend') {
