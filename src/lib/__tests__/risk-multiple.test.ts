@@ -34,6 +34,14 @@ describe('riskMultipleOf', () => {
     expect(riskMultipleOf({ type: 'BUY', entry_price: 1.1, exit_price: 1.105, stop_loss: 1.1 })).toBeNull()
     expect(riskMultipleOf({ type: 'BUY', entry_price: 1.1, exit_price: null, stop_loss: 1.09 })).toBeNull()
   })
+
+  it('refuses a stop stored as zero, which is how an older sync wrote "none"', () => {
+    // Dividing by the whole entry price gave every stopless trade a fake R of
+    // about 0.005 instead of leaving it out of the distribution.
+    expect(
+      riskMultipleOf({ type: 'BUY', entry_price: 3600, exit_price: 3610, stop_loss: 0 })
+    ).toBeNull()
+  })
 })
 
 describe('riskMultiples', () => {

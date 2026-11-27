@@ -62,6 +62,20 @@ function round(value: number, decimals: number): number {
 }
 
 /**
+ * A stop or target, or null when the position carried neither.
+ *
+ * The MT5 agent sends 0 for a position that never had a stop loss or take
+ * profit, and storing that made "no level" indistinguishable from a level at
+ * price zero: the trade ticket then measured risk from the entry down to 0 and
+ * showed a six-figure loss, and the R-multiple treated the whole entry price as
+ * the risk. No instrument quotes at 0, so it means absent here.
+ */
+function level(value: unknown): number | null {
+  const parsed = numeric(value)
+  return parsed !== null && parsed > 0 ? price(parsed) : null
+}
+
+/**
  * Timestamps without an explicit offset are read as UTC. MT5 deal times are
  * broker-server time and the agent now sends them as UTC, but an older agent
  * sends a naive local string — treating it as UTC is still better than letting
@@ -123,8 +137,8 @@ function prepare(value: unknown, userId: string): PreparedTrade | string {
       entry_price: price(entry),
       exit_price: price(exit),
       lot_size: round(lot, 3),
-      stop_loss: price(numeric(trade.stop_loss) ?? 0),
-      take_profit: price(numeric(trade.take_profit) ?? 0),
+      stop_loss: level(trade.stop_loss),
+      take_profit: level(trade.take_profit),
       pnl: round(pnl, 2),
       commission: round(numeric(trade.commission) ?? 0, 2),
       swap: round(numeric(trade.swap) ?? 0, 2),

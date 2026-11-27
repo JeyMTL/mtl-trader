@@ -82,8 +82,14 @@ double pointValue(String symbol) {
         exit: price,
         lots: lots,
       );
-  final loss = stop == null ? 0.0 : -at(stop);
-  final gain = take == null ? 0.0 : at(take);
+  // A synced MT5 position that never had a stop arrives as 0. Reading that as a
+  // price measured risk from the entry down to zero — a six-figure loss on a
+  // single lot of gold — when the trade simply has no level. No instrument
+  // quotes at 0, so it means absent.
+  final stopLevel = stop != null && stop > 0 ? stop : null;
+  final takeLevel = take != null && take > 0 ? take : null;
+  final loss = stopLevel == null ? 0.0 : -at(stopLevel);
+  final gain = takeLevel == null ? 0.0 : at(takeLevel);
   final risk = loss > 0 ? loss : 0.0;
   final reward = gain > 0 ? gain : 0.0;
   return (
@@ -92,8 +98,8 @@ double pointValue(String symbol) {
     r: risk > 0 && reward > 0 ? reward / risk : null,
     // Reaching zero this way means the level is at or past the entry, which is
     // the wrong side — a level exactly on the entry is worth saying too.
-    stopWrongSide: stop != null && loss <= 0,
-    takeWrongSide: take != null && gain <= 0,
+    stopWrongSide: stopLevel != null && loss <= 0,
+    takeWrongSide: takeLevel != null && gain <= 0,
   );
 }
 

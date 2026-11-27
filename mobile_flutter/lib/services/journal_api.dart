@@ -166,6 +166,9 @@ class JournalApi {
       final entry = asDouble(row['entry_price']);
       final exit = asDouble(row['exit_price']);
       final stop = asDouble(row['stop_loss']);
+      // 0 is how an older sync wrote "this position had no stop": dividing by
+      // the whole entry price would give it a tiny, invented R.
+      if (stop <= 0) continue;
       final risk = (entry - stop).abs();
       if (risk <= 1e-9) continue;
       final direction =

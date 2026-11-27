@@ -166,8 +166,8 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
         _exitPrice = asNullableDouble(trade['exit_price']);
         _exitReason = null;
         _lots.text = _numberText(trade['lot_size'], decimals: 2);
-        _stop.text = _numberText(trade['stop_loss']);
-        _take.text = _numberText(trade['take_profit']);
+        _stop.text = _levelText(trade['stop_loss']);
+        _take.text = _levelText(trade['take_profit']);
         _commission.text = _numberText(trade['commission'], decimals: 2);
         _swap.text = _numberText(trade['swap'], decimals: 2);
         _strategy.text = asString(trade['strategy']) ?? '';
@@ -198,6 +198,18 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     final parsed = asDouble(value);
     if (parsed == 0) return '0';
     return price(parsed, decimals: decimals);
+  }
+
+  /// A stored stop or target as the form should show it.
+  ///
+  /// A synced MT5 position with no stop is stored as 0, and [_numberText]
+  /// printed that as "0": the field then held a level at price zero, which is
+  /// not a price and turned the risk strip into the whole entry price. Zero
+  /// means "no level", so it reads as an empty field.
+  String _levelText(dynamic value) {
+    if (value == null) return '';
+    final parsed = asDouble(value);
+    return parsed > 0 ? price(parsed, decimals: 5) : '';
   }
 
   double? _valueOf(TextEditingController controller) {

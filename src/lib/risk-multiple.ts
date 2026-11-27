@@ -19,9 +19,9 @@ export interface RiskRow {
 /**
  * How many R a closed trade made, or null when it cannot be measured.
  *
- * Null for a missing stop, a missing exit, or a stop exactly on the entry —
- * a trade with no risk defined has no R, and printing 0 would claim it was a
- * scratch.
+ * Null for a missing stop, a missing exit, a stop exactly on the entry, or a
+ * stop stored as 0 — a trade with no risk defined has no R, and printing 0
+ * would claim it was a scratch.
  */
 export function riskMultipleOf(row: RiskRow): number | null {
   // `Number(null)` is 0, which would quietly turn a missing stop into a risk of
@@ -35,6 +35,10 @@ export function riskMultipleOf(row: RiskRow): number | null {
   if (!Number.isFinite(entry) || !Number.isFinite(exit) || !Number.isFinite(stop)) {
     return null
   }
+  // 0 is how a sync older than the `level` gate wrote "this position had no
+  // stop". Dividing by the whole entry price would give every stopless trade a
+  // tiny, invented R instead of leaving it out.
+  if (!(stop > 0)) return null
   const risk = Math.abs(entry - stop)
   if (!(risk > 1e-9)) return null
   // A short profits when price falls, so its move is negated before dividing.

@@ -105,6 +105,26 @@ void main() {
       expect(right.takeWrongSide, isFalse);
     });
 
+    test('a level stored as zero is no level at all', () {
+      // A synced MT5 position with no stop arrives as 0. Read as a price, it
+      // made risk the whole entry price: 3600 × 1.5 × 100 = $540,000 on a trade
+      // that never had a stop.
+      final preview = riskRewardPreview(
+        type: 'BUY',
+        symbol: 'XAUUSD',
+        entry: 3600,
+        stop: 0,
+        take: 0,
+        lots: 1.5,
+      );
+
+      expect(preview.risk, 0);
+      expect(preview.reward, 0);
+      expect(preview.r, isNull);
+      expect(preview.stopWrongSide, isFalse);
+      expect(preview.takeWrongSide, isFalse);
+    });
+
     test('a level exactly on the entry counts as the wrong side', () {
       final preview = riskRewardPreview(
         type: 'BUY',

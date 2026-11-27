@@ -249,12 +249,11 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
         lot_size: data.lot_size === null || data.lot_size === undefined
           ? ''
           : formatPrice(data.lot_size, 2),
-        stop_loss: data.stop_loss === null || data.stop_loss === undefined
-          ? ''
-          : formatPrice(data.stop_loss),
-        take_profit: data.take_profit === null || data.take_profit === undefined
-          ? ''
-          : formatPrice(data.take_profit),
+        // A position synced without a stop was stored as 0, and printing that
+        // filled the ticket with a level at price zero: risk then measured the
+        // whole entry price. Zero means "no level", exactly like an empty column.
+        stop_loss: !data.stop_loss ? '' : formatPrice(data.stop_loss),
+        take_profit: !data.take_profit ? '' : formatPrice(data.take_profit),
         commission: data.commission === null || data.commission === undefined
           ? ''
           : formatPrice(data.commission, 2),

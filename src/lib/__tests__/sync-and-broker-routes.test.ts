@@ -202,6 +202,16 @@ describe('sync ingest', () => {
     expect(state.upserted[0]).toMatchObject({ position_id: 101, user_id: 'u1', symbol: 'EURUSD' })
   })
 
+  it('stores a stop and target the position did not have as null, not zero', async () => {
+    // The MT5 agent sends 0 for a position with no stop. Stored as 0, the ticket
+    // read it as a level at price zero: risk then measured the whole entry price
+    // and the trade form showed a six-figure loss on a trade with no levels.
+    await postSync({ trades: [closedTrade({ stop_loss: 0, take_profit: 0 })] })
+
+    expect(state.upserted[0].stop_loss).toBeNull()
+    expect(state.upserted[0].take_profit).toBeNull()
+  })
+
   it('collapses two observations of the same position into one row', async () => {
     const res = await postSync({
       trades: [closedTrade({ ticket: 9001, pnl: 5 }), closedTrade({ ticket: 9002, pnl: 20 })],
