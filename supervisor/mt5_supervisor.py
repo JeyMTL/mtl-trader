@@ -1631,7 +1631,6 @@ def open_session(row, terminal=None):
     login = int(row["account_login"])
     server = canonical_server_name(row.get("broker_name"), row["server"])
     session = {"login": login, "password": password, "server": server}
-    key = terminal_key(row)
 
     attempts = []
     candidates = [terminal] if terminal else (terminal_order(row) or [None])
@@ -1666,12 +1665,10 @@ def open_session(row, terminal=None):
                 actual = getattr(info, "login", None)
                 if actual is not None and int(actual) == login:
                     warn_if_no_algo_trading(path)
-                    remember_terminal(key, path or "")
-                    return
+                    return path or ""
                 if switch_account(login, password, server):
                     warn_if_no_algo_trading(path)
-                    remember_terminal(key, path or "")
-                    return
+                    return path or ""
                 error = mt5.last_error()
                 if is_wrong_password(error):
                     stop_terminal_process(path)
@@ -1964,12 +1961,19 @@ def sync_one(row, terminal=None):
     user_id = row["user_id"]
     mark(user_id, "connecting")
     try:
-        open_session(row, terminal)
+        path = open_session(row, terminal)
         synced = read_closed(row)
         # The session is still open, so this is the moment the stop can be
         # enforced for an account that is about to have its terminal closed.
         # A close forces the check; an empty read keeps the normal interval.
         enforce_lock(row, force=bool(synced))
+        if synced:
+            # Only an account that has journaled a trade has proved this terminal
+            # works for it, so that is the first moment it may be pinned to one.
+            # Pinning on a login alone kept an account on a terminal it never
+            # actually synced through, and a rejected password or a terminal that
+            # could not read anything would inherit that preference for good.
+            remember_terminal(terminal_key(row), path or "")
         return synced
     finally:
         mt5.shutdown()

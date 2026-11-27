@@ -155,27 +155,29 @@ class TerminalResolutionTests(unittest.TestCase):
             "credential_cipher": "v1:unused",
         }
 
-    def test_remembers_the_terminal_that_worked(self):
+    def test_returns_the_terminal_that_worked_without_pinning_it(self):
         first = make_terminal(self.tmp.name, "plain")
         second = make_terminal(self.tmp.name, "fundednext")
         sup.MT5_PATH = first
         os.environ["MT5_PATHS"] = second
         try:
             sup.mt5 = FakeMt5([("fail", (-10005, "IPC timeout"))] * 2 + [("ok", None)])
-            sup.open_session(self.row())
+            used = sup.open_session(self.row())
         finally:
             os.environ.pop("MT5_PATHS", None)
 
-        stored = json.loads(self.cache.read_text(encoding="utf-8"))
-        self.assertEqual(stored["fundednext|fundednext-server 3"], second)
+        self.assertEqual(used, second)
+        # A login alone proves nothing: only a sync that journaled a trade may
+        # pin this account to a terminal (see TerminalPinTests).
+        self.assertFalse(self.cache.exists())
         # The account is switched on the attached terminal, not handed to it at
         # start-up: that form is what times out on the current builds.
         self.assertEqual(sup.mt5.logins[0], (35476861, "FundedNext-Server 3"))
 
-        # The next login goes straight to the terminal that worked.
+        # With nothing pinned, the next login starts from the configured order.
         sup.mt5 = FakeMt5([("ok", None)])
         sup.open_session(self.row())
-        self.assertEqual(sup.mt5.calls[0][0], second)
+        self.assertEqual(sup.mt5.calls[0][0], first)
 
     def test_tries_the_next_terminal_when_one_cannot_start(self):
         first = make_terminal(self.tmp.name, "plain")
@@ -1399,6 +1401,57 @@ class SlotResetTests(unittest.TestCase):
 
         self.assertEqual(results.get_nowait()["error"], "Authorization failed")
         self.assertEqual(account.read_bytes(), b"authenticated before the run")
+
+
+class TerminalPinTests(unittest.TestCase):
+    """A terminal is only remembered for an account it has actually journaled."""
+
+    def setUp(self):
+        self.pinned = []
+        self.saved = {
+            name: getattr(sup, name)
+            for name in (
+                "open_session",
+                "read_closed",
+                "enforce_lock",
+                "mark",
+                "remember_terminal",
+            )
+        }
+        self.addCleanup(self._restore)
+        sup.open_session = lambda row, terminal=None: "C:/fleet/slot-1/terminal64.exe"
+        sup.enforce_lock = lambda row, force=False: None
+        sup.mark = lambda *args, **kwargs: None
+        sup.remember_terminal = lambda key, path: self.pinned.append((key, path))
+
+    def _restore(self):
+        for name, value in self.saved.items():
+            setattr(sup, name, value)
+
+    def row(self):
+        return {
+            "user_id": "u1",
+            "broker_name": "Exness",
+            "server": "Exness-MT5Trial10",
+            "account_login": 486046720,
+        }
+
+    def test_a_login_that_synced_nothing_does_not_pin_the_terminal(self):
+        sup.read_closed = lambda row: 0
+
+        sup.sync_one(self.row())
+
+        self.assertEqual(self.pinned, [])
+
+    def test_the_first_sync_with_a_trade_pins_the_terminal(self):
+        sup.read_closed = lambda row: 3
+
+        sup.sync_one(self.row())
+
+        self.assertEqual(
+            self.pinned,
+            [(sup.terminal_key(self.row()), "C:/fleet/slot-1/terminal64.exe")],
+        )
 
 
 class FailureNoticeTests(unittest.TestCase):
