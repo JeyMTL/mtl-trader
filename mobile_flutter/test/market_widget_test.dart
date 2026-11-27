@@ -123,4 +123,30 @@ void main() {
       expect(marketInstrumentLabel('NAS100'), 'NAS100');
     });
   });
+
+  group('searching for an instrument', () {
+    test('an empty query is the whole chip row', () {
+      expect(marketInstrumentMatches(''), kMarketInstruments);
+      expect(marketInstrumentMatches('   '), kMarketInstruments);
+    });
+
+    test('matches a fragment of the code however it is typed', () {
+      expect(marketInstrumentMatches('eur'), contains('EURUSD'));
+      expect(marketInstrumentMatches('EUR/USD'), contains('EURUSD'));
+      expect(marketInstrumentMatches('nas'), <String>['NAS100']);
+      expect(marketInstrumentMatches('us'), contains('US30'));
+    });
+
+    test('offers a cross the chips do not carry, but the mapping resolves', () {
+      expect(marketInstrumentMatches('gbp jpy').first, 'GBPJPY');
+      expect(marketInstrumentMatches('gbpjpy'), <String>['GBPJPY']);
+      // An alias for an index the chips list under another name.
+      expect(marketInstrumentMatches('jp225'), <String>['JP225']);
+    });
+
+    test('does not invent an instrument the mapping cannot chart', () {
+      expect(marketInstrumentMatches('xptusd'), isEmpty);
+      expect(marketInstrumentMatches('aapl'), isEmpty);
+    });
+  });
 }

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/features.dart';
 import '../core/format.dart';
 import '../core/journal_freshness.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -22,7 +21,6 @@ import 'dashboard_screen.dart';
 import 'edge_screen.dart';
 import 'import_screen.dart';
 import 'journal_screen.dart';
-import 'market_view_screen.dart';
 import 'prop_firm_screen.dart';
 import 'trade_form_screen.dart';
 
@@ -45,17 +43,9 @@ class _AppShellState extends State<AppShell>
     value: 1,
   );
 
-  /// Desk (0), Journal (1), Calendar (2), Account (3), Market (4). Analytics is
-  /// not a tab of its own: it is the Desk's second scope, which is what leaves
-  /// the middle of the bar free for the one action the app is built around.
-  ///
-  /// Market exists because the chart it replaces is off
-  /// (`kMarketChartsEnabled`) and the only way in was the trade form's button:
-  /// checking a level before writing a trade should not mean opening a trade.
-  /// The bottom-bar index of the market view. Named because it is the one tab
-  /// that is not rebuilt with the journal: its WebView has to survive a resume.
-  static const int _marketTab = 4;
-
+  /// Desk (0), Journal (1), Calendar (2), Account (3). Analytics is not a tab
+  /// of its own: it is the Desk's second scope, which is what leaves the middle
+  /// of the bar free for the one action the app is built around.
   int _index = 0;
   int _deskScope = 0;
   int _reload = 0;
@@ -404,11 +394,7 @@ class _AppShellState extends State<AppShell>
   void _invalidate() {
     setState(() {
       _reload++;
-      // Everything but the market view. The tabs re-query the journal, which is
-      // what a resume is for; rebuilding the market view throws away its
-      // WebView instead, and it comes back blank while TradingView loads again
-      // from scratch. It holds no journal data, so it has nothing to refresh.
-      _built.removeWhere((index, _) => index != _marketTab);
+      _built.clear();
     });
   }
 
@@ -419,9 +405,7 @@ class _AppShellState extends State<AppShell>
     if (saved == true && mounted) {
       setState(() {
         _reload++;
-        // Same rule as `_invalidate`: the journal tabs reload, the market view
-        // keeps the WebView it already has.
-        _built.removeWhere((index, _) => index != _marketTab);
+        _built.clear();
         _index = 1;
       });
     }
@@ -526,7 +510,7 @@ class _AppShellState extends State<AppShell>
           onEdit: (id) => _openTrade(tradeId: id),
           initialDay: _calendarDay,
         );
-      case 3:
+      default:
         return AccountScreen(
           key: ValueKey('account-$_reload'),
           api: _api,
@@ -535,12 +519,6 @@ class _AppShellState extends State<AppShell>
           onOpenBacktest: _openBacktest,
           onOpenPropFirm: _openPropFirm,
         );
-      default:
-        // 4 — the market view holds the chart's place while the chart is off.
-        // It is the default rather than a numbered case so the switch keeps
-        // compiling if the bar grows another destination before the screen for
-        // it does.
-        return const MarketViewScreen();
     }
   }
 
@@ -549,7 +527,7 @@ class _AppShellState extends State<AppShell>
     final l10n = AppLocalizations.of(context);
     _built.putIfAbsent(_index, () => _create(_index));
     final screens = List<Widget>.generate(
-      5,
+      4,
       (index) => _built[index] ?? const SizedBox.shrink(),
     );
 
@@ -584,7 +562,7 @@ class _AppShellState extends State<AppShell>
   }
 
   /// The bar the thumb lives on: four destinations with the create action docked
-  /// in the middle of them, and a fifth (Market) when the market view is on.
+  /// in the middle of them.
   ///
   /// It replaces the floating "+", which sat on top of whatever was under it —
   /// the Report link, the analytics bars, the account CTA. Docked, the action is
@@ -631,20 +609,6 @@ class _AppShellState extends State<AppShell>
                       onTap: () => _select(1),
                     ),
                   ),
-                  if (kMarketWidgetEnabled)
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.candlestick_chart_outlined,
-                        selectedIcon: Icons.candlestick_chart,
-                        // English on purpose, like the market view screen it
-                        // opens: those strings are not in the language packs,
-                        // and a new ARB key would have to be filled in all 33
-                        // before `l10n_test` went green.
-                        label: 'Market',
-                        selected: _index == _marketTab,
-                        onTap: () => _select(_marketTab),
-                      ),
-                    ),
                   _CreateButton(
                     tooltip: l10n.newTrade,
                     onTap: () {

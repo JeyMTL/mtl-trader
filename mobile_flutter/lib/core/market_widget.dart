@@ -176,3 +176,28 @@ String marketInstrumentFor(String? raw) {
 /// splitting it in the middle reads as a currency it is not.
 String marketInstrumentLabel(String code) =>
     _isPair(code) ? '${code.substring(0, 3)}/${code.substring(3)}' : code;
+
+/// What a search query matches: the chips first, then the one instrument the
+/// mapping knows but the chips do not carry.
+///
+/// The chip row is a shortlist, not the whole catalogue. Any cross the mapping
+/// can resolve (`EURGBP`, `GBPJPY`, `USDJPYRAW`) is chartable, so typing it has
+/// to offer it rather than answering "no results" and sending the trader back
+/// to a list they cannot extend.
+List<String> marketInstrumentMatches(String query) {
+  final needle = _compact(query);
+  if (needle.isEmpty) return kMarketInstruments;
+
+  final matches = <String>[
+    for (final instrument in kMarketInstruments)
+      if (_compact(instrument).contains(needle)) instrument,
+  ];
+
+  // Typed in full and not already listed: offer it as the first result. Only
+  // when the mapping actually resolves it, so `XPTUSD` still says no.
+  final known = matches.any((instrument) => _compact(instrument) == needle);
+  if (!known && tradingViewSymbol(needle) != null) {
+    matches.insert(0, needle);
+  }
+  return matches;
+}
