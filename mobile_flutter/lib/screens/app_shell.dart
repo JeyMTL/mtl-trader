@@ -52,6 +52,10 @@ class _AppShellState extends State<AppShell>
   /// Market exists because the chart it replaces is off
   /// (`kMarketChartsEnabled`) and the only way in was the trade form's button:
   /// checking a level before writing a trade should not mean opening a trade.
+  /// The bottom-bar index of the market view. Named because it is the one tab
+  /// that is not rebuilt with the journal: its WebView has to survive a resume.
+  static const int _marketTab = 4;
+
   int _index = 0;
   int _deskScope = 0;
   int _reload = 0;
@@ -400,7 +404,11 @@ class _AppShellState extends State<AppShell>
   void _invalidate() {
     setState(() {
       _reload++;
-      _built.clear();
+      // Everything but the market view. The tabs re-query the journal, which is
+      // what a resume is for; rebuilding the market view throws away its
+      // WebView instead, and it comes back blank while TradingView loads again
+      // from scratch. It holds no journal data, so it has nothing to refresh.
+      _built.removeWhere((index, _) => index != _marketTab);
     });
   }
 
@@ -411,7 +419,9 @@ class _AppShellState extends State<AppShell>
     if (saved == true && mounted) {
       setState(() {
         _reload++;
-        _built.clear();
+        // Same rule as `_invalidate`: the journal tabs reload, the market view
+        // keeps the WebView it already has.
+        _built.removeWhere((index, _) => index != _marketTab);
         _index = 1;
       });
     }
@@ -631,8 +641,8 @@ class _AppShellState extends State<AppShell>
                         // and a new ARB key would have to be filled in all 33
                         // before `l10n_test` went green.
                         label: 'Market',
-                        selected: _index == 4,
-                        onTap: () => _select(4),
+                        selected: _index == _marketTab,
+                        onTap: () => _select(_marketTab),
                       ),
                     ),
                   _CreateButton(
