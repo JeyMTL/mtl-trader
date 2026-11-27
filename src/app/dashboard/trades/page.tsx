@@ -37,6 +37,35 @@ export default function TradesPage() {
   const [clearLoading, setClearLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
   const [error, setError] = useState('')
+  // This list is a client-side read, so the dashboard layout's server refresh
+  // cannot reach it: a trade the supervisor journals while the tab is open used
+  // to stay invisible until the trader navigated somewhere else. Realtime is
+  // the fast path; the visibility check covers a socket that died while the tab
+  // was in the background, which is exactly when a closed trade arrives.
+  const [refreshTick, setRefreshTick] = useState(0)
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const reload = () => {
+      if (timer) clearTimeout(timer)
+      // One refetch per burst: a first sync inserts dozens of rows.
+      timer = setTimeout(() => setRefreshTick((tick) => tick + 1), 600)
+    }
+    const channel = supabase
+      .channel('trades-list-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, reload)
+      .subscribe()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reload()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      void supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
 
   const applyResult = useCallback((result: TradePageResult | null, message: string | null) => {
     if (!result) {
@@ -103,7 +132,7 @@ export default function TradesPage() {
       applyResult(result, message)
     })
     return () => { active = false }
-  }, [page, debouncedSearch, filter, session, fetchPage, applyResult])
+  }, [page, debouncedSearch, filter, session, refreshTick, fetchPage, applyResult])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this trade?')) return
