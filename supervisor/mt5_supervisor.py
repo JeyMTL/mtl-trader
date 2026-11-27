@@ -1698,19 +1698,26 @@ def stop_terminal_process(path):
     to exit rather than firing a kill and hoping.
 
     Scoped to that exact executable, so another customer's terminal on the same
-    host is never touched. Best effort: a missing process is not an error.
+    host is never touched. A missing process is not an error.
+
+    Returns False only when the terminal survived every attempt to close it. A
+    terminal in that state still owns its folder's IPC pipe and its
+    `accounts.dat`, so attaching to that folder answers `IPC timeout` for the
+    rest of the process's life, and rewriting the account file underneath it is
+    how one bad attempt makes a slot unusable for every account, not just the
+    one that failed. Callers quarantine the slot on False instead of reusing it.
     """
     try:
         mt5.shutdown()
     except Exception:  # noqa: BLE001
         pass
     if os.name != "nt":
-        return
+        return True
     if not path:
         # A default install gives nothing to scope the kill to. Saying so beats
         # killing every terminal on a host that may be serving other customers.
         print("  [warn] rejected login, but there is no terminal path to close")
-        return
+        return True
     import subprocess
 
     # Match on the full executable path, so only this slot's terminal is stopped.
@@ -1719,30 +1726,45 @@ def stop_terminal_process(path):
     target = os.path.abspath(path).replace("'", "''")
     image = Path(path).stem or "terminal64"
     script = (
-        f"$p = Get-Process -Name '{image}' -ErrorAction SilentlyContinue | "
-        f"Where-Object {{ $_.Path -eq '{target}' }}; "
-        "if (-not $p) { 'none' } else { "
+        f"$p = @(Get-Process -Name '{image}' -ErrorAction SilentlyContinue | "
+        f"Where-Object {{ $_.Path -eq '{target}' }}); "
+        "if ($p.Count -eq 0) { 'none' } else { "
         "$p | Stop-Process -Force -ErrorAction SilentlyContinue; "
         "$p | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue; "
-        "if (Get-Process -Id $p.Id -ErrorAction SilentlyContinue) "
-        "{ 'stuck' } else { 'killed' } }"
+        "$alive = @($p | Where-Object { Get-Process -Id $_.Id -ErrorAction SilentlyContinue }); "
+        # A terminal whose IPC thread is stuck can ignore Stop-Process. Ending its
+        # whole tree is the last thing that works without touching another slot.
+        "if ($alive.Count -gt 0) { "
+        "$alive | ForEach-Object { & taskkill.exe /F /T /PID $_.Id 2>&1 | Out-Null }; "
+        "$alive | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue; "
+        "$alive = @($alive | Where-Object { Get-Process -Id $_.Id -ErrorAction SilentlyContinue }); "
+        "} "
+        "if ($alive.Count -gt 0) { 'stuck' } else { 'killed' } }"
     )
     try:
         result = subprocess.run(
             ["powershell", "-NoProfile", "-Command", script],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
         )
     except (OSError, subprocess.SubprocessError) as error:
         print(f"  [warn] could not close {path}: {error}")
-        return
+        return False
     lines = (result.stdout or "").strip().splitlines()
     outcome = lines[-1].strip() if lines else ""
     if outcome == "stuck":
         print(f"  [warn] terminal at {path} did not exit after the rejected login")
-    elif outcome == "killed":
+        return False
+    if outcome == "killed":
         print(f"  closed the terminal at {path} after the rejected login")
+        return True
+    if outcome != "none":
+        # No verdict from PowerShell: assume the worst rather than copy an
+        # account file under a process that may still hold the folder.
+        print(f"  [warn] could not tell whether {path} closed ({outcome or 'no output'})")
+        return False
+    return True
 
 
 def slot_account_file(terminal):
@@ -1783,18 +1805,47 @@ def reset_slot(terminal):
     logs in again. Closing the terminal and restoring the seed makes the retry a
     first attempt again, so an account that had issues goes back to the queue
     like a new one instead of keeping the details that broke it.
+
+    Returns False when the terminal would not close. The slot is then left
+    exactly as it is and must not be handed another account: its account file is
+    still held by a live process, so overwriting it is what a quarantine avoids.
     """
     if not terminal:
-        return
-    stop_terminal_process(terminal)
+        return True
+    if stop_terminal_process(terminal) is False:
+        print(
+            f"  [warn] {terminal} is still running; leaving "
+            f"{slot_account_file(terminal)} alone",
+            flush=True,
+        )
+        return False
     account, seed = slot_account_file(terminal), slot_seed_file(terminal)
     if not seed.exists():
-        return
+        return True
     try:
         shutil.copy2(seed, account)
         print(f"  [slot] reset {account} to the file it started with", flush=True)
     except OSError as error:
         print(f"  [warn] could not reset {account}: {error}", flush=True)
+    return True
+
+
+def release_quarantined(quarantined, terminals):
+    """Return the slots whose terminal has finally gone, so they can be reused.
+
+    A slot quarantined for a terminal that would not exit is only worth trying
+    again once that process is gone: until then every attach answers
+    `IPC timeout`, and one such slot would otherwise absorb the account forever
+    while a dozen healthy slots sat idle.
+    """
+    released = []
+    for slot in sorted(quarantined):
+        path = terminals[slot] if 0 <= slot < len(terminals) else ""
+        if terminal_running(path):
+            continue
+        quarantined.discard(slot)
+        released.append(slot)
+    return released
 
 
 def open_session(row, terminal=None):
@@ -2625,17 +2676,22 @@ def fleet_worker(slot, terminal, jobs, results, waiting=None, log_path=None):
             error = str(exc) or type(exc).__name__
         finally:
             mt5.shutdown()
+        quarantined = False
         if error:
             # The failed attempt has left its account in the slot, and the next
             # start would boot that instead of a clean one: close it and put the
-            # account file back so the retry is a first attempt again.
-            reset_slot(terminal)
+            # account file back so the retry is a first attempt again. When the
+            # terminal refuses to close, the slot is reported instead, because
+            # its account file must not be rewritten under a live process.
+            quarantined = reset_slot(terminal) is False
         print(
             f"[slot {slot}] {row['user_id'][:8]}… done"
             f"{': ' + error if error else ''}",
             flush=True,
         )
-        results.put({"slot": slot, "row": row, "error": error})
+        results.put(
+            {"slot": slot, "row": row, "error": error, "quarantined": quarantined}
+        )
 
 
 def run_fleet():
@@ -2687,16 +2743,30 @@ def run_fleet():
 
     free = list(range(size))
     busy = {}
+    # Slots whose terminal would not close. Their account files are left alone
+    # and they get no account until the process is gone: a single unkillable
+    # terminal otherwise answers `IPC timeout` for the whole fleet.
+    quarantined = set()
     try:
         while True:
             session_reminders()
+            for slot in release_quarantined(quarantined, terminals):
+                print(f"  slot {slot} is free again; returning it to the rotation")
+                if slot not in free:
+                    free.append(slot)
             while True:
                 try:
                     done = results.get_nowait()
                 except queue.Empty:
                     break
                 busy.pop(done["slot"], None)
-                if done["slot"] not in free:
+                if done.get("quarantined"):
+                    quarantined.add(done["slot"])
+                    print(
+                        f"  [warn] slot {done['slot']} left out of the rotation "
+                        "until its terminal exits"
+                    )
+                elif done["slot"] not in free:
                     free.append(done["slot"])
                 if done["error"]:
                     report_failure(done["row"], done["error"])
@@ -2708,7 +2778,11 @@ def run_fleet():
                 if slot in busy and not process.is_alive():
                     print(f"[warn] slot {slot} died mid-account; restarting it")
                     busy.pop(slot, None)
-                    if slot not in free:
+                    if slot in quarantined:
+                        # Its terminal may still be holding the folder; only the
+                        # release check above may put this slot back in service.
+                        print(f"  [warn] slot {slot} stays quarantined")
+                    elif slot not in free:
                         free.append(slot)
                     workers[slot] = spawn(slot)
 

@@ -1408,6 +1408,56 @@ class SlotResetTests(unittest.TestCase):
 
         self.assertEqual(account.read_bytes(), b"unauthenticated")
 
+    def test_a_terminal_that_will_not_close_keeps_its_account_file(self):
+        # Writing over accounts.dat under a live terminal is what leaves a slot
+        # answering IPC timeout for every later account, not just this one.
+        terminal, account = self._slot()
+        sup.keep_slot_seed(terminal)
+        account.write_bytes(b"the account the failed attempt tried")
+
+        with mock.patch.object(sup, "stop_terminal_process", lambda path: False):
+            reused = sup.reset_slot(terminal)
+
+        self.assertFalse(reused)
+        self.assertEqual(account.read_bytes(), b"the account the failed attempt tried")
+
+    def test_a_slot_whose_terminal_survived_is_quarantined(self):
+        jobs, results = queue.Queue(), queue.Queue()
+        row = {"user_id": "row-9", "status": "pending"}
+        terminal, account = self._slot()
+        sup.keep_slot_seed(terminal)
+        saved_sync, saved_watch, saved_seconds = sup.sync_one, sup.watch, sup.WATCH_SECONDS
+        self.addCleanup(setattr, sup, "sync_one", saved_sync)
+        self.addCleanup(setattr, sup, "watch", saved_watch)
+        self.addCleanup(setattr, sup, "WATCH_SECONDS", saved_seconds)
+
+        def boom(sync_row, terminal=None):
+            raise RuntimeError("IPC timeout")
+
+        sup.sync_one = boom
+        sup.watch = lambda *args, **kwargs: None
+        sup.WATCH_SECONDS = 0
+        jobs.put(("row-9", row))
+        jobs.put(None)
+
+        with mock.patch.object(sup, "stop_terminal_process", lambda path: False):
+            with contextlib.redirect_stdout(io.StringIO()):
+                sup.fleet_worker(3, terminal, jobs, results)
+
+        self.assertTrue(results.get_nowait()["quarantined"])
+
+    def test_a_quarantined_slot_returns_once_its_terminal_is_gone(self):
+        quarantined = {0, 1}
+        running = {"slot-00": True, "slot-01": False}
+        saved = sup.terminal_running
+        self.addCleanup(setattr, sup, "terminal_running", saved)
+        sup.terminal_running = lambda path: running[path]
+
+        released = sup.release_quarantined(quarantined, ["slot-00", "slot-01"])
+
+        self.assertEqual(released, [1])
+        self.assertEqual(quarantined, {0})
+
     def test_a_failed_job_resets_its_own_slot(self):
         jobs, results = queue.Queue(), queue.Queue()
         row = {"user_id": "row-9", "status": "pending"}
