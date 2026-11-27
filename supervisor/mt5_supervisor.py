@@ -1962,6 +1962,12 @@ def sync_one(row, terminal=None):
     mark(user_id, "connecting")
     try:
         path = open_session(row, terminal)
+        # A terminal that has logged in *is* connected, and the app's card follows
+        # this status: waiting for the read below left the customer watching
+        # "Connecting…" for the minutes a first year-long read takes, on an
+        # account that was already live. The cursor is untouched — only
+        # `read_closed` moves `last_sync_at`, and only when it delivered rows.
+        mark(user_id, "connected")
         synced = read_closed(row)
         # The session is still open, so this is the moment the stop can be
         # enforced for an account that is about to have its terminal closed.

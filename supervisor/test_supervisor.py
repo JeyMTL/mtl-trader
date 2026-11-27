@@ -1454,6 +1454,47 @@ class TerminalPinTests(unittest.TestCase):
         )
 
 
+class ConnectedBeforeReadTests(unittest.TestCase):
+    """The app's card follows the login, not the year-long first read."""
+
+    def setUp(self):
+        self.calls = []
+        self.saved = {
+            name: getattr(sup, name)
+            for name in (
+                "open_session",
+                "read_closed",
+                "enforce_lock",
+                "mark",
+                "remember_terminal",
+            )
+        }
+        self.addCleanup(self._restore)
+        sup.open_session = lambda row, terminal=None: self.calls.append("login") or (
+            "C:/fleet/slot-1/terminal64.exe"
+        )
+        sup.read_closed = lambda row: self.calls.append("read") or 0
+        sup.mark = lambda user_id, status, **kwargs: self.calls.append(status)
+        sup.enforce_lock = lambda row, force=False: None
+        sup.remember_terminal = lambda key, path: None
+
+    def _restore(self):
+        for name, value in self.saved.items():
+            setattr(sup, name, value)
+
+    def test_the_row_turns_connected_before_the_first_read_finishes(self):
+        sup.sync_one(
+            {
+                "user_id": "u1",
+                "broker_name": "Exness",
+                "server": "Exness-MT5Trial10",
+                "account_login": 486046720,
+            }
+        )
+
+        self.assertEqual(self.calls, ["connecting", "login", "connected", "read"])
+
+
 class FailureNoticeTests(unittest.TestCase):
     """What the phone is told when an account stops syncing."""
 
