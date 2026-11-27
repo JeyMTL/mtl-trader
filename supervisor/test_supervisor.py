@@ -1408,6 +1408,33 @@ class SlotResetTests(unittest.TestCase):
 
         self.assertEqual(account.read_bytes(), b"unauthenticated")
 
+    def test_the_seed_follows_the_last_login_that_worked(self):
+        # A failure must not roll the slot back to the file it had before it ever
+        # logged in: that is the state that answers `IPC timeout` for every
+        # account, and it is what took a folder that had just synced offline.
+        terminal, account = self._slot()
+        sup.keep_slot_seed(terminal)
+        account.write_bytes(b"the login that worked")
+
+        sup.refresh_slot_seed(terminal)
+
+        seed = sup.slot_seed_file(terminal)
+        self.assertEqual(seed.read_bytes(), b"the login that worked")
+
+        account.write_bytes(b"the account a failed attempt tried")
+        with mock.patch.object(sup, "stop_terminal_process", lambda path: None):
+            sup.reset_slot(terminal)
+
+        self.assertEqual(account.read_bytes(), b"the login that worked")
+
+    def test_a_slot_with_no_seed_is_not_given_one_mid_run(self):
+        terminal, account = self._slot()
+        account.write_bytes(b"a plain install")
+
+        sup.refresh_slot_seed(terminal)
+
+        self.assertFalse(sup.slot_seed_file(terminal).exists())
+
     def test_a_terminal_that_will_not_close_keeps_its_account_file(self):
         # Writing over accounts.dat under a live terminal is what leaves a slot
         # answering IPC timeout for every later account, not just this one.
@@ -1484,6 +1511,90 @@ class SlotResetTests(unittest.TestCase):
 
         self.assertEqual(results.get_nowait()["error"], "Authorization failed")
         self.assertEqual(account.read_bytes(), b"authenticated before the run")
+
+
+class FolderFailoverTests(unittest.TestCase):
+    """A folder that cannot log in must not hold the account.
+
+    The live host lost an hour to this: one slot answered `IPC timeout`, the
+    account was marked `failed`, and the row sat out the cooldown while a dozen
+    healthy folders idled. A folder in that state needs one hand login; until it
+    gets one it must not be spent on a customer's account at all.
+    """
+
+    def done(self, slot, error, user_id="u1"):
+        return {
+            "slot": slot,
+            "row": {"user_id": user_id, "status": "connecting"},
+            "error": error,
+            "quarantined": False,
+        }
+
+    def test_a_terminal_failure_is_not_blamed_on_the_account(self):
+        self.assertTrue(sup.is_folder_failure("(-10005, 'IPC timeout')"))
+        self.assertTrue(sup.is_folder_failure("(-10001, 'IPC send failed')"))
+        # The folder is fine; the customer has to fix the credential.
+        self.assertFalse(
+            sup.is_folder_failure(f"{sup.WRONG_PASSWORD_MESSAGE} for account 1")
+        )
+        # Nor is a lapsed plan a terminal problem.
+        self.assertFalse(sup.is_folder_failure("ingest rejected (402): upgrade_required"))
+
+    def test_the_account_moves_on_and_the_bad_folder_stays_out(self):
+        free, folder_bad, attempted = [0, 1, 2], {}, {}
+        terminals = [f"slot-{slot:02d}/terminal64.exe" for slot in range(3)]
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            slot = sup.retire_folder_after_failure(
+                self.done(0, "(-10005, 'IPC timeout')"),
+                free,
+                folder_bad,
+                attempted,
+                terminals,
+            )
+
+        self.assertEqual(slot, 1)
+        self.assertIn(0, folder_bad)
+        # Slot 1 is now busy with the account, so only slot 2 is still free.
+        self.assertEqual(free, [2])
+        self.assertEqual(attempted["u1"], {0, 1})
+
+    def test_a_rejected_password_does_not_move_the_account(self):
+        free, folder_bad, attempted = [1], {}, {}
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            slot = sup.retire_folder_after_failure(
+                self.done(0, f"{sup.WRONG_PASSWORD_MESSAGE} for account 1"),
+                free,
+                folder_bad,
+                attempted,
+            )
+
+        self.assertIsNone(slot)
+        self.assertEqual(folder_bad, {})
+        self.assertEqual(free, [1])
+
+    def test_one_round_cannot_walk_the_whole_fleet(self):
+        free, folder_bad, attempted = list(range(6)), set(), {}
+        handed = []
+        for slot in range(6):
+            handed.append(
+                sup.next_slot_for_retry("u1", free, folder_bad, attempted)
+            )
+
+        self.assertEqual(handed[: sup.SLOT_ATTEMPTS], [0, 1, 2])
+        self.assertTrue(all(slot is None for slot in handed[sup.SLOT_ATTEMPTS :]))
+
+    def test_a_host_with_no_healthy_folder_reports_the_failure(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            slot = sup.retire_folder_after_failure(
+                self.done(0, "(-10005, 'IPC timeout')"),
+                [],
+                {1: 0.0, 2: 0.0},
+                {},
+            )
+
+        self.assertIsNone(slot)
 
 
 class TerminalPinTests(unittest.TestCase):

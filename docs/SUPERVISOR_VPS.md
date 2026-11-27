@@ -97,6 +97,17 @@ works in a folder that has never authenticated. So a slot that times out is
 reopened with its own login instead of being reported as failed, and nobody has
 to log in by hand on the host.
 
+When even that start is refused, the folder is the one thing that cannot be
+fixed from inside the process, and the supervisor stops spending accounts on it:
+the slot is taken out of the rotation (`… cannot log in …; that folder stays out
+of the rotation until it has been logged in once by hand`) and the account is
+handed to the next healthy slot in the same cycle (`moving to slot N: the folder,
+not the account, refused the login`), so its closes keep arriving. The folder is
+tried again after 30 minutes. One that keeps refusing needs the single login MT5
+will not accept from a program — `terminal64.exe /portable` in that slot's
+directory, log in, close it — and a host whose copies were all made from a
+terminal that never authenticated will need that once per slot.
+
 ### The slot's saved account is never trusted
 
 A portable terminal boots from `config\accounts.dat`, which remembers the account

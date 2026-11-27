@@ -123,6 +123,16 @@ MT5_FLEET_DIRS = os.environ.get("MT5_FLEET_DIRS", "")
 # Long enough that a busy account is not interrupted, short enough that a
 # spare account gets a turn within a cycle or two.
 FLEET_MIN_HOLD_SECONDS = float(os.environ.get("FLEET_MIN_HOLD_SECONDS", "60"))
+# How many folders one account may be handed to in a single round. A folder that
+# answers `IPC timeout` cannot log in at all until it has authenticated once by
+# hand, and no retry changes that, so the account is moved to another slot
+# instead of waiting out the failure cooldown. The cap stops a host whose every
+# folder is in that state from spinning through the whole fleet in one go.
+SLOT_ATTEMPTS = 3
+# How long a folder that refused a login stays out of the rotation. Long enough
+# that a host problem is not re-tested on every cycle, short enough that a folder
+# fixed by hand while the supervisor is running is used again on its own.
+FOLDER_RETRY_SECONDS = 1800
 # The claim sorts by least recently synced, so a capped host rotates through a
 # backlog instead of serving the same few accounts forever.
 CAPACITY_WARN_SECONDS = 300
@@ -1784,7 +1794,9 @@ def keep_slot_seed(terminal):
     from 6230 on answer every program login with `IPC timeout` until that folder
     has authenticated once, so an emptied slot is a slot that never connects
     again. Keeping the file it started with and putting it back is the same
-    fresh start without that dead end.
+    fresh start without that dead end — and `refresh_slot_seed` moves the seed
+    on to each clean shutdown, so a restore never rolls back past a login that
+    worked.
     """
     if not terminal:
         return
@@ -1794,6 +1806,27 @@ def keep_slot_seed(terminal):
             shutil.copy2(account, seed)
     except OSError as error:
         print(f"  [warn] could not keep a seed of {account}: {error}", flush=True)
+
+
+def refresh_slot_seed(terminal):
+    """Keep a slot's newest authenticated account file as the one to fall back to.
+
+    `keep_slot_seed` runs before any job, so what it saved is the state the folder
+    had *before* it ever logged in. Restoring that after a failure rolls the slot
+    back past its last working login, and a folder that logged in fine a minute
+    ago then answers `IPC timeout` for every account. Only called while the
+    terminal is stopped: MT5 writes `accounts.dat` on its way out, so a copy taken
+    then is a whole file and the one that last authenticated.
+    """
+    if not terminal:
+        return
+    account, seed = slot_account_file(terminal), slot_seed_file(terminal)
+    if not seed.exists() or not account.exists():
+        return
+    try:
+        shutil.copy2(account, seed)
+    except OSError as error:
+        print(f"  [warn] could not refresh the seed of {account}: {error}", flush=True)
 
 
 def reset_slot(terminal):
@@ -1884,7 +1917,11 @@ def open_session(row, terminal=None):
         # it exits. This is the hand login the runbook asks for, left open.
         if terminal_running(path):
             print(f"  closing the terminal already running from {path}")
-            stop_terminal_process(path)
+            if stop_terminal_process(path):
+                # It has just flushed its account file on exit, and that file is
+                # the state this folder can still log in from. The fallback must
+                # not stay at the pre-run snapshot and undo a working login.
+                refresh_slot_seed(path)
 
         for attempt in range(2):  # one retry: a stale terminal often clears on shutdown
             # Attach without credentials first. On a terminal that has
@@ -2631,6 +2668,73 @@ def report_failure(row, error):
     )
 
 
+FOLDER_FAILURE_HINTS = ("IPC timeout", "IPC send failed", "Process create failed")
+
+
+def is_folder_failure(error):
+    """Whether the terminal folder, not the account, refused the login.
+
+    These are the three answers that mean the terminal never reached the broker,
+    so every folder that gives one is a folder nothing can log into until it has
+    authenticated once by hand (see `warn_if_never_authenticated`). A rejected
+    password is the opposite: the folder is fine and the customer has to fix the
+    credential, so it must not be blamed on the slot and must not be retried on
+    another one.
+    """
+    text = str(error)
+    if is_wrong_password(text) or is_lapse(text):
+        return False
+    return any(hint in text for hint in FOLDER_FAILURE_HINTS)
+
+
+def next_slot_for_retry(user_id, free, folder_bad, attempted, limit=SLOT_ATTEMPTS):
+    """Another slot to hand this account, or None when the failure is real.
+
+    A fleet slot owns a terminal, but the account does not own the slot: a folder
+    that cannot log in is a host fault, and leaving the account `failed` for the
+    ten-minute cooldown because the one slot that was free happens to be that
+    folder is what turned a single bad copy into hours of missing trades. Slots
+    that have already refused this account are not tried twice, and neither is
+    one known to be unusable, so a host with a couple of broken copies still
+    journals from the healthy ones in the same cycle.
+    """
+    tried = attempted.setdefault(user_id, set())
+    if len(tried) >= limit:
+        return None
+    for slot in list(free):
+        if slot in folder_bad or slot in tried:
+            continue
+        free.remove(slot)
+        tried.add(slot)
+        return slot
+    return None
+
+
+def retire_folder_after_failure(done, free, folder_bad, attempted, terminals=()):
+    """Take a folder that refused a login out of the rotation, and pick the next.
+
+    Returns the slot that should take this account now, or None when the folder
+    is not the problem (a rejected password, a lapsed plan) or when the account
+    has already been through its share of folders and the failure is worth
+    reporting.
+    """
+    error = done["error"]
+    slot = done["slot"]
+    if not is_folder_failure(error):
+        return None
+    where = terminals[slot] if 0 <= slot < len(terminals) else f"slot {slot}"
+    if slot not in folder_bad:
+        folder_bad[slot] = time.monotonic()
+        if slot in free:
+            free.remove(slot)
+        print(
+            f"  [warn] {where} cannot log in ({str(error)[:160]}); that folder "
+            "stays out of the rotation until it has been logged in once by hand"
+        )
+    attempted.setdefault(done["row"]["user_id"], set()).add(slot)
+    return next_slot_for_retry(done["row"]["user_id"], free, folder_bad, attempted)
+
+
 def fleet_worker(slot, terminal, jobs, results, waiting=None, log_path=None):
     """One terminal, one account at a time, in its own process.
 
@@ -2747,6 +2851,12 @@ def run_fleet():
     # and they get no account until the process is gone: a single unkillable
     # terminal otherwise answers `IPC timeout` for the whole fleet.
     quarantined = set()
+    # Slots whose folder refused every login, and when that happened. A folder in
+    # this state needs one hand login; until it gets one, handing it accounts only
+    # spends their attempts and their cooldown.
+    folder_bad = {}
+    # Which slots this account has already been refused by in its current round.
+    attempted = {}
     try:
         while True:
             session_reminders()
@@ -2754,22 +2864,49 @@ def run_fleet():
                 print(f"  slot {slot} is free again; returning it to the rotation")
                 if slot not in free:
                     free.append(slot)
+            now = time.monotonic()
+            for slot, since in list(folder_bad.items()):
+                if now - since < FOLDER_RETRY_SECONDS:
+                    continue
+                del folder_bad[slot]
+                print(
+                    f"  slot {slot} gets another try: its folder has been out of "
+                    f"the rotation for {FOLDER_RETRY_SECONDS // 60} minutes"
+                )
+                if slot not in free and slot not in quarantined:
+                    free.append(slot)
             while True:
                 try:
                     done = results.get_nowait()
                 except queue.Empty:
                     break
                 busy.pop(done["slot"], None)
+                error = done["error"]
+                user_id = done["row"]["user_id"]
                 if done.get("quarantined"):
                     quarantined.add(done["slot"])
                     print(
                         f"  [warn] slot {done['slot']} left out of the rotation "
                         "until its terminal exits"
                     )
-                elif done["slot"] not in free:
+                elif done["slot"] not in folder_bad and done["slot"] not in free:
                     free.append(done["slot"])
-                if done["error"]:
-                    report_failure(done["row"], done["error"])
+                if not error:
+                    attempted.pop(user_id, None)
+                    continue
+                slot = retire_folder_after_failure(
+                    done, free, folder_bad, attempted, terminals
+                )
+                if slot is not None:
+                    busy[slot] = user_id
+                    jobs.put((user_id, done["row"]))
+                    print(
+                        f"  {user_id[:8]}… moving to slot {slot}: the folder, "
+                        "not the account, refused the login"
+                    )
+                    continue
+                attempted.pop(user_id, None)
+                report_failure(done["row"], error)
 
             # A slot that died mid-account never reports, and without this its
             # account would be stuck `connecting` and its terminal unused for as
@@ -2782,6 +2919,9 @@ def run_fleet():
                         # Its terminal may still be holding the folder; only the
                         # release check above may put this slot back in service.
                         print(f"  [warn] slot {slot} stays quarantined")
+                    elif slot in folder_bad:
+                        # Its folder still needs the one hand login it never got.
+                        print(f"  [warn] slot {slot} stays out: its folder cannot log in")
                     elif slot not in free:
                         free.append(slot)
                     workers[slot] = spawn(slot)
