@@ -151,7 +151,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      // The same tick the mode switch uses: the press landed, the form just is
+      // not ready. Silence here reads as a dead button until the eye finds the
+      // red text under the field.
+      HapticFeedback.selectionClick();
+      return;
+    }
+    // Light, not a buzz: this confirms the action is going out, and the spinner
+    // carries the rest of the wait.
+    HapticFeedback.lightImpact();
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
@@ -159,8 +168,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _notice = null;
     });
 
-    final auth = Supabase.instance.client.auth;
     try {
+      // Inside the try on purpose: an auth client that failed to initialise is a
+      // "could not reach the journal" to the trader, not a crash out of the tap
+      // handler.
+      final auth = Supabase.instance.client.auth;
       if (_signUp) {
         final response = await auth.signUp(
           email: _email.text.trim(),
@@ -383,20 +395,25 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ],
                           const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loading ? null : _submit,
-                            child: _loading
-                                ? SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.ink,
+                          _PressScale(
+                            enabled: !_loading,
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _submit,
+                              child: _loading
+                                  ? SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.ink,
+                                      ),
+                                    )
+                                  : Text(
+                                      _signUp
+                                          ? l10n.createAccount
+                                          : l10n.signIn,
                                     ),
-                                  )
-                                : Text(
-                                    _signUp ? l10n.createAccount : l10n.signIn,
-                                  ),
+                            ),
                           ),
                           const SizedBox(height: 14),
                           Row(
@@ -556,6 +573,46 @@ class _BrandBadge extends StatelessWidget {
   }
 }
 
+/// The gold action dips under the finger.
+///
+/// `Listener` rather than a gesture detector: the button owns the tap, and this
+/// only watches raw pointer events, so nothing steals the press or the keyboard
+/// activation. The curve and the 110ms length are the card's own press feel,
+/// which keeps the whole screen in one motion language.
+class _PressScale extends StatefulWidget {
+  const _PressScale({required this.child, this.enabled = true});
+
+  final Widget child;
+  final bool enabled;
+
+  @override
+  State<_PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<_PressScale> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return Listener(
+      onPointerDown: widget.enabled
+          ? (_) => setState(() => _pressed = true)
+          : null,
+      onPointerUp: (_) => setState(() => _pressed = false),
+      onPointerCancel: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: widget.enabled && _pressed ? 0.98 : 1,
+        duration: reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _LanguageButton extends StatelessWidget {
   const _LanguageButton();
 
@@ -577,10 +634,15 @@ class _LanguageButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
-          child: Text(
-            active?.flag ?? '🌐',
-            style: const TextStyle(fontSize: 18),
-          ),
+          // A full-colour globe emoji reads as a sticker on a gold screen; the
+          // line icon belongs to the palette. A chosen language still shows its
+          // flag, which is the one place colour earns its keep.
+          child: active == null
+              ? Icon(Icons.language, size: 20, color: AppColors.muted)
+              : Text(
+                  active.flag,
+                  style: const TextStyle(fontSize: 18),
+                ),
         ),
       ),
     );

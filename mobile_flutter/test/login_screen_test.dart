@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mtl_trader_mobile/core/language_packs.dart';
@@ -72,6 +73,79 @@ void main() {
 
     expect(tabs.dy, lessThan(primary.dy));
     expect(primary.dy, lessThan(google.dy));
+  });
+
+  testWidgets('the gold action dips under the finger and comes back', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(appHome(const LoginScreen()));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // The nearest AnimatedScale above the button is the press wrapper; the
+    // card's own is further up and never moves here.
+    final scale = find
+        .ancestor(
+          of: find.byType(ElevatedButton),
+          matching: find.byType(AnimatedScale),
+        )
+        .first;
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ElevatedButton)),
+    );
+    await tester.pump(const Duration(milliseconds: 130));
+    expect(tester.widget<AnimatedScale>(scale).scale, 0.98);
+
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 130));
+    expect(tester.widget<AnimatedScale>(scale).scale, 1);
+  });
+
+  testWidgets('submitting ticks the phone, refusals tick it differently', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final haptics = <Object?>[];
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'HapticFeedback.vibrate') haptics.add(call.arguments);
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    await tester.pumpWidget(appHome(const LoginScreen()));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Empty form: the press lands, so it ticks — a selection click, not the
+    // impact that would claim the request went out.
+    await tester.tap(find.widgetWithText(ElevatedButton, fr['signIn']!).last);
+    await tester.pump();
+    expect(haptics, ['HapticFeedbackType.selectionClick']);
+
+    // A filled form is a real submit: light impact, even though this harness has
+    // no Supabase to send it to.
+    haptics.clear();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, fr['emailLabel']!).first,
+      'trader@example.com',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, fr['passwordLabel']!).first,
+      'correct horse',
+    );
+    await tester.tap(find.widgetWithText(ElevatedButton, fr['signIn']!).last);
+    await tester.pump();
+    expect(haptics, ['HapticFeedbackType.lightImpact']);
   });
 
   testWidgets('fits the narrowest phone at 2x text', (tester) async {
