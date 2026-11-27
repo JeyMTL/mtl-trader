@@ -262,10 +262,19 @@ class _DrawingsPanelState extends State<DrawingsPanel> {
                 letterSpacing: 1.1,
               ),
             ),
-            const Spacer(),
-            Text(
-              tools.isEmpty ? 'Long-press a tool to pin it' : 'Long-press to remove',
-              style: TextStyle(color: AppColors.faint, fontSize: 9.5),
+            const SizedBox(width: 8),
+            // Expanded, not a Spacer: at a doubled text size the hint is the
+            // part that gives way, instead of pushing the row off the sheet.
+            Expanded(
+              child: Text(
+                tools.isEmpty
+                    ? 'Long-press a tool to pin it'
+                    : 'Long-press to remove',
+                textAlign: TextAlign.right,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
+              ),
             ),
           ],
         ),
@@ -385,7 +394,7 @@ class _FavouriteChip extends StatelessWidget {
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(AppRadius.chip),
         child: Container(
-          height: 34,
+          constraints: const BoxConstraints(minHeight: 34),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: AppColors.primary.withAlpha(20),
@@ -429,7 +438,7 @@ class _CategoryChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 30,
+        constraints: const BoxConstraints(minHeight: 30),
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
@@ -490,20 +499,25 @@ class _ToolTile extends StatelessWidget {
             children: [
               Center(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(tool.icon, size: 24, color: AppColors.text),
                     const SizedBox(height: 6),
-                    Text(
-                      tool.label,
-                      maxLines: 2,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 9.5,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
+                    // Flexible because the tile has a fixed aspect: at a doubled
+                    // text size the label, not the tile, has to give way.
+                    Flexible(
+                      child: Text(
+                        tool.label,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 9.5,
+                          height: 1.2,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -551,8 +565,8 @@ class _ModeToggle extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.field),
       child: Container(
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: active ? AppColors.primary.withAlpha(22) : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.field),

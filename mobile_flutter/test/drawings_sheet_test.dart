@@ -154,4 +154,37 @@ void main() {
       expect(find.text('On'), findsOneWidget);
     });
   });
+
+  testWidgets('the sheet fits a 320pt phone at 2x text', (tester) async {
+    tester.view.physicalSize = const Size(320, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildFlatTheme(AppPalette.dark),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: const TextScaler.linear(2),
+          ),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(14),
+            child: DrawingsPanel(
+              onPick: (_) {},
+              keepDrawing: false,
+              onKeepDrawingChanged: (_) {},
+              magnet: MagnetMode.off,
+              onMagnetChanged: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tester.takeException(), isNull);
+  });
 }
