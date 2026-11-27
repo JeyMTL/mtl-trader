@@ -196,8 +196,8 @@ def sync_trades(app_url, user_id, token, trades):
     Sends the batch in chunks and returns True only when every chunk landed.
 
     Retries transient failures (429, 5xx, network) with backoff; stops on a
-    permanent refusal, because a wrong token or an unverified email will never
-    succeed by being sent again.
+    permanent refusal, because a wrong token, an unverified email or a plan
+    without auto sync will never succeed by being sent again.
     """
     if not trades:
         return True
@@ -218,13 +218,18 @@ def sync_trades(app_url, user_id, token, trades):
                 body = response.json()
                 total += int(body.get("imported", 0))
                 break
-            elif response.status_code in (400, 401, 403):
+            elif response.status_code in (400, 401, 402, 403):
                 detail = response.json().get("error", "request refused")
                 print(f"Sync refused ({response.status_code}): {detail}")
                 if response.status_code == 401:
                     print("The token does not match. Rotate it on the MT5 Sync page and update the config.")
                 elif response.status_code == 403:
                     print("Confirm your email address before syncing.")
+                elif response.status_code == 402:
+                    # The plan has no auto sync (included from Basic). Previously this
+                    # fell into the retry branch, so a free account saw "HTTP 402;
+                    # retrying" with no word about what was wrong.
+                    print("Auto sync is not part of this plan. Compare plans on the MT5 Sync page, or import your history by hand.")
                 return False
             elif attempt >= 5:
                 print(f"Server kept failing (HTTP {response.status_code}); will retry next poll.")

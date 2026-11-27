@@ -60,6 +60,13 @@ input int    InpUnreachableGraceMinutes = 5;  // Release after this long offline
 // as untrustworthy and the normal poll takes over again.
 #define LOCK_SKEW_TOLERANCE 120
 
+// A refused plan (HTTP 402) is not a transient failure: the answer cannot change
+// until the account is upgraded, and retrying every five seconds both hammers
+// the API and buries the one line in the log that explains it. Ask again half an
+// hour later, so a plan bought in the browser reaches a terminal that stayed
+// attached.
+#define REFUSED_RETRY_SECONDS 1800
+
 string   g_appUrl = "";           // InpAppUrl without a trailing slash
 
 datetime g_lastClose = 0;          // server time of the newest pushed close
@@ -74,6 +81,9 @@ datetime g_lockedSince = 0;   // the stop instant, in server time
 datetime g_lockUntil = 0;     // the day end the server reported, server time
 long     g_serverSkew = 0;    // server clock minus this terminal's clock, seconds
 string   g_lockMode = "";     // off | soft | hard, as the server reports it
+
+datetime g_refusedUntil = 0;   // sync is paused until then: the server refused the plan
+string   g_refusedReason = ""; // the server's sentence, kept for the chart comment
 
 CTrade   g_trade;
 
@@ -290,10 +300,43 @@ bool PostBatch(const string &bodies[], const int start, const int count)
                   "> Allow WebRequest for listed URL.", GetLastError(), g_appUrl);
       return false;
      }
+   // 402 is the plan, not the connection. A free account sees this every time it
+   // closes a trade, and the answer will not change on the next tick, so say it
+   // where the trader is actually looking — an alert plus a line on the chart —
+   // and then stop asking for a while.
+   if(status == 402)
+     {
+      string reason = JsonString(answer, "error");
+      if(reason == "")
+         reason = "MT5 auto sync needs a paid plan. Choose one on the MT5 Sync page.";
+
+      g_refusedUntil = TimeCurrent() + REFUSED_RETRY_SECONDS;
+      // One alert per refusal, not one per retry: the chart comment below stays
+      // up while the pause lasts, so the warning is never lost.
+      if(g_refusedReason == "")
+        {
+         Alert("MTL Ledger: sync is paused — ", reason);
+         PrintFormat("Sync refused (HTTP 402): %s", reason);
+        }
+      g_refusedReason = reason;
+      Comment("MTL Ledger — sync paused\n", reason,
+              "\nAsks again in ", REFUSED_RETRY_SECONDS / 60, " minutes.");
+      return false;
+     }
+
    if(status != 200 && status != 202)
      {
       PrintFormat("Sync rejected (HTTP %d): %s", status, answer);
       return false;
+     }
+
+   // The plan was bought, or the pause ran out and the server now accepts the
+   // batch: take the warning off the chart, or it would outlive the problem.
+   if(g_refusedUntil > 0)
+     {
+      g_refusedUntil = 0;
+      g_refusedReason = "";
+      Comment("");
      }
    return true;
   }
@@ -306,6 +349,11 @@ bool Push(const string &bodies[])
    int total = ArraySize(bodies);
    if(total == 0)
       return true;
+
+   // While a refusal is being served out there is nothing to send: the server
+   // would give the same answer for every closed trade in the window.
+   if(TimeCurrent() < g_refusedUntil)
+      return false;
 
    // The route rejects batches over 5000 and request bodies over 1 MB. Two
    // hundred positions is comfortably inside both.
@@ -327,6 +375,12 @@ void SyncNewDeals(const bool full)
       from = g_lastClose - 60; // one minute of overlap; the upsert absorbs it
    if(full || from == 0)
       from = TimeCurrent() - (datetime)InpLookbackDays * 86400;
+
+   // Do not even build the batch while the plan is refused — `Push` would drop
+   // it, and reading a month of history every five seconds to throw it away is
+   // work nobody asked for.
+   if(TimeCurrent() < g_refusedUntil)
+      return;
 
    if(!HistorySelect(from, TimeCurrent()))
       return;

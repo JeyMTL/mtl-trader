@@ -81,6 +81,36 @@ export async function checkFeature(
 }
 
 /**
+ * The refusal sentence for MT5 sync.
+ *
+ * The generic `subscription_required` wording — "your paid period has ended" —
+ * is a lie for the account that never paid: nothing ended, the free plan simply
+ * never included autosync. This matters more here than anywhere else because
+ * the EA prints the same sentence in a terminal alert and on the chart, away
+ * from the page that sells plans, so it has to make sense on its own.
+ *
+ * An account is treated as lapsed only if it holds, or held, a paid tier or a
+ * cancelled/expired period. A free account and a finished trial fall back to
+ * the free sentence, which is what they are on now.
+ */
+export function syncRefusalMessage(gate: FeatureGuard): string {
+  if (gate.reason !== 'subscription_required') return gate.message
+
+  const account = gate.account
+  // No row is "account not found", not a plan problem: keep that sentence.
+  if (account === null) return gate.message
+
+  const everPaid =
+    (account.subscription_tier ?? 'free') !== 'free' ||
+    account.subscription_status === 'cancelled' ||
+    account.subscription_status === 'expired'
+
+  return everPaid
+    ? 'Your paid period has ended. Choose a plan to keep syncing trades automatically.'
+    : 'MT5 auto sync is included from Basic. On the free plan, import your closed trades from the Import page, or choose a plan to sync them automatically.'
+}
+
+/**
  * The caller's billing row, or null when it cannot be read.
  *
  * A purchase route only needs to know whether the account already owns the plan

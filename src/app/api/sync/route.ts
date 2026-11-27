@@ -5,7 +5,7 @@ import { clientKey, rateLimit } from '@/lib/rate-limit'
 import { hasValidBearer } from '@/lib/auth-guards'
 import { apiError, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
-import { checkFeature } from '@/lib/plan-guard'
+import { checkFeature, syncRefusalMessage } from '@/lib/plan-guard'
 import { notifyPropBreach } from '@/lib/push-events'
 
 /**
@@ -225,7 +225,7 @@ export async function POST(req: Request) {
     const gate = await checkFeature(userId, 'sync')
     if (!gate.allowed) {
       return NextResponse.json(
-        { error: gate.message, code: 'upgrade_required' },
+        { error: syncRefusalMessage(gate), code: 'upgrade_required' },
         { status: gate.status }
       )
     }
@@ -404,7 +404,7 @@ export async function GET(req: Request) {
     const gate = await checkFeature(userId, 'sync')
     if (!gate.allowed) {
       return NextResponse.json(
-        { error: gate.message, code: 'upgrade_required' },
+        { error: syncRefusalMessage(gate), code: 'upgrade_required' },
         { status: gate.status }
       )
     }

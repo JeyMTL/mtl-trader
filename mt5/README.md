@@ -55,6 +55,11 @@ invalidates the old one immediately — update the EA inputs and reattach.
   push a close immediately from `OnTradeTransaction`, with a 30-second cursor
   sync as a safety net and a full reconcile every 30 minutes.
 - A failed batch does not advance the cursor, so the next poll retries it.
+- **A refused plan is not retried every five seconds.** Auto sync is included
+  from Basic; a free account gets `402` with a sentence that names the free
+  plan. The EA raises one alert, keeps the same sentence on the chart, and asks
+  again in 30 minutes — so a plan bought in the browser is picked up by the
+  terminal that stayed attached, without reattaching it.
 - The lock is re-read the moment a batch is accepted, not on the next poll. A
   close may be the one that breaches the daily stop, so the guard acts on that
   event instead of up to 30 seconds later.
@@ -90,7 +95,8 @@ at the trader's local midnight.
 | --- | --- |
 | `WebRequest failed (4014)` | URL not in the WebRequest whitelist. Add the exact `InpAppUrl`. |
 | `Sync rejected (HTTP 401)` | Wrong or rotated token, or the user id does not match. |
-| `Sync rejected (HTTP 403)` | Email unverified, or the plan has no sync feature. |
+| `Sync rejected (HTTP 403)` | Email unverified. |
+| `Sync refused (HTTP 402)` + chart comment | The account has no auto sync: it is included from Basic, so a free plan (or a lapsed paid one) is refused. The EA pauses for 30 minutes rather than retrying. Compare plans on the MT5 Sync page. |
 | `Sync rejected (HTTP 429)` | Rate limit (240 sync requests/hour/account). The cursor retries. |
 | Nothing after attach | Check the Experts tab; the EA prints the first failure with its reason. |
 | Lock never activates | A daily loss limit (or an entry cap) must be set and `lock_mode` must be `soft` or `hard` — both freeze the terminal, only `hard` also locks the journal. The EA must be attached with Algo Trading allowed, since MT5 refuses `order_send` without it. |

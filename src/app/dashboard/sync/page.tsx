@@ -3,7 +3,18 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Download, Key, Server, XCircle, Loader2, Copy, Check, RefreshCw } from 'lucide-react'
+import {
+  Download,
+  Key,
+  Server,
+  XCircle,
+  Loader2,
+  Copy,
+  Check,
+  RefreshCw,
+  Lock,
+  ArrowRight,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/api'
 import { MT5_HOSTED_SYNC_ENABLED, MT5_SYNC_ENABLED } from '@/lib/features'
@@ -21,6 +32,17 @@ export default function SyncPage() {
   const [brokerName, setBrokerName] = useState('')
   const [server, setServer] = useState('')
   const [login, setLogin] = useState('')
+  // Set when the server refuses the token because the account is not entitled.
+  // Without it the page used to render an empty token box and the full setup
+  // guide, so a free trader pasted a blank token into the EA and watched it
+  // fail with nothing on screen to explain why. A genuine failure (the route
+  // 500s, the network drops) uses the same slot but must not be called a plan
+  // problem, hence `refused`.
+  const [notice, setNotice] = useState<{
+    title: string
+    message: string
+    refused: boolean
+  } | null>(null)
 
   useEffect(() => {
     // The nav link is hidden, but a bookmark or an old typed URL still reaches
@@ -38,10 +60,28 @@ export default function SyncPage() {
       }
       setUser({ id: authUser.id, email: authUser.email! })
 
-      const response = await authedFetch(`/api/sync?userId=${authUser.id}`)
-      const data = await response.json()
-      if (data.token) {
-        setToken(data.token)
+      try {
+        const response = await authedFetch(`/api/sync?userId=${authUser.id}`)
+        const data = await response.json()
+        if (data.code === 'upgrade_required') {
+          setNotice({
+            title: 'Auto sync is not part of your plan',
+            refused: true,
+            message:
+              data.error ||
+              'MT5 auto sync is included from Basic. Choose a plan to sync your trades automatically.',
+          })
+        } else if (data.token) {
+          setToken(data.token)
+        } else if (data.error) {
+          setNotice({ title: 'Could not load your sync token', refused: false, message: data.error })
+        }
+      } catch {
+        setNotice({
+          title: 'Could not reach the server',
+          refused: false,
+          message: 'Check your connection and reload the page to load your sync token.',
+        })
       }
       setLoading(false)
     }
@@ -96,6 +136,81 @@ export default function SyncPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // A refused plan is the only state where the rest of the page would be a set
+  // of instructions that cannot be followed: every card below needs a token the
+  // server will not issue. Say why, and leave the way to fix it one click away.
+  if (notice) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">MT5 Auto Sync</h1>
+          <p className="text-gray-400 mt-1">
+            Sync closed trades from your own MT5 terminal, and let the same EA enforce the daily
+            stop.
+          </p>
+        </div>
+
+        <div
+          className={
+            notice.refused
+              ? 'rounded-xl border border-primary/40 bg-primary/10 p-5'
+              : 'rounded-xl border border-danger/40 bg-danger/10 p-5'
+          }
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${
+                notice.refused ? 'bg-primary/15' : 'bg-danger/15'
+              }`}
+            >
+              {notice.refused ? (
+                <Lock className="h-5 w-5 text-primary" />
+              ) : (
+                <XCircle className="h-5 w-5 text-danger" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-base font-semibold text-white">{notice.title}</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-300">{notice.message}</p>
+              {notice.refused && (
+                <p className="mt-2 text-xs leading-relaxed text-gray-400">
+                  Nothing in your journal is affected: the trades you already have stay where they
+                  are, and the chart desk, calendar and simulator keep working.
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {notice.refused && (
+                  <>
+                    <Link
+                      href="/pricing"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                    >
+                      Compare plans
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                    <Link
+                      href="/dashboard/import"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600"
+                    >
+                      Import history by hand
+                    </Link>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="text-xs font-medium text-gray-500 transition-colors hover:text-gray-300"
+                >
+                  {notice.refused ? 'Already upgraded? Reload' : 'Reload'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }

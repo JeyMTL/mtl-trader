@@ -286,8 +286,55 @@ describe('sync ingest', () => {
 
     const res = await postSync({ trades: [closedTrade()] })
     expect(res.status).toBe(402)
-    expect((await res.json()).code).toBe('upgrade_required')
+    const body = await res.json()
+    expect(body.code).toBe('upgrade_required')
+    expect(body.error).toMatch(/paid period has ended/i)
     expect(state.upserted).toHaveLength(0)
+  })
+
+  it('tells a free account its plan has no sync, not that a period ended', async () => {
+    // The EA shows this sentence in an alert, and the sync page shows it under
+    // "auto sync is not part of your plan". "Your paid period has ended" is
+    // untrue for an account that has never paid.
+    state.account = {
+      subscription_tier: 'free',
+      subscription_status: null,
+      trial_ends_at: null,
+      max_trades: 30,
+      current_period_end: null,
+      cancel_at_period_end: false,
+    }
+
+    const res = await postSync({ trades: [closedTrade()] })
+    expect(res.status).toBe(402)
+    const body = await res.json()
+    expect(body.code).toBe('upgrade_required')
+    expect(body.error).toMatch(/free plan/i)
+    expect(body.error).toMatch(/Basic/i)
+    expect(body.error).not.toMatch(/period has ended/i)
+    expect(state.upserted).toHaveLength(0)
+  })
+
+  it('refuses to hand a free account a sync token', async () => {
+    // The page asks for the token first; if this answered with one, a free user
+    // would configure the EA and only find out on the first closed trade.
+    state.account = {
+      subscription_tier: 'free',
+      subscription_status: null,
+      trial_ends_at: null,
+      max_trades: 30,
+      current_period_end: null,
+      cancel_at_period_end: false,
+    }
+
+    const { GET } = await import('@/app/api/sync/route')
+    const res = await GET(new Request('http://localhost/api/sync?userId=u1'))
+    const body = await res.json()
+    expect(res.status).toBe(402)
+    expect(body.code).toBe('upgrade_required')
+    expect(body.error).toMatch(/free plan/i)
+    expect(body.token).toBeUndefined()
+    expect(state.updates).toHaveLength(0)
   })
 
   it('lets a live trial sync, because the trial is the Pro pitch', async () => {
