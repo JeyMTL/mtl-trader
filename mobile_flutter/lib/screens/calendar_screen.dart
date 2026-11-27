@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../core/analytics.dart';
 import '../core/format.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
@@ -92,6 +93,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FutureBuilder<List<DailyPnlPoint>>(
       future: _future,
       builder: (context, snapshot) {
@@ -150,7 +152,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       children: [
                         IconButton(
                           onPressed: () => _shiftMonth(-1),
-                          tooltip: 'Previous month',
+                          tooltip: l10n.calendarPreviousMonth,
                           icon: Icon(
                             Icons.chevron_left,
                             size: 20,
@@ -171,10 +173,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 summary.trades == 0
-                                    ? 'No trades'
-                                    : '${signedMoney(summary.pnl)} · '
-                                        '${summary.trades}T · '
-                                        '${countNoun(summary.days, 'day')}',
+                                    ? l10n.calendarNoTrades
+                                    : l10n.calendarMonthFoot(
+                                        signedMoney(summary.pnl),
+                                        summary.trades,
+                                        summary.days,
+                                      ),
                                 style: TextStyle(
                                   color: summary.trades == 0
                                       ? AppColors.faint
@@ -193,7 +197,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                         IconButton(
                           onPressed: () => _shiftMonth(1),
-                          tooltip: 'Next month',
+                          tooltip: l10n.calendarNextMonth,
                           icon: Icon(
                             Icons.chevron_right,
                             size: 20,
@@ -235,7 +239,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         child: Column(
                           children: [
                             Text(
-                              'Could not load this month',
+                              AppLocalizations.of(context).calendarLoadFailed,
                               style: TextStyle(
                                 color: AppColors.faint,
                                 fontSize: 11.5,
@@ -364,7 +368,7 @@ class _Legend extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(
-          'Winning day',
+          AppLocalizations.of(context).calendarLegendWin,
           style: TextStyle(color: AppColors.faint, fontSize: 10.5),
         ),
         const SizedBox(width: 14),
@@ -379,7 +383,7 @@ class _Legend extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(
-          'Losing day',
+          AppLocalizations.of(context).calendarLegendLoss,
           style: TextStyle(color: AppColors.faint, fontSize: 10.5),
         ),
       ],
@@ -464,7 +468,7 @@ class _DaySheet extends StatelessWidget {
                     return Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Text(
-                        'No trades loaded for this day.',
+                        AppLocalizations.of(context).calendarDayEmpty,
                         style:
                             TextStyle(color: AppColors.faint, fontSize: 11.5),
                       ),

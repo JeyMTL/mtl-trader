@@ -1577,4 +1577,188 @@ class AppLocalizationsPack extends AppLocalizations {
 
   @override
   String get journalResult => _read('journalResult') ?? _en.journalResult;
+
+  @override
+  String syncedOne(String symbol, String pnl) {
+    final template = _read('syncedOne');
+    if (template == null) return _en.syncedOne(symbol, pnl);
+    return _fill(template, <String, Object?>{'symbol': symbol, 'pnl': pnl});
+  }
+
+  @override
+  String syncedMany(int count, String pnl) {
+    final template = _read('syncedMany');
+    if (template == null) return _en.syncedMany(count, pnl);
+    return _fill(template, <String, Object?>{'count': count, 'pnl': pnl});
+  }
+
+  @override
+  String journaledTitle(String symbol) {
+    final template = _read('journaledTitle');
+    if (template == null) return _en.journaledTitle(symbol);
+    return _fill(template, <String, Object?>{'symbol': symbol});
+  }
+
+  @override
+  String get journaledBody => _read('journaledBody') ?? _en.journaledBody;
+
+  @override
+  String get aTrade => _read('aTrade') ?? _en.aTrade;
+
+  @override
+  String get calendarPreviousMonth => _read('calendarPreviousMonth') ?? _en.calendarPreviousMonth;
+
+  @override
+  String get calendarNextMonth => _read('calendarNextMonth') ?? _en.calendarNextMonth;
+
+  @override
+  String get calendarNoTrades => _read('calendarNoTrades') ?? _en.calendarNoTrades;
+
+  @override
+  String calendarMonthFoot(String pnl, int trades, int days) {
+    final template = _read('calendarMonthFoot');
+    if (template == null) return _en.calendarMonthFoot(pnl, trades, days);
+    return _fill(template, <String, Object?>{'pnl': pnl, 'trades': trades, 'days': days});
+  }
+
+  @override
+  String get calendarLoadFailed => _read('calendarLoadFailed') ?? _en.calendarLoadFailed;
+
+  @override
+  String get calendarLegendWin => _read('calendarLegendWin') ?? _en.calendarLegendWin;
+
+  @override
+  String get calendarLegendLoss => _read('calendarLegendLoss') ?? _en.calendarLegendLoss;
+
+  @override
+  String get calendarDayEmpty => _read('calendarDayEmpty') ?? _en.calendarDayEmpty;
+
+  @override
+  String get symbolSearchHint => _read('symbolSearchHint') ?? _en.symbolSearchHint;
+
+  @override
+  String get symbolNoMatchTitle => _read('symbolNoMatchTitle') ?? _en.symbolNoMatchTitle;
+
+  @override
+  String get symbolNoMatchBody => _read('symbolNoMatchBody') ?? _en.symbolNoMatchBody;
+
+  @override
+  String symbolFooter(int count) {
+    final template = _read('symbolFooter');
+    if (template == null) return _en.symbolFooter(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get timeFrameTitle => _read('timeFrameTitle') ?? _en.timeFrameTitle;
+
+  @override
+  String get timeFrameNotServed => _read('timeFrameNotServed') ?? _en.timeFrameNotServed;
+
+  @override
+  String get screenshotFailed => _read('screenshotFailed') ?? _en.screenshotFailed;
+
+  @override
+  String get confirmTitle => _read('confirmTitle') ?? _en.confirmTitle;
+
+  @override
+  String confirmBody(String email) {
+    final template = _read('confirmBody');
+    if (template == null) return _en.confirmBody(email);
+    return _fill(template, <String, Object?>{'email': email});
+  }
+
+  @override
+  String get confirmChecked => _read('confirmChecked') ?? _en.confirmChecked;
+
+  @override
+  String get confirmCheckFailed => _read('confirmCheckFailed') ?? _en.confirmCheckFailed;
+
+  @override
+  String get confirmResent => _read('confirmResent') ?? _en.confirmResent;
+
+  @override
+  String get confirmResendFailed => _read('confirmResendFailed') ?? _en.confirmResendFailed;
+
+  @override
+  String get confirmCheckedAction => _read('confirmCheckedAction') ?? _en.confirmCheckedAction;
+
+  @override
+  String get confirmResendAction => _read('confirmResendAction') ?? _en.confirmResendAction;
+
+  @override
+  String get confirmOtherAccount => _read('confirmOtherAccount') ?? _en.confirmOtherAccount;
+
+  @override
+  String get edgeLoadFailed => _read('edgeLoadFailed') ?? _en.edgeLoadFailed;
+
+  @override
+  String get edgeWhenYouWin => _read('edgeWhenYouWin') ?? _en.edgeWhenYouWin;
+
+  @override
+  String get edgeIntro => _read('edgeIntro') ?? _en.edgeIntro;
+
+  @override
+  String edgeZonePill(String zone) {
+    final template = _read('edgeZonePill');
+    if (template == null) return _en.edgeZonePill(zone);
+    return _fill(template, <String, Object?>{'zone': zone});
+  }
+
+  @override
+  String get edgeEmptyTitle => _read('edgeEmptyTitle') ?? _en.edgeEmptyTitle;
+
+  @override
+  String get edgeEmptyBody => _read('edgeEmptyBody') ?? _en.edgeEmptyBody;
+
+  @override
+  String get edgeGroupTimeOfDay => _read('edgeGroupTimeOfDay') ?? _en.edgeGroupTimeOfDay;
+
+  @override
+  String get edgeGroupSessions => _read('edgeGroupSessions') ?? _en.edgeGroupSessions;
+
+  @override
+  String get edgeBestHour => _read('edgeBestHour') ?? _en.edgeBestHour;
+
+  @override
+  String get edgeWorstHour => _read('edgeWorstHour') ?? _en.edgeWorstHour;
+
+  @override
+  String get edgeBestSession => _read('edgeBestSession') ?? _en.edgeBestSession;
+
+  @override
+  String get edgeWorstSession => _read('edgeWorstSession') ?? _en.edgeWorstSession;
+
+  @override
+  String get edgeByHourTitle => _read('edgeByHourTitle') ?? _en.edgeByHourTitle;
+
+  @override
+  String get edgeByHourSub => _read('edgeByHourSub') ?? _en.edgeByHourSub;
+
+  @override
+  String edgeExcluded(int min, String median, int timed) {
+    final template = _read('edgeExcluded');
+    if (template == null) return _en.edgeExcluded(min, median, timed);
+    return _fill(template, <String, Object?>{'min': min, 'median': median, 'timed': timed});
+  }
+
+  @override
+  String get edgeSessionsSub => _read('edgeSessionsSub') ?? _en.edgeSessionsSub;
+
+  @override
+  String edgeNeedTrades(int min) {
+    final template = _read('edgeNeedTrades');
+    if (template == null) return _en.edgeNeedTrades(min);
+    return _fill(template, <String, Object?>{'min': min});
+  }
+
+  @override
+  String get edgeNotEnoughSample => _read('edgeNotEnoughSample') ?? _en.edgeNotEnoughSample;
+
+  @override
+  String edgeCardFoot(int trades, String winRate) {
+    final template = _read('edgeCardFoot');
+    if (template == null) return _en.edgeCardFoot(trades, winRate);
+    return _fill(template, <String, Object?>{'trades': trades, 'winRate': winRate});
+  }
 }

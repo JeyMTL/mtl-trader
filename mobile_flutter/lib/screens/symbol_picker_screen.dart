@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/instruments.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -89,7 +90,7 @@ class _SymbolSheetState extends State<_SymbolSheet> {
                 autofocus: false,
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
-                  hintText: 'Search pairs, metals, indices, crypto',
+                  hintText: AppLocalizations.of(context).symbolSearchHint,
                   prefixIcon: Icon(
                     Icons.search,
                     size: 18,
@@ -114,10 +115,9 @@ class _SymbolSheetState extends State<_SymbolSheet> {
             ),
             Expanded(
               child: items.isEmpty
-                  ? const EmptyState(
-                      title: 'No instrument matches',
-                      body:
-                          'Try a shorter search, or type the symbol directly.',
+                  ? EmptyState(
+                      title: AppLocalizations.of(context).symbolNoMatchTitle,
+                      body: AppLocalizations.of(context).symbolNoMatchBody,
                       icon: Icons.search_off,
                     )
                   : ListView(children: children),
@@ -125,7 +125,9 @@ class _SymbolSheetState extends State<_SymbolSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
               child: Text(
-                '${instrumentCatalog.length} instruments · every chart is a live OANDA CFD quote',
+                AppLocalizations.of(
+                  context,
+                ).symbolFooter(instrumentCatalog.length),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.faint, fontSize: 9.5),
               ),

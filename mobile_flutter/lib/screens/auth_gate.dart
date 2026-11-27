@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import '../services/telemetry.dart';
+import '../l10n/gen/app_localizations.dart';
 import 'app_shell.dart';
 import 'login_screen.dart';
 
@@ -79,13 +80,12 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
       if (!mounted) return;
       // The AuthGate listens to auth changes; a confirmed user is routed in.
       setState(
-        () => _message =
-            'Checked. If the journal did not open, sign out and back in.',
+        () => _message = AppLocalizations.of(context).confirmChecked,
       );
     } catch (_) {
       if (mounted) {
         setState(
-          () => _message = 'Could not check yet. Try again in a moment.',
+          () => _message = AppLocalizations.of(context).confirmCheckFailed,
         );
       }
     } finally {
@@ -105,8 +105,7 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
       );
       if (mounted) {
         setState(
-          () => _message =
-              'Confirmation link sent. Check your inbox and spam folder.',
+          () => _message = AppLocalizations.of(context).confirmResent,
         );
       }
     } on AuthException catch (error) {
@@ -114,7 +113,7 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _message = 'Could not resend the email. Try again in a minute.',
+          () => _message = AppLocalizations.of(context).confirmResendFailed,
         );
       }
     } finally {
@@ -142,7 +141,7 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      'Confirm your email',
+                      AppLocalizations.of(context).confirmTitle,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 20,
@@ -151,7 +150,9 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'The journal opens once ${widget.email} is confirmed. Open the link Supabase emailed you, then return here.',
+                      AppLocalizations.of(
+                        context,
+                      ).confirmBody(widget.email),
                       style: TextStyle(
                         color: AppColors.muted,
                         fontSize: 12.5,
@@ -181,7 +182,9 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                                 color: AppColors.ink,
                               ),
                             )
-                          : const Text('I have confirmed'),
+                          : Text(
+                              AppLocalizations.of(context).confirmCheckedAction,
+                            ),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
@@ -192,12 +195,16 @@ class _VerifyEmailScreenState extends State<_VerifyEmailScreen> {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Resend confirmation'),
+                          : Text(
+                              AppLocalizations.of(context).confirmResendAction,
+                            ),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
                       onPressed: () => Supabase.instance.client.auth.signOut(),
-                      child: const Text('Use another account'),
+                      child: Text(
+                        AppLocalizations.of(context).confirmOtherAccount,
+                      ),
                     ),
                   ],
                 ),

@@ -261,9 +261,10 @@ class _AppShellState extends State<AppShell>
     _syncedPnl = 0;
     if (count == 0 || !mounted) return;
 
-    final text = count == 1
-        ? '$symbol synced · ${signedMoney(pnl)}'
-        : '$count trades synced · ${signedMoney(pnl)}';
+    final l10n = AppLocalizations.of(context);
+    final money = signedMoney(pnl);
+    final text =
+        count == 1 ? l10n.syncedOne(symbol, money) : l10n.syncedMany(count, money);
     ScaffoldMessenger.maybeOf(context)
       ?..hideCurrentSnackBar()
       ..showSnackBar(
@@ -301,8 +302,9 @@ class _AppShellState extends State<AppShell>
   }
 
   Widget _journaledBanner() {
+    final l10n = AppLocalizations.of(context);
     final row = _needsDetails!;
-    final symbol = row['symbol']?.toString() ?? 'A trade';
+    final symbol = row['symbol']?.toString() ?? l10n.aTrade;
     return Material(
       color: AppColors.surface,
       child: SafeArea(
@@ -321,7 +323,7 @@ class _AppShellState extends State<AppShell>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$symbol journaled',
+                      l10n.journaledTitle(symbol),
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 13,
@@ -329,7 +331,7 @@ class _AppShellState extends State<AppShell>
                       ),
                     ),
                     Text(
-                      'Add screenshots and notes to finish the record.',
+                      l10n.journaledBody,
                       style: TextStyle(
                         color: AppColors.muted,
                         fontSize: 11.5,

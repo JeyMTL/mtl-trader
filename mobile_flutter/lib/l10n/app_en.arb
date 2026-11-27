@@ -860,5 +860,144 @@
       }
     }
   },
-  "journalResult": "Result"
+  "journalResult": "Result",
+  "syncedOne": "{symbol} synced · {pnl}",
+  "@syncedOne": {
+    "placeholders": {
+      "symbol": {
+        "type": "String"
+      },
+      "pnl": {
+        "type": "String"
+      }
+    }
+  },
+  "syncedMany": "{count, plural, =1{1 trade synced} other{{count} trades synced}} · {pnl}",
+  "@syncedMany": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "pnl": {
+        "type": "String"
+      }
+    }
+  },
+  "journaledTitle": "{symbol} journaled",
+  "@journaledTitle": {
+    "placeholders": {
+      "symbol": {
+        "type": "String"
+      }
+    }
+  },
+  "journaledBody": "Add screenshots and notes to finish the record.",
+  "aTrade": "A trade",
+  "calendarPreviousMonth": "Previous month",
+  "calendarNextMonth": "Next month",
+  "calendarNoTrades": "No trades",
+  "calendarMonthFoot": "{pnl} · {trades}T · {days, plural, =1{1 day} other{{days} days}}",
+  "@calendarMonthFoot": {
+    "placeholders": {
+      "pnl": {
+        "type": "String"
+      },
+      "trades": {
+        "type": "int"
+      },
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "calendarLoadFailed": "Could not load this month",
+  "calendarLegendWin": "Winning day",
+  "calendarLegendLoss": "Losing day",
+  "calendarDayEmpty": "No trades loaded for this day.",
+  "symbolSearchHint": "Search pairs, metals, indices, crypto",
+  "symbolNoMatchTitle": "No instrument matches",
+  "symbolNoMatchBody": "Try a shorter search, or type the symbol directly.",
+  "symbolFooter": "{count} instruments · every chart is a live OANDA CFD quote",
+  "@symbolFooter": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeFrameTitle": "Time frame",
+  "timeFrameNotServed": "Not served by this chart feed yet",
+  "screenshotFailed": "Could not load this screenshot.",
+  "confirmTitle": "Confirm your email",
+  "confirmBody": "The journal opens once {email} is confirmed. Open the link Supabase emailed you, then return here.",
+  "@confirmBody": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmChecked": "Checked. If the journal did not open, sign out and back in.",
+  "confirmCheckFailed": "Could not check yet. Try again in a moment.",
+  "confirmResent": "Confirmation link sent. Check your inbox and spam folder.",
+  "confirmResendFailed": "Could not resend the email. Try again in a minute.",
+  "confirmCheckedAction": "I have confirmed",
+  "confirmResendAction": "Resend confirmation",
+  "confirmOtherAccount": "Use another account",
+  "edgeLoadFailed": "Could not load the edge report",
+  "edgeWhenYouWin": "WHEN YOU WIN",
+  "edgeIntro": "The journal ranks every entry hour and session by realised P&L.",
+  "edgeZonePill": "{zone} TIME",
+  "@edgeZonePill": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "edgeEmptyTitle": "No time windows yet",
+  "edgeEmptyBody": "Open a trade and set the entry and exit time. The hour and session report is built from that window.",
+  "edgeGroupTimeOfDay": "Time of day",
+  "edgeGroupSessions": "Sessions",
+  "edgeBestHour": "Most profitable hour",
+  "edgeWorstHour": "Most losses",
+  "edgeBestSession": "Best session",
+  "edgeWorstSession": "Weakest session",
+  "edgeByHourTitle": "P&L by entry hour",
+  "edgeByHourSub": "24-hour clock in your timezone; sessions use UTC.",
+  "edgeExcluded": "Windows with fewer than {min} trades are excluded from best/worst. Median hold {median} across {timed, plural, =1{1 timed trade} other{{timed} timed trades}}.",
+  "@edgeExcluded": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "median": {
+        "type": "String"
+      },
+      "timed": {
+        "type": "int"
+      }
+    }
+  },
+  "edgeSessionsSub": "UTC market windows: Asian 00–08 · London 08–13 · overlap 13–16 · New York 16–21 · late 21–24.",
+  "edgeNeedTrades": "Need {min}+ trades",
+  "@edgeNeedTrades": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "edgeNotEnoughSample": "Not enough sample",
+  "edgeCardFoot": "{trades, plural, =1{1 trade} other{{trades} trades}} · {winRate} win",
+  "@edgeCardFoot": {
+    "placeholders": {
+      "trades": {
+        "type": "int"
+      },
+      "winRate": {
+        "type": "String"
+      }
+    }
+  }
 }

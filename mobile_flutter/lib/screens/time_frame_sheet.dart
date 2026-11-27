@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/market_data.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../ui/theme.dart';
 
 /// Longest window `/api/market/candles` accepts for an explicit range.
@@ -118,7 +119,7 @@ class _TimeFrameSheet extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Time frame',
+                    AppLocalizations.of(context).timeFrameTitle,
                     style: TextStyle(
                       color: AppColors.text,
                       fontSize: 16.5,
@@ -221,7 +222,9 @@ class _TimeFrameRow extends StatelessWidget {
             ),
             Expanded(
               child: Text(
-                refused ? 'Not served by this chart feed yet' : interval.detail,
+                refused
+                    ? AppLocalizations.of(context).timeFrameNotServed
+                    : interval.detail,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

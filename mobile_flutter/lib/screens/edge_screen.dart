@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/edge.dart';
 import '../core/format.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
 import '../ui/theme.dart';
@@ -75,7 +76,7 @@ class _EdgeScreenState extends State<EdgeScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Could not load the edge report',
+                      AppLocalizations.of(context).edgeLoadFailed,
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 15,
@@ -126,7 +127,7 @@ class _EdgeScreenState extends State<EdgeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'WHEN YOU WIN',
+                              AppLocalizations.of(context).edgeWhenYouWin,
                               style: TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 9.5,
@@ -136,7 +137,9 @@ class _EdgeScreenState extends State<EdgeScreen> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'The journal ranks every entry hour and session by realised P&L.',
+                              AppLocalizations.of(
+                                context,
+                              ).edgeIntro,
                               style: TextStyle(
                                 color: AppColors.muted,
                                 fontSize: 11.5,
@@ -147,25 +150,29 @@ class _EdgeScreenState extends State<EdgeScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Pill(text: '${stats.timezone} TIME', tone: Tone.neutral),
+                      Pill(
+                        text: AppLocalizations.of(
+                          context,
+                        ).edgeZonePill(stats.timezone),
+                        tone: Tone.neutral,
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 10),
                 if (!hasData)
-                  const FlatCard(
+                  FlatCard(
                     child: EmptyState(
                       icon: Icons.schedule,
-                      title: 'No time windows yet',
-                      body:
-                          'Open a trade and set the entry and exit time. The hour and session report is built from that window.',
+                      title: AppLocalizations.of(context).edgeEmptyTitle,
+                      body: AppLocalizations.of(context).edgeEmptyBody,
                     ),
                   )
                 else ...[
                   // Two labelled pairs instead of four identical cards in one
                   // stack, so it is obvious which two compare hours and which
                   // two compare sessions.
-                  const _GroupLabel('Time of day'),
+                  _GroupLabel(AppLocalizations.of(context).edgeGroupTimeOfDay),
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -175,19 +182,21 @@ class _EdgeScreenState extends State<EdgeScreen> {
                     childAspectRatio: 1.35,
                     children: [
                       _EdgeCard(
-                        title: 'Most profitable hour',
+                        title: AppLocalizations.of(context).edgeBestHour,
+                        minTrades: edge.minTrades,
                         period: edge.bestHour,
                         positive: true,
                       ),
                       _EdgeCard(
-                        title: 'Most losses',
+                        title: AppLocalizations.of(context).edgeWorstHour,
+                        minTrades: edge.minTrades,
                         period: edge.worstHour,
                         positive: false,
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const _GroupLabel('Sessions'),
+                  _GroupLabel(AppLocalizations.of(context).edgeGroupSessions),
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -197,12 +206,14 @@ class _EdgeScreenState extends State<EdgeScreen> {
                     childAspectRatio: 1.35,
                     children: [
                       _EdgeCard(
-                        title: 'Best session',
+                        title: AppLocalizations.of(context).edgeBestSession,
+                        minTrades: edge.minTrades,
                         period: edge.bestSession,
                         positive: true,
                       ),
                       _EdgeCard(
-                        title: 'Weakest session',
+                        title: AppLocalizations.of(context).edgeWorstSession,
+                        minTrades: edge.minTrades,
                         period: edge.worstSession,
                         positive: false,
                       ),
@@ -213,17 +224,19 @@ class _EdgeScreenState extends State<EdgeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SectionTitle(
-                          title: 'P&L by entry hour',
-                          subtitle:
-                              '24-hour clock in your timezone; sessions use UTC.',
+                        SectionTitle(
+                          title: AppLocalizations.of(context).edgeByHourTitle,
+                          subtitle: AppLocalizations.of(context).edgeByHourSub,
                         ),
                         const SizedBox(height: 12),
                         SizedBox(height: 190, child: _HourChart(hours: hours)),
                         const SizedBox(height: 8),
                         Text(
-                          'Windows with fewer than ${edge.minTrades} trades are excluded from best/worst. '
-                          'Median hold ${durationText(stats.medianMinutes)} across ${stats.holdTrades} timed trades.',
+                          AppLocalizations.of(context).edgeExcluded(
+                            edge.minTrades,
+                            durationText(stats.medianMinutes),
+                            stats.holdTrades,
+                          ),
                           style: TextStyle(
                             color: AppColors.faint,
                             fontSize: 9.5,
@@ -239,12 +252,11 @@ class _EdgeScreenState extends State<EdgeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.fromLTRB(14, 14, 14, 4),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
                           child: SectionTitle(
-                            title: 'Sessions',
-                            subtitle:
-                                'UTC market windows: Asian 00–08 · London 08–13 · overlap 13–16 · New York 16–21 · late 21–24.',
+                            title: AppLocalizations.of(context).edgeGroupSessions,
+                            subtitle: AppLocalizations.of(context).edgeSessionsSub,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -300,11 +312,13 @@ class _EdgeCard extends StatelessWidget {
     required this.title,
     required this.period,
     required this.positive,
+    this.minTrades = 3,
   });
 
   final String title;
   final EdgePeriod? period;
   final bool positive;
+  final int minTrades;
 
   @override
   Widget build(BuildContext context) {
@@ -337,7 +351,8 @@ class _EdgeCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            period?.label ?? 'Need 3+ trades',
+            period?.label ??
+                AppLocalizations.of(context).edgeNeedTrades(minTrades),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -358,9 +373,11 @@ class _EdgeCard extends StatelessWidget {
           ),
           Text(
             period == null
-                ? 'Not enough sample'
-                : '${countNoun(period!.trades, 'trade')} · '
-                    '${percent(period!.winRate)} win',
+                ? AppLocalizations.of(context).edgeNotEnoughSample
+                : AppLocalizations.of(context).edgeCardFoot(
+                    period!.trades,
+                    percent(period!.winRate),
+                  ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: AppColors.faint, fontSize: 9),

@@ -2644,6 +2644,294 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Result'**
   String get journalResult;
+
+  /// No description provided for @syncedOne.
+  ///
+  /// In en, this message translates to:
+  /// **'{symbol} synced · {pnl}'**
+  String syncedOne(String symbol, String pnl);
+
+  /// No description provided for @syncedMany.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 trade synced} other{{count} trades synced}} · {pnl}'**
+  String syncedMany(int count, String pnl);
+
+  /// No description provided for @journaledTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{symbol} journaled'**
+  String journaledTitle(String symbol);
+
+  /// No description provided for @journaledBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add screenshots and notes to finish the record.'**
+  String get journaledBody;
+
+  /// No description provided for @aTrade.
+  ///
+  /// In en, this message translates to:
+  /// **'A trade'**
+  String get aTrade;
+
+  /// No description provided for @calendarPreviousMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get calendarPreviousMonth;
+
+  /// No description provided for @calendarNextMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get calendarNextMonth;
+
+  /// No description provided for @calendarNoTrades.
+  ///
+  /// In en, this message translates to:
+  /// **'No trades'**
+  String get calendarNoTrades;
+
+  /// No description provided for @calendarMonthFoot.
+  ///
+  /// In en, this message translates to:
+  /// **'{pnl} · {trades}T · {days, plural, =1{1 day} other{{days} days}}'**
+  String calendarMonthFoot(String pnl, int trades, int days);
+
+  /// No description provided for @calendarLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this month'**
+  String get calendarLoadFailed;
+
+  /// No description provided for @calendarLegendWin.
+  ///
+  /// In en, this message translates to:
+  /// **'Winning day'**
+  String get calendarLegendWin;
+
+  /// No description provided for @calendarLegendLoss.
+  ///
+  /// In en, this message translates to:
+  /// **'Losing day'**
+  String get calendarLegendLoss;
+
+  /// No description provided for @calendarDayEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No trades loaded for this day.'**
+  String get calendarDayEmpty;
+
+  /// No description provided for @symbolSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search pairs, metals, indices, crypto'**
+  String get symbolSearchHint;
+
+  /// No description provided for @symbolNoMatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No instrument matches'**
+  String get symbolNoMatchTitle;
+
+  /// No description provided for @symbolNoMatchBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a shorter search, or type the symbol directly.'**
+  String get symbolNoMatchBody;
+
+  /// No description provided for @symbolFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} instruments · every chart is a live OANDA CFD quote'**
+  String symbolFooter(int count);
+
+  /// No description provided for @timeFrameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time frame'**
+  String get timeFrameTitle;
+
+  /// No description provided for @timeFrameNotServed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not served by this chart feed yet'**
+  String get timeFrameNotServed;
+
+  /// No description provided for @screenshotFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this screenshot.'**
+  String get screenshotFailed;
+
+  /// No description provided for @confirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your email'**
+  String get confirmTitle;
+
+  /// No description provided for @confirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The journal opens once {email} is confirmed. Open the link Supabase emailed you, then return here.'**
+  String confirmBody(String email);
+
+  /// No description provided for @confirmChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked. If the journal did not open, sign out and back in.'**
+  String get confirmChecked;
+
+  /// No description provided for @confirmCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not check yet. Try again in a moment.'**
+  String get confirmCheckFailed;
+
+  /// No description provided for @confirmResent.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation link sent. Check your inbox and spam folder.'**
+  String get confirmResent;
+
+  /// No description provided for @confirmResendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not resend the email. Try again in a minute.'**
+  String get confirmResendFailed;
+
+  /// No description provided for @confirmCheckedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'I have confirmed'**
+  String get confirmCheckedAction;
+
+  /// No description provided for @confirmResendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend confirmation'**
+  String get confirmResendAction;
+
+  /// No description provided for @confirmOtherAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Use another account'**
+  String get confirmOtherAccount;
+
+  /// No description provided for @edgeLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the edge report'**
+  String get edgeLoadFailed;
+
+  /// No description provided for @edgeWhenYouWin.
+  ///
+  /// In en, this message translates to:
+  /// **'WHEN YOU WIN'**
+  String get edgeWhenYouWin;
+
+  /// No description provided for @edgeIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'The journal ranks every entry hour and session by realised P&L.'**
+  String get edgeIntro;
+
+  /// No description provided for @edgeZonePill.
+  ///
+  /// In en, this message translates to:
+  /// **'{zone} TIME'**
+  String edgeZonePill(String zone);
+
+  /// No description provided for @edgeEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No time windows yet'**
+  String get edgeEmptyTitle;
+
+  /// No description provided for @edgeEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a trade and set the entry and exit time. The hour and session report is built from that window.'**
+  String get edgeEmptyBody;
+
+  /// No description provided for @edgeGroupTimeOfDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Time of day'**
+  String get edgeGroupTimeOfDay;
+
+  /// No description provided for @edgeGroupSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions'**
+  String get edgeGroupSessions;
+
+  /// No description provided for @edgeBestHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Most profitable hour'**
+  String get edgeBestHour;
+
+  /// No description provided for @edgeWorstHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Most losses'**
+  String get edgeWorstHour;
+
+  /// No description provided for @edgeBestSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Best session'**
+  String get edgeBestSession;
+
+  /// No description provided for @edgeWorstSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Weakest session'**
+  String get edgeWorstSession;
+
+  /// No description provided for @edgeByHourTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'P&L by entry hour'**
+  String get edgeByHourTitle;
+
+  /// No description provided for @edgeByHourSub.
+  ///
+  /// In en, this message translates to:
+  /// **'24-hour clock in your timezone; sessions use UTC.'**
+  String get edgeByHourSub;
+
+  /// No description provided for @edgeExcluded.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows with fewer than {min} trades are excluded from best/worst. Median hold {median} across {timed, plural, =1{1 timed trade} other{{timed} timed trades}}.'**
+  String edgeExcluded(int min, String median, int timed);
+
+  /// No description provided for @edgeSessionsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'UTC market windows: Asian 00–08 · London 08–13 · overlap 13–16 · New York 16–21 · late 21–24.'**
+  String get edgeSessionsSub;
+
+  /// No description provided for @edgeNeedTrades.
+  ///
+  /// In en, this message translates to:
+  /// **'Need {min}+ trades'**
+  String edgeNeedTrades(int min);
+
+  /// No description provided for @edgeNotEnoughSample.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough sample'**
+  String get edgeNotEnoughSample;
+
+  /// No description provided for @edgeCardFoot.
+  ///
+  /// In en, this message translates to:
+  /// **'{trades, plural, =1{1 trade} other{{trades} trades}} · {winRate} win'**
+  String edgeCardFoot(int trades, String winRate);
 }
 
 class _AppLocalizationsDelegate

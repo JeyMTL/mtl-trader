@@ -1529,4 +1529,201 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get journalResult => 'Result';
+
+  @override
+  String syncedOne(String symbol, String pnl) {
+    return '$symbol synced · $pnl';
+  }
+
+  @override
+  String syncedMany(int count, String pnl) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades synced',
+      one: '1 trade synced',
+    );
+    return '$_temp0 · $pnl';
+  }
+
+  @override
+  String journaledTitle(String symbol) {
+    return '$symbol journaled';
+  }
+
+  @override
+  String get journaledBody => 'Add screenshots and notes to finish the record.';
+
+  @override
+  String get aTrade => 'A trade';
+
+  @override
+  String get calendarPreviousMonth => 'Previous month';
+
+  @override
+  String get calendarNextMonth => 'Next month';
+
+  @override
+  String get calendarNoTrades => 'No trades';
+
+  @override
+  String calendarMonthFoot(String pnl, int trades, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days',
+      one: '1 day',
+    );
+    return '$pnl · ${trades}T · $_temp0';
+  }
+
+  @override
+  String get calendarLoadFailed => 'Could not load this month';
+
+  @override
+  String get calendarLegendWin => 'Winning day';
+
+  @override
+  String get calendarLegendLoss => 'Losing day';
+
+  @override
+  String get calendarDayEmpty => 'No trades loaded for this day.';
+
+  @override
+  String get symbolSearchHint => 'Search pairs, metals, indices, crypto';
+
+  @override
+  String get symbolNoMatchTitle => 'No instrument matches';
+
+  @override
+  String get symbolNoMatchBody =>
+      'Try a shorter search, or type the symbol directly.';
+
+  @override
+  String symbolFooter(int count) {
+    return '$count instruments · every chart is a live OANDA CFD quote';
+  }
+
+  @override
+  String get timeFrameTitle => 'Time frame';
+
+  @override
+  String get timeFrameNotServed => 'Not served by this chart feed yet';
+
+  @override
+  String get screenshotFailed => 'Could not load this screenshot.';
+
+  @override
+  String get confirmTitle => 'Confirm your email';
+
+  @override
+  String confirmBody(String email) {
+    return 'The journal opens once $email is confirmed. Open the link Supabase emailed you, then return here.';
+  }
+
+  @override
+  String get confirmChecked =>
+      'Checked. If the journal did not open, sign out and back in.';
+
+  @override
+  String get confirmCheckFailed =>
+      'Could not check yet. Try again in a moment.';
+
+  @override
+  String get confirmResent =>
+      'Confirmation link sent. Check your inbox and spam folder.';
+
+  @override
+  String get confirmResendFailed =>
+      'Could not resend the email. Try again in a minute.';
+
+  @override
+  String get confirmCheckedAction => 'I have confirmed';
+
+  @override
+  String get confirmResendAction => 'Resend confirmation';
+
+  @override
+  String get confirmOtherAccount => 'Use another account';
+
+  @override
+  String get edgeLoadFailed => 'Could not load the edge report';
+
+  @override
+  String get edgeWhenYouWin => 'WHEN YOU WIN';
+
+  @override
+  String get edgeIntro =>
+      'The journal ranks every entry hour and session by realised P&L.';
+
+  @override
+  String edgeZonePill(String zone) {
+    return '$zone TIME';
+  }
+
+  @override
+  String get edgeEmptyTitle => 'No time windows yet';
+
+  @override
+  String get edgeEmptyBody =>
+      'Open a trade and set the entry and exit time. The hour and session report is built from that window.';
+
+  @override
+  String get edgeGroupTimeOfDay => 'Time of day';
+
+  @override
+  String get edgeGroupSessions => 'Sessions';
+
+  @override
+  String get edgeBestHour => 'Most profitable hour';
+
+  @override
+  String get edgeWorstHour => 'Most losses';
+
+  @override
+  String get edgeBestSession => 'Best session';
+
+  @override
+  String get edgeWorstSession => 'Weakest session';
+
+  @override
+  String get edgeByHourTitle => 'P&L by entry hour';
+
+  @override
+  String get edgeByHourSub =>
+      '24-hour clock in your timezone; sessions use UTC.';
+
+  @override
+  String edgeExcluded(int min, String median, int timed) {
+    String _temp0 = intl.Intl.pluralLogic(
+      timed,
+      locale: localeName,
+      other: '$timed timed trades',
+      one: '1 timed trade',
+    );
+    return 'Windows with fewer than $min trades are excluded from best/worst. Median hold $median across $_temp0.';
+  }
+
+  @override
+  String get edgeSessionsSub =>
+      'UTC market windows: Asian 00–08 · London 08–13 · overlap 13–16 · New York 16–21 · late 21–24.';
+
+  @override
+  String edgeNeedTrades(int min) {
+    return 'Need $min+ trades';
+  }
+
+  @override
+  String get edgeNotEnoughSample => 'Not enough sample';
+
+  @override
+  String edgeCardFoot(int trades, String winRate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      trades,
+      locale: localeName,
+      other: '$trades trades',
+      one: '1 trade',
+    );
+    return '$_temp0 · $winRate win';
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../ui/theme.dart';
+import '../l10n/gen/app_localizations.dart';
 
 class MediaViewerScreen extends StatelessWidget {
   const MediaViewerScreen({
@@ -45,7 +46,7 @@ class MediaViewerScreen extends StatelessWidget {
             },
             errorBuilder: (context, error, stack) => Center(
               child: Text(
-                'Could not load this screenshot.',
+                AppLocalizations.of(context).screenshotFailed,
                 style: TextStyle(color: AppColors.muted, fontSize: 12),
               ),
             ),

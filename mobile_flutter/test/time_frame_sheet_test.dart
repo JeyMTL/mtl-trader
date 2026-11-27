@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mtl_trader_mobile/core/instruments.dart';
+import 'package:mtl_trader_mobile/l10n/gen/app_localizations.dart';
 import 'package:mtl_trader_mobile/screens/chart_picker_screen.dart';
 import 'package:mtl_trader_mobile/screens/time_frame_sheet.dart';
 import 'package:mtl_trader_mobile/services/market_data.dart';
@@ -39,6 +40,9 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: buildFlatTheme(AppPalette.dark),
         home: const ChartPickerScreen(
           instrument: Instrument(
