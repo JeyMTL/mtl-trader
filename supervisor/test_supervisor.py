@@ -1325,6 +1325,82 @@ class FleetModeTests(unittest.TestCase):
         self.assertTrue(hooks["should_yield"]())
 
 
+class SlotResetTests(unittest.TestCase):
+    """A slot that failed comes back as a first attempt, not as a stuck terminal."""
+
+    def _slot(self):
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        config = Path(holder.name) / "config"
+        config.mkdir()
+        account = config / "accounts.dat"
+        account.write_bytes(b"authenticated before the run")
+        return str(Path(holder.name) / "terminal64.exe"), account
+
+    def test_the_seed_is_taken_once_and_never_overwritten(self):
+        terminal, account = self._slot()
+
+        sup.keep_slot_seed(terminal)
+        seed = sup.slot_seed_file(terminal)
+        self.assertEqual(seed.read_bytes(), b"authenticated before the run")
+
+        # Whatever a later login writes must not become the state to fall back
+        # to: the seed is the terminal as it was before any account used it.
+        account.write_bytes(b"another account")
+        sup.keep_slot_seed(terminal)
+        self.assertEqual(seed.read_bytes(), b"authenticated before the run")
+
+    def test_a_failed_slot_is_closed_and_its_account_file_restored(self):
+        terminal, account = self._slot()
+        sup.keep_slot_seed(terminal)
+        account.write_bytes(b"the account the failed attempt tried")
+        stopped = []
+
+        with mock.patch.object(sup, "stop_terminal_process", side_effect=stopped.append):
+            sup.reset_slot(terminal)
+
+        self.assertEqual(stopped, [terminal])
+        self.assertEqual(account.read_bytes(), b"authenticated before the run")
+
+    def test_a_slot_with_no_seed_keeps_the_account_file_it_has(self):
+        # A slot copied with an unauthenticated account file has nothing better
+        # to restore, and emptying it would leave a folder MT5 refuses to drive.
+        terminal, account = self._slot()
+        account.write_bytes(b"unauthenticated")
+
+        with mock.patch.object(sup, "stop_terminal_process", lambda path: None):
+            sup.reset_slot(terminal)
+
+        self.assertEqual(account.read_bytes(), b"unauthenticated")
+
+    def test_a_failed_job_resets_its_own_slot(self):
+        jobs, results = queue.Queue(), queue.Queue()
+        row = {"user_id": "row-9", "status": "pending"}
+        terminal, account = self._slot()
+        sup.keep_slot_seed(terminal)
+        saved_sync, saved_watch, saved_seconds = sup.sync_one, sup.watch, sup.WATCH_SECONDS
+        self.addCleanup(setattr, sup, "sync_one", saved_sync)
+        self.addCleanup(setattr, sup, "watch", saved_watch)
+        self.addCleanup(setattr, sup, "WATCH_SECONDS", saved_seconds)
+
+        def boom(sync_row, terminal=None):
+            account.write_bytes(b"the account the failed attempt tried")
+            raise RuntimeError("Authorization failed")
+
+        sup.sync_one = boom
+        sup.watch = lambda *args, **kwargs: None
+        sup.WATCH_SECONDS = 0
+        jobs.put(("row-9", row))
+        jobs.put(None)
+
+        with mock.patch.object(sup, "stop_terminal_process", lambda path: None):
+            with contextlib.redirect_stdout(io.StringIO()):
+                sup.fleet_worker(3, terminal, jobs, results)
+
+        self.assertEqual(results.get_nowait()["error"], "Authorization failed")
+        self.assertEqual(account.read_bytes(), b"authenticated before the run")
+
+
 class FailureNoticeTests(unittest.TestCase):
     """What the phone is told when an account stops syncing."""
 

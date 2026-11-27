@@ -69,6 +69,7 @@ import multiprocessing as mp
 import os
 import queue
 import re
+import shutil
 import sys
 import time
 import unicodedata
@@ -1558,6 +1559,58 @@ def stop_terminal_process(path):
         print(f"  closed the terminal at {path} after the rejected login")
 
 
+def slot_account_file(terminal):
+    """The account file a slot's portable terminal boots from."""
+    return Path(terminal).parent / "config" / "accounts.dat"
+
+
+def slot_seed_file(terminal):
+    """Where a slot keeps the account file it started the run with."""
+    return Path(terminal).parent / "config" / "accounts.dat.seed"
+
+
+def keep_slot_seed(terminal):
+    """Remember a slot's account file before any job can replace it.
+
+    A slot cannot simply lose its account file after a failure: terminal builds
+    from 6230 on answer every program login with `IPC timeout` until that folder
+    has authenticated once, so an emptied slot is a slot that never connects
+    again. Keeping the file it started with and putting it back is the same
+    fresh start without that dead end.
+    """
+    if not terminal:
+        return
+    account, seed = slot_account_file(terminal), slot_seed_file(terminal)
+    try:
+        if account.exists() and not seed.exists():
+            shutil.copy2(account, seed)
+    except OSError as error:
+        print(f"  [warn] could not keep a seed of {account}: {error}", flush=True)
+
+
+def reset_slot(terminal):
+    """Close a failed slot's terminal and put its account file back.
+
+    A failed login leaves the account it tried in `config\accounts.dat`, and the
+    next start boots *that* account — a login dialog nobody answers — instead of
+    coming up clean, which is what turns one bad attempt into a slot that never
+    logs in again. Closing the terminal and restoring the seed makes the retry a
+    first attempt again, so an account that had issues goes back to the queue
+    like a new one instead of keeping the details that broke it.
+    """
+    if not terminal:
+        return
+    stop_terminal_process(terminal)
+    account, seed = slot_account_file(terminal), slot_seed_file(terminal)
+    if not seed.exists():
+        return
+    try:
+        shutil.copy2(seed, account)
+        print(f"  [slot] reset {account} to the file it started with", flush=True)
+    except OSError as error:
+        print(f"  [warn] could not reset {account}: {error}", flush=True)
+
+
 def open_session(row, terminal=None):
     """Attach to MT5 and log in, trying every installed terminal until one can.
 
@@ -2274,6 +2327,11 @@ def fleet_worker(slot, terminal, jobs, results, waiting=None, log_path=None):
             error = str(exc) or type(exc).__name__
         finally:
             mt5.shutdown()
+        if error:
+            # The failed attempt has left its account in the slot, and the next
+            # start would boot that instead of a clean one: close it and put the
+            # account file back so the retry is a first attempt again.
+            reset_slot(terminal)
         print(
             f"[slot {slot}] {row['user_id'][:8]}… done"
             f"{': ' + error if error else ''}",
@@ -2293,6 +2351,8 @@ def run_fleet():
     free_mb = available_memory_mb()
     size = capacity_slots(FLEET_SIZE, available_mb=free_mb)
     terminals = fleet_terminals()[:size]
+    for terminal in terminals:
+        keep_slot_seed(terminal)
     if size < FLEET_SIZE:
         print(
             f"[capacity] FLEET_SIZE={FLEET_SIZE} but only {size} slot(s) fit in "
