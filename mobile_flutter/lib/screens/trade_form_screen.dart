@@ -17,7 +17,9 @@ import '../services/telemetry.dart';
 import '../services/media_service.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import '../core/features.dart';
 import 'chart_picker_screen.dart';
+import 'market_view_screen.dart';
 import 'media_viewer_screen.dart';
 import 'symbol_picker_screen.dart';
 import 'package:mtl_trader_mobile/core/friendly_error.dart';
@@ -57,7 +59,13 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
 
   /// Where the market closed the trade, found from the candles after entry —
   /// never typed in. A saved trade keeps the price the broker already recorded.
+  ///
+  /// With `kMarketChartsEnabled` off there are no candles to ask, so the field
+  /// becomes a typed price out of the trader's own terminal. That is a worse
+  /// guarantee than the candles gave (a typed exit is where a losing sell turns
+  /// into a "profit"), which is why it only exists while the chart is away.
   double? _exitPrice;
+  final _exitText = TextEditingController();
   ExitReason? _exitReason;
   bool _resolvingExit = false;
   List<String> _tags = const [];
@@ -149,6 +157,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       _strategy,
       _notes,
       _tagDraft,
+      _exitText,
     ]) {
       controller.dispose();
     }
@@ -164,6 +173,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
         _symbol.text = asString(trade['symbol']) ?? '';
         _entry.text = _numberText(trade['entry_price']);
         _exitPrice = asNullableDouble(trade['exit_price']);
+        _exitText.text = _exitPrice == null ? '' : '$_exitPrice';
         _exitReason = null;
         _lots.text = _numberText(trade['lot_size'], decimals: 2);
         _stop.text = _levelText(trade['stop_loss']);
@@ -943,7 +953,22 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
       _exitReason = null;
       _closeTime = null;
     });
-    if (_levelsHint == null) unawaited(_resolveExitFromMarket());
+    // The resolver needs the candle route, which answers 503 while the chart is
+    // off; firing it anyway would greet every new trade with an error.
+    if (_levelsHint == null && kMarketChartsEnabled) {
+      unawaited(_resolveExitFromMarket());
+    }
+  }
+
+  /// Opens the market view that holds the chart's place while the candle route
+  /// is off. It lands on the instrument already typed, not on a default pair.
+  Future<void> _openMarket() async {
+    final instrument = inferInstrument(_symbol.text);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => MarketViewScreen(instrument: instrument?.symbol),
+      ),
+    );
   }
 
 /// The exit reason in the reader's language.
@@ -967,6 +992,9 @@ String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
     final l10n = AppLocalizations.of(context);
     final price = _exitPrice;
     final reason = _exitReason;
+    // No candles, no resolved exit: the field becomes the price from the
+    // trader's own terminal. See the note on `_exitPrice`.
+    if (!kMarketChartsEnabled) return _typedExitRow();
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
@@ -1023,6 +1051,36 @@ String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// The exit while the chart is off: typed, from the terminal.
+  ///
+  /// The close time is picked by hand from the row below this one, and the exit
+  /// reason reads as `Saved exit` — the app was not there to see which level was
+  /// hit, so it does not claim to know.
+  Widget _typedExitRow() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TextFormField(
+        controller: _exitText,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        style: tabular.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+        decoration: InputDecoration(
+          hintText: 'Exit price from your terminal',
+          isDense: true,
+          border: InputBorder.none,
+          hintStyle: TextStyle(color: AppColors.faint, fontSize: 12),
+        ),
+        onChanged: (raw) => setState(
+          () => _exitPrice = double.tryParse(raw.trim().replaceAll(',', '.')),
+        ),
       ),
     );
   }
@@ -1095,6 +1153,12 @@ String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
     // The exit is read from the market, never typed. A saved trade that was
     // reopened keeps its broker exit and needs no second lookup.
     if (_exitPrice == null) {
+      if (!kMarketChartsEnabled) {
+        setState(
+          () => _error = 'Enter the exit price to save a closed trade.',
+        );
+        return;
+      }
       if (_openTime == null) {
         setState(
           () => _error = AppLocalizations.of(context).tradeSetOpenedTime,
@@ -1294,12 +1358,20 @@ String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
                   // the gold surface: it reads as the bridge to the chart, not
                   // as a fourth choice of trade type above it.
                   OutlinedButton.icon(
-                    onPressed: _saving ? null : _openChart,
-                    icon: const Icon(
-                      Icons.candlestick_chart_outlined,
+                    onPressed: _saving
+                        ? null
+                        : (kMarketChartsEnabled ? _openChart : _openMarket),
+                    icon: Icon(
+                      kMarketChartsEnabled
+                          ? Icons.candlestick_chart_outlined
+                          : Icons.show_chart,
                       size: 17,
                     ),
-                    label: Text(l10n.tradePinLevels),
+                    label: Text(
+                      kMarketChartsEnabled
+                          ? l10n.tradePinLevels
+                          : 'Market view',
+                    ),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(44),
                       backgroundColor: AppColors.primary.withAlpha(22),
@@ -1543,9 +1615,15 @@ String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
                   _WindowRow(
                     label: l10n.tradeClosed,
                     value: _closeTime == null
-                        ? l10n.tradeFoundWithExit
+                        ? (kMarketChartsEnabled
+                            ? l10n.tradeFoundWithExit
+                            : l10n.tradeNotSet)
                         : '${dayOf(_closeTime)} · ${timeOf(_closeTime)}',
-                    onTap: () => _resolveExitFromMarket(announce: true),
+                    // With the chart off there is nothing to find the close from,
+                    // so the row opens the picker instead of a 503.
+                    onTap: () => kMarketChartsEnabled
+                        ? _resolveExitFromMarket(announce: true)
+                        : _pickWindow(open: false),
                   ),
                   const SizedBox(height: 8),
                   Row(

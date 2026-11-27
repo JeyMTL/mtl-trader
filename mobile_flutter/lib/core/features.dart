@@ -14,3 +14,24 @@
 /// "Connecting…" — the screen says so itself after two minutes and tells the
 /// trader to start the host or disconnect, rather than hanging silently.
 const bool kMt5SyncEnabled = true;
+
+/// The candle chart, off while there is no licensed feed behind it.
+///
+/// Mirrors `MARKET_CHARTS_ENABLED` in `src/lib/features.ts`. The candles this
+/// app drew came from the web deployment's `/api/market/candles`, which is fed
+/// by a personal OANDA token — a token that licenses those prices to one person.
+/// Serving them to anybody else is redistribution, so the route now answers 503
+/// and every screen that read from it has to stop asking: the chart picker, the
+/// "find the exit from the candles" resolver, and the level pinning that went
+/// with them.
+///
+/// Nothing is deleted. `kMarketChartsEnabled = true` plus a licensed feed is the
+/// whole way back, and the chart picker is untouched behind this flag.
+const bool kMarketChartsEnabled = false;
+
+/// The free market view that holds the chart's place meanwhile.
+///
+/// Mirrors `MARKET_WIDGET_ENABLED` in `src/lib/features.ts`. TradingView serves
+/// the prices inside its own WebView under its own terms, so no quote of ours is
+/// shown and no vendor key is spent. No seconds, no drawings, no journal data.
+const bool kMarketWidgetEnabled = true;

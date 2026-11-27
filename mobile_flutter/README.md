@@ -7,6 +7,12 @@ A native, flat-design Flutter client for the same Supabase journal as the web ap
 - **Desk** — balance, net P&L, win rate, profit factor, max drawdown, equity curve, time edge and the latest journal entries.
 - **Journal** — searchable, paged trade list with entry → exit time windows and photo/voice-note counts.
 - **Chart pinning** — every instrument ships in the app (forex majors, crosses and exotics, metals, indices, crypto, energy); tap the candle chart to fill entry, stop, target and exit prices and the entry/exit times instead of typing them. Spot forex and crypto charts are live and refresh every minute; exchange-traded instruments are delayed.
+- **Market view** — while `kMarketChartsEnabled` is off in `lib/core/features.dart`
+  (the candles come from a personal OANDA token that cannot be redistributed),
+  the chart button in the trade form opens a TradingView widget in its own
+  WebView instead: instrument and interval chips, no seconds, no drawings, and
+  no journal data on the screen. The trade's exit is then typed from the
+  trader's terminal rather than read off the candles.
 - **New / edit entry** — instrument, direction, entry price, size, SL/TP, commission, swap, strategy, notes, tags, entry time, live P&L — the exit is found from the candles after entry (whichever of SL/TP the market hit first) instead of being typed — plus:
   - multiple chart screenshots (camera or gallery),
   - a voice note recorded in the app,
