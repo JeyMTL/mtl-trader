@@ -359,7 +359,8 @@ class _EdgeCard extends StatelessWidget {
           Text(
             period == null
                 ? 'Not enough sample'
-                : '${period!.trades} trades · ${percent(period!.winRate)} win',
+                : '${countNoun(period!.trades, 'trade')} · '
+                    '${percent(period!.winRate)} win',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: AppColors.faint, fontSize: 9),
@@ -505,7 +506,8 @@ class _SessionRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${period.trades} trades · ${percent(period.winRate)} win rate',
+                  '${countNoun(period.trades, 'trade')} · '
+                  '${percent(period.winRate)} win rate',
                   style: TextStyle(color: AppColors.faint, fontSize: 9.5),
                 ),
               ],

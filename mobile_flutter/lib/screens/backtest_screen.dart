@@ -1321,7 +1321,7 @@ class _BacktestScreenState extends State<BacktestScreen> {
                             Text(
                               '${run.symbol} · ${run.strategyId} · '
                               '${_day(run.createdAt)} · '
-                              '${run.metrics.trades} trades',
+                              '${countNoun(run.metrics.trades, 'trade')}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(

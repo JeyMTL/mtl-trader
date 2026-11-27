@@ -174,7 +174,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     ? 'No trades'
                                     : '${signedMoney(summary.pnl)} · '
                                         '${summary.trades}T · '
-                                        '${summary.days} days',
+                                        '${countNoun(summary.days, 'day')}',
                                 style: TextStyle(
                                   color: summary.trades == 0
                                       ? AppColors.faint
@@ -435,7 +435,7 @@ class _DaySheet extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              '${point.trades} ${point.trades == 1 ? 'trade' : 'trades'}',
+              countNoun(point.trades, 'trade'),
               style: TextStyle(color: AppColors.faint, fontSize: 11),
             ),
             const SizedBox(height: 10),

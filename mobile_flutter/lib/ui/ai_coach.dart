@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/format.dart';
 import '../models/ai_review.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
@@ -179,7 +180,7 @@ class _AiCoachCardState extends State<AiCoachCard> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${_review!.sampleSize} trades analysed',
+                  '${countNoun(_review!.sampleSize, 'trade')} analysed',
                   style: TextStyle(
                       color: AppColors.faint, fontSize: kMinLabelSize),
                 ),

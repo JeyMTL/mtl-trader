@@ -51,4 +51,14 @@ void main() {
       expect(price(-0.0000001), '0');
     });
   });
+
+  test('a count takes the right noun, singular and plural', () {
+    expect(countNoun(1, 'trade'), '1 trade');
+    expect(countNoun(0, 'trade'), '0 trades');
+    expect(countNoun(2, 'trade'), '2 trades');
+    expect(countNoun(1, 'day'), '1 day');
+    // A noun that does not just take an s passes its plural.
+    expect(countNoun(1, 'entry', plural: 'entries'), '1 entry');
+    expect(countNoun(3, 'entry', plural: 'entries'), '3 entries');
+  });
 }

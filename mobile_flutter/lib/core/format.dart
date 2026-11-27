@@ -36,6 +36,18 @@ String compactMoney(num value) => _compact.format(value);
 
 String percent(num value) => '${value.toStringAsFixed(1)}%';
 
+/// A count with its noun in the right number: `1 trade`, `2 trades`.
+///
+/// Counted messages that reach the screen through the ARB use ICU plurals
+/// (`monthTrades` and friends). A handful of screens still build their own
+/// line, and those cannot route a translation through the catalogue; this is
+/// the same rule in one place rather than a ternary at every call site. Pass
+/// [plural] for a noun that does not just take an `s`.
+String countNoun(int count, String singular, {String? plural}) {
+  final word = count == 1 ? singular : (plural ?? '${singular}s');
+  return '$count $word';
+}
+
 /// A price with the float noise taken out.
 ///
 /// MT5 prices are averaged out of deals in binary floating point, so a gold

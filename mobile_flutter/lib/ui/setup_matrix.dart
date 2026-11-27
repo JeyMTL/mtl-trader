@@ -158,7 +158,8 @@ class _SetupMatrixState extends State<SetupMatrix> {
                   Semantics(
                     button: true,
                     selected: _colorFilter.contains(group.key),
-                    label: 'Filter by colour: ${group.value} setups',
+                    label:
+                        'Filter by colour: ${countNoun(group.value, 'setup')}',
                     child: InkWell(
                       onTap: () => setState(() {
                         if (!_colorFilter.remove(group.key)) {

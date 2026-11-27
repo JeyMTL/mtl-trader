@@ -272,7 +272,9 @@ class _ImportScreenState extends State<ImportScreen> {
               ElevatedButton(
                 onPressed: _busy ? null : _import,
                 child: Text(
-                  _busy ? 'Importing…' : 'Import ${trades.length} trades',
+                  _busy
+                      ? 'Importing…'
+                      : 'Import ${countNoun(trades.length, 'trade')}',
                 ),
               ),
               const SizedBox(height: 8),
@@ -346,7 +348,9 @@ class _ImportScreenState extends State<ImportScreen> {
             title: _fileName ?? 'Selected file',
             subtitle: trades.isEmpty
                 ? '0 closed trades found'
-                : '${trades.length} trades · $_wins wins · $_losses losses',
+                : '${countNoun(trades.length, 'trade')} · '
+                    '${countNoun(_wins, 'win')} · '
+                    '${countNoun(_losses, 'loss')}',
             trailing: IconButton(
               tooltip: 'Remove file',
               onPressed: _busy ? null : _reset,
