@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
+import { mayReadMarketData } from '@/lib/solo'
 import {
   CANDLE_INTERVALS,
   aggregateCandles,
@@ -141,6 +142,14 @@ export async function GET(req: Request) {
   const user = await getAuthUser(req)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  // A solo deployment bought these prices for one person. Anyone else gets an
+  // honest refusal instead of a chart, because that is the whole licence.
+  if (!mayReadMarketData(user.id)) {
+    return NextResponse.json(
+      { error: 'The chart feed is private to the account that owns it.' },
+      { status: 403 }
+    )
   }
 
   const { searchParams } = new URL(req.url)

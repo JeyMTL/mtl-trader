@@ -2,6 +2,7 @@ import { createServerSupabase, requireServerUser } from '@/lib/supabase-server'
 import { ChartWorkspace, type ChartDrawingRow } from '@/components/chart-workspace'
 import { loadAccount } from '@/lib/plan-guard'
 import { hasPaidPlan, hasProTools } from '@/lib/subscription'
+import { isSoloOwner } from '@/lib/solo'
 
 /**
  * Web chart desk.
@@ -23,8 +24,11 @@ export default async function ChartPage() {
   // once so the first paint does not flash a locked size; the component only
   // draws it.
   const account = (await loadAccount(user.id)) ?? {}
-  const proTimeframes = hasProTools(account)
-  const paidTimeframes = hasPaidPlan(account)
+  // In a solo deployment the owner is the only person the feed serves, so the
+  // plan gate is not the thing standing between them and the finer sizes.
+  const owner = isSoloOwner(user.id)
+  const proTimeframes = owner || hasProTools(account)
+  const paidTimeframes = owner || hasPaidPlan(account)
 
   let drawings: ChartDrawingRow[] = []
   let tableMissing = false

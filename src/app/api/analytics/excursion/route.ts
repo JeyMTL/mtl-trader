@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { apiError } from '@/lib/log'
+import { mayReadMarketData } from '@/lib/solo'
 import { rateLimit } from '@/lib/rate-limit'
 import { fetchExcursionSeries } from '@/lib/excursion-feed'
 import {
@@ -82,6 +83,13 @@ export async function GET(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Same gate as the chart: this route spends vendor credit too.
+    if (!mayReadMarketData(user.id)) {
+      return NextResponse.json(
+        { error: 'Market measurement is private to the account that owns the feed.' },
+        { status: 403 }
+      )
+    }
 
     // A page view can trigger vendor calls, so it gets a budget. Re-visits after
     // the cache is warm cost one table read and still count against it, which is
