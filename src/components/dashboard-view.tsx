@@ -69,6 +69,16 @@ interface DashboardViewProps {
 
 type ChartMode = 'equity' | 'daily'
 
+/** Windows for the equity curve. `ALL` keeps the whole journal. */
+type EquityRange = '1W' | '1M' | '3M' | 'ALL'
+
+const EQUITY_RANGES: Array<{ id: EquityRange; label: string; days: number }> = [
+  { id: '1W', label: '1W', days: 7 },
+  { id: '1M', label: '1M', days: 30 },
+  { id: '3M', label: '3M', days: 90 },
+  { id: 'ALL', label: 'ALL', days: Number.POSITIVE_INFINITY },
+]
+
 /** Display names for the four UTC windows the filter and the RPC share. */
 const SESSION_LABELS: Record<string, string> = {
   asian: 'Asian',
@@ -243,6 +253,7 @@ export function DashboardView({
   // because they are legal in an id but awkward inside an SVG `url(#…)`.
   const equityFillId = `equityFill-${useId().replace(/:/g, '')}`
   const [chartMode, setChartMode] = useState<ChartMode>('equity')
+  const [equityRange, setEquityRange] = useState<EquityRange>('1M')
 
   const totalPnl = Number(summary.total_pnl) || 0
   const wins = Number(summary.wins) || 0
@@ -263,11 +274,35 @@ export function DashboardView({
     [equity, depositsTotal]
   )
 
+  // The window is cut on the calendar day, then the axis is fitted to what is
+  // left. A three-month account opened on "ALL" is the same curve it always
+  // was; opened on "1W" it has enough vertical room to show the week.
+  const windowedEquity = useMemo(() => {
+    const days = EQUITY_RANGES.find((range) => range.id === equityRange)?.days ?? Infinity
+    if (!Number.isFinite(days) || equityData.length === 0) return equityData
+    // Anchored on the newest point, not on the wall clock: reading the clock
+    // during render is not idempotent, and a journal that has not traded this
+    // week should still show its last week under "1W" rather than nothing.
+    const newest = new Date(`${String(equityData[equityData.length - 1].day).slice(0, 10)}T00:00:00`)
+    const cutoff = newest.getTime() - days * 86_400_000
+    const windowed = equityData.filter(
+      (point) => new Date(`${String(point.day).slice(0, 10)}T00:00:00`).getTime() >= cutoff
+    )
+    // A quiet week would otherwise empty the chart; fall back to the last two
+    // points so the panel still says something rather than going blank.
+    return windowed.length > 1 ? windowed : equityData.slice(-2)
+  }, [equityData, equityRange])
+
+  const windowDelta = useMemo(() => {
+    if (windowedEquity.length < 2) return 0
+    return windowedEquity[windowedEquity.length - 1].balance - windowedEquity[0].balance
+  }, [windowedEquity])
+
   // The equity axis follows the balance, not zero: a young account's first few
   // dollars would otherwise flatten into a line at the top of the chart.
   const equityDomain = useMemo(
-    () => paddedDomain(equityData.map((point) => point.balance)),
-    [equityData]
+    () => paddedDomain(windowedEquity.map((point) => point.balance)),
+    [windowedEquity]
   )
 
   const dailySeries = useMemo(
@@ -413,11 +448,18 @@ export function DashboardView({
               <p className="eyebrow">Performance</p>
               <p className="num mt-1 text-lg font-semibold text-white">{formatCurrency(balance)}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={cn('badge', totalPnl >= 0 ? 'badge-buy' : 'badge-sell')}>
-                {totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl)}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span
+                className={cn('badge', windowDelta >= 0 ? 'badge-buy' : 'badge-sell')}
+                title={
+                  equityRange === 'ALL'
+                    ? 'All-time change'
+                    : `Change over the last ${EQUITY_RANGES.find((range) => range.id === equityRange)?.label}`
+                }
+              >
+                {windowDelta >= 0 ? '+' : ''}{formatCurrency(windowDelta)}
               </span>
-              <div className="segmented" role="tablist" aria-label="Chart range">
+              <div className="segmented" role="tablist" aria-label="Chart type">
                 {([
                   ['equity', 'Equity'],
                   ['daily', 'Daily'],
@@ -435,19 +477,36 @@ export function DashboardView({
                   </button>
                 ))}
               </div>
+              {chartMode === 'equity' && (
+                <div className="segmented" role="tablist" aria-label="Equity range">
+                  {EQUITY_RANGES.map((range) => (
+                    <button
+                      key={range.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={equityRange === range.id}
+                      data-active={equityRange === range.id}
+                      onClick={() => setEquityRange(range.id)}
+                      className="segmented-option"
+                    >
+                      {range.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="p-2 pb-3 sm:p-4">
             {chartMode === 'equity' ? (
-              equityData.length > 0 ? (
+              windowedEquity.length > 0 ? (
                 <div className="h-[230px] w-full sm:h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={equityData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <AreaChart data={windowedEquity} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id={equityFillId} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0.22} />
-                          <stop offset="100%" stopColor={totalPnl >= 0 ? palette.profit : palette.loss} stopOpacity={0} />
+                          <stop offset="0%" stopColor={windowDelta >= 0 ? palette.profit : palette.loss} stopOpacity={0.22} />
+                          <stop offset="100%" stopColor={windowDelta >= 0 ? palette.profit : palette.loss} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid {...gridProps(palette)} />
@@ -466,11 +525,11 @@ export function DashboardView({
                         type="monotone"
                         dataKey="balance"
                         name="Equity"
-                        stroke={totalPnl >= 0 ? palette.profit : palette.loss}
+                        stroke={windowDelta >= 0 ? palette.profit : palette.loss}
                         strokeWidth={1.8}
                         fill={`url(#${equityFillId})`}
-                        dot={equityData.length <= 12
-                          ? { r: 2.6, strokeWidth: 0, fill: totalPnl >= 0 ? palette.profit : palette.loss }
+                        dot={windowedEquity.length <= 12
+                          ? { r: 2.6, strokeWidth: 0, fill: windowDelta >= 0 ? palette.profit : palette.loss }
                           : false}
                         activeDot={{ r: 3, strokeWidth: 0 }}
                       />

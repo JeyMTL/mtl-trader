@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useId, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Target, DollarSign, AlertTriangle, Clock, Sparkles, Loader2, TrendingDown, TrendingUp } from 'lucide-react'
 import { formatCurrency, formatDuration, formatPercent } from '@/lib/utils'
@@ -10,8 +10,9 @@ import { SetupMatrix } from '@/components/setup-matrix'
 import { ExcursionCard } from '@/components/excursion-card'
 import type { CoachInsight } from '@/lib/ai/types'
 import { axisProps, gridProps, paddedDomain, useChartPalette } from '@/lib/chart-theme'
-import { hourlySeries, sessionPeriod, timeEdgeReport, type EdgePeriod } from '@/lib/edge-window'
+import { hourlySeries, timeEdgeReport, type EdgePeriod } from '@/lib/edge-window'
 import { matchStrategyByLabel } from '@/lib/backtest/strategies'
+import { rDistribution, rSummary, type SessionDayCell } from '@/lib/risk-multiple'
 import {
   AreaChart,
   Area,
@@ -89,6 +90,10 @@ export interface AnalyticsViewProps {
   strategyStats: StrategyStat[]
   /** True when `strategy_stats` is missing from the database. */
   strategyStatsMissing: boolean
+  /** R measured on each recent closed trade that carried a stop. */
+  rMultiples: number[]
+  /** P&L per session per weekday, from the same window of closed trades. */
+  sessionHeat: SessionDayCell[]
 }
 
 /** Display names for the four UTC windows the filter and the RPC share. */
@@ -98,6 +103,14 @@ const SESSION_LABELS: Record<string, string> = {
   newyork: 'New York',
   sydney: 'Sydney',
 }
+
+/** Columns of the session heatmap, in the order a trading week runs. */
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+
+const HEAT_COLOURS = {
+  gain: [69, 210, 154],
+  loss: [242, 107, 120],
+} as const
 
 function EdgeCard({
   title,
@@ -149,7 +162,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats, sessionStats, sessionStatsMissing, strategyStats, strategyStatsMissing }: AnalyticsViewProps) {
+export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, depositsTotal, timeStats, sessionStats, sessionStatsMissing, strategyStats, strategyStatsMissing, rMultiples, sessionHeat }: AnalyticsViewProps) {
   const palette = useChartPalette()
   // Unique per instance, and identical across the server render and the
   // hydrating client. A fixed id collides whenever two of these charts are
@@ -238,7 +251,6 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
 
   const edge = useMemo(() => timeEdgeReport(timeStats, 3), [timeStats])
   const hourChart = useMemo(() => hourlySeries(timeStats), [timeStats])
-  const sessionRows = useMemo(() => (timeStats.sessions ?? []).map(sessionPeriod), [timeStats.sessions])
   const hasTimeSamples = hourChart.some((row) => row.trades > 0)
   const hasRankedEdge = Boolean(
     edge.bestHour || edge.worstHour || edge.bestSession || edge.worstSession
@@ -289,6 +301,45 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
       }),
     [strategyStats]
   )
+
+  // R-multiples: the same trade measured against the stop it risked, so a
+  // journal of different position sizes can be read as one distribution.
+  const rBuckets = useMemo(() => rDistribution(rMultiples), [rMultiples])
+  const rStats = useMemo(() => rSummary(rMultiples), [rMultiples])
+  const rMaxCount = useMemo(
+    () => Math.max(1, ...rBuckets.map((bucket) => bucket.count)),
+    [rBuckets]
+  )
+
+  // The leaderboard ranks by what one trade earns, not by the total: the label
+  // with the largest pile is usually just the label used most often.
+  const rankedStrategies = useMemo(
+    () =>
+      [...strategyData]
+        .map((item) => ({
+          ...item,
+          perTrade: item.trades > 0 ? item.pnl / item.trades : 0,
+        }))
+        .sort((a, b) => b.perTrade - a.perTrade),
+    [strategyData]
+  )
+  const strategyMaxAbs = useMemo(
+    () => Math.max(0, ...rankedStrategies.map((item) => Math.abs(item.perTrade))),
+    [rankedStrategies]
+  )
+
+  // Session × weekday: the strongest cell sets the scale, and an empty cell is
+  // drawn empty rather than as a zero, so "lost on Tuesday" never looks like
+  // "did not trade Tuesday".
+  const heatMaxAbs = useMemo(
+    () => Math.max(0, ...sessionHeat.map((cell) => Math.abs(cell.pnl))),
+    [sessionHeat]
+  )
+  const heatByKey = useMemo(() => {
+    const map = new Map<string, SessionDayCell>()
+    for (const cell of sessionHeat) map.set(`${cell.session}:${cell.weekday}`, cell)
+    return map
+  }, [sessionHeat])
 
   const dayData = useMemo(() => {
     const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -558,6 +609,76 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
       <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <h2 className="text-lg font-semibold text-white">R-multiple distribution</h2>
+            <p className="mt-1 text-sm text-gray-400">
+              {rStats.count > 0
+                ? `${rStats.count} closed ${rStats.count === 1 ? 'trade' : 'trades'} sized against the stop they risked.`
+                : 'Every trade measured against the risk it took.'}
+            </p>
+          </div>
+          {rStats.count > 0 && (
+            <span className="chip">
+              Average {rStats.average >= 0 ? '+' : ''}{rStats.average.toFixed(2)}R
+            </span>
+          )}
+        </div>
+
+        {rStats.count === 0 ? (
+          <div className="mt-4 rounded-lg border border-dashed border-border px-4 py-6 text-center">
+            <p className="text-sm font-medium text-gray-300">No risk multiples yet</p>
+            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-gray-500">
+              Add the stop loss when you journal a trade. Each one then counts in multiples of the risk it
+              took — a 2R winner is the same on a $200 risk as on a $2,000 one.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 grid grid-cols-7 items-end gap-2">
+              {rBuckets.map((bucket) => (
+                <div key={bucket.label} className="flex flex-col items-center gap-1.5">
+                  <span className="num text-[11px] font-semibold text-gray-400">{bucket.count}</span>
+                  <div
+                    className={`w-full rounded-sm ${
+                      bucket.tone === 'gain'
+                        ? 'bg-success'
+                        : bucket.tone === 'loss'
+                          ? 'bg-danger'
+                          : 'bg-gray-500'
+                    } ${bucket.count === 0 ? 'opacity-20' : 'opacity-80'}`}
+                    style={{ height: `${(bucket.count / rMaxCount) * 96 + 2}px` }}
+                    title={`${bucket.label}: ${bucket.count} ${bucket.count === 1 ? 'trade' : 'trades'}`}
+                  />
+                  <span className="num text-[10px] font-semibold text-gray-500">{bucket.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 divide-x divide-border border-t border-border pt-3 sm:grid-cols-4">
+              {[
+                { label: 'Median', value: `${rStats.median >= 0 ? '+' : ''}${rStats.median.toFixed(2)}R` },
+                { label: 'Best', value: `${rStats.best >= 0 ? '+' : ''}${rStats.best.toFixed(2)}R` },
+                { label: 'Worst', value: `${rStats.worst >= 0 ? '+' : ''}${rStats.worst.toFixed(2)}R` },
+                { label: 'Positive', value: `${rStats.hitRate.toFixed(0)}%` },
+              ].map((stat) => (
+                <div key={stat.label} className="px-3 py-1 first:pl-0 last:pr-0">
+                  <p className="metric-label">{stat.label}</p>
+                  <p className="num mt-1 text-sm font-semibold text-white">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
+              Measured in price units from entry, exit and stop, so it works on any instrument without a
+              contract size. The last column is open-ended: one 12R runner would otherwise flatten every
+              ordinary trade into the first bar.
+            </p>
+          </>
+        )}
+      </div>
+
+      <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
             <h2 className="text-lg font-semibold text-white">Time edge</h2>
             <p className="mt-1 text-sm text-gray-400">
               Which windows pay and which bleed — entry hours in {timeStats.timezone}, sessions in UTC market hours.
@@ -614,44 +735,10 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
               </ResponsiveContainer>
             </div>
 
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-400">Session</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-400">Trades</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-400">Win rate</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-400">Net P&amp;L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessionRows.map((row) => {
-                    const isBest = edge.bestSession?.key === row.key
-                    const isWorst = edge.worstSession?.key === row.key
-                    return (
-                      <tr key={row.key} className="border-b border-border/60 last:border-0">
-                        <td className="px-3 py-2.5 text-sm text-white">
-                          <span className="inline-flex items-center gap-2">
-                            {row.label}
-                            {isBest && <span className="badge badge-buy">best</span>}
-                            {isWorst && <span className="badge badge-sell">weakest</span>}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-sm text-gray-300">{row.trades}</td>
-                        <td className="px-3 py-2.5 text-sm text-gray-300">{formatPercent(row.winRate)}</td>
-                        <td className={`px-3 py-2.5 text-right text-sm font-medium tabular-nums ${row.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
-                          {row.pnl >= 0 ? '+' : ''}{formatCurrency(row.pnl)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
             <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
               Windows with fewer than {edge.minTrades} trades are left out of the best/worst calls. Hours are
-              local entry time; session rows use UTC. The hold figure uses trades that carry both an open and a close time.
+              local entry time; the session map below uses UTC. The hold figure uses trades that carry both an
+              open and a close time.
             </p>
           </>
         ) : (
@@ -667,8 +754,72 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           <h2 className="text-lg font-semibold text-white">Sessions</h2>
           <p className="text-xs text-gray-500">UTC windows — the same buckets the journal filters by</p>
         </div>
+        {sessionHeat.length > 0 && (
+          <div className="mt-4">
+            <div className="grid grid-cols-[auto_repeat(5,minmax(0,1fr))] gap-1.5">
+              <span />
+              {WEEKDAY_LABELS.map((label) => (
+                <span key={label} className="pb-0.5 text-center text-[10px] font-medium text-gray-600">
+                  {label}
+                </span>
+              ))}
+              {(['sydney', 'asian', 'london', 'newyork'] as const).map((session) => (
+                <Fragment key={session}>
+                  <span className="flex items-center pr-2 text-[11px] font-medium text-gray-400">
+                    {SESSION_LABELS[session]}
+                  </span>
+                  {[1, 2, 3, 4, 5].map((weekday) => {
+                    const cell = heatByKey.get(`${session}:${weekday}`)
+                    const intensity = cell
+                      ? 0.16 + Math.min(Math.abs(cell.pnl) / Math.max(heatMaxAbs, 1), 1) * 0.44
+                      : 0
+                    const colour = cell ? (cell.pnl >= 0 ? HEAT_COLOURS.gain : HEAT_COLOURS.loss) : null
+                    return (
+                      <div
+                        key={weekday}
+                        title={
+                          cell
+                            ? `${SESSION_LABELS[session]} ${WEEKDAY_LABELS[weekday - 1]} · ${formatCurrency(cell.pnl)} across ${cell.trades} ${cell.trades === 1 ? 'trade' : 'trades'}`
+                            : `${SESSION_LABELS[session]} ${WEEKDAY_LABELS[weekday - 1]} · no trades`
+                        }
+                        className="flex h-10 items-center justify-center rounded-md border border-transparent text-[10px] font-semibold tabular-nums text-white"
+                        style={
+                          colour
+                            ? { backgroundColor: `rgba(${colour[0]}, ${colour[1]}, ${colour[2]}, ${intensity})` }
+                            : { backgroundColor: 'rgba(255,255,255,0.02)' }
+                        }
+                      >
+                        {cell ? (
+                          <>
+                            {cell.pnl >= 0 ? '+' : ''}
+                            {Math.round(cell.pnl)}
+                          </>
+                        ) : (
+                          <span className="text-gray-700">·</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </Fragment>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[10px] text-gray-500">
+              <span>
+                P&amp;L per session per weekday. A trade in the London/New York overlap counts in both.
+              </span>
+              <span className="flex items-center gap-1">
+                Loss
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-danger/40" />
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-surface-light" />
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-success/40" />
+                Profit
+              </span>
+            </div>
+          </div>
+        )}
+
         {sessionStats.length > 0 ? (
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-5 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
@@ -924,32 +1075,58 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
 
       <div className="bg-surface border border-border rounded-xl p-4 sm:p-6">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-white">Performance by Strategy</h2>
-          <p className="text-xs text-gray-500">The label you typed on each trade</p>
+          <h2 className="text-lg font-semibold text-white">Strategy leaderboard</h2>
+          <p className="text-xs text-gray-500">Ranked by what one trade earns, not by the total</p>
         </div>
         {strategyData.length > 0 ? (
           <>
           <div className="space-y-2 lg:hidden">
-            {strategyData.map((item) => (
-              <div key={item.strategy} className="flex items-center justify-between rounded-xl border border-border bg-surface-light/60 px-4 py-3">
-                <div className="min-w-0">
-                  {item.backtestHref ? (
-                    <Link
-                      href={item.backtestHref}
-                      className="block truncate text-sm font-semibold text-white hover:text-primary hover:underline"
+            {rankedStrategies.map((item, index) => (
+              <div key={item.strategy} className="rounded-xl border border-border bg-surface-light/60 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className={`num w-4 shrink-0 text-[11px] font-bold ${index === 0 ? 'text-primary' : 'text-gray-600'}`}
                     >
-                      {item.strategy}
-                    </Link>
-                  ) : (
-                    <p className="truncate text-sm font-semibold text-white">{item.strategy}</p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    {item.trades} trades · {formatPercent(item.winRate)} win rate
-                  </p>
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      {item.backtestHref ? (
+                        <Link
+                          href={item.backtestHref}
+                          className="block truncate text-sm font-semibold text-white hover:text-primary hover:underline"
+                        >
+                          {item.strategy}
+                        </Link>
+                      ) : (
+                        <p className="truncate text-sm font-semibold text-white">{item.strategy}</p>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        {item.trades} trades · {formatPercent(item.winRate)} win rate
+                      </p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p
+                      className={`num text-sm font-semibold ${item.perTrade >= 0 ? 'text-success' : 'text-danger'}`}
+                    >
+                      {item.perTrade >= 0 ? '+' : ''}{formatCurrency(item.perTrade)}
+                    </p>
+                    <p className="num text-[10px] text-gray-500">{formatCurrency(item.pnl)} total</p>
+                  </div>
                 </div>
-                <span className={`shrink-0 pl-3 text-sm font-semibold tabular-nums ${item.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
-                  {formatCurrency(item.pnl)}
-                </span>
+                <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-background">
+                  <div
+                    className={`h-1 rounded-full ${item.perTrade >= 0 ? 'bg-success' : 'bg-danger'}`}
+                    style={{
+                      width: `${
+                        strategyMaxAbs === 0
+                          ? 0
+                          : Math.max(4, (Math.abs(item.perTrade) / strategyMaxAbs) * 100)
+                      }%`,
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -957,15 +1134,22 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
+                  <th className="w-8 text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">#</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Strategy</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Trades</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Win Rate</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">P&amp;L</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Per trade</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Net P&amp;L</th>
                 </tr>
               </thead>
               <tbody>
-                {strategyData.map((item) => (
+                {rankedStrategies.map((item, index) => (
                   <tr key={item.strategy} className="border-b border-border last:border-0">
+                    <td
+                      className={`num px-4 py-3 text-xs font-bold ${index === 0 ? 'text-primary' : 'text-gray-600'}`}
+                    >
+                      {index + 1}
+                    </td>
                     <td className="px-4 py-3 text-sm font-medium text-white">
                       {item.backtestHref ? (
                         <Link
@@ -977,10 +1161,27 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
                       ) : (
                         item.strategy
                       )}
+                      <div className="mt-2 h-1 w-full max-w-[180px] overflow-hidden rounded-full bg-background">
+                        <div
+                          className={`h-1 rounded-full ${item.perTrade >= 0 ? 'bg-success' : 'bg-danger'}`}
+                          style={{
+                            width: `${
+                              strategyMaxAbs === 0
+                                ? 0
+                                : Math.max(4, (Math.abs(item.perTrade) / strategyMaxAbs) * 100)
+                            }%`,
+                          }}
+                        />
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-300">{item.trades}</td>
                     <td className="px-4 py-3 text-sm text-gray-300">{formatPercent(item.winRate)}</td>
-                    <td className={`px-4 py-3 text-sm font-medium ${item.pnl >= 0 ? 'text-success' : 'text-danger'}`}>
+                    <td
+                      className={`num px-4 py-3 text-right text-sm font-semibold ${item.perTrade >= 0 ? 'text-success' : 'text-danger'}`}
+                    >
+                      {item.perTrade >= 0 ? '+' : ''}{formatCurrency(item.perTrade)}
+                    </td>
+                    <td className="num px-4 py-3 text-right text-sm text-gray-400">
                       {formatCurrency(item.pnl)}
                     </td>
                   </tr>
@@ -990,8 +1191,9 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
           </div>
           <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
             Rows match the label exactly (trimmed of spaces), so “SMA cross” and “sma cross” count as two
-            strategies. Blank labels are grouped as Untagged. A name the backtester recognises opens it
-            with its rules pre-selected; the rest stay plain text.
+            strategies. Blank labels are grouped as Untagged. Ranking uses the average trade, because the
+            label with the biggest total is usually just the label used most often. A name the backtester
+            recognises opens it with its rules pre-selected; the rest stay plain text.
           </p>
           </>
         ) : (

@@ -1,6 +1,7 @@
 import { createServerSupabase, requireServerUser } from '@/lib/supabase-server'
 import { logEvent } from '@/lib/log'
 import { AnalyticsView } from '@/components/analytics-view'
+import { riskMultiples, sessionDayHeat } from '@/lib/risk-multiple'
 import {
   EMPTY_SUMMARY,
   EMPTY_TIME_STATS,
@@ -38,7 +39,7 @@ export default async function AnalyticsPage() {
     )
   }
 
-  const [summaryResult, equityResult, symbolsResult, tagsResult, breakdownsResult, depositsResult, timeResult, sessionResult, strategyResult] = await Promise.all([
+  const [summaryResult, equityResult, symbolsResult, tagsResult, breakdownsResult, depositsResult, timeResult, sessionResult, strategyResult, recentResult] = await Promise.all([
     supabase.rpc('trade_summary'),
     supabase.rpc('equity_curve'),
     supabase.rpc('symbol_stats', { p_limit: 20 }),
@@ -52,6 +53,17 @@ export default async function AnalyticsPage() {
     // The free-text label typed on each journal trade, grouped in SQL so the
     // browser receives one row per strategy instead of every trade.
     supabase.rpc('strategy_stats', { p_limit: 20 }),
+    // The R-multiple distribution and the session heatmap need three columns
+    // per trade rather than an aggregate, so they are measured from a bounded
+    // window of closed trades. 400 is where the shape stops moving; the page
+    // still does not grow with the whole history.
+    supabase
+      .from('trades')
+      .select('type, entry_price, exit_price, stop_loss, pnl, open_time, close_time')
+      .eq('user_id', user.id)
+      .not('exit_price', 'is', null)
+      .order('close_time', { ascending: false })
+      .limit(400),
   ])
 
   for (const [event, result] of [
@@ -64,6 +76,7 @@ export default async function AnalyticsPage() {
     ['analytics.time_stats', timeResult],
     ['analytics.session_stats', sessionResult],
     ['analytics.strategy_stats', strategyResult],
+    ['analytics.recent_closed', recentResult],
   ] as const) {
     if (result.error) logEvent('error', event, { error: result.error, userId: user.id })
   }
@@ -82,6 +95,16 @@ export default async function AnalyticsPage() {
   const sessionStatsMissing = Boolean(sessionResult.error)
   const strategyStatsMissing = Boolean(strategyResult.error)
 
+  const recentClosed = (recentResult.data ?? []) as Array<{
+    type: string | null
+    entry_price: number | null
+    exit_price: number | null
+    stop_loss: number | null
+    pnl: number | null
+    open_time: string | null
+    close_time: string | null
+  }>
+
   return (
     <AnalyticsView
       summary={summary}
@@ -95,6 +118,10 @@ export default async function AnalyticsPage() {
       sessionStatsMissing={sessionStatsMissing}
       strategyStats={Array.isArray(strategyStats) ? strategyStats : []}
       strategyStatsMissing={strategyStatsMissing}
+      rMultiples={riskMultiples(recentClosed)}
+      sessionHeat={sessionDayHeat(
+        recentClosed.map((row) => ({ open_time: row.open_time, pnl: Number(row.pnl) || 0 }))
+      )}
     />
   )
 }
