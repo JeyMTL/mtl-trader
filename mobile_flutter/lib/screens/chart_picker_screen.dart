@@ -2190,7 +2190,7 @@ class _ChartPickerScreenState extends State<ChartPickerScreen>
     return false;
   }
 
-  /// Replay is sold with Pro.
+  /// Replay is sold with Pro.
   ///
   /// This check is the upgrade prompt, not the enforcement: candles are served
   /// to every plan, and replay is a way of drawing on them. It lives here
