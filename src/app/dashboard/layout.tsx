@@ -252,6 +252,12 @@ export default function DashboardLayout({
     ? null
     : Math.max(0, user.maxTrades - user.tradesUsed)
 
+  // `max_trades = -1` is the sentinel for "no cap" — an unlimited trial, or a
+  // plan sold without one. `tradesRemaining` is null in that case, so a
+  // "{remaining} / {cap}" line would render as "/ -1" rather than as the
+  // unlimited account it is.
+  const unlimitedTrades = !!user && user.maxTrades < 0
+
   // A stored `pro` tier outlives the period it was paid for, so the tier only
   // counts while the account is actually active (or on a live trial).
   const planLive = user?.status === 'active' || user?.status === 'trial'
@@ -370,7 +376,7 @@ export default function DashboardLayout({
                       : 'Free plan'}
               </div>
               <div className="text-sm text-white font-medium">
-                {user.status === 'active' ? (isPro ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
+                {user.status === 'active' ? (isPro || unlimitedTrades ? 'Unlimited trades' : `${tradesRemaining} / ${user.maxTrades} trades remaining this month`) :
                  user.status === 'trial'
                    ? trial?.expired
                      ? 'Trial ended — 30 trades a month on Free'
@@ -412,7 +418,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-4 min-w-0">
             {user && (
               <div className="text-sm text-gray-400 truncate">
-                {isPro ? 'Unlimited trades' : user.maxTrades === 0 ? (
+                {isPro || unlimitedTrades ? 'Unlimited trades' : user.maxTrades === 0 ? (
                   'Read-only — journal safe'
                 ) : (
                   <><span className="text-white font-medium">{tradesRemaining}</span> / {user.maxTrades} trades remaining this month</>
@@ -568,7 +574,7 @@ export default function DashboardLayout({
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-xs text-gray-400">
                     {user.status === 'active'
-                      ? (isPro ? 'Unlimited trades' : `${tradesRemaining} of ${user.maxTrades} trades left this month`)
+                      ? (isPro || unlimitedTrades ? 'Unlimited trades' : `${tradesRemaining} of ${user.maxTrades} trades left this month`)
                       : user.status === 'trial'
                         ? 'Unlimited trades during the trial'
                         : 'No active plan'}
