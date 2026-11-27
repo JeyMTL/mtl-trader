@@ -94,10 +94,16 @@ for ($slot = 1; $slot -le $Count; $slot++) {
     # and no slot can see another slot's accounts or history.
     New-Item -ItemType Directory -Force -Path (Join-Path $dest "profiles\$Profile") | Out-Null
 
+    # `[Experts]` is the Algo Trading pair. A terminal that has never had it set
+    # is read-only to a program: the daily stop and the guard EA cannot cancel
+    # or close anything, and nothing in the journal says why.
     $config = @"
 [Common]
 ProfileLast=$Profile
 NewsEnable=0
+[Experts]
+AllowLiveTrading=1
+Enabled=1
 [Charts]
 MaxBars=5000
 SaveDeleted=0

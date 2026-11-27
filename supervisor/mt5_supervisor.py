@@ -1293,17 +1293,22 @@ def terminal_config_path(path, portable):
     normal install keeps it under `%APPDATA%/MetaQuotes/Terminal/<hash>`, whose
     hash is only knowable after the terminal has started once, so that case
     is left alone rather than guessed at.
+
+    A portable folder with no `config` gets one. A slot copied by hand instead
+    of by `setup_fleet.ps1` had none, which meant the one setting a headless
+    host cannot click was skipped for exactly the slots that needed it: the
+    terminal came up with algo trading off and the daily stop could cancel
+    nothing on it.
     """
-    if not path:
+    if not path or not portable:
         return None
-    folder = Path(path).parent
-    candidates = [folder / "config" / "common.ini"]
-    if not portable:
-        return None
-    for candidate in candidates:
-        if candidate.parent.is_dir():
-            return candidate
-    return None
+    candidate = Path(path).parent / "config" / "common.ini"
+    try:
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # A read-only folder is not fatal here: the write reports it below.
+        pass
+    return candidate
 
 
 def looks_portable(path):
@@ -1342,9 +1347,30 @@ def ensure_algo_trading(config_path):
     if config_path is None:
         return True
     config_path = Path(config_path)
-    if not config_path.exists():
+    # MT5 writes its ini as UTF-16 with a BOM and silently ignores a UTF-8 one.
+    # Writing the edit back as UTF-8 therefore disabled the very setting it was
+    # meant to switch on: the terminal read its old file, or none at all, and
+    # `trade_allowed` stayed false on every slot.
+    try:
+        raw = config_path.read_bytes() if config_path.exists() else b""
+    except OSError as error:
+        print(f"[warn] cannot read {config_path} ({error}); algo trading stays off")
         return True
-    lines = config_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        text, encoding = raw.decode("utf-16", errors="ignore"), "utf-16"
+    elif b"\x00" in raw:
+        # UTF-16 without the BOM: still not UTF-8, and decoding it as UTF-8
+        # would produce NUL-riddled text that overwrites the file on save.
+        text, encoding = raw.decode("utf-16", errors="ignore"), "utf-16"
+    elif raw:
+        try:
+            text, encoding = raw.decode("utf-8-sig"), "utf-8-sig"
+        except UnicodeDecodeError:
+            text, encoding = raw.decode("utf-16", errors="ignore"), "utf-16"
+    else:
+        # A portable slot with no config yet: write the one MT5 needs.
+        text, encoding = "", "utf-16"
+    lines = text.splitlines()
 
     wanted = dict(ALGO_TRADING_KEYS)
     out = []
@@ -1389,7 +1415,11 @@ def ensure_algo_trading(config_path):
 
     if changed:
         try:
-            config_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+            payload = "\n".join(out) + "\n"
+            if encoding == "utf-8-sig":
+                config_path.write_text(payload, encoding="utf-8-sig")
+            else:
+                config_path.write_bytes(payload.encode("utf-16"))
         except OSError as error:
             # A terminal under Program Files belongs to an administrator, and a
             # supervisor started by a normal user cannot write there. Raising
@@ -1500,6 +1530,53 @@ def switch_account(login, password, server, settle_seconds=15.0):
         if info is not None and int(getattr(info, "login", 0) or 0) == login:
             return True
         time.sleep(0.5)
+    return False
+
+
+def login_via_command_line(path, login, password, server, portable=True, settle_seconds=None):
+    """Start the terminal already logged in, without a person doing it.
+
+    A slot whose saved account no longer authorises (an expired MetaQuotes demo
+    is the usual seed) opens MT5's modal Login window at startup. That window
+    owns the slot's IPC pipe, so every `initialize()` answers `-10005 IPC
+    timeout` and retrying cannot get past it: the account has to be handed to
+    the process before it starts. MT5 takes that on the command line, and unlike
+    a program login it works in a folder that has never authenticated.
+
+    Independent of `mt5.initialize`'s own launch path on purpose: the module does
+    not pass these arguments itself, which is why a slot stuck on the dialog
+    stayed stuck through every cycle.
+    """
+    if os.name != "nt" or not path:
+        return False
+    import subprocess
+
+    stop_terminal_process(path)
+    args = [path]
+    if portable:
+        args.append("/portable")
+    args += [f"/login:{login}", f"/password:{password}", f"/server:{server}"]
+    try:
+        subprocess.Popen(args, close_fds=True)
+    except OSError as error:
+        print(f"  [warn] cannot start {path} with a login ({error})")
+        return False
+
+    budget = INIT_TIMEOUT_MS / 1000 if settle_seconds is None else settle_seconds
+    deadline = time.monotonic() + budget
+    while time.monotonic() < deadline:
+        time.sleep(5)
+        try:
+            started = mt5.initialize(path=path, portable=portable, timeout=15_000)
+        except Exception:  # noqa: BLE001 - an old module or a dead pipe
+            started = False
+        if not started:
+            continue
+        info = mt5.account_info()
+        if info is not None and int(getattr(info, "login", 0) or 0) == int(login):
+            warn_if_no_algo_trading(path)
+            return True
+        mt5.shutdown()
     return False
 
 
@@ -1716,13 +1793,24 @@ def open_session(row, terminal=None):
             retryable = ("IPC timeout", "IPC send failed", "Process create failed")
             if not any(hint in str(error) for hint in retryable):
                 break
+            # The slot is sitting on MT5's own Login dialog (a saved account that
+            # stopped authorising), so the pipe is never free. Starting the
+            # terminal with the credentials answers what a person would otherwise
+            # have to type, and a portable slot keeps that login for next time.
+            if terminal and path and attempt == 0 and "IPC timeout" in str(error):
+                if login_via_command_line(
+                    path, login, password, server, portable=bool(portable)
+                ):
+                    return path
 
     tried = "; ".join(f"{where} -> {why}" for where, why in attempts)
     raise RuntimeError(
         f"no terminal could log in to {server} as {login} ({tried}). "
         "Install the broker's own terminal and list it in MT5_PATHS, or open MT5 "
         "once by hand, log in, and close it — a portable terminal has to be "
-        "started with /portable for that login to be the one reused here."
+        "started with /portable for that login to be the one reused here. "
+        "The supervisor already tried starting the slot with the account on its "
+        "command line, so this means that start was refused as well."
     )
 
 

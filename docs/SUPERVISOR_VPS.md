@@ -82,6 +82,21 @@ Do not copy a terminal that is running, and never point this at the terminal you
 trade on: the supervisor logs in and out of customer accounts, which replaces
 whatever session is open.
 
+### Fleet slots never need a hand login
+
+A slot copied from a plain install ships with the installer's MetaQuotes demo as
+its saved account. When that demo stops authorising, MT5 opens its **modal Login
+window** at startup, and that window owns the slot's IPC pipe: every
+`initialize()` then answers `-10005 IPC timeout` and the account is unreachable,
+no matter how many times it is retried. That is a terminal waiting for a person,
+not a broken account.
+
+The supervisor closes such a terminal and starts it again with the account on the
+command line — `terminal64.exe /portable /login:… /password:… /server:…` — which
+works in a folder that has never authenticated. So a slot that times out is
+reopened with its own login instead of being reported as failed, and nobody has
+to log in by hand on the host.
+
 ## 5. Apply the small-host settings
 
 Copy `supervisor/deploy/small-vps.env` over `C:\MTLSync\.env` and fill in the

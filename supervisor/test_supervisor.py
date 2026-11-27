@@ -84,6 +84,24 @@ class FakeMt5:
         return self._last
 
 
+class SeededMt5:
+    """A terminal that came up logged in, the way the command line leaves it."""
+
+    def __init__(self, login):
+        self.login = login
+        self.initialized = 0
+
+    def initialize(self, path=None, portable=False, timeout=0, **session):
+        self.initialized += 1
+        return True
+
+    def account_info(self):
+        return types.SimpleNamespace(login=self.login)
+
+    def shutdown(self):
+        return True
+
+
 def make_terminal(directory, name="terminal64.exe"):
     folder = Path(directory) / name.replace(".exe", "")
     folder.mkdir(parents=True, exist_ok=True)
@@ -1709,11 +1727,34 @@ class AlgoTradingConfigTests(unittest.TestCase):
         with mock.patch.object(Path, "write_text", side_effect=PermissionError(13, "denied")):
             self.assertTrue(sup.ensure_algo_trading(path))
 
-    def test_does_not_invent_a_config_that_is_not_there(self):
+    def test_writes_the_section_into_a_slot_that_has_no_config_yet(self):
+        # A slot copied by hand instead of by setup_fleet.ps1 has no config of
+        # its own, and it is exactly the slot that needs this: without the pair
+        # MT5 comes up read-only to a program and the daily stop cancels nothing.
         path = Path(tempfile.mkdtemp()) / "common.ini"
 
-        self.assertTrue(sup.ensure_algo_trading(path))
-        self.assertFalse(path.exists())
+        self.assertFalse(sup.ensure_algo_trading(path))
+
+        text = path.read_text(encoding="utf-16")
+        self.assertIn("[Experts]", text)
+        self.assertIn("AllowLiveTrading=1", text)
+        self.assertIn("Enabled=1", text)
+
+    def test_keeps_the_encoding_mt5_actually_reads(self):
+        # MT5 reads this ini as UTF-16 with a BOM and ignores a UTF-8 one, so
+        # writing the edit back as UTF-8 turned the setting off in the act of
+        # turning it on: every slot logged `trade_allowed` false.
+        path = self.config("[Common]\nLogin=486046720\n")
+        path.write_bytes(path.read_text(encoding="utf-8").encode("utf-16"))
+
+        self.assertFalse(sup.ensure_algo_trading(path))
+
+        raw = path.read_bytes()
+        self.assertTrue(raw.startswith(b"\xff\xfe"))
+        text = raw.decode("utf-16")
+        self.assertIn("Login=486046720", text)
+        self.assertIn("Enabled=1", text)
+        self.assertTrue(sup.ensure_algo_trading(path))  # second pass is a no-op
 
     def test_an_install_with_a_config_folder_is_not_a_portable_one(self):
         # A stock `C:\Program Files\MetaTrader 5` ships exactly this much. Calling
@@ -1742,6 +1783,118 @@ class AlgoTradingConfigTests(unittest.TestCase):
         # A normal install keeps its config under %APPDATA% for a hash only the
         # terminal knows; guessing there would edit the wrong profile.
         self.assertIsNone(sup.terminal_config_path(str(folder / "terminal64.exe"), False))
+
+    def test_a_portable_slot_without_a_config_folder_gets_one(self):
+        folder = Path(tempfile.mkdtemp())
+        (folder / "terminal64.exe").write_bytes(b"")
+
+        config = sup.terminal_config_path(str(folder / "terminal64.exe"), True)
+
+        self.assertEqual(config, folder / "config" / "common.ini")
+        self.assertTrue((folder / "config").is_dir())
+
+
+class SlotLoginDialogTests(unittest.TestCase):
+    """A slot stuck on MT5's own Login window is started already logged in.
+
+    A freed slot whose saved account no longer authorises (the shipped
+    MetaQuotes demo) opens a modal Login window at startup. That window owns the
+    IPC pipe, so `initialize()` answers -10005 for ever and the account is never
+    reached. Handing the login to the process is the only way past it without a
+    person typing into the VPS.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.exe = make_terminal(self.tmp.name, "slot")
+        self.stopped = []
+        self.saved = {
+            name: getattr(sup, name)
+            for name in (
+                "decrypt_credential",
+                "terminal_running",
+                "stop_terminal_process",
+                "warn_if_never_authenticated",
+                "warn_if_no_algo_trading",
+                "mt5",
+            )
+        }
+        self.saved["sleep"] = sup.time.sleep
+        sup.decrypt_credential = lambda cipher: "pw"
+        sup.terminal_running = lambda path: False
+        sup.stop_terminal_process = lambda path: self.stopped.append(path)
+        sup.warn_if_never_authenticated = lambda *a, **k: None
+        sup.warn_if_no_algo_trading = lambda path: None
+        sup.time.sleep = lambda seconds: None
+        self.addCleanup(self.restore)
+
+    def restore(self):
+        for name, value in self.saved.items():
+            if name == "sleep":
+                sup.time.sleep = value
+            else:
+                setattr(sup, name, value)
+
+    def row(self):
+        return {
+            "user_id": "u1",
+            "broker_name": "Exness",
+            "server": "Exness-MT5Trial10",
+            "account_login": 486046720,
+            "credential_cipher": "v1:x:y:z",
+        }
+
+    def test_starts_the_slot_with_the_account_on_the_command_line(self):
+        spawned = []
+        sup.mt5 = SeededMt5(486046720)
+
+        with mock.patch("subprocess.Popen", lambda args, **kw: spawned.append(args)):
+            self.assertTrue(
+                sup.login_via_command_line(
+                    self.exe, 486046720, "pw", "Exness-MT5Trial10"
+                )
+            )
+
+        self.assertEqual(
+            spawned,
+            [
+                [
+                    self.exe,
+                    "/portable",
+                    "/login:486046720",
+                    "/password:pw",
+                    "/server:Exness-MT5Trial10",
+                ]
+            ],
+        )
+        # The dialog holds the pipe: the old process is closed before the new one.
+        self.assertEqual(self.stopped, [self.exe])
+
+    def test_a_terminal_that_came_up_on_another_account_is_refused(self):
+        sup.mt5 = SeededMt5(1001384187)
+
+        with mock.patch("subprocess.Popen", lambda args, **kw: None):
+            self.assertFalse(
+                sup.login_via_command_line(
+                    self.exe,
+                    486046720,
+                    "pw",
+                    "Exness-MT5Trial10",
+                    settle_seconds=0,
+                )
+            )
+
+    def test_a_slot_that_times_out_is_reopened_with_its_login(self):
+        sup.mt5 = FakeMt5([("fail", (-10005, "IPC timeout"))])
+        called = []
+        saved = sup.login_via_command_line
+        self.addCleanup(setattr, sup, "login_via_command_line", saved)
+        sup.login_via_command_line = lambda *a, **k: called.append((a, k)) or True
+
+        self.assertEqual(sup.open_session(self.row(), self.exe), self.exe)
+        self.assertEqual(called[0][0][:4], (self.exe, 486046720, "pw", "Exness-MT5Trial10"))
+        self.assertTrue(called[0][1]["portable"])
 
 
 class AlgoTradingWarningTests(unittest.TestCase):
