@@ -896,20 +896,32 @@ export function ChartWorkspace({
     context.lineTo(size.width, plotH + 0.5)
     context.stroke()
 
-    // Grid and axes.
+    // Grid and axes. The price labels are pixel-density ticks on a 1-2-2.5-5
+    // ladder: four fixed gridlines left fat empty bands on a tall chart and a
+    // crowded smear on a short one, and neither reads as a price.
     context.font = '10px ui-sans-serif, system-ui, sans-serif'
     context.fillStyle = axisInk
     context.strokeStyle = gridInk
     context.lineWidth = 1
-    for (let step = 0; step <= 4; step += 1) {
-      const y = (plotH / 4) * step
+    // Replay paints up to the bar the trader has walked to, and no further: the
+    // candles after it exist but are not history yet.
+    const lastPaintable = replayCut === null ? candles.length - 1 : Math.min(replayCut, candles.length - 1)
+    const liveShown = candles[lastPaintable]
+    const liveY = liveShown ? yForPrice(liveShown.c) : null
+    let previousPriceY: number | null = null
+    for (const price of priceAxisTicks(priceForY(plotH), priceForY(0), plotH, decimals(priceForY(0)))) {
+      const y = yForPrice(price)
+      if (y < 0 || y > plotH) continue
+      // A pill in the gutter wins the space under it: the live price and the
+      // crosshair price are the two numbers the trader is actually reading.
+      if (liveY !== null && Math.abs(liveY - y) < 18) continue
+      if (hover && Math.abs(hover.y - y) < 18) continue
+      if (previousPriceY !== null && Math.abs(previousPriceY - y) < 32) continue
+      previousPriceY = y
       context.beginPath()
       context.moveTo(0, y)
       context.lineTo(plotW, y)
       context.stroke()
-      // The bottom gridline shares its corner with the first time label, so the
-      // price there is left to the axis below rather than painted twice.
-      const price = priceForY(y)
       context.fillStyle = axisInk
       context.fillText(
         price.toFixed(decimals(price)),
@@ -919,29 +931,38 @@ export function ChartWorkspace({
         Math.min(plotH - 4, Math.max(12, y + 3))
       )
     }
-    const ticks = Math.max(3, Math.min(8, Math.floor(plotW / 110)))
-    for (let step = 0; step <= ticks; step += 1) {
-      const index = view.start + (view.span / ticks) * step
-      const x = xForIndex(index)
+    // Time labels work the same way across the plot: a calendar step wide enough
+    // to clear the last label, with day, month and year boundaries in heavier
+    // type rather than a repeated date on every tick.
+    let previousTimeX: number | null = null
+    for (const marker of timeAxisTicks(
+      timeForIndex(view.start),
+      timeForIndex(view.start + view.span),
+      plotW,
+      settings.clock24 !== false
+    )) {
+      const x = xForIndex(indexForTime(marker.ms))
       if (x < 0 || x > plotW) continue
+      if (previousTimeX !== null && x - previousTimeX < 28) continue
+      previousTimeX = x
       context.beginPath()
       context.moveTo(x, 0)
       context.lineTo(x, plotH)
       context.stroke()
+      context.font = marker.major
+        ? '600 10px ui-sans-serif, system-ui, sans-serif'
+        : '10px ui-sans-serif, system-ui, sans-serif'
       context.fillStyle = axisInk
-      const label = tickLabel(timeForIndex(index), interval, settings)
-      const labelWidth = context.measureText(label).width
+      const labelWidth = context.measureText(marker.label).width
       // Centred under its own tick and kept inside the plot, so the first and
       // last labels do not hang off the gutter.
       const labelX = Math.max(2, Math.min(x - labelWidth / 2, plotW - labelWidth - 2))
-      context.fillText(label, labelX, plotH + 15)
+      context.fillText(marker.label, labelX, plotH + 15)
     }
+    context.font = '10px ui-sans-serif, system-ui, sans-serif'
 
     // Candles.
     const bodyW = Math.max(1.5, (plotW / view.span) * 0.65)
-    // Replay paints up to the bar the trader has walked to, and no further: the
-    // candles after it exist but are not history yet.
-    const lastPaintable = replayCut === null ? candles.length - 1 : Math.min(replayCut, candles.length - 1)
     for (let index = Math.floor(view.start); index <= Math.min(view.start + view.span, lastPaintable); index += 1) {
       const candle = candles[index]
       if (!candle) continue
@@ -1033,7 +1054,14 @@ export function ChartWorkspace({
     }
 
     // Objects. Paint order is the trader's: a higher `z` sits on top, and the
-    // list order decides when nobody has moved one.
+    // list order decides when nobody has moved one. Everything an object owns is
+    // clipped to the candle pane, so a wide label or a stray handle can no
+    // longer sit on top of the price or time axis.
+    const axisTags: Array<{ y: number; text: string; colour: string }> = []
+    context.save()
+    context.beginPath()
+    context.rect(0, 0, plotW, plotH)
+    context.clip()
     const orderedObjects = [...symbolDrawings].sort(
       (a, b) => (a.style?.z ?? 0) - (b.style?.z ?? 0)
     )
@@ -1049,6 +1077,19 @@ export function ChartWorkspace({
       // filter is about what the trader still wants to see.
       const firedAlert = Boolean(row.style?.al && row.style?.fd)
       if (firedAlert && activeAlertsOnly) continue
+      // One viewport test per object, before anything of it is painted. When it
+      // fails the geometry, its label, its measurements and its handles are all
+      // skipped together: pinning an off-screen label to the chart edge is
+      // exactly what used to leave text floating after a pan.
+      const anchors = points.map((point) => ({
+        x: xForIndex(indexForTime(point.t)),
+        y: yForPrice(point.p),
+      }))
+      const minX = Math.min(...anchors.map((anchor) => anchor.x))
+      const maxX = Math.max(...anchors.map((anchor) => anchor.x))
+      const minY = Math.min(...anchors.map((anchor) => anchor.y))
+      const maxY = Math.max(...anchors.map((anchor) => anchor.y))
+      if (!objectInPane({ minX, maxX, minY, maxY }, row.kind, plotW, plotH)) continue
       const selected = row.id === selectedId
       const colour = styleColour(row.style, selected)
       context.strokeStyle = colour
@@ -1061,7 +1102,7 @@ export function ChartWorkspace({
       if (row.kind === 'text') {
         // A label pinned on the phone has to read here too: the words are the
         // object, and a dot with no text would be a bug with a shadow.
-        const at = { x: xForIndex(indexForTime(points[0].t)), y: yForPrice(points[0].p) }
+        const at = anchors[0]
         const words = row.text ?? ''
         if (words) {
           context.font = '600 11px ui-sans-serif, system-ui, sans-serif'
@@ -1104,12 +1145,9 @@ export function ChartWorkspace({
           }
         }
         context.setLineDash([])
-        context.fillStyle = colour
-        const tag = points[0].p.toFixed(decimals(points[0].p))
-        const width = context.measureText(tag).width + 8
-        context.fillRect(plotW + 2, y - 8, width, 16)
-        context.fillStyle = '#0b1220'
-        context.fillText(tag, plotW + 6, y + 4)
+        // The price tag belongs in the gutter, which is outside the clip, so it
+        // is collected here and painted once the plot is unclipped.
+        axisTags.push({ y, text: points[0].p.toFixed(decimals(points[0].p)), colour })
         continue
       }
 
@@ -1126,8 +1164,8 @@ export function ChartWorkspace({
       }
 
       if (points.length < 2) continue
-      const a = { x: xForIndex(indexForTime(points[0].t)), y: yForPrice(points[0].p) }
-      const b = { x: xForIndex(indexForTime(points[1].t)), y: yForPrice(points[1].p) }
+      const a = anchors[0]
+      const b = anchors[1]
 
       if (row.kind === 'measure') {
         const delta = points[1].p - points[0].p
@@ -1147,9 +1185,15 @@ export function ChartWorkspace({
         context.fillStyle = '#0b1220'
         const width = context.measureText(label).width + 10
         const captionY = Math.max(2, top - 20)
-        context.fillRect(Math.max(2, left + 4), captionY, width, 16)
-        context.fillStyle = selected ? '#bfdbfe' : '#cbd5e1'
-        context.fillText(label, Math.max(2, left + 4) + 5, captionY + 12)
+        const captionX = left + 4
+        // Only when the caption's own corner is inside the pane: a measure that
+        // has been panned almost out of sight must not hang its numbers on the
+        // chart edge.
+        if (captionX >= 0 && captionX + width <= plotW) {
+          context.fillRect(captionX, captionY, width, 16)
+          context.fillStyle = selected ? '#bfdbfe' : '#cbd5e1'
+          context.fillText(label, captionX + 5, captionY + 12)
+        }
         continue
       }
 
@@ -1169,7 +1213,12 @@ export function ChartWorkspace({
           context.stroke()
           context.globalAlpha = 1
           context.fillStyle = colour
-          context.fillText(`${Math.round(ratio * 100)}%`, right + 4, y - 2)
+          // Kept inside the pane even when the right anchor is panned past it: a
+          // Fib that is still visible keeps its percentages, one that is not
+          // never reaches this code.
+          const percent = `${Math.round(ratio * 100)}%`
+          const percentWidth = context.measureText(percent).width
+          context.fillText(percent, Math.max(2, Math.min(right + 4, plotW - percentWidth - 2)), y - 2)
         }
       } else {
         context.beginPath()
@@ -1209,6 +1258,19 @@ export function ChartWorkspace({
       context.arc(x, y, 5, 0, Math.PI * 2)
       context.stroke()
       context.setLineDash([])
+    }
+    context.restore()
+
+    // Price tags for horizontal lines go back into the gutter, which the clip
+    // above deliberately excludes so the axis keeps owning its own numbers.
+    context.setLineDash([])
+    context.font = '10px ui-sans-serif, system-ui, sans-serif'
+    for (const tag of axisTags) {
+      const tagWidth = context.measureText(tag.text).width + 8
+      context.fillStyle = tag.colour
+      context.fillRect(plotW + 2, tag.y - 8, tagWidth, 16)
+      context.fillStyle = '#0b1220'
+      context.fillText(tag.text, plotW + 6, tag.y + 4)
     }
 
     // The last price, with the countdown under it when the trader asked for
@@ -2475,6 +2537,252 @@ function intervalMs(interval: string): number {
     '1d': 24 * 60 * 60_000,
   }
   return table[interval] ?? 60 * 60_000
+}
+
+/**
+ * A price step a trader reads as round: 1, 2, 2.5 or 5 times a power of ten.
+ *
+ * Dividing the visible range by a fixed tick count invents steps like 37.4,
+ * which round to 37 and then either collide or leave a gap depending on where
+ * the range starts. The ladder snaps to the numbers people actually quote.
+ */
+export function niceStep(raw: number): number {
+  if (!Number.isFinite(raw) || raw <= 0) return 0
+  const magnitude = 10 ** Math.floor(Math.log10(raw))
+  const normalised = raw / magnitude
+  const ladder = [1, 2, 2.5, 5, 10]
+  const pick = ladder.find((candidate) => normalised <= candidate * (1 + 1e-9)) ?? 10
+  return pick * magnitude
+}
+
+/**
+ * Price levels for the axis, spaced by the plot's own height.
+ *
+ * Four fixed gridlines left fat empty bands on a tall chart and a crowded smear
+ * on a short one. The count now follows the pixel height and the step comes
+ * from the ladder, floored at the instrument's precision so two labels can never
+ * print the same number.
+ */
+export function priceAxisTicks(
+  min: number,
+  max: number,
+  plotHeightPx: number,
+  precision: number,
+  preferredSpacingPx = 44
+): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min || plotHeightPx <= 0) return []
+  const range = max - min
+  // Three is the floor: two labels read as "top" and "bottom" and nothing else.
+  const target = Math.max(3, Math.floor(plotHeightPx / preferredSpacingPx))
+  const digits = Math.max(0, Math.min(8, precision))
+  const minTick = 10 ** -digits
+  // 32px between label centres is the hard collision guard.
+  const step = Math.max(niceStep(range / (target - 1)), (32 * range) / plotHeightPx, minTick)
+  const first = Math.ceil(min / step - 1e-9) * step
+  const ticks: number[] = []
+  for (let value = first; value <= max + 1e-9 && ticks.length < 64; value += step) {
+    // Repeated addition drifts: 3595.738 arrives as 3595.7380000000003.
+    ticks.push(Number(value.toFixed(digits + 2)))
+  }
+  return ticks
+}
+
+export interface TimeAxisTick {
+  ms: number
+  major: boolean
+  label: string
+}
+
+interface TimeStep {
+  unit: 'minute' | 'day' | 'week' | 'month' | 'year'
+  count: number
+}
+
+const MINUTE_MS = 60_000
+const DAY_MS = 24 * 60 * MINUTE_MS
+
+const TIME_LADDER: TimeStep[] = [
+  { unit: 'minute', count: 1 },
+  { unit: 'minute', count: 5 },
+  { unit: 'minute', count: 15 },
+  { unit: 'minute', count: 30 },
+  { unit: 'minute', count: 60 },
+  { unit: 'minute', count: 120 },
+  { unit: 'minute', count: 240 },
+  { unit: 'minute', count: 360 },
+  { unit: 'minute', count: 720 },
+  { unit: 'day', count: 1 },
+  { unit: 'day', count: 3 },
+  { unit: 'week', count: 1 },
+  // Two weeks is not in the textbook ladder, but jumping 7d -> 1M leaves a
+  // hundred-day view with three labels and a lot of empty axis.
+  { unit: 'week', count: 2 },
+  { unit: 'month', count: 1 },
+  { unit: 'month', count: 3 },
+  { unit: 'year', count: 1 },
+]
+
+function stepMilliseconds(step: TimeStep): number {
+  switch (step.unit) {
+    case 'minute':
+      return step.count * MINUTE_MS
+    case 'day':
+      return step.count * DAY_MS
+    case 'week':
+      return step.count * 7 * DAY_MS
+    case 'month':
+      return step.count * 30 * DAY_MS
+    case 'year':
+      return step.count * 365 * DAY_MS
+  }
+}
+
+/** First tick at or after `ms`, on the UTC boundary the step names. */
+function snapUp(ms: number, step: TimeStep): number {
+  if (step.unit === 'minute') {
+    const size = stepMilliseconds(step)
+    return Math.ceil(ms / size) * size
+  }
+  if (step.unit === 'day') {
+    const size = stepMilliseconds(step)
+    return Math.ceil(ms / size) * size
+  }
+  if (step.unit === 'week') {
+    const dayStart = Math.floor(ms / DAY_MS) * DAY_MS
+    // Monday first, so a week tick lands on a week rather than on the epoch.
+    const weekday = new Date(dayStart).getUTCDay()
+    let candidate = dayStart + ((8 - weekday) % 7) * DAY_MS
+    if (candidate < ms) candidate += 7 * DAY_MS
+    return candidate
+  }
+  const date = new Date(ms)
+  if (step.unit === 'month') {
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth()
+    const aligned = month - (month % step.count)
+    const candidate = Date.UTC(year, aligned, 1)
+    if (candidate >= ms) return candidate
+    let next = aligned + step.count
+    let nextYear = year
+    while (next >= 12) {
+      next -= 12
+      nextYear += 1
+    }
+    return Date.UTC(nextYear, next, 1)
+  }
+  const candidate = Date.UTC(date.getUTCFullYear(), 0, 1)
+  return candidate >= ms ? candidate : Date.UTC(date.getUTCFullYear() + 1, 0, 1)
+}
+
+function advance(ms: number, step: TimeStep): number {
+  if (step.unit === 'month' || step.unit === 'year') {
+    const date = new Date(ms)
+    const months = step.unit === 'year' ? step.count * 12 : step.count
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1)
+  }
+  return ms + stepMilliseconds(step)
+}
+
+function clockLabel(ms: number, clock24: boolean): string {
+  const date = new Date(ms)
+  const hours = date.getUTCHours()
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+  if (clock24) return `${String(hours).padStart(2, '0')}:${minutes}`
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12
+  return `${hour12}:${minutes} ${hours >= 12 ? 'PM' : 'AM'}`
+}
+
+function dayLabel(ms: number): string {
+  const date = new Date(ms)
+  return `${date.getUTCDate()} ${date.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`
+}
+
+function monthLabel(ms: number): string {
+  return new Date(ms).toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })
+}
+
+/**
+ * Time labels snapped to the calendar, wide enough never to collide.
+ *
+ * Labelling every Nth bar drifts: the same setting produced `03:47` mid-session
+ * and collided at two zoom levels either side of it. Ticks now land on real
+ * clock and calendar boundaries, and the first tick of a new day, month or year
+ * is flagged so the axis can render it in heavier type instead of repeating a
+ * date on every label.
+ */
+export function timeAxisTicks(
+  startMs: number,
+  endMs: number,
+  plotWidthPx: number,
+  clock24 = true,
+  minSpacingPx = 95
+): TimeAxisTick[] {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs || plotWidthPx <= 0) {
+    return []
+  }
+  const span = endMs - startMs
+  const step =
+    TIME_LADDER.find(
+      (candidate) => (stepMilliseconds(candidate) / span) * plotWidthPx >= minSpacingPx
+    ) ?? TIME_LADDER[TIME_LADDER.length - 1]
+
+  const ticks: TimeAxisTick[] = []
+  let ms = snapUp(startMs, step)
+  for (let guard = 0; guard < 200 && ms <= endMs; guard += 1) {
+    const date = new Date(ms)
+    const previous = ticks.length > 0 ? new Date(ticks[ticks.length - 1].ms) : null
+    const newYear = previous !== null && previous.getUTCFullYear() !== date.getUTCFullYear()
+    const newMonth = previous !== null && previous.getUTCMonth() !== date.getUTCMonth()
+    const newDay = previous !== null && previous.getUTCDate() !== date.getUTCDate()
+    const major = newYear || newMonth || (step.unit === 'minute' && newDay)
+
+    let label: string
+    if (step.unit === 'year') {
+      label = String(date.getUTCFullYear())
+    } else if (step.unit === 'month') {
+      label = newYear ? String(date.getUTCFullYear()) : monthLabel(ms)
+    } else if (step.unit === 'day' || step.unit === 'week') {
+      label = newYear ? String(date.getUTCFullYear()) : newMonth ? monthLabel(ms) : dayLabel(ms)
+    } else {
+      label = newYear
+        ? String(date.getUTCFullYear())
+        : newMonth
+          ? monthLabel(ms)
+          : newDay
+            ? dayLabel(ms)
+            : clockLabel(ms, clock24)
+    }
+
+    ticks.push({ ms, major, label })
+    ms = advance(ms, step)
+  }
+  return ticks
+}
+
+/**
+ * Whether an object's pixel bounds touch the candle pane at all.
+ *
+ * One decision per object, taken before any of it is painted, so a panned-away
+ * object takes its geometry, labels, measurements and handles with it. A
+ * horizontal line is decided by its price, a vertical one by its time, and the
+ * rest by their bounding box: a segment that crosses the pane has a box that
+ * overlaps it even when neither anchor is on screen.
+ */
+export function objectInPane(
+  bounds: { minX: number; maxX: number; minY: number; maxY: number },
+  kind: string,
+  plotWidth: number,
+  plotHeight: number
+): boolean {
+  const spansPrices = bounds.minY <= plotHeight && bounds.maxY >= 0
+  const spansTimes = bounds.minX <= plotWidth && bounds.maxX >= 0
+  if (kind === 'ray') return spansPrices
+  if (kind === 'vline') return spansTimes
+  if (kind === 'text') {
+    // The words hang above and to the right of the anchor.
+    return spansTimes && bounds.maxY >= 0 && bounds.minY - 16 <= plotHeight
+  }
+  return spansPrices && spansTimes
 }
 
 function pricePrecision(price: number): number {
