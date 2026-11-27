@@ -143,6 +143,39 @@ class JournalApi {
     return asList(data).map((row) => StrategyStat.fromMap(asMap(row))).toList();
   }
 
+  /// Risk multiples, one per closed trade that carried a stop loss.
+  ///
+  /// R is measured in price, so no contract size is needed: a trade that ran
+  /// twice as far as its stop risked is +2R whatever the instrument. A trade
+  /// without a stop, or with the stop on the wrong side of entry, has no risk
+  /// unit and is left out instead of being guessed at.
+  Future<List<double>> rMultiples({int limit = 400}) async {
+    final id = userId;
+    if (id == null) return const [];
+    final data = await _db
+        .from('trades')
+        .select('type, entry_price, exit_price, stop_loss')
+        .eq('user_id', id)
+        .not('stop_loss', 'is', null)
+        .not('exit_price', 'is', null)
+        .order('close_time', ascending: false)
+        .limit(limit);
+    final values = <double>[];
+    for (final raw in asList(data)) {
+      final row = asMap(raw);
+      final entry = asDouble(row['entry_price']);
+      final exit = asDouble(row['exit_price']);
+      final stop = asDouble(row['stop_loss']);
+      final risk = (entry - stop).abs();
+      if (risk <= 1e-9) continue;
+      final direction =
+          row['type']?.toString().toUpperCase() == 'SELL' ? -1 : 1;
+      final value = (exit - entry) * direction / risk;
+      if (value.isFinite) values.add(value);
+    }
+    return values;
+  }
+
   /// Distinct strategy labels already used, for the form's suggestion chips.
   /// Missing migration or an empty journal both yield an empty list.
   Future<List<String>> strategyLabels({int limit = 20}) async {

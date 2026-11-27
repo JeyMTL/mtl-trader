@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../core/format.dart';
@@ -1257,7 +1257,10 @@ String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
                           label: l10n.tradeBuy,
                           active: _type == 'BUY',
                           positive: true,
-                          onTap: () => setState(() => _type = 'BUY'),
+                          onTap: () {
+                            if (_type != 'BUY') HapticFeedback.selectionClick();
+                            setState(() => _type = 'BUY');
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1266,7 +1269,10 @@ String _exitReasonText(AppLocalizations l10n, ExitReason reason) {
                           label: l10n.tradeSell,
                           active: _type == 'SELL',
                           positive: false,
-                          onTap: () => setState(() => _type = 'SELL'),
+                          onTap: () {
+                            if (_type != 'SELL') HapticFeedback.selectionClick();
+                            setState(() => _type = 'SELL');
+                          },
                         ),
                       ),
                     ],

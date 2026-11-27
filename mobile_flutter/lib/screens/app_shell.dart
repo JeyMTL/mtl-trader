@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/format.dart';
@@ -42,7 +43,11 @@ class _AppShellState extends State<AppShell>
     value: 1,
   );
 
+  /// Desk (0), Journal (1), Calendar (2), Account (3). Analytics is not a tab
+  /// of its own: it is the Desk's second scope, which is what leaves the middle
+  /// of the bar free for the one action the app is built around.
   int _index = 0;
+  int _deskScope = 0;
   int _reload = 0;
   DateTime? _calendarDay;
 
@@ -358,7 +363,19 @@ class _AppShellState extends State<AppShell>
   }
 
   void _select(int index) {
-    if (index == _index) return;
+    // Tapping Desk while the Desk is showing Analytics goes back to the cockpit
+    // rather than doing nothing.
+    if (index == _index) {
+      if (index == 0 && _deskScope != 0) {
+        HapticFeedback.selectionClick();
+        setState(() {
+          _deskScope = 0;
+          _built.remove(0);
+        });
+      }
+      return;
+    }
+    HapticFeedback.selectionClick();
     setState(() => _index = index);
     _fade.value = 0.45;
     _fade.forward();
@@ -425,20 +442,47 @@ class _AppShellState extends State<AppShell>
   void _openDay(DateTime day) {
     setState(() {
       _calendarDay = day;
-      _index = 3;
-      _built.remove(3);
+      _index = 2;
+      _built.remove(2);
     });
   }
+
+  /// Switches the Desk between the cockpit and the performance view. Both
+  /// screens draw this bar themselves, so it sits under the header they already
+  /// have instead of adding a second row of chrome above it.
+  void _setDeskScope(int scope) {
+    if (scope == _deskScope) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _deskScope = scope;
+      _built.remove(0);
+    });
+  }
+
+  Widget _deskScopeBar() => _ScopeBar(
+        scope: _deskScope,
+        onChanged: _setDeskScope,
+      );
 
   Widget _create(int index) {
     switch (index) {
       case 0:
+        if (_deskScope == 1) {
+          return AnalyticsScreen(
+            key: ValueKey('analytics-$_reload'),
+            api: _api,
+            onOpenEdge: _openEdge,
+            onOpenDay: _openDay,
+            header: _deskScopeBar(),
+          );
+        }
         return DashboardScreen(
           key: ValueKey('dashboard-$_reload'),
           api: _api,
           onOpenEdge: _openEdge,
           onEdit: (id) => _openTrade(tradeId: id),
           onOpenImport: _openImport,
+          scopeBar: _deskScopeBar(),
         );
       case 1:
         return JournalScreen(
@@ -448,13 +492,6 @@ class _AppShellState extends State<AppShell>
           onDataChanged: _invalidate,
         );
       case 2:
-        return AnalyticsScreen(
-          key: ValueKey('analytics-$_reload'),
-          api: _api,
-          onOpenEdge: _openEdge,
-          onOpenDay: _openDay,
-        );
-      case 3:
         return CalendarScreen(
           key: ValueKey(
             'calendar-$_reload-${_calendarDay?.toIso8601String() ?? 'now'}',
@@ -480,7 +517,7 @@ class _AppShellState extends State<AppShell>
     final l10n = AppLocalizations.of(context);
     _built.putIfAbsent(_index, () => _create(_index));
     final screens = List<Widget>.generate(
-      5,
+      4,
       (index) => _built[index] ?? const SizedBox.shrink(),
     );
 
@@ -491,12 +528,16 @@ class _AppShellState extends State<AppShell>
           Expanded(
             // Back from a tab returns to the desk, the way the bottom bar
             // reads: the tab sits on top of the desk, not beside it. Only the
-            // desk itself closes the app.
+            // desk itself, in its cockpit scope, closes the app.
             child: PopScope(
-              canPop: _index == 0,
+              canPop: _index == 0 && _deskScope == 0,
               onPopInvokedWithResult: (didPop, _) {
-                if (didPop || _index == 0) return;
-                _select(0);
+                if (didPop) return;
+                if (_index != 0) {
+                  _select(0);
+                } else if (_deskScope != 0) {
+                  _setDeskScope(0);
+                }
               },
               child: FadeTransition(
                 opacity: _fade,
@@ -506,56 +547,270 @@ class _AppShellState extends State<AppShell>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openTrade(),
-        tooltip: l10n.newTrade,
-        child: const Icon(Icons.add, size: 24),
-      ),
-      bottomNavigationBar: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.border)),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.primary.withAlpha(16),
-                  Colors.transparent,
+      bottomNavigationBar: _bottomBar(context, l10n),
+    );
+  }
+
+  /// The bar the thumb lives on: four destinations with the create action docked
+  /// in the middle of them.
+  ///
+  /// It replaces the floating "+", which sat on top of whatever was under it —
+  /// the Report link, the analytics bars, the account CTA. Docked, the action is
+  /// always in the same reachable place and never covers content.
+  Widget _bottomBar(BuildContext context, AppLocalizations l10n) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: Colors.white.withAlpha(20)),
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.surface.withAlpha(226),
+                AppColors.background.withAlpha(242),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 66,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.space_dashboard_outlined,
+                      selectedIcon: Icons.space_dashboard,
+                      label: l10n.navDesk,
+                      selected: _index == 0,
+                      onTap: () => _select(0),
+                    ),
+                  ),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.menu_book_outlined,
+                      selectedIcon: Icons.menu_book,
+                      label: l10n.navJournal,
+                      selected: _index == 1,
+                      onTap: () => _select(1),
+                    ),
+                  ),
+                  _CreateButton(
+                    tooltip: l10n.newTrade,
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      _openTrade();
+                    },
+                  ),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.calendar_month_outlined,
+                      selectedIcon: Icons.calendar_month,
+                      label: l10n.navCalendar,
+                      selected: _index == 2,
+                      onTap: () => _select(2),
+                    ),
+                  ),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.person_outline,
+                      selectedIcon: Icons.person,
+                      label: l10n.navAccount,
+                      selected: _index == 3,
+                      onTap: () => _select(3),
+                    ),
+                  ),
                 ],
               ),
             ),
-            child: NavigationBar(
-              selectedIndex: _index,
-              onDestinationSelected: _select,
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.space_dashboard_outlined),
-                  selectedIcon: const Icon(Icons.space_dashboard),
-                  label: l10n.navDesk,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.primary : AppColors.muted;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: const BorderRadius.all(Radius.circular(12)),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        label: label,
+        excludeSemantics: true,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(selected ? selectedIcon : icon, size: 22, color: color),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The primary action, docked in the middle of the bottom bar.
+class _CreateButton extends StatelessWidget {
+  const _CreateButton({required this.tooltip, required this.onTap});
+
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        excludeSemantics: true,
+        child: SizedBox(
+          width: 68,
+          child: Center(
+            child: InkResponse(
+              onTap: onTap,
+              radius: 32,
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFE2B873), AppColors.primary],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withAlpha(70),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                NavigationDestination(
-                  icon: const Icon(Icons.menu_book_outlined),
-                  selectedIcon: const Icon(Icons.menu_book),
-                  label: l10n.navJournal,
+                child: const Icon(
+                  Icons.add,
+                  size: 26,
+                  color: Color(0xFF10141B),
                 ),
-                NavigationDestination(
-                  icon: const Icon(Icons.insights_outlined),
-                  selectedIcon: const Icon(Icons.insights),
-                  label: l10n.navAnalytics,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  selectedIcon: const Icon(Icons.calendar_month),
-                  label: l10n.navCalendar,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.person_outline),
-                  selectedIcon: const Icon(Icons.person),
-                  label: l10n.navAccount,
-                ),
-              ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Desk / Analytics, as one control: the two views answer different questions
+/// about the same account, so they share a tab instead of taking two of them.
+class _ScopeBar extends StatelessWidget {
+  const _ScopeBar({required this.scope, required this.onChanged});
+
+  final int scope;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          _ScopeSegment(
+            label: l10n.navDesk,
+            selected: scope == 0,
+            onTap: () => onChanged(0),
+          ),
+          _ScopeSegment(
+            label: l10n.navAnalytics,
+            selected: scope == 1,
+            onTap: () => onChanged(1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScopeSegment extends StatelessWidget {
+  const _ScopeSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.surfaceAlt : Colors.transparent,
+            borderRadius: const BorderRadius.all(Radius.circular(8)),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary.withAlpha(110)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: TextStyle(
+              color: selected ? AppColors.primary : AppColors.muted,
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
         ),

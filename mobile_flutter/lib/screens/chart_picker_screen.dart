@@ -5772,6 +5772,10 @@ class _ChartCanvasState extends State<_ChartCanvas>
   /// Where the last touch was, so a release can finish what the drag was doing
   /// without needing a focal point from the end event.
   Offset _lastTouch = Offset.zero;
+
+  /// The price the stop or target line was on at the previous drag frame, so a
+  /// tick fires when it crosses a level rather than on every pixel of travel.
+  double? _dragTickedAt;
   Offset _tapDownAt = Offset.zero;
   Offset _doubleTapAt = Offset.zero;
   DateTime _tapDownTime = DateTime.fromMillisecondsSinceEpoch(0);
@@ -6953,8 +6957,31 @@ class _ChartCanvasState extends State<_ChartCanvas>
       setState(() => _crosshair = local);
       return;
     }
+    final price = _priceFor(local);
+    // Dragging a stop or a target across the entry, or across the other one of
+    // the pair, is where the risk flips sign. A tick marks the crossing.
+    if (marker == Marker.stop || marker == Marker.take) {
+      final anchor = marker == Marker.stop ? _stop : _take;
+      final previous = _dragTickedAt;
+      if (previous != null) {
+        for (final level in [
+          if (marker != Marker.entry) _entry,
+          if (marker != Marker.stop) _stop,
+          if (marker != Marker.take) _take,
+        ]) {
+          if (level == null || level == anchor) continue;
+          final before = previous - level;
+          final after = price - level;
+          if (before != 0 && after != 0 && before.sign != after.sign) {
+            HapticFeedback.selectionClick();
+            break;
+          }
+        }
+      }
+    }
+    _dragTickedAt = price;
     setState(() {
-      _setDraft(marker, _priceFor(local));
+      _setDraft(marker, price);
       // Entry and exit are points, not just prices: the time follows the drag.
       final time = _timeFor(local);
       if (time != null) {
@@ -6979,6 +7006,7 @@ class _ChartCanvasState extends State<_ChartCanvas>
       return;
     }
     final marker = _dragging;
+    _dragTickedAt = null;
     // A long press that did not grab anything leaves the crosshair where the
     // trader put it. TradingView keeps it too: the price it is on is the thing
     // the next tap acts on, and clearing it on lift-off would make the quick

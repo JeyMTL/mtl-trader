@@ -3250,6 +3250,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear all drawings'**
   String get clearDrawings;
+
+  /// No description provided for @deskToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get deskToday;
+
+  /// No description provided for @deskThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get deskThisWeek;
+
+  /// No description provided for @deskMonthTrades.
+  ///
+  /// In en, this message translates to:
+  /// **'Trades this month'**
+  String get deskMonthTrades;
+
+  /// No description provided for @rMultipleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'R-multiple distribution'**
+  String get rMultipleTitle;
+
+  /// No description provided for @rMultipleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 trade sized against its stop.} other{{count} trades sized against their stops.}}'**
+  String rMultipleSubtitle(int count);
+
+  /// No description provided for @rMultipleEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No risk multiples yet'**
+  String get rMultipleEmptyTitle;
+
+  /// No description provided for @rMultipleEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a stop loss on a trade. Each one then counts in multiples of the risk it took.'**
+  String get rMultipleEmptyBody;
+
+  /// No description provided for @rMultipleFoot.
+  ///
+  /// In en, this message translates to:
+  /// **'Average {average} per trade'**
+  String rMultipleFoot(String average);
+
+  /// No description provided for @strategyLeaderboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Strategy leaderboard'**
+  String get strategyLeaderboard;
+
+  /// No description provided for @strategyLeaderboardSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Ranked by what each trade earns, not by the total.'**
+  String get strategyLeaderboardSub;
+
+  /// No description provided for @sessionHeatmap.
+  ///
+  /// In en, this message translates to:
+  /// **'Session heatmap'**
+  String get sessionHeatmap;
+
+  /// No description provided for @sessionHeatmapSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Where the money was made, session by session.'**
+  String get sessionHeatmapSub;
+
+  /// No description provided for @symbolFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get symbolFavorites;
+
+  /// No description provided for @daySummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected day'**
+  String get daySummaryTitle;
+
+  /// No description provided for @daySummaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a day with trades to see its numbers here.'**
+  String get daySummaryHint;
+
+  /// No description provided for @daySummaryViewTrades.
+  ///
+  /// In en, this message translates to:
+  /// **'All trades'**
+  String get daySummaryViewTrades;
+
+  /// No description provided for @symbolPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Instruments'**
+  String get symbolPickerTitle;
+
+  /// No description provided for @allAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'All instruments'**
+  String get allAssets;
+
+  /// No description provided for @symbolNoFavoritesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No pinned instruments'**
+  String get symbolNoFavoritesTitle;
+
+  /// No description provided for @symbolNoFavoritesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Star the instruments you watch. They stay at the top of this list.'**
+  String get symbolNoFavoritesBody;
+
+  /// No description provided for @pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to favorites'**
+  String get pin;
+
+  /// No description provided for @unpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from favorites'**
+  String get unpin;
 }
 
 class _AppLocalizationsDelegate

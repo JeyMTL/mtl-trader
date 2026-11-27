@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/edge.dart';
 import '../core/format.dart';
@@ -26,6 +27,7 @@ class DashboardScreen extends StatefulWidget {
     required this.onOpenEdge,
     required this.onEdit,
     this.onOpenImport,
+    this.scopeBar,
   });
 
   final JournalApi api;
@@ -35,6 +37,10 @@ class DashboardScreen extends StatefulWidget {
   /// Opens the import screen from the empty equity chart. Optional so the
   /// screen can still be built on its own.
   final VoidCallback? onOpenImport;
+
+  /// Desk / Analytics, drawn by the shell under the header. Optional for the
+  /// same reason: the screen stands on its own in a test.
+  final Widget? scopeBar;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -116,6 +122,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icon(Icons.rule_outlined, size: 20, color: AppColors.muted),
           ),
         ],
+        bottom: widget.scopeBar == null
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(50),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+                  child: widget.scopeBar!,
+                ),
+              ),
       ),
       body: FutureBuilder<DashboardData>(
         future: _future,
@@ -150,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _DashboardBody extends StatelessWidget {
+class _DashboardBody extends StatefulWidget {
   const _DashboardBody({
     required this.api,
     required this.data,
@@ -166,12 +181,120 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback? onOpenImport;
 
   @override
+  State<_DashboardBody> createState() => _DashboardBodyState();
+}
+
+class _DashboardBodyState extends State<_DashboardBody> {
+  /// Equity windows, in days: 0 is the whole account.
+  static const List<int> _rangeDays = [7, 30, 90, 0];
+  static const List<String> _rangeLabels = ['1W', '1M', '3M', 'ALL'];
+
+  int _range = 1;
+
+  void _setRange(int index) {
+    if (index == _range) return;
+    HapticFeedback.selectionClick();
+    setState(() => _range = index);
+  }
+
+  static String _iso(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  Widget _rangeBar() {
+    // Wrapped rather than a row: at a 2x text size the four pills and their
+    // labels are wider than a 320pt phone.
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (var index = 0; index < _rangeLabels.length; index++)
+          GestureDetector(
+            onTap: () => _setRange(index),
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: index == _range
+                    ? AppColors.primary.withAlpha(28)
+                    : Colors.transparent,
+                borderRadius: const BorderRadius.all(Radius.circular(7)),
+                border: Border.all(
+                  color: index == _range
+                      ? AppColors.primary.withAlpha(120)
+                      : AppColors.border,
+                ),
+              ),
+              child: Text(
+                _rangeLabels[index],
+                style: TextStyle(
+                  color: index == _range ? AppColors.primary : AppColors.muted,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final data = widget.data;
     final summary = data.summary;
+    final api = widget.api;
+    final onEdit = widget.onEdit;
+    final onOpenEdge = widget.onOpenEdge;
+    final onOpenImport = widget.onOpenImport;
     final edge = timeEdgeReport(data.timeStats);
     final hours = hourlySeries(data.timeStats);
     final rawDrawdown = _maxDrawdown(data.equity, data.deposits);
+
+    // The curve's window, plus the balance it starts from: a 1W view that began
+    // at zero would read as a 100% loss from the account's opening deposit.
+    final today = DateTime.now();
+    final cutoffDays = _rangeDays[_range];
+    var window = data.equity;
+    var startBalance = data.deposits;
+    if (cutoffDays > 0 && data.equity.isNotEmpty) {
+      final cutoff = _iso(today.subtract(Duration(days: cutoffDays - 1)));
+      var start =
+          data.equity.indexWhere((point) => point.day.compareTo(cutoff) >= 0);
+      if (start < 0) start = data.equity.length;
+      startBalance =
+          data.deposits + (start == 0 ? 0 : data.equity[start - 1].cumulative);
+      window = data.equity.sublist(start);
+    }
+
+    final todayIso = _iso(today);
+    final weekIso = _iso(today.subtract(const Duration(days: 6)));
+    var todayPnl = 0.0;
+    var weekPnl = 0.0;
+    var todayTrades = 0;
+    var weekTrades = 0;
+    for (final point in data.equity) {
+      if (point.day == todayIso) {
+        todayPnl += point.pnl;
+        todayTrades += point.trades;
+      }
+      if (point.day.compareTo(weekIso) >= 0) {
+        weekPnl += point.pnl;
+        weekTrades += point.trades;
+      }
+    }
+    final Tone todayTone = todayPnl == 0
+        ? Tone.muted
+        : (todayPnl > 0 ? Tone.positive : Tone.negative);
+    final Tone weekTone = weekPnl == 0
+        ? Tone.muted
+        : (weekPnl > 0 ? Tone.positive : Tone.negative);
     // A balance below the logged deposits is a ledger problem, not a 249%
     // drawdown: no broker account goes below zero. The tile caps the scale and
     // marks it, rather than printing a percentage that cannot be real.
@@ -194,6 +317,9 @@ class _DashboardBody extends StatelessWidget {
             data: data,
             summary: summary,
             onOpenImport: onOpenImport,
+            window: window,
+            startBalance: startBalance,
+            rangeBar: _rangeBar(),
           ),
         ),
         const SizedBox(height: 10),
@@ -213,20 +339,26 @@ class _DashboardBody extends StatelessWidget {
                   MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.5),
             ),
             children: [
+              // The day's cockpit: what has happened today and this week, plus
+              // the risk the account carries. Win rate, profit factor and
+              // expectancy are the Analytics scope's job — they were printed
+              // on both screens and read as two different numbers whenever one
+              // of them was a day newer.
               MetricCard(
-                label: l10n.winRate,
-                value: percent(summary.winRate),
-                foot: l10n.winnersCount(summary.wins),
-                icon: Icons.track_changes,
+                label: l10n.deskToday,
+                value: signedMoney(todayPnl),
+                foot: l10n.monthTrades(todayTrades),
+                tone: todayTone,
+                semanticValue: pnlLabel(context, todayPnl),
+                icon: Icons.today,
               ),
               MetricCard(
-                label: l10n.profitFactor,
-                value: summary.profitFactor > 0
-                    ? summary.profitFactor.toStringAsFixed(2)
-                    : '—',
-                foot:
-                    '${money(summary.grossProfit)} / ${money(summary.grossLoss)}',
-                icon: Icons.balance,
+                label: l10n.deskThisWeek,
+                value: signedMoney(weekPnl),
+                foot: l10n.monthTrades(weekTrades),
+                tone: weekTone,
+                semanticValue: pnlLabel(context, weekPnl),
+                icon: Icons.date_range,
               ),
               MetricCard(
                 label: l10n.maxDrawdown,
@@ -238,15 +370,10 @@ class _DashboardBody extends StatelessWidget {
                 icon: Icons.trending_down,
               ),
               MetricCard(
-                label: l10n.avgPerTrade,
-                value:
-                    summary.totalTrades > 0 ? money(summary.averageTrade) : '—',
-                foot: l10n.expectancy,
-                tone: summary.averageTrade >= 0 ? Tone.positive : Tone.negative,
-                semanticValue: summary.totalTrades > 0
-                    ? pnlLabel(context, summary.averageTrade)
-                    : null,
-                icon: Icons.functions,
+                label: l10n.deskMonthTrades,
+                value: '${summary.monthTrades}',
+                foot: l10n.winnersCount(summary.monthWins),
+                icon: Icons.receipt_long,
               ),
             ],
           ),
@@ -436,15 +563,25 @@ class _BalanceHero extends StatelessWidget {
     required this.data,
     required this.summary,
     this.onOpenImport,
+    this.window,
+    this.startBalance,
+    this.rangeBar,
   });
 
   final DashboardData data;
   final TradeSummary summary;
   final VoidCallback? onOpenImport;
 
+  /// The part of the equity curve the selected timeframe covers, and the
+  /// balance it opens on.
+  final List<EquityPoint>? window;
+  final double? startBalance;
+  final Widget? rangeBar;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final points = window ?? data.equity;
     return FlatCard(
       padding: EdgeInsets.zero,
       child: Stack(
@@ -526,9 +663,13 @@ class _BalanceHero extends StatelessWidget {
                   style: TextStyle(color: AppColors.muted, fontSize: 11.5),
                 ),
                 const SizedBox(height: 10),
+                if (rangeBar != null) ...[
+                  rangeBar!,
+                  const SizedBox(height: 8),
+                ],
                 SizedBox(
                   height: 116,
-                  child: data.equity.isEmpty
+                  child: points.isEmpty
                       ? Center(
                           child: onOpenImport == null
                               ? Text(
@@ -559,8 +700,9 @@ class _BalanceHero extends StatelessWidget {
                             signedMoney(data.equity.last.cumulative),
                           ),
                           child: _EquityChart(
-                            points: data.equity,
+                            points: points,
                             deposits: data.deposits,
+                            startBalance: startBalance ?? data.deposits,
                           ),
                         ),
                 ),
@@ -678,20 +820,43 @@ class _DashboardSkeleton extends StatelessWidget {
   }
 }
 
-class _EquityChart extends StatelessWidget {
-  const _EquityChart({required this.points, required this.deposits});
+class _EquityChart extends StatefulWidget {
+  const _EquityChart({
+    required this.points,
+    required this.deposits,
+    this.startBalance,
+  });
 
   final List<EquityPoint> points;
   final double deposits;
 
+  /// Where the drawn window opens. The full-history view opens on the deposit;
+  /// a weekly view opens on the balance the week began with.
+  final double? startBalance;
+
+  @override
+  State<_EquityChart> createState() => _EquityChartState();
+}
+
+class _EquityChartState extends State<_EquityChart> {
+  /// The last point the finger was over, so the chart ticks once per candle
+  /// scrubbed instead of once per touch event.
+  int? _scrubbed;
+
   @override
   Widget build(BuildContext context) {
+    final points = widget.points;
+    final deposits = widget.deposits;
+    final open = widget.startBalance ?? deposits;
     // The curve starts at the deposit rather than at the first close. With one
     // trade the chart drew a lone point and the line looked broken, and a flat
     // account had no shape at all; point 0 is the opening balance, so every
     // account reads as a line from where it started to where it is now.
     final spots = <FlSpot>[
-      FlSpot(0, deposits),
+      // Point 0 is the opening balance, which is a different number once the
+      // window starts mid-history: `cumulative` is still measured from the
+      // account's first deposit.
+      FlSpot(0, open),
       for (var index = 0; index < points.length; index++)
         FlSpot((index + 1).toDouble(), deposits + points[index].cumulative),
     ];
@@ -755,7 +920,34 @@ class _EquityChart extends StatelessWidget {
           ),
         ),
         borderData: FlBorderData(show: false),
-        lineTouchData: LineTouchData(enabled: false),
+        // Scrubbing reads the balance behind a day, with a tick each time the
+        // finger crosses into another one.
+        lineTouchData: LineTouchData(
+          enabled: true,
+          touchCallback: (event, response) {
+            final spot = response?.lineBarSpots?.firstOrNull;
+            if (spot == null) return;
+            if (spot.spotIndex == _scrubbed) return;
+            _scrubbed = spot.spotIndex;
+            HapticFeedback.selectionClick();
+          },
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => AppColors.surfaceAlt,
+            getTooltipItems: (touched) => touched
+                .map(
+                  (spot) => LineTooltipItem(
+                    compactMoney(spot.y),
+                    TextStyle(
+                      color: AppColors.text,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
         lineBarsData: [
           LineChartBarData(
             spots: spots,

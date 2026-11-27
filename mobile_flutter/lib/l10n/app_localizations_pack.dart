@@ -1936,4 +1936,78 @@ class AppLocalizationsPack extends AppLocalizations {
 
   @override
   String get clearDrawings => _read('clearDrawings') ?? _en.clearDrawings;
+
+  @override
+  String get deskToday => _read('deskToday') ?? _en.deskToday;
+
+  @override
+  String get deskThisWeek => _read('deskThisWeek') ?? _en.deskThisWeek;
+
+  @override
+  String get deskMonthTrades => _read('deskMonthTrades') ?? _en.deskMonthTrades;
+
+  @override
+  String get rMultipleTitle => _read('rMultipleTitle') ?? _en.rMultipleTitle;
+
+  @override
+  String rMultipleSubtitle(int count) {
+    final template = _read('rMultipleSubtitle');
+    if (template == null) return _en.rMultipleSubtitle(count);
+    return _fill(template, <String, Object?>{'count': count});
+  }
+
+  @override
+  String get rMultipleEmptyTitle => _read('rMultipleEmptyTitle') ?? _en.rMultipleEmptyTitle;
+
+  @override
+  String get rMultipleEmptyBody => _read('rMultipleEmptyBody') ?? _en.rMultipleEmptyBody;
+
+  @override
+  String rMultipleFoot(String average) {
+    final template = _read('rMultipleFoot');
+    if (template == null) return _en.rMultipleFoot(average);
+    return _fill(template, <String, Object?>{'average': average});
+  }
+
+  @override
+  String get strategyLeaderboard => _read('strategyLeaderboard') ?? _en.strategyLeaderboard;
+
+  @override
+  String get strategyLeaderboardSub => _read('strategyLeaderboardSub') ?? _en.strategyLeaderboardSub;
+
+  @override
+  String get sessionHeatmap => _read('sessionHeatmap') ?? _en.sessionHeatmap;
+
+  @override
+  String get sessionHeatmapSub => _read('sessionHeatmapSub') ?? _en.sessionHeatmapSub;
+
+  @override
+  String get symbolFavorites => _read('symbolFavorites') ?? _en.symbolFavorites;
+
+  @override
+  String get daySummaryTitle => _read('daySummaryTitle') ?? _en.daySummaryTitle;
+
+  @override
+  String get daySummaryHint => _read('daySummaryHint') ?? _en.daySummaryHint;
+
+  @override
+  String get daySummaryViewTrades => _read('daySummaryViewTrades') ?? _en.daySummaryViewTrades;
+
+  @override
+  String get symbolPickerTitle => _read('symbolPickerTitle') ?? _en.symbolPickerTitle;
+
+  @override
+  String get allAssets => _read('allAssets') ?? _en.allAssets;
+
+  @override
+  String get symbolNoFavoritesTitle => _read('symbolNoFavoritesTitle') ?? _en.symbolNoFavoritesTitle;
+
+  @override
+  String get symbolNoFavoritesBody => _read('symbolNoFavoritesBody') ?? _en.symbolNoFavoritesBody;
+
+  @override
+  String get pin => _read('pin') ?? _en.pin;
+
+  @override
+  String get unpin => _read('unpin') ?? _en.unpin;
 }

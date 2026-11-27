@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../core/analytics.dart';
@@ -6,6 +7,7 @@ import '../core/format.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../models/models.dart';
 import '../services/journal_api.dart';
+import '../ui/a11y.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
@@ -32,6 +34,10 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   late DateTime _month = monthStart(widget.initialDay ?? DateTime.now());
   late Future<List<DailyPnlPoint>> _future = _load();
+
+  /// The day the summary panel below the grid describes. Null until a date is
+  /// tapped; the panel falls back to the latest traded day in the month.
+  late DateTime? _selectedDay = widget.initialDay;
 
   static final DateFormat _monthTitle = DateFormat('MMMM yyyy');
 
@@ -71,6 +77,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  void _selectDay(DateTime day) {
+    HapticFeedback.selectionClick();
+    setState(() => _selectedDay = day);
+  }
+
+  /// The latest day in the visible month that actually traded.
+  DateTime? _latestTradedDay(List<DailyPnlPoint> points) {
+    DateTime? latest;
+    for (final point in points) {
+      if (point.trades == 0) continue;
+      final day = DateTime.tryParse(point.day);
+      if (day == null) continue;
+      if (latest == null || day.isAfter(latest)) latest = day;
+    }
+    return latest;
+  }
+
   Future<void> _openDay(DateTime day, DailyPnlPoint point) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -101,6 +124,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final byDay = {for (final point in points) point.day: point};
         final summary = monthSummary(points, _month);
         final grid = monthGrid(_month);
+        final selected = _selectedDay ?? _latestTradedDay(points);
+        final selectedPoint = selected == null ? null : byDay[isoDay(selected)];
 
         return RefreshIndicator(
           onRefresh: _refresh,
@@ -263,13 +288,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   point: grid[index + offset] == null
                                       ? null
                                       : byDay[isoDay(grid[index + offset]!)],
-                                  onTap: _openDay,
+                                  selected: grid[index + offset] != null &&
+                                      selected != null &&
+                                      isoDay(grid[index + offset]!) ==
+                                          isoDay(selected),
+                                  onTap: _selectDay,
                                 ),
                               ),
                           ],
                         ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 12),
+              _DaySummaryCard(
+                api: widget.api,
+                day: selected,
+                point: selectedPoint,
+                onEdit: widget.onEdit,
+                onOpenDay: _openDay,
               ),
               const SizedBox(height: 14),
               const _Legend(),
@@ -282,11 +319,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
 }
 
 class _DayCell extends StatelessWidget {
-  const _DayCell({required this.day, required this.point, required this.onTap});
+  const _DayCell({
+    required this.day,
+    required this.point,
+    required this.onTap,
+    this.selected = false,
+  });
 
   final DateTime? day;
   final DailyPnlPoint? point;
-  final void Function(DateTime day, DailyPnlPoint point) onTap;
+  final ValueChanged<DateTime> onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -303,7 +346,7 @@ class _DayCell extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(1.5),
       child: InkWell(
-        onTap: hasTrades ? () => onTap(date, point!) : null,
+        onTap: hasTrades ? () => onTap(date) : null,
         borderRadius: const BorderRadius.all(Radius.circular(4)),
         child: Container(
           height: 46,
@@ -314,8 +357,12 @@ class _DayCell extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: const BorderRadius.all(Radius.circular(4)),
             border: Border.all(
-              color:
-                  hasTrades ? tint.withValues(alpha: 0.35) : AppColors.border,
+              color: selected
+                  ? AppColors.primary
+                  : hasTrades
+                      ? tint.withValues(alpha: 0.35)
+                      : AppColors.border,
+              width: selected ? 1.4 : 1,
             ),
           ),
           child: Column(
@@ -345,6 +392,237 @@ class _DayCell extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The day under the cursor, described in place.
+///
+/// It used to be a modal: tapping a date covered the month with a sheet, so
+/// comparing two days meant open, close, open, close. The panel keeps the grid
+/// on screen and answers the same question.
+class _DaySummaryCard extends StatelessWidget {
+  const _DaySummaryCard({
+    required this.api,
+    required this.day,
+    required this.point,
+    required this.onEdit,
+    required this.onOpenDay,
+  });
+
+  final JournalApi api;
+  final DateTime? day;
+  final DailyPnlPoint? point;
+  final ValueChanged<String> onEdit;
+  final void Function(DateTime day, DailyPnlPoint point) onOpenDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final selected = day;
+    if (selected == null) {
+      return FlatCard(
+        child: Text(
+          l10n.daySummaryHint,
+          style: TextStyle(color: AppColors.faint, fontSize: 11.5),
+        ),
+      );
+    }
+
+    return FlatCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SectionTitle(
+                  title: l10n.daySummaryTitle,
+                  subtitle: longDay(selected),
+                ),
+              ),
+              if (point != null)
+                Text(
+                  signedMoney(point!.pnl),
+                  style: TextStyle(
+                    color:
+                        point!.pnl >= 0 ? AppColors.success : AppColors.danger,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          FutureBuilder<List<TradeRow>>(
+            future: api.dayTrades(selected),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              final trades = snapshot.data ?? const <TradeRow>[];
+              if (snapshot.hasError || trades.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Text(
+                    l10n.calendarDayEmpty,
+                    style: TextStyle(color: AppColors.faint, fontSize: 11.5),
+                  ),
+                );
+              }
+
+              final wins = trades.where((trade) => trade.pnl > 0).length;
+              final net = trades.fold<double>(0, (sum, t) => sum + t.pnl);
+              final visible = trades.take(3).toList();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DayStat(
+                          label: l10n.monthTrades(trades.length),
+                          value: null,
+                        ),
+                      ),
+                      Expanded(
+                        child: _DayStat(
+                          label: l10n.winRate,
+                          value: percent(
+                              trades.isEmpty ? 0 : wins / trades.length * 100),
+                        ),
+                      ),
+                      Expanded(
+                        child: _DayStat(
+                          label: l10n.avgPerTrade,
+                          value: signedMoney(net / trades.length),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  for (final trade in visible) ...[
+                    const ListDivider(),
+                    InkWell(
+                      onTap: () => onEdit(trade.id),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        child: Row(
+                          children: [
+                            Pill(
+                              text: trade.type.toUpperCase(),
+                              tone: trade.type.toUpperCase() == 'BUY'
+                                  ? Tone.positive
+                                  : Tone.negative,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                trade.symbol,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: AppColors.text,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            PnlText(
+                              value: trade.pnl,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 16,
+                              color: AppColors.faint,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (trades.length > visible.length)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => onOpenDay(
+                          selected,
+                          point ??
+                              DailyPnlPoint(
+                                day: isoDay(selected),
+                                pnl: net,
+                                trades: trades.length,
+                              ),
+                        ),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 36),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Text(l10n.daySummaryViewTrades),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayStat extends StatelessWidget {
+  const _DayStat({required this.label, this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (value != null)
+          Text(
+            value!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.text,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: AppColors.faint, fontSize: kMinLabelSize),
+        ),
+      ],
     );
   }
 }

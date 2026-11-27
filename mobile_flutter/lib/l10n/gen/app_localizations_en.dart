@@ -1894,4 +1894,84 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clearDrawings => 'Clear all drawings';
+
+  @override
+  String get deskToday => 'Today';
+
+  @override
+  String get deskThisWeek => 'This week';
+
+  @override
+  String get deskMonthTrades => 'Trades this month';
+
+  @override
+  String get rMultipleTitle => 'R-multiple distribution';
+
+  @override
+  String rMultipleSubtitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count trades sized against their stops.',
+      one: '1 trade sized against its stop.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rMultipleEmptyTitle => 'No risk multiples yet';
+
+  @override
+  String get rMultipleEmptyBody =>
+      'Set a stop loss on a trade. Each one then counts in multiples of the risk it took.';
+
+  @override
+  String rMultipleFoot(String average) {
+    return 'Average $average per trade';
+  }
+
+  @override
+  String get strategyLeaderboard => 'Strategy leaderboard';
+
+  @override
+  String get strategyLeaderboardSub =>
+      'Ranked by what each trade earns, not by the total.';
+
+  @override
+  String get sessionHeatmap => 'Session heatmap';
+
+  @override
+  String get sessionHeatmapSub =>
+      'Where the money was made, session by session.';
+
+  @override
+  String get symbolFavorites => 'Favorites';
+
+  @override
+  String get daySummaryTitle => 'Selected day';
+
+  @override
+  String get daySummaryHint => 'Tap a day with trades to see its numbers here.';
+
+  @override
+  String get daySummaryViewTrades => 'All trades';
+
+  @override
+  String get symbolPickerTitle => 'Instruments';
+
+  @override
+  String get allAssets => 'All instruments';
+
+  @override
+  String get symbolNoFavoritesTitle => 'No pinned instruments';
+
+  @override
+  String get symbolNoFavoritesBody =>
+      'Star the instruments you watch. They stay at the top of this list.';
+
+  @override
+  String get pin => 'Pin to favorites';
+
+  @override
+  String get unpin => 'Remove from favorites';
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -22,11 +24,16 @@ class AnalyticsScreen extends StatefulWidget {
     required this.api,
     required this.onOpenEdge,
     required this.onOpenDay,
+    this.header,
   });
 
   final JournalApi api;
   final VoidCallback onOpenEdge;
   final ValueChanged<DateTime> onOpenDay;
+
+  /// Desk / Analytics, supplied by the shell. Optional so the screen still
+  /// builds on its own.
+  final Widget? header;
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -39,6 +46,8 @@ class _AnalyticsData {
     required this.symbols,
     required this.tags,
     required this.strategies,
+    required this.timeStats,
+    required this.multiples,
   });
 
   final TradeSummary summary;
@@ -46,6 +55,8 @@ class _AnalyticsData {
   final List<SymbolStat> symbols;
   final List<TagStat> tags;
   final List<StrategyStat> strategies;
+  final TimeStats timeStats;
+  final List<double> multiples;
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
@@ -69,12 +80,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       // without the migration leave this list empty and the section hidden.
       widget.api.strategyStats(limit: 20),
     ]);
+    // A missing `stop_loss` column or an empty set is not an error for the
+    // page: the R section has its own empty state.
+    final multiples =
+        await widget.api.rMultiples().catchError((_) => const <double>[]);
     return _AnalyticsData(
       summary: results[0] as TradeSummary,
       daily: results[1] as List<DailyPnlPoint>,
       symbols: results[2] as List<SymbolStat>,
       tags: results[3] as List<TagStat>,
       strategies: results[4] as List<StrategyStat>,
+      timeStats: await widget.api.timeStats(),
+      multiples: multiples,
     );
   }
 
@@ -113,15 +130,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      l10n.navAnalytics,
-                      style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
+                    child: widget.header ??
+                        Text(
+                          l10n.navAnalytics,
+                          style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
                   ),
                   IconButton(
                     onPressed: _refresh,
@@ -149,6 +167,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 AiCoachCard(api: widget.api, summary: data.summary),
                 const SizedBox(height: 14),
                 _SummaryGrid(summary: data.summary),
+                const SizedBox(height: 14),
+                _RMultipleSection(multiples: data.multiples),
+                const SizedBox(height: 14),
+                _StrategyLeaderboard(strategies: data.strategies),
+                const SizedBox(height: 14),
+                _SessionHeatmap(stats: data.timeStats),
                 const SizedBox(height: 14),
                 _MonthlySection(daily: data.daily),
                 const SizedBox(height: 14),
@@ -335,6 +359,400 @@ class _SummaryGrid extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// How far each trade ran, in units of the risk it carried.
+///
+/// This is the question a win rate cannot answer: 60% winners that each make
+/// 0.3R lose money. The buckets sit around break-even so the shape of the edge
+/// — fat right tail or a pile of -1R stops — is visible at a glance.
+class _RMultipleSection extends StatelessWidget {
+  const _RMultipleSection({required this.multiples});
+
+  final List<double> multiples;
+
+  static const List<double> _edges = [-2, -1, 0, 1, 2, 3];
+  static const List<String> _labels = [
+    '<-2R',
+    '-2R',
+    '-1R',
+    '0',
+    '+1R',
+    '+2R',
+    '+3R',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (multiples.isEmpty) {
+      return FlatCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionTitle(title: l10n.rMultipleTitle),
+            const SizedBox(height: 8),
+            EmptyState(
+              icon: Icons.speed,
+              title: l10n.rMultipleEmptyTitle,
+              body: l10n.rMultipleEmptyBody,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final counts = List<int>.filled(_labels.length, 0);
+    for (final value in multiples) {
+      var bucket = _labels.length - 1;
+      for (var index = 0; index < _edges.length; index++) {
+        if (value < _edges[index]) {
+          bucket = index;
+          break;
+        }
+      }
+      counts[bucket]++;
+    }
+    final maxCount = counts.reduce(math.max);
+    final average = multiples.reduce((a, b) => a + b) / multiples.length;
+
+    return FlatCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(
+            title: l10n.rMultipleTitle,
+            subtitle: l10n.rMultipleSubtitle(multiples.length),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var index = 0; index < counts.length; index++)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${counts[index]}',
+                          style: TextStyle(
+                            color: counts[index] == 0
+                                ? AppColors.faint
+                                : AppColors.muted,
+                            fontSize: kMinLabelSize,
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Zero-height bars for empty buckets, so the axis stays
+                        // even; the label still marks the column.
+                        Container(
+                          height: maxCount == 0
+                              ? 2
+                              : (counts[index] / maxCount) * 78 + 2,
+                          decoration: BoxDecoration(
+                            color: _bucketColor(index).withAlpha(
+                              counts[index] == 0 ? 40 : 210,
+                            ),
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _labels[index],
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: AppColors.faint,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const ListDivider(),
+          const SizedBox(height: 8),
+          Text(
+            l10n.rMultipleFoot(
+              average >= 0
+                  ? '+${average.toStringAsFixed(2)}R'
+                  : '${average.toStringAsFixed(2)}R',
+            ),
+            style: TextStyle(
+              color: average >= 0 ? AppColors.success : AppColors.danger,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _bucketColor(int index) {
+    if (index < 3) return AppColors.danger;
+    if (index == 3) return AppColors.muted;
+    return AppColors.success;
+  }
+}
+
+/// The strategies that make money per trade, ranked — not just by total P&L,
+/// which a single large trade can carry for months.
+class _StrategyLeaderboard extends StatelessWidget {
+  const _StrategyLeaderboard({required this.strategies});
+
+  final List<StrategyStat> strategies;
+
+  @override
+  Widget build(BuildContext context) {
+    if (strategies.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final ranked = [...strategies]
+      ..sort((a, b) => b.expectancy.compareTo(a.expectancy));
+    final top = ranked.take(5).toList();
+    final maxAbs = top.fold<double>(
+      0,
+      (max, row) => row.expectancy.abs() > max ? row.expectancy.abs() : max,
+    );
+
+    return FlatCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(
+            title: l10n.strategyLeaderboard,
+            subtitle: l10n.strategyLeaderboardSub,
+          ),
+          const SizedBox(height: 10),
+          for (var index = 0; index < top.length; index++) ...[
+            if (index > 0) const ListDivider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 18,
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        color: index == 0 ? AppColors.primary : AppColors.faint,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          top[index].strategy,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.text,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        // Length is volume of edge, colour is its sign.
+                        ClipRRect(
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(2),
+                          ),
+                          child: SizedBox(
+                            height: 4,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: maxAbs == 0
+                                      ? 1
+                                      : (top[index].expectancy.abs() /
+                                              maxAbs *
+                                              100)
+                                          .round()
+                                          .clamp(1, 100),
+                                  child: ColoredBox(
+                                    color: top[index].expectancy >= 0
+                                        ? AppColors.success.withAlpha(170)
+                                        : AppColors.danger.withAlpha(170),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: maxAbs == 0
+                                      ? 99
+                                      : (100 -
+                                              (top[index].expectancy.abs() /
+                                                      maxAbs *
+                                                      100)
+                                                  .round())
+                                          .clamp(0, 99),
+                                  child: ColoredBox(
+                                    color: AppColors.border,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      PnlText(
+                        value: top[index].expectancy,
+                        glyph: false,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.symbolStats(
+                          top[index].trades,
+                          percent(top[index].winRate),
+                        ),
+                        style: TextStyle(
+                          color: AppColors.faint,
+                          fontSize: kMinLabelSize,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// P&L and win rate by session, as a heat grid.
+///
+/// Each session is two lines, the way a scoreboard reads: the name and how many
+/// trades it carried on top, the money and the hit rate below. The tint answers
+/// "where was I good" before any of the numbers do.
+class _SessionHeatmap extends StatelessWidget {
+  const _SessionHeatmap({required this.stats});
+
+  final TimeStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final rows = [...stats.sessions]..sort((a, b) => b.pnl.compareTo(a.pnl));
+    if (rows.isEmpty) return const SizedBox.shrink();
+    final maxAbs = rows.fold<double>(
+      0,
+      (max, row) => row.pnl.abs() > max ? row.pnl.abs() : max,
+    );
+
+    return FlatCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(
+            title: l10n.sessionHeatmap,
+            subtitle: l10n.sessionHeatmapSub,
+          ),
+          const SizedBox(height: 10),
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: maxAbs == 0 || row.trades == 0
+                      ? AppColors.surfaceAlt
+                      : (row.pnl >= 0 ? AppColors.success : AppColors.danger)
+                          .withAlpha(
+                          (16 + 46 * (row.pnl.abs() / maxAbs)).round(),
+                        ),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_sessionName(l10n, row.session)} (${row.trades})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${signedMoney(row.pnl)} · ${percent(row.winRate)}',
+                            style: TextStyle(
+                              color: row.pnl >= 0
+                                  ? AppColors.success
+                                  : AppColors.danger,
+                              fontSize: kMinLabelSize,
+                              fontWeight: FontWeight.w600,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      row.pnl >= 0 ? Icons.trending_up : Icons.trending_down,
+                      size: 16,
+                      color:
+                          row.pnl >= 0 ? AppColors.success : AppColors.danger,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _sessionName(AppLocalizations l10n, String raw) {
+    switch (raw.toLowerCase()) {
+      case 'asian':
+        return l10n.journalSessionAsian;
+      case 'london':
+        return l10n.journalSessionLondon;
+      case 'newyork':
+        return l10n.journalSessionNewYork;
+      case 'sydney':
+        return l10n.journalSessionSydney;
+      default:
+        return raw;
+    }
   }
 }
 
