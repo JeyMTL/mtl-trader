@@ -70,5 +70,53 @@ void main() {
       expect(preview.reward, 0);
       expect(preview.r, isNull);
     });
+    test('flags the side each level was entered on, so the form can say why', () {
+      final wrongStop = riskRewardPreview(
+        type: 'BUY',
+        symbol: 'EURUSD',
+        entry: 1.1000,
+        stop: 1.1050,
+        take: 1.1200,
+        lots: 0.1,
+      );
+      expect(wrongStop.stopWrongSide, isTrue);
+      expect(wrongStop.takeWrongSide, isFalse);
+
+      final wrongTake = riskRewardPreview(
+        type: 'SELL',
+        symbol: 'EURUSD',
+        entry: 1.1000,
+        stop: 1.1050,
+        take: 1.1100,
+        lots: 0.1,
+      );
+      expect(wrongTake.stopWrongSide, isFalse);
+      expect(wrongTake.takeWrongSide, isTrue);
+
+      final right = riskRewardPreview(
+        type: 'BUY',
+        symbol: 'EURUSD',
+        entry: 1.1000,
+        stop: 1.0950,
+        take: 1.1150,
+        lots: 0.1,
+      );
+      expect(right.stopWrongSide, isFalse);
+      expect(right.takeWrongSide, isFalse);
+    });
+
+    test('a level exactly on the entry counts as the wrong side', () {
+      final preview = riskRewardPreview(
+        type: 'BUY',
+        symbol: 'EURUSD',
+        entry: 1.1000,
+        stop: 1.1000,
+        take: 1.1150,
+        lots: 0.1,
+      );
+
+      expect(preview.risk, 0);
+      expect(preview.stopWrongSide, isTrue);
+    });
   });
 }

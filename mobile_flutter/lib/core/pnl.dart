@@ -55,7 +55,19 @@ double pointValue(String symbol) {
 /// and a preview that called it a loss would be describing a trade the market
 /// cannot print. Commission and swap are left out on purpose: the preview is
 /// about the levels, and the costs are typed after them.
-({double risk, double reward, double? r}) riskRewardPreview({
+///
+/// The two flags say whether a level was entered on the side that cannot be
+/// hit first. Both figures are zero in that case, which is indistinguishable
+/// from "no levels yet", and the strip owes the trader which one it is: "add a
+/// level" in front of a stop that was simply typed two digits out is the sort
+/// of hint that makes a form feel like it is not listening.
+({
+  double risk,
+  double reward,
+  double? r,
+  bool stopWrongSide,
+  bool takeWrongSide,
+}) riskRewardPreview({
   required String type,
   required String symbol,
   required double entry,
@@ -78,6 +90,10 @@ double pointValue(String symbol) {
     risk: risk,
     reward: reward,
     r: risk > 0 && reward > 0 ? reward / risk : null,
+    // Reaching zero this way means the level is at or past the entry, which is
+    // the wrong side — a level exactly on the entry is worth saying too.
+    stopWrongSide: stop != null && loss <= 0,
+    takeWrongSide: take != null && gain <= 0,
   );
 }
 

@@ -268,7 +268,13 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
   /// What the trade loses at the stop and stands to make at the target, in
   /// account currency, recalculated on every keystroke. The maths lives in
   /// `riskRewardPreview` so the strip and its tests cannot disagree.
-  ({double risk, double reward, double? r})? get _riskPreview {
+  ({
+    double risk,
+    double reward,
+    double? r,
+    bool stopWrongSide,
+    bool takeWrongSide,
+  })? get _riskPreview {
     final entry = _valueOf(_entry);
     final lots = _valueOf(_lots);
     final stop = _valueOf(_stop);
@@ -285,6 +291,38 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     );
   }
 
+  /// The line under the three figures when they cannot all be filled.
+  ///
+  /// A level on the wrong side of the entry is a different message from "there
+  /// is nothing here yet": both leave risk and reward at zero, but telling a
+  /// trader to add a level they have already typed makes the form look deaf.
+  ({String text, bool warning})? get _riskHint {
+    final preview = _riskPreview;
+    const empty = (
+      text: 'Add an entry, a level and a size to preview the risk.',
+      warning: false,
+    );
+    if (preview == null) return empty;
+    final isBuy = _type.toUpperCase() != 'SELL';
+    if (preview.stopWrongSide) {
+      return (
+        text: isBuy
+            ? 'A buy\'s stop sits below the entry — this one is above it.'
+            : 'A sell\'s stop sits above the entry — this one is below it.',
+        warning: true,
+      );
+    }
+    if (preview.takeWrongSide) {
+      return (
+        text: isBuy
+            ? 'A buy\'s target sits above the entry — this one is below it.'
+            : 'A sell\'s target sits below the entry — this one is above it.',
+        warning: true,
+      );
+    }
+    return preview.risk <= 0 && preview.reward <= 0 ? empty : null;
+  }
+
   /// Three figures in a fixed order, so they land in the same place whether or
   /// not the trade has a target yet. The strip sits under the numbers it reads,
   /// not over the chart, and it updates as they are typed.
@@ -293,6 +331,7 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
     final risk = preview?.risk ?? 0;
     final reward = preview?.reward ?? 0;
     final r = preview?.r;
+    final hint = _riskHint;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
@@ -323,12 +362,18 @@ class _TradeFormScreenState extends State<TradeFormScreen> {
               ),
             ],
           ),
-          if (risk <= 0 && reward <= 0)
+          if (hint != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                'Add an entry, a level and a size to preview the risk.',
-                style: TextStyle(color: AppColors.faint, fontSize: 9.5),
+                hint.text,
+                style: TextStyle(
+                  color: hint.warning
+                      ? AppColors.primaryLight
+                      : AppColors.faint,
+                  fontSize: 9.5,
+                  height: 1.3,
+                ),
               ),
             ),
         ],
