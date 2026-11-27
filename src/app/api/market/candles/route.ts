@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
 import { mayReadMarketData } from '@/lib/solo'
+import { MARKET_CHARTS_ENABLED } from '@/lib/features'
 import {
   CANDLE_INTERVALS,
   aggregateCandles,
@@ -139,6 +140,15 @@ async function fetchOanda(
 }
 
 export async function GET(req: Request) {
+  // Charting is off until a feed licenses redistribution (see features.ts).
+  // Answered before auth so a switched-off deployment spends no vendor credit
+  // and no database round trip on a route nobody is offered.
+  if (!MARKET_CHARTS_ENABLED) {
+    return NextResponse.json(
+      { error: 'Charting is turned off on this deployment.' },
+      { status: 503 }
+    )
+  }
   const user = await getAuthUser(req)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

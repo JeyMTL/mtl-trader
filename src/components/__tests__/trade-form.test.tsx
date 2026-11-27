@@ -18,6 +18,17 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: db.push, back: vi.fn(), replace: vi.fn() }),
 }))
 
+// Charting is off in the shipped build while the feed is unlicensed. The picker
+// still exists behind the flag, so these tests run with the flag read from a
+// mutable object: on for the pinning case, off for the case that asserts it is
+// gone.
+const flags = vi.hoisted(() => ({ charts: true }))
+vi.mock('@/lib/features', () => ({
+  get MARKET_CHARTS_ENABLED() {
+    return flags.charts
+  },
+}))
+
 vi.mock('next/link', () => ({
   default: function MockLink({ href, children }: { href: string; children: ReactNode }) {
     return <a href={href}>{children}</a>
@@ -110,6 +121,7 @@ function fillRequired() {
 
 describe('TradeForm', () => {
   beforeEach(() => {
+    flags.charts = true
     db.inserted = null
     db.updated = null
     db.editRow = null
@@ -146,7 +158,15 @@ describe('TradeForm', () => {
     expect(screen.getByText(/\+50\.0 pips/)).toBeTruthy()
   })
 
+  it('offers no chart picker while charting is switched off', () => {
+    flags.charts = false
+    render(<TradeForm mode="create" />)
+
+    expect(screen.queryByRole('button', { name: /Pin levels from chart/i })).toBeNull()
+  })
+
   it('opens the chart picker for the trade\'s own symbol', async () => {
+    flags.charts = true
     render(<TradeForm mode="create" />)
     fill('Symbol', 'XAUUSDM')
 

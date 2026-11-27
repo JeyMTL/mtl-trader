@@ -28,6 +28,7 @@ import { calculatePnL, cn, formatCurrency, formatDuration, formatPrice, getPoint
 import { effectiveMaxTrades, UNLIMITED } from '@/lib/subscription'
 import { mergeTags, suggestTags } from '@/lib/ai/autotag'
 import { strategyColor } from '@/lib/strategy-colors'
+import { MARKET_CHARTS_ENABLED } from '@/lib/features'
 import { JournalMedia } from '@/components/journal-media'
 import {
   deleteJournalMedia,
@@ -740,14 +741,18 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
                 <p className="text-xs text-gray-500">Entry, exit and size</p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPinOpen(true)}
-                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-gray-300 transition-colors hover:border-primary/50 hover:text-white"
-                >
-                  <CandlestickChart className="h-3.5 w-3.5" />
-                  Pin levels from chart
-                </button>
+                {/* Pinning reads prices off a candle chart, so it is offered
+                    only while charting is on. */}
+                {MARKET_CHARTS_ENABLED && (
+                  <button
+                    type="button"
+                    onClick={() => setPinOpen(true)}
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-gray-300 transition-colors hover:border-primary/50 hover:text-white"
+                  >
+                    <CandlestickChart className="h-3.5 w-3.5" />
+                    Pin levels from chart
+                  </button>
+                )}
                 <span className="eyebrow">02</span>
               </div>
             </div>
@@ -1183,7 +1188,7 @@ export function TradeForm({ mode, tradeId }: { mode: Mode; tradeId?: string }) {
         </aside>
       </div>
 
-      {pinOpen && (
+      {MARKET_CHARTS_ENABLED && pinOpen && (
         <LevelPicker
           symbol={form.symbol}
           side={form.type}

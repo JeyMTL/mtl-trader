@@ -1,5 +1,15 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+const flags = vi.hoisted(() => ({ charts: true }))
+
+// The route is off whenever a deployment has no licensed feed; the flag is read
+// at call time, so a test can turn it on for the measuring cases.
+vi.mock('@/lib/features', () => ({
+  get MARKET_CHARTS_ENABLED() {
+    return flags.charts
+  },
+}))
+
 const state = vi.hoisted(() => ({
   trades: [] as Record<string, unknown>[],
   stored: [] as Record<string, unknown>[],
@@ -65,6 +75,7 @@ async function call(days = 90): Promise<Response> {
 }
 
 beforeEach(() => {
+  flags.charts = true
   state.trades = [
     {
       id: 't1',
@@ -84,6 +95,18 @@ beforeEach(() => {
 })
 
 describe('GET /api/analytics/excursion', () => {
+  it('answers 503 without touching a vendor when charting is off', async () => {
+    flags.charts = false
+    const { GET } = await import('@/app/api/analytics/excursion/route')
+
+    const res = await GET(new Request('http://localhost/api/analytics/excursion?days=90'))
+
+    expect(res.status).toBe(503)
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'Charting is turned off on this deployment.',
+    })
+  })
+
   it('measures a trade, stores the row and returns the summary', async () => {
     const res = await call()
     expect(res.status).toBe(200)

@@ -1,8 +1,10 @@
+import { redirect } from 'next/navigation'
 import { createServerSupabase, requireServerUser } from '@/lib/supabase-server'
 import { ChartWorkspace, type ChartDrawingRow } from '@/components/chart-workspace'
 import { loadAccount } from '@/lib/plan-guard'
 import { hasPaidPlan, hasProTools } from '@/lib/subscription'
 import { isSoloOwner } from '@/lib/solo'
+import { MARKET_CHARTS_ENABLED } from '@/lib/features'
 
 /**
  * Web chart desk.
@@ -17,6 +19,9 @@ import { isSoloOwner } from '@/lib/solo'
 export const dynamic = 'force-dynamic'
 
 export default async function ChartPage() {
+  // Off while there is no licensed feed: a bookmark or an old link lands on the
+  // dashboard rather than on a chart the deployment cannot legally draw.
+  if (!MARKET_CHARTS_ENABLED) redirect('/dashboard')
   const user = await requireServerUser()
   const supabase = await createServerSupabase()
   // The seconds sizes split across the paid plans: 5s/10s/15s are Pro, 30s and

@@ -33,7 +33,7 @@ import {
   trialRemaining,
   TRIAL_DAYS,
 } from '@/lib/subscription'
-import { MT5_SYNC_ENABLED } from '@/lib/features'
+import { MARKET_CHARTS_ENABLED, MT5_SYNC_ENABLED } from '@/lib/features'
 import { Logo } from '@/components/logo'
 import LockGate from '@/components/lock-gate'
 import { Avatar } from '@/components/avatar'
@@ -262,7 +262,11 @@ export default function DashboardLayout({
   // it, so its entry point is filtered out rather than deleted: the route, the
   // credentials store and the supervisor stay, and `MT5_SYNC_ENABLED` brings the
   // link back in one line. See `src/lib/features.ts`.
-  const hiddenHrefs = MT5_SYNC_ENABLED ? [] : ['/dashboard/sync']
+  const hiddenHrefs = [
+    ...(MT5_SYNC_ENABLED ? [] : ['/dashboard/sync']),
+    // Charting is off until a feed licenses redistribution (see features.ts).
+    ...(MARKET_CHARTS_ENABLED ? [] : ['/dashboard/chart']),
+  ]
   const isVisible = (href: string) =>
     (proTools || !PRO_ONLY_HREFS.includes(href)) && !hiddenHrefs.includes(href)
   const visibleNavigation = navigation.filter((item) => isVisible(item.href))

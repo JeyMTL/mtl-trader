@@ -21,3 +21,19 @@ export const MT5_SYNC_ENABLED = true
  * `docs/PLAY_LAUNCH_STATUS.md`.
  */
 export const MT5_HOSTED_SYNC_ENABLED = false
+
+/**
+ * Charting, off while there is no licensed feed behind it.
+ *
+ * Every candle this app serves comes from a personal OANDA token, and a
+ * personal token licenses those prices to one person — putting them on other
+ * people's screens is redistribution. Until a feed with redistribution in its
+ * contract is paid for, the chart is closed rather than quietly in breach: the
+ * nav entries go, `/dashboard/chart` redirects, the exit-capture card and the
+ * trade form's level pinning go with it, and the two vendor routes answer 503
+ * instead of spending the key.
+ *
+ * The code is all still here, deliberately. `MARKET_CHARTS_ENABLED = true` and a
+ * licensed feed is the whole switch back.
+ */
+export const MARKET_CHARTS_ENABLED = false

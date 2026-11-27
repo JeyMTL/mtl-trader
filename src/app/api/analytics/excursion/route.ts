@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { apiError } from '@/lib/log'
 import { mayReadMarketData } from '@/lib/solo'
+import { MARKET_CHARTS_ENABLED } from '@/lib/features'
 import { rateLimit } from '@/lib/rate-limit'
 import { fetchExcursionSeries } from '@/lib/excursion-feed'
 import {
@@ -81,6 +82,13 @@ function num(value: number | string): number {
 
 export async function GET(req: Request) {
   try {
+    // Exit capture is measured against candles, so it is off with the chart.
+    if (!MARKET_CHARTS_ENABLED) {
+      return NextResponse.json(
+        { error: 'Charting is turned off on this deployment.' },
+        { status: 503 }
+      )
+    }
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     // Same gate as the chart: this route spends vendor credit too.
