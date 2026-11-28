@@ -878,5 +878,6 @@
   "lockMt5Ready": "Klar — båda behörigheterna beviljade.",
   "lockMt5NeedsA11y": "Tillgänglighetstjänsten är inte tillåten än",
   "lockMt5NeedsOverlay": "Visa över andra appar är inte tillåtet än",
-  "lockMt5Allow": "Tillåt"
+  "lockMt5Allow": "Tillåt",
+  "languageUpdate": "Uppdatera"
 }

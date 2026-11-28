@@ -878,5 +878,6 @@
   "lockMt5Ready": "Hazır — iki izin de verildi.",
   "lockMt5NeedsA11y": "Erişilebilirlik hizmetine henüz izin verilmedi",
   "lockMt5NeedsOverlay": "Diğer uygulamaların üzerinde gösterme henüz izinli değil",
-  "lockMt5Allow": "İzin ver"
+  "lockMt5Allow": "İzin ver",
+  "languageUpdate": "Güncelleme"
 }

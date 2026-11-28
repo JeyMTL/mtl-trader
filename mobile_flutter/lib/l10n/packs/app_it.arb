@@ -878,5 +878,6 @@
   "lockMt5Ready": "Pronto — entrambi i permessi concessi.",
   "lockMt5NeedsA11y": "Servizio di accessibilità non ancora consentito",
   "lockMt5NeedsOverlay": "Visualizzazione sopra altre app non ancora consentita",
-  "lockMt5Allow": "Consenti"
+  "lockMt5Allow": "Consenti",
+  "languageUpdate": "Aggiornamento"
 }

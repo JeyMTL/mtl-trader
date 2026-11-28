@@ -878,5 +878,6 @@
   "lockMt5Ready": "Siap — kedua izin diberikan.",
   "lockMt5NeedsA11y": "Layanan aksesibilitas belum diizinkan",
   "lockMt5NeedsOverlay": "Tampilkan di atas aplikasi lain belum diizinkan",
-  "lockMt5Allow": "Izinkan"
+  "lockMt5Allow": "Izinkan",
+  "languageUpdate": "Memperbarui"
 }

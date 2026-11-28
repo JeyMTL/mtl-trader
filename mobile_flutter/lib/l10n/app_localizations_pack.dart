@@ -3219,4 +3219,7 @@ class AppLocalizationsPack extends AppLocalizations {
 
   @override
   String get lockMt5Allow => _read('lockMt5Allow') ?? _en.lockMt5Allow;
+
+  @override
+  String get languageUpdate => _read('languageUpdate') ?? _en.languageUpdate;
 }

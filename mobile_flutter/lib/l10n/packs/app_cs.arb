@@ -878,5 +878,6 @@
   "lockMt5Ready": "Připraveno — obě oprávnění udělena.",
   "lockMt5NeedsA11y": "Služba přístupnosti zatím není povolena",
   "lockMt5NeedsOverlay": "Zobrazení nad jinými aplikacemi zatím není povoleno",
-  "lockMt5Allow": "Povolit"
+  "lockMt5Allow": "Povolit",
+  "languageUpdate": "Aktualizovat"
 }

@@ -878,5 +878,6 @@
   "lockMt5Ready": "Gatavs — abas atļaujas piešķirtas.",
   "lockMt5NeedsA11y": "Pieejamības pakalpojums vēl nav atļauts",
   "lockMt5NeedsOverlay": "Rādīšana virs citām lietotnēm vēl nav atļauta",
-  "lockMt5Allow": "Atļaut"
+  "lockMt5Allow": "Atļaut",
+  "languageUpdate": "Atjaunināt"
 }

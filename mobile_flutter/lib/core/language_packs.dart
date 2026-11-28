@@ -217,10 +217,24 @@ class LanguagePacks extends ChangeNotifier {
     }
   }
 
-  /// Downloads and stores one language. Returns false when it could not be
-  /// fetched, leaving the phone exactly as it was.
-  Future<bool> install(String code) async {
-    if (isBuiltIn(code) || _installed.containsKey(code)) return true;
+  /// True when the phone holds this pack but the published one is newer.
+  ///
+  /// Without this an installed pack stayed at whatever version was current on
+  /// the day it was downloaded, so a translation shipped later never arrived.
+  bool isStale(String code) {
+    final installed = _installed[code];
+    final published = _available[code];
+    return installed != null &&
+        published != null &&
+        published.version != installed.version;
+  }
+
+  /// Downloads and stores one language, or replaces it when [force] is set so
+  /// a newer version can land. Returns false when it could not be fetched,
+  /// leaving the phone exactly as it was.
+  Future<bool> install(String code, {bool force = false}) async {
+    if (isBuiltIn(code)) return true;
+    if (!force && _installed.containsKey(code)) return true;
     if (!_installing.add(code)) return false;
 
     _errors.remove(code);
@@ -288,10 +302,15 @@ class LanguagePacks extends ChangeNotifier {
   /// Downloads the saved language's pack if it is not on the phone yet, so a
   /// language chosen before packs existed comes back without a trip to settings.
   Future<void> ensureActivePack(String? code) async {
-    if (code == null || isBuiltIn(code) || _installed.containsKey(code)) return;
-    if (_available.isEmpty) await refreshManifest();
-    if (!_available.containsKey(code)) return;
-    await install(code);
+    if (code == null || isBuiltIn(code)) return;
+    // The cached manifest is from install day, so ask the server: that is how a
+    // translation published since the pack was downloaded reaches the phone.
+    await refreshManifest();
+    final published = _available[code];
+    if (published == null) return;
+    final installed = _installed[code];
+    if (installed != null && installed.version == published.version) return;
+    await install(code, force: installed != null);
   }
 
   /// The delegates the app hands to `MaterialApp`: packs first, then the

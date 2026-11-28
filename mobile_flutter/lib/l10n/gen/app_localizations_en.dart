@@ -3248,4 +3248,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lockMt5Allow => 'Allow';
+
+  @override
+  String get languageUpdate => 'Update';
 }

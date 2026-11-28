@@ -878,5 +878,6 @@
   "lockMt5Ready": "Gereed — beide machtigingen verleend.",
   "lockMt5NeedsA11y": "Toegankelijkheidsservice nog niet toegestaan",
   "lockMt5NeedsOverlay": "Over andere apps weergeven nog niet toegestaan",
-  "lockMt5Allow": "Toestaan"
+  "lockMt5Allow": "Toestaan",
+  "languageUpdate": "Update"
 }

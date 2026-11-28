@@ -878,5 +878,6 @@
   "lockMt5Ready": "Valmis — molemmat luvat myönnetty.",
   "lockMt5NeedsA11y": "Esteettömyyspalvelua ei ole vielä sallittu",
   "lockMt5NeedsOverlay": "Näyttäminen muiden sovellusten päällä ei ole vielä sallittu",
-  "lockMt5Allow": "Salli"
+  "lockMt5Allow": "Salli",
+  "languageUpdate": "Päivitä"
 }

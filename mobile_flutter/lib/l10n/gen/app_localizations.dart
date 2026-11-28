@@ -5369,6 +5369,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow'**
   String get lockMt5Allow;
+
+  /// No description provided for @languageUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get languageUpdate;
 }
 
 class _AppLocalizationsDelegate

@@ -878,5 +878,6 @@
   "lockMt5Ready": "Bereit — beide Berechtigungen erteilt.",
   "lockMt5NeedsA11y": "Bedienungshilfe noch nicht erlaubt",
   "lockMt5NeedsOverlay": "Über anderen Apps anzeigen noch nicht erlaubt",
-  "lockMt5Allow": "Erlauben"
+  "lockMt5Allow": "Erlauben",
+  "languageUpdate": "Aktualisieren"
 }

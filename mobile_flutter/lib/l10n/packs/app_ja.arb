@@ -878,5 +878,6 @@
   "lockMt5Ready": "準備完了 — 両方の権限が許可されています。",
   "lockMt5NeedsA11y": "ユーザー補助サービスがまだ許可されていません",
   "lockMt5NeedsOverlay": "他のアプリの上に重ねて表示がまだ許可されていません",
-  "lockMt5Allow": "許可"
+  "lockMt5Allow": "許可",
+  "languageUpdate": "アップデート"
 }

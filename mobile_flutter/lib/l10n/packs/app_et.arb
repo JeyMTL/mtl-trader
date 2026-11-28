@@ -878,5 +878,6 @@
   "lockMt5Ready": "Valmis — mõlemad load antud.",
   "lockMt5NeedsA11y": "Juurdepääsuteenus pole veel lubatud",
   "lockMt5NeedsOverlay": "Kuvamine teiste rakenduste kohal pole veel lubatud",
-  "lockMt5Allow": "Luba"
+  "lockMt5Allow": "Luba",
+  "languageUpdate": "Värskenda"
 }

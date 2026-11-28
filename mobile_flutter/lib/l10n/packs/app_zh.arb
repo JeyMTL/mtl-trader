@@ -878,5 +878,6 @@
   "lockMt5Ready": "已就绪 — 两项权限均已授予。",
   "lockMt5NeedsA11y": "辅助功能服务尚未允许",
   "lockMt5NeedsOverlay": "显示在其他应用上层尚未允许",
-  "lockMt5Allow": "允许"
+  "lockMt5Allow": "允许",
+  "languageUpdate": "更新"
 }

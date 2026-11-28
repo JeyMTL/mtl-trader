@@ -878,5 +878,6 @@
   "lockMt5Ready": "Spremno — oba dopuštenja odobrena.",
   "lockMt5NeedsA11y": "Usluga pristupačnosti još nije dopuštena",
   "lockMt5NeedsOverlay": "Prikaz iznad drugih aplikacija još nije dopušten",
-  "lockMt5Allow": "Dopusti"
+  "lockMt5Allow": "Dopusti",
+  "languageUpdate": "Ažurirati"
 }

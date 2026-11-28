@@ -878,5 +878,6 @@
   "lockMt5Ready": "جاهز — تم منح الإذنين.",
   "lockMt5NeedsA11y": "خدمة إمكانية الوصول غير مسموح بها بعد",
   "lockMt5NeedsOverlay": "العرض فوق التطبيقات الأخرى غير مسموح به بعد",
-  "lockMt5Allow": "السماح"
+  "lockMt5Allow": "السماح",
+  "languageUpdate": "تحديث"
 }

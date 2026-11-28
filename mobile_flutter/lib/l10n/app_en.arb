@@ -1869,5 +1869,6 @@
   "lockMt5Ready": "Ready — both permissions granted.",
   "lockMt5NeedsA11y": "Accessibility service not allowed yet",
   "lockMt5NeedsOverlay": "Display over other apps not allowed yet",
-  "lockMt5Allow": "Allow"
+  "lockMt5Allow": "Allow",
+  "languageUpdate": "Update"
 }

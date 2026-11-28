@@ -157,12 +157,15 @@ class _LanguageSheetState extends State<_LanguageSheet> {
     }
 
     final packs = LanguagePacks.instance;
+    // An installed pack can be replaced by a newer published one: choosing the
+    // language is also the moment to pick up its latest translation.
+    final stale = packs.isInstalled(code) && packs.isStale(code);
     final downloadable = !packs.isBuiltIn(code) &&
         !packs.isInstalled(code) &&
         packs.infoFor(code) != null;
 
-    if (downloadable) {
-      final installed = await packs.install(code);
+    if (downloadable || stale) {
+      final installed = await packs.install(code, force: stale);
       if (!installed) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -318,6 +321,7 @@ class _LanguageSheetState extends State<_LanguageSheet> {
     }
 
     if (packs.isInstalled(entry.code)) {
+      final stale = packs.isStale(entry.code);
       return _LanguageRow(
         flag: entry.flag,
         title: entry.nativeName,
@@ -327,7 +331,25 @@ class _LanguageSheetState extends State<_LanguageSheet> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _LanguageBadge(l10n.languageDownloaded),
+            if (stale)
+              TextButton(
+                onPressed: () => _choose(entry.code),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  minimumSize: const Size(0, 30),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: Text(
+                  l10n.languageUpdate,
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+            else
+              _LanguageBadge(l10n.languageDownloaded),
             IconButton(
               tooltip: l10n.languageRemove,
               visualDensity: VisualDensity.compact,

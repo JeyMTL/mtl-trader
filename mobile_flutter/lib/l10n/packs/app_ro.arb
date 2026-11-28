@@ -878,5 +878,6 @@
   "lockMt5Ready": "Pregătit — ambele permisiuni acordate.",
   "lockMt5NeedsA11y": "Serviciul de accesibilitate nu este încă permis",
   "lockMt5NeedsOverlay": "Afișarea peste alte aplicații nu este încă permisă",
-  "lockMt5Allow": "Permite"
+  "lockMt5Allow": "Permite",
+  "languageUpdate": "Actualizare"
 }

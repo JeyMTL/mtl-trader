@@ -878,5 +878,6 @@
   "lockMt5Ready": "Pripravljeno — obe dovoljenji odobreni.",
   "lockMt5NeedsA11y": "Storitev dostopnosti še ni dovoljena",
   "lockMt5NeedsOverlay": "Prikaz nad drugimi aplikacijami še ni dovoljen",
-  "lockMt5Allow": "Dovoli"
+  "lockMt5Allow": "Dovoli",
+  "languageUpdate": "Posodobitev"
 }

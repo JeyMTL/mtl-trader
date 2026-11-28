@@ -96,6 +96,48 @@ void main() {
     expect(restarted.messagesFor('fr')!['navDesk'], 'Bureau');
   });
 
+  test('a newer published pack replaces the installed one', () async {
+    server.manifest(<Map<String, Object>>[
+      <String, Object>{'code': 'fr', 'version': 1, 'bytes': 10, 'keys': 1},
+    ]);
+    server.pack('fr', <String, String>{'navDesk': 'Bureau'}, version: 1);
+    await packs.refreshManifest();
+    await packs.install('fr');
+
+    // The translator ships a new version while this phone keeps its old one.
+    server.manifest(<Map<String, Object>>[
+      <String, Object>{'code': 'fr', 'version': 2, 'bytes': 10, 'keys': 1},
+    ]);
+    server.pack('fr', <String, String>{'navDesk': 'Bureau de trading'}, version: 2);
+
+    final restarted = LanguagePacks(fetch: server.get);
+    await restarted.restore();
+    await restarted.ensureActivePack('fr');
+
+    expect(restarted.messagesFor('fr')!['navDesk'], 'Bureau de trading');
+    expect(restarted.isStale('fr'), isFalse);
+  });
+
+  test('a current pack is not downloaded again at start-up', () async {
+    final paths = <String>[];
+    final counted = LanguagePacks(fetch: (uri) async {
+      paths.add(uri.path);
+      return server.get(uri);
+    });
+    server.manifest(<Map<String, Object>>[
+      <String, Object>{'code': 'fr', 'version': 3, 'bytes': 10, 'keys': 1},
+    ]);
+    server.pack('fr', <String, String>{'navDesk': 'Bureau'}, version: 3);
+    await counted.restore();
+    await counted.ensureActivePack('fr');
+
+    paths.clear();
+    await counted.ensureActivePack('fr');
+
+    // The manifest is re-read, the pack itself is not downloaded again.
+    expect(paths, <String>['/locales/manifest.json']);
+  });
+
   test('removing a pack deletes it from the phone too', () async {
     server.pack('fr', <String, String>{'navDesk': 'Bureau'});
     await packs.install('fr');

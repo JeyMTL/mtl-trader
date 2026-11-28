@@ -878,5 +878,6 @@
   "lockMt5Ready": "तैयार — दोनों अनुमतियाँ दी गई हैं।",
   "lockMt5NeedsA11y": "एक्सेसिबिलिटी सेवा अभी अनुमत नहीं है",
   "lockMt5NeedsOverlay": "अन्य ऐप्स के ऊपर दिखाना अभी अनुमत नहीं है",
-  "lockMt5Allow": "अनुमति दें"
+  "lockMt5Allow": "अनुमति दें",
+  "languageUpdate": "अद्यतन"
 }

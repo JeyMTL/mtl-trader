@@ -878,5 +878,6 @@
   "lockMt5Ready": "준비됨 — 두 권한 모두 허용됨.",
   "lockMt5NeedsA11y": "접근성 서비스가 아직 허용되지 않았습니다",
   "lockMt5NeedsOverlay": "다른 앱 위에 표시가 아직 허용되지 않았습니다",
-  "lockMt5Allow": "허용"
+  "lockMt5Allow": "허용",
+  "languageUpdate": "업데이트"
 }

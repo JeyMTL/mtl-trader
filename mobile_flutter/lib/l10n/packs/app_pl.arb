@@ -878,5 +878,6 @@
   "lockMt5Ready": "Gotowe — oba uprawnienia przyznane.",
   "lockMt5NeedsA11y": "Usługa ułatwień dostępu nie jest jeszcze dozwolona",
   "lockMt5NeedsOverlay": "Wyświetlanie nad innymi aplikacjami nie jest jeszcze dozwolone",
-  "lockMt5Allow": "Zezwól"
+  "lockMt5Allow": "Zezwól",
+  "languageUpdate": "Aktualizacja"
 }

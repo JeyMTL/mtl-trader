@@ -878,5 +878,6 @@
   "lockMt5Ready": "Klar — begge tilladelser er givet.",
   "lockMt5NeedsA11y": "Tilgængelighedstjenesten er ikke tilladt endnu",
   "lockMt5NeedsOverlay": "Vis over andre apps er ikke tilladt endnu",
-  "lockMt5Allow": "Tillad"
+  "lockMt5Allow": "Tillad",
+  "languageUpdate": "Opdatering"
 }
