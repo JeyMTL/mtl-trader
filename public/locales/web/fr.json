@@ -1420,5 +1420,17 @@
   "Zone": "Zone",
   "Start 3-day free trial": "Commencer l'essai gratuit de 3 jours",
   "3-day free trial · No credit card required · Web + Android": "Essai gratuit de 3 jours · Aucune carte requise · Web et Android",
-  "This language is still being translated. Some text remains in English.": "Cette langue est en cours de traduction. Certains textes restent en anglais."
+  "This language is still being translated. Some text remains in English.": "Cette langue est en cours de traduction. Certains textes restent en anglais.",
+  "30+ Languages": "30+ langues",
+  "Android & Web App": "Application Android et Web",
+  "Chart desk from 1m to daily candles, with every drawing tool except position pinning": "Bureau à cartes de 1 m aux bougies quotidiennes, avec tous les outils de dessin sauf l'épinglage de position",
+  "Leave it connected and reload this page to check again. Do not disconnect: that deletes the stored password and restarts the whole read.": "Laissez-le connecté et rechargez cette page pour vérifier à nouveau. Ne pas déconnecter : cela supprime le mot de passe stocké et relance toute la lecture.",
+  "Live chart data": "Données graphiques en direct",
+  "MT5 Auto-Sync": "Synchronisation automatique MT5",
+  "Still not connected after two minutes, and no sync session has picked the account up yet. That normally means the account number, server or investor password was rejected.": "Toujours pas connecté après deux minutes et aucune session de synchronisation n'a encore récupéré le compte. Cela signifie normalement que le numéro de compte, le serveur ou le mot de passe de l'investisseur ont été rejetés.",
+  "Still signing in. The first sync reads up to a year of closed trades from the terminal, so it can take several minutes.": "Je suis toujours en train de me connecter. La première synchronisation lit jusqu'à un an de transactions clôturées à partir du terminal, cela peut donc prendre plusieurs minutes.",
+  "Still stuck? Contact support": "Toujours bloqué ? Contacter l'assistance",
+  "The first connection can take a few minutes while the terminal downloads your trade history. You can close this page — we send a notification to your phone when sync is live, or if the password was rejected. If it stays here, check that the account number and investor password are correct, then disconnect and connect again.": "La première connexion peut prendre quelques minutes le temps que le terminal télécharge votre historique de transactions. Vous pouvez fermer cette page : nous envoyons une notification sur votre téléphone lorsque la synchronisation est en direct ou si le mot de passe a été rejeté. S'il reste ici, vérifiez que le numéro de compte et le mot de passe de l'investisseur sont corrects, puis déconnectez-vous et reconnectez-vous.",
+  "The first connection can take a few minutes while we download your trade history. You can close this page: we notify you when sync is live, or if the password is wrong.": "La première connexion peut prendre quelques minutes pendant que nous téléchargeons votre historique de transactions. Vous pouvez fermer cette page : nous vous avertissons lorsque la synchronisation est active ou si le mot de passe est erroné.",
+  "What happened:": "Ce qui s'est passé:"
 }

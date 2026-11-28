@@ -3,234 +3,234 @@
   "packs": [
     {
       "code": "ar",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "bg",
-      "translated": 346,
+      "translated": 1429,
       "total": 1429,
-      "percent": 24,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "cs",
-      "translated": 80,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "da",
-      "translated": 76,
+      "translated": 1429,
       "total": 1429,
-      "percent": 5,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "de",
-      "translated": 181,
+      "translated": 1429,
       "total": 1429,
-      "percent": 13,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "el",
-      "translated": 81,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "es",
-      "translated": 83,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "et",
-      "translated": 80,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "fi",
-      "translated": 80,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "fr",
-      "translated": 1417,
+      "translated": 1429,
       "total": 1429,
-      "percent": 99,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "hi",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "hr",
-      "translated": 79,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "hu",
-      "translated": 80,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "id",
-      "translated": 79,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "it",
-      "translated": 79,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "ja",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "ko",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "lt",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "lv",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "nb",
-      "translated": 79,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "nl",
-      "translated": 79,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "pl",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "pt",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "ro",
-      "translated": 79,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "ru",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "sk",
-      "translated": 80,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "sl",
-      "translated": 79,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "sr",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "sv",
-      "translated": 76,
+      "translated": 1429,
       "total": 1429,
-      "percent": 5,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "tr",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "uk",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "vi",
-      "translated": 80,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     },
     {
       "code": "zh",
-      "translated": 82,
+      "translated": 1429,
       "total": 1429,
-      "percent": 6,
-      "complete": false
+      "percent": 100,
+      "complete": true
     }
   ]
 }
