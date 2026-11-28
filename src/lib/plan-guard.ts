@@ -2,6 +2,7 @@ import { getAdminClient } from '@/lib/server-auth'
 import {
   aiReviewQuota,
   canUseFeature,
+  trialDailyLimit,
   type AccountState,
   type FeatureAccess,
   type PlanFeature,
@@ -29,6 +30,12 @@ export interface FeatureGuard extends FeatureAccess {
   account: AccountState | null
   /** Monthly AI allowance in force (0 for everything else). */
   quota: number
+  /**
+   * Per-day allowance a running trial puts on this feature, or null when the
+   * account is not on a trial (or the feature is not capped per day). The route
+   * counts today's uses itself; this only says the limit.
+   */
+  dailyQuota: number | null
 }
 
 const MESSAGES: Record<string, string> = {
@@ -65,6 +72,7 @@ export async function checkFeature(
       message: 'Account not found.',
       account: null,
       quota: 0,
+      dailyQuota: null,
     }
   }
 
@@ -77,7 +85,57 @@ export async function checkFeature(
     message: access.allowed ? '' : MESSAGES[access.reason] || MESSAGES.subscription_required,
     account,
     quota: feature === 'ai_review' ? aiReviewQuota(account, now) : 0,
+    dailyQuota: trialDailyLimit(feature, account, now),
   }
+}
+
+/** ISO timestamp for the start of the UTC day [now] falls in. */
+export function startOfUtcDay(now: Date = new Date()): string {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  ).toISOString()
+}
+
+/** Seconds until the next UTC midnight, for a `Retry-After` header. */
+export function secondsUntilUtcDayEnd(now: Date = new Date()): number {
+  const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+  return Math.max(1, Math.ceil((end - now.getTime()) / 1000))
+}
+
+/**
+ * AI reviews generated since midnight UTC.
+ *
+ * The trial's daily cap is measured on the same rows the monthly quota counts;
+ * there is no second meter to drift out of step with the reviews themselves.
+ * Cached reads do not insert, so they cost nothing here either.
+ */
+export async function aiReviewsToday(userId: string, now: Date = new Date()): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from('ai_reviews')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', startOfUtcDay(now))
+
+  if (error) throw new Error(`Could not count today's reviews: ${error.message}`)
+  return count ?? 0
+}
+
+/**
+ * Backtest runs started since midnight UTC.
+ *
+ * Every completed run is persisted to `backtests`, so that table is the meter a
+ * trial's one-a-day limit reads. A run that the engine rejected writes no row and
+ * so does not spend the day's allowance.
+ */
+export async function backtestsToday(userId: string, now: Date = new Date()): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from('backtests')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', startOfUtcDay(now))
+
+  if (error) throw new Error(`Could not count today's backtests: ${error.message}`)
+  return count ?? 0
 }
 
 /**

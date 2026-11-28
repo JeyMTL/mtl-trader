@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "サブスクリプションは更新されません。アクセスは有料期間が終了するまで継続されます。",
   "Your trial has ended.": "トライアルは終了しました。",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "トライアルは終了しました。何も削除されていません - 日記はまだここにあり、読むことができます - しかし、新しい取引には計画が必要です。",
-  "Zone": "ゾーン"
+  "Zone": "ゾーン",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Pro ツールを 3 日間試してから、月に 30 回のトレードを続けてください。",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3 日間のトライアル: すべての Pro ツール、無制限の取引、1 日あたり 1 回の AI レビューと 1 回のバックテスト"
 }

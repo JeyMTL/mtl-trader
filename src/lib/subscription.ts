@@ -398,10 +398,12 @@ export interface FeatureAccess {
 /**
  * Whether an account may use a feature.
  *
- * A trial is allowed everything on purpose: a trial that cannot try the paid
- * features converts nobody. A lapsed account is refused even though its stored
- * tier may still say `pro`, because the period — not the label — is what ends
- * access.
+ * A trial is allowed every feature on purpose: a trial that cannot try the paid
+ * tools converts nobody. How *much* of the two per-call tools it gets is a
+ * separate question — `trialDailyLimit` caps the AI review and the backtester at
+ * one a day, and the routes check that after this gate says yes. A lapsed account
+ * is refused even though its stored tier may still say `pro`, because the period
+ * — not the label — is what ends access.
  */
 export function canUseFeature(
   account: AccountState,
@@ -419,18 +421,50 @@ export function canUseFeature(
 }
 
 /**
- * Monthly AI review allowance. The trial is treated as Pro.
+ * How many times a running trial may use a Pro tool in one UTC day.
+ *
+ * A trial used to hand over the whole Pro allowance — forty AI reviews and an
+ * unlimited backtester — so three days of trial were worth more than a paid
+ * month, and a new account never had a reason to look at the price. These are
+ * the two tools that cost money per call, so the trial now samples them: one a
+ * day for each of the three trial days. Everything else the trial opens (replay,
+ * the hard lock, the fast candles, push) is unchanged.
+ */
+export const TRIAL_DAILY_LIMITS: Partial<Record<PlanFeature, number>> = {
+  ai_review: 1,
+  backtest: 1,
+}
+
+/**
+ * The daily cap a running trial puts on [feature], or null for anything a trial
+ * does not cap (and for every account that is not on a trial).
+ */
+export function trialDailyLimit(
+  feature: PlanFeature,
+  account: AccountState,
+  now: Date = new Date()
+): number | null {
+  if (!isTrialActive(account, now)) return null
+  return TRIAL_DAILY_LIMITS[feature] ?? null
+}
+
+/**
+ * Monthly AI review allowance.
  *
  * The AI review is sold with Pro, so Basic has no allowance and forty a month is
- * what Pro buys; the trial runs at the Pro allowance so a new account can judge
- * the feature before paying for it. `PRO_ONLY` is what actually refuses the
- * route, this table is only how much of an allowed feature is left.
+ * what Pro buys. A trial gets one a day (`TRIAL_DAILY_LIMITS`), which over its
+ * `TRIAL_DAYS` is the total below — the route enforces the daily part, this
+ * number is what the UI and the monthly count compare against.
+ * `PRO_ONLY` is what actually refuses the route; this table is only how much of
+ * an allowed feature is left.
  */
 export const AI_REVIEW_QUOTA: Record<string, number> = { free: 0, basic: 0, pro: 40 }
 
 /** How many AI reviews the account may generate this month. */
 export function aiReviewQuota(account: AccountState, now: Date = new Date()): number {
-  if (isTrialActive(account, now)) return AI_REVIEW_QUOTA.pro
+  if (isTrialActive(account, now)) {
+    return TRIAL_DAYS * (TRIAL_DAILY_LIMITS.ai_review ?? 0)
+  }
   if (!isSubscriptionActive(account, now)) return 0
   return AI_REVIEW_QUOTA[account.subscription_tier ?? 'free'] ?? 0
 }

@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Előfizetése nem újul meg. A hozzáférés a fizetett időszak végéig tart.",
   "Your trial has ended.": "A próbaidőszak véget ért.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "A próbaidőszak véget ért. Semmit sem töröltek – a folyóirat még mindig itt van és olvasható –, de az új kereskedésekhez tervre van szükség.",
-  "Zone": "Zóna"
+  "Zone": "Zóna",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Próbálja ki a Pro eszközöket 3 napig, majd tartson 30 kereskedést havonta.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3 napos próbaverzió: minden Pro eszköz, korlátlan kereskedés, 1 AI áttekintés és napi 1 visszateszt"
 }

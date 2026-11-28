@@ -46,7 +46,14 @@ vi.mock('@/lib/rate-limit', () => ({
 }))
 
 vi.mock('@/lib/plan-guard', () => ({
-  checkFeature: async () => ({ allowed: true, status: 200, message: '', quota: 200, reason: '' }),
+  checkFeature: async () => ({
+    allowed: true,
+    status: 200,
+    message: '',
+    quota: 200,
+    reason: '',
+    dailyQuota: null,
+  }),
   aiReviewsThisMonth: async () => 0,
 }))
 

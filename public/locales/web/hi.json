@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "आपकी सदस्यता नवीनीकृत नहीं होगी. भुगतान अवधि के अंत तक पहुंच जारी रहती है।",
   "Your trial has ended.": "आपका परीक्षण समाप्त हो गया है.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "आपका परीक्षण समाप्त हो गया है. कुछ भी हटाया नहीं गया - पत्रिका अभी भी यहां है और पढ़ने योग्य है - लेकिन नए ट्रेडों के लिए एक योजना की आवश्यकता है।",
-  "Zone": "जोन"
+  "Zone": "जोन",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "3 दिनों के लिए प्रो टूल आज़माएं, फिर प्रति माह 30 ट्रेड रखें।",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-दिवसीय परीक्षण: प्रत्येक प्रो टूल, असीमित ट्रेड, 1 एआई समीक्षा और एक दिन में 1 बैकटेस्ट"
 }

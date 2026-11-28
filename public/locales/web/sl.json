@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Vaša naročnina ne bo podaljšana. Dostop se nadaljuje do konca plačanega obdobja.",
   "Your trial has ended.": "Vaše preizkusno obdobje se je končalo.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Vaše preizkusno obdobje se je končalo. Nič ni bilo izbrisano - dnevnik je še vedno tukaj in berljiv - vendar novi posli potrebujejo načrt.",
-  "Zone": "Cona"
+  "Zone": "Cona",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Preizkusite orodja Pro za 3 dni, nato obdržite 30 poslov na mesec.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-dnevna preskusna različica: vsako orodje Pro, neomejeno trgovanje, 1 pregled z umetno inteligenco in 1 preizkus za nazaj na dan"
 }

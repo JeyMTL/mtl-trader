@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "لن يتم تجديد اشتراكك. يستمر الوصول حتى نهاية الفترة المدفوعة.",
   "Your trial has ended.": "انتهت محاكمتك.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "انتهت محاكمتك. لم يتم حذف أي شيء - لا تزال المجلة هنا ويمكن قراءتها - ولكن الصفقات الجديدة تحتاج إلى خطة.",
-  "Zone": "منطقة"
+  "Zone": "منطقة",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "جرب الأدوات الاحترافية لمدة 3 أيام، ثم احتفظ بـ 30 صفقة في الشهر.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "تجربة مدتها 3 أيام: كل أداة احترافية، وعمليات تداول غير محدودة، ومراجعة واحدة للذكاء الاصطناعي واختبار خلفي واحد يوميًا"
 }

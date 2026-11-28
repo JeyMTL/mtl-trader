@@ -1432,5 +1432,7 @@
   "Still stuck? Contact support": "Toujours bloqué ? Contacter l'assistance",
   "The first connection can take a few minutes while the terminal downloads your trade history. You can close this page — we send a notification to your phone when sync is live, or if the password was rejected. If it stays here, check that the account number and investor password are correct, then disconnect and connect again.": "La première connexion peut prendre quelques minutes le temps que le terminal télécharge votre historique de transactions. Vous pouvez fermer cette page : nous envoyons une notification sur votre téléphone lorsque la synchronisation est en direct ou si le mot de passe a été rejeté. S'il reste ici, vérifiez que le numéro de compte et le mot de passe de l'investisseur sont corrects, puis déconnectez-vous et reconnectez-vous.",
   "The first connection can take a few minutes while we download your trade history. You can close this page: we notify you when sync is live, or if the password is wrong.": "La première connexion peut prendre quelques minutes pendant que nous téléchargeons votre historique de transactions. Vous pouvez fermer cette page : nous vous avertissons lorsque la synchronisation est active ou si le mot de passe est erroné.",
-  "What happened:": "Ce qui s'est passé:"
+  "What happened:": "Ce qui s'est passé:",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Essayez les outils Pro pendant 3 jours, puis effectuez 30 transactions par mois.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "Essai de 3 jours : tous les outils Pro, transactions illimitées, 1 révision IA et 1 backtest par jour"
 }

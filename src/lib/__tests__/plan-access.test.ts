@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   AI_REVIEW_QUOTA,
+  TRIAL_DAILY_LIMITS,
+  TRIAL_DAYS,
   aiReviewQuota,
   canUseFeature,
   hasProTools,
   isProTimeframe,
+  trialDailyLimit,
   type AccountState,
 } from '@/lib/subscription'
 
@@ -100,9 +103,30 @@ describe('canUseFeature', () => {
   })
 })
 
+describe('trialDailyLimit', () => {
+  it('caps the AI review and the backtester at one a day during the trial', () => {
+    expect(trialDailyLimit('ai_review', TRIAL)).toBe(1)
+    expect(trialDailyLimit('backtest', TRIAL)).toBe(1)
+  })
+
+  it('leaves the rest of the trial open', () => {
+    for (const feature of ['replay', 'hard_lock', 'fast_timeframes', 'push_alerts'] as const) {
+      expect(trialDailyLimit(feature, TRIAL)).toBeNull()
+    }
+  })
+
+  it('applies to nobody but a running trial', () => {
+    expect(trialDailyLimit('ai_review', paid('pro'))).toBeNull()
+    expect(trialDailyLimit('ai_review', paid('basic'))).toBeNull()
+    expect(trialDailyLimit('backtest', EXPIRED)).toBeNull()
+    expect(trialDailyLimit('backtest', LAPSED_TRIAL)).toBeNull()
+  })
+})
+
 describe('aiReviewQuota', () => {
-  it('gives the trial a Pro allowance', () => {
-    expect(aiReviewQuota(TRIAL)).toBe(AI_REVIEW_QUOTA.pro)
+  it('gives the trial one a day for each of its days', () => {
+    expect(aiReviewQuota(TRIAL)).toBe(TRIAL_DAYS * (TRIAL_DAILY_LIMITS.ai_review ?? 0))
+    expect(aiReviewQuota(TRIAL)).toBe(3)
   })
 
   it('gives Basic none and Pro forty, because the AI review is sold with Pro', () => {

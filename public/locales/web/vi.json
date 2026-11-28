@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Đăng ký của bạn sẽ không gia hạn. Quyền truy cập tiếp tục cho đến khi kết thúc thời gian thanh toán.",
   "Your trial has ended.": "Thời gian dùng thử của bạn đã kết thúc.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Thời gian dùng thử của bạn đã kết thúc. Không có gì bị xóa — nhật ký vẫn ở đây và có thể đọc được — nhưng các giao dịch mới cần có kế hoạch.",
-  "Zone": "Vùng"
+  "Zone": "Vùng",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Hãy dùng thử các công cụ Pro trong 3 ngày, sau đó thực hiện 30 giao dịch mỗi tháng.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "Dùng thử 3 ngày: mọi công cụ Pro, giao dịch không giới hạn, 1 lần đánh giá AI và 1 lần kiểm tra lại mỗi ngày"
 }

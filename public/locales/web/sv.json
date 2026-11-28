@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Ditt abonnemang kommer inte att förnyas. Åtkomsten fortsätter till slutet av den betalda perioden.",
   "Your trial has ended.": "Din rättegång har avslutats.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Din rättegång har avslutats. Ingenting raderades - tidskriften är fortfarande här och läsbar - men nya affärer behöver en plan.",
-  "Zone": "Zon"
+  "Zone": "Zon",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Prova Pro-verktygen i 3 dagar och håll sedan 30 affärer i månaden.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-dagars provversion: varje Pro-verktyg, obegränsade byten, 1 AI-recension och 1 backtest per dag"
 }

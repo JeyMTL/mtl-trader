@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Abonnementet ditt vil ikke fornyes. Tilgangen fortsetter til slutten av den betalte perioden.",
   "Your trial has ended.": "Prøveperioden din er avsluttet.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Prøveperioden din er avsluttet. Ingenting ble slettet - journalen er fortsatt her og lesbar - men nye handler trenger en plan.",
-  "Zone": "Sone"
+  "Zone": "Sone",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Prøv Pro-verktøyene i 3 dager, og hold deretter 30 handler i måneden.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-dagers prøveversjon: hvert Pro-verktøy, ubegrensede handler, 1 AI-gjennomgang og 1 backtest om dagen"
 }

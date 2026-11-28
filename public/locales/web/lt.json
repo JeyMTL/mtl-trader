@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Jūsų prenumerata nebus atnaujinta. Prieiga tęsiasi iki mokamo laikotarpio pabaigos.",
   "Your trial has ended.": "Jūsų bandymas baigėsi.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Jūsų bandymas baigėsi. Niekas nebuvo ištrintas – žurnalas vis dar yra čia ir jį galima skaityti, bet naujiems sandoriams reikia plano.",
-  "Zone": "Zona"
+  "Zone": "Zona",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Išbandykite „Pro“ įrankius 3 dienas, tada atlikite 30 sandorių per mėnesį.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3 dienų bandomasis laikotarpis: kiekvienas „Pro“ įrankis, neriboti sandoriai, 1 AI peržiūra ir 1 atgalinis patikrinimas per dieną"
 }

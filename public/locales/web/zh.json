@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "您的订阅将不会续订。访问持续到付费期结束。",
   "Your trial has ended.": "您的审判已经结束。",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "您的审判已经结束。没有任何内容被删除——日记仍然在这里并且可读——但新交易需要一个计划。",
-  "Zone": "区"
+  "Zone": "区",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "试用专业工具 3 天，然后每月保留 30 笔交易。",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3 天试用：每个 Pro 工具、无限交易、每天 1 次 AI 审核和 1 次回测"
 }

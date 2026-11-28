@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Teie tellimust ei uuendata. Juurdepääs kestab kuni tasulise perioodi lõpuni.",
   "Your trial has ended.": "Teie prooviperiood on lõppenud.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Teie prooviperiood on lõppenud. Midagi ei kustutatud - ajakiri on endiselt siin ja loetav -, kuid uued tehingud vajavad plaani.",
-  "Zone": "Tsoon"
+  "Zone": "Tsoon",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Proovige Pro tööriistu 3 päeva, seejärel tehke 30 tehingut kuus.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-päevane prooviversioon: iga Pro tööriist, piiramatud tehingud, 1 AI ülevaade ja 1 tagasitest päevas"
 }

@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "구독이 갱신되지 않습니다. 유료 기간이 종료될 때까지 액세스가 계속됩니다.",
   "Your trial has ended.": "평가판이 종료되었습니다.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "평가판이 종료되었습니다. 아무것도 삭제되지 않았습니다. 저널은 여전히 ​​여기에 있고 읽을 수 있습니다. 하지만 새로운 거래에는 계획이 필요합니다.",
-  "Zone": "존"
+  "Zone": "존",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "3일 동안 Pro 도구를 사용해 보고 한 달에 30번의 거래를 유지하세요.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3일 평가판: 모든 Pro 도구, 무제한 거래, 하루 1회 AI 검토 및 1회 백테스트"
 }

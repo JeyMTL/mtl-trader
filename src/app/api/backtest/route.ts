@@ -4,7 +4,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { apiError, apiWarn, logEvent } from '@/lib/log'
 import { readJsonBody } from '@/lib/request'
 import { runBacktest } from '@/lib/backtest'
-import { checkFeature } from '@/lib/plan-guard'
+import { backtestsToday, checkFeature, secondsUntilUtcDayEnd } from '@/lib/plan-guard'
 
 /**
  * Backtest runs.
@@ -63,6 +63,25 @@ export async function POST(req: Request) {
         { error: gate.message, code: 'upgrade_required' },
         { status: gate.status }
       )
+    }
+
+    // A trial gets one run a day instead of the Pro plan's open engine. Counted
+    // before the CSV is parsed and the simulation runs, so a second attempt
+    // costs neither time nor the vendor's compute.
+    if (typeof gate.dailyQuota === 'number') {
+      const today = await backtestsToday(user.id)
+      if (today >= gate.dailyQuota) {
+        return NextResponse.json(
+          {
+            error: `The free trial includes ${gate.dailyQuota} backtest${gate.dailyQuota === 1 ? '' : 's'} a day. The next run unlocks at midnight UTC.`,
+            code: 'daily_limit',
+          },
+          {
+            status: 429,
+            headers: { 'Retry-After': String(secondsUntilUtcDayEnd()) },
+          }
+        )
+      }
     }
 
     const parsed = await readJsonBody<Record<string, unknown>>(req, {

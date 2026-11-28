@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Abonamentul dvs. nu se va reînnoi. Accesul continuă până la sfârșitul perioadei plătite.",
   "Your trial has ended.": "Procesul tău s-a încheiat.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Procesul tău s-a încheiat. Nimic nu a fost șters - jurnalul este încă aici și poate fi citit - dar tranzacțiile noi au nevoie de un plan.",
-  "Zone": "Zonă"
+  "Zone": "Zonă",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Încercați instrumentele Pro timp de 3 zile, apoi păstrați 30 de tranzacții pe lună.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "Probă de 3 zile: fiecare instrument Pro, tranzacții nelimitate, 1 revizuire AI și 1 backtest pe zi"
 }

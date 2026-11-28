@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Вашият абонамент няма да бъде подновен. Достъпът продължава до края на платения период.",
   "Your trial has ended.": "Пробният ви период приключи.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Пробният ви период приключи. Нищо не беше изтрито - дневникът все още е тук и може да се чете - но новите сделки се нуждаят от план.",
-  "Zone": "Зона"
+  "Zone": "Зона",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Изпробвайте професионалните инструменти за 3 дни, след което поддържайте 30 сделки на месец.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-дневен пробен период: всеки професионален инструмент, неограничени сделки, 1 AI преглед и 1 бектест на ден"
 }

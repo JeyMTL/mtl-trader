@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient, getAuthUser } from '@/lib/server-auth'
 import { rateLimit } from '@/lib/rate-limit'
-import { aiReviewsThisMonth, checkFeature } from '@/lib/plan-guard'
+import { aiReviewsThisMonth, aiReviewsToday, checkFeature } from '@/lib/plan-guard'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hashPayload } from '@/lib/ai/cache'
 import { createProvider, resolveProviderConfig } from '@/lib/ai/providers'
@@ -222,6 +222,22 @@ export async function POST(req: Request) {
           generatedAt: cached.created_at,
         },
       })
+    }
+
+    // The trial samples the tool rather than handing over the Pro allowance:
+    // one review a day, checked before the monthly count so a trial never sees
+    // the (larger) monthly number it will not reach.
+    if (typeof gate.dailyQuota === 'number') {
+      const today = await aiReviewsToday(user.id)
+      if (today >= gate.dailyQuota) {
+        return NextResponse.json(
+          {
+            error: `The free trial includes ${gate.dailyQuota} AI review${gate.dailyQuota === 1 ? '' : 's'} a day. The next one unlocks at midnight UTC.`,
+            code: 'daily_limit',
+          },
+          { status: 402 }
+        )
+      }
     }
 
     // A cached review returned above without inserting a row, so this counts

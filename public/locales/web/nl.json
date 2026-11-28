@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Uw abonnement wordt niet verlengd. De toegang loopt door tot het einde van de betaalde periode.",
   "Your trial has ended.": "Uw proefperiode is afgelopen.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Uw proefperiode is afgelopen. Er is niets verwijderd – het dagboek is er nog steeds en leesbaar – maar nieuwe transacties hebben een plan nodig.",
-  "Zone": "Zone"
+  "Zone": "Zone",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Probeer de Pro-tools drie dagen uit en behoud vervolgens 30 transacties per maand.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3 dagen op proef: elke Pro-tool, onbeperkt handelen, 1 AI-review en 1 backtest per dag"
 }

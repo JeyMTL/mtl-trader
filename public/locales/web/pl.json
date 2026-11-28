@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Twoja subskrypcja nie zostanie odnowiona. Dostęp trwa do końca opłaconego okresu.",
   "Your trial has ended.": "Twój okres próbny dobiegł końca.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Twój okres próbny dobiegł końca. Nic nie zostało usunięte — dziennik nadal tu jest i jest czytelny — ale nowe transakcje wymagają planu.",
-  "Zone": "Strefa"
+  "Zone": "Strefa",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Wypróbuj narzędzia Pro przez 3 dni, a następnie utrzymuj 30 transakcji miesięcznie.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-dniowy okres próbny: każde narzędzie Pro, nieograniczona liczba transakcji, 1 recenzja AI i 1 test historyczny dziennie"
 }

@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Η συνδρομή σας δεν θα ανανεωθεί. Η πρόσβαση συνεχίζεται μέχρι το τέλος της περιόδου πληρωμής.",
   "Your trial has ended.": "Η δοκιμή σας έληξε.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Η δοκιμή σας έληξε. Τίποτα δεν διαγράφηκε - το περιοδικό είναι ακόμα εδώ και αναγνώσιμο - αλλά οι νέες συναλλαγές χρειάζονται ένα σχέδιο.",
-  "Zone": "Ζώνη"
+  "Zone": "Ζώνη",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Δοκιμάστε τα εργαλεία Pro για 3 ημέρες και μετά κρατήστε 30 συναλλαγές το μήνα.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "Δοκιμή 3 ημερών: κάθε εργαλείο Pro, απεριόριστες συναλλαγές, 1 κριτική AI και 1 backtest την ημέρα"
 }

@@ -2,7 +2,7 @@ import { SubscriptionPlan } from '@/types'
 
 /** One-line positioning for the marketing pricing cards. */
 export const PLAN_TAGLINES: Record<string, string> = {
-  free: 'Try every Pro tool, then keep 30 trades a month.',
+  free: 'Try the Pro tools for 3 days, then keep 30 trades a month.',
   basic: 'The full journal, chart desk and daily-stop guard.',
   pro: 'Add AI reviews, replay and the backtester.',
 }
@@ -43,7 +43,7 @@ export const PLANS: SubscriptionPlan[] = [
     // back to, so it cannot be a read-only tombstone.
     max_trades: 30,
     features: [
-      '3-day trial: every Pro tool, unlimited trades',
+      '3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day',
       '30 trades a month after the trial',
       'Prop-firm simulator: daily loss, drawdown, target and consistency rules',
       'Journal with photos, voice notes, tags, setups and mistakes',

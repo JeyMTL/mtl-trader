@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Jūsu abonements netiks atjaunots. Piekļuve turpinās līdz apmaksātā perioda beigām.",
   "Your trial has ended.": "Jūsu izmēģinājums ir beidzies.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Jūsu izmēģinājums ir beidzies. Nekas netika izdzēsts — žurnāls joprojām ir šeit un lasāms, taču jauniem darījumiem ir nepieciešams plāns.",
-  "Zone": "Zona"
+  "Zone": "Zona",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Izmēģiniet Pro rīkus 3 dienas, pēc tam veiciet 30 darījumus mēnesī.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3 dienu izmēģinājums: katrs Pro rīks, neierobežoti darījumi, 1 AI pārskats un 1 atpakaļpārbaude dienā"
 }

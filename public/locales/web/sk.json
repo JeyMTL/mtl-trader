@@ -1427,5 +1427,7 @@
   "Your subscription will not renew. Access continues until the end of the paid period.": "Vaše predplatné sa neobnoví. Prístup pokračuje až do konca plateného obdobia.",
   "Your trial has ended.": "Vaša skúšobná verzia sa skončila.",
   "Your trial has ended. Nothing was deleted — the journal is still here and readable — but new trades need a plan.": "Vaša skúšobná verzia sa skončila. Nič nebolo vymazané – denník je stále tu a je čitateľný – ale nové obchody potrebujú plán.",
-  "Zone": "Zóna"
+  "Zone": "Zóna",
+  "Try the Pro tools for 3 days, then keep 30 trades a month.": "Vyskúšajte nástroje Pro na 3 dni, potom si nechajte 30 obchodov mesačne.",
+  "3-day trial: every Pro tool, unlimited trades, 1 AI review and 1 backtest a day": "3-dňová skúšobná verzia: každý nástroj Pro, neobmedzené obchody, 1 kontrola AI a 1 spätný test denne"
 }
