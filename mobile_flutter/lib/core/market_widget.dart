@@ -9,7 +9,12 @@
 /// is redistribution, and nothing here needs a data licence.
 library;
 
-/// Candle sizes TradingView renders for free. Seconds are not offered.
+/// Candle sizes TradingView renders for free.
+///
+/// Seconds are not offered because the widget only pretends to take them: a
+/// `5S` URL shows `5s` in its own picker but draws one-minute bars (its legend
+/// reads `1`), so a seconds chip would promise a resolution the chart is not
+/// showing.
 class MarketInterval {
   const MarketInterval(this.key, this.label, this.tv);
 
@@ -27,9 +32,12 @@ const List<MarketInterval> kMarketIntervals = <MarketInterval>[
   MarketInterval('1m', '1m', '1'),
   MarketInterval('5m', '5m', '5'),
   MarketInterval('15m', '15m', '15'),
+  MarketInterval('30m', '30m', '30'),
   MarketInterval('1h', '1h', '60'),
   MarketInterval('4h', '4h', '240'),
   MarketInterval('1d', '1d', 'D'),
+  MarketInterval('1W', '1W', 'W'),
+  MarketInterval('1M', '1M', 'M'),
 ];
 
 /// Instruments the market view offers, spelled the way a terminal does.

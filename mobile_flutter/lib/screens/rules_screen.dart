@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,9 +8,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/subscription.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../services/daily_stop_bus.dart';
+import '../services/mt5_freezer.dart';
 import '../services/session_reminders.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'day_lock_gate.dart' show FreezerDisclosureDialog;
 
 /// The Rules tab, on the phone.
 ///
@@ -27,7 +30,7 @@ class RulesScreen extends StatefulWidget {
   State<RulesScreen> createState() => _RulesScreenState();
 }
 
-class _RulesScreenState extends State<RulesScreen> {
+class _RulesScreenState extends State<RulesScreen> with WidgetsBindingObserver {
   /// Read through the State's own context: the cards are built in helper
   /// methods, not inside `build`.
   AppLocalizations get _l10n => AppLocalizations.of(context);
@@ -55,14 +58,38 @@ class _RulesScreenState extends State<RulesScreen> {
   bool _saving = false;
   String? _error;
 
+  /// Whether this phone covers MT5 while a stop is active, and what the cover
+  /// is still missing before it can. Both live outside `playbooks`: the server
+  /// decides the stop, the phone decides whether it may freeze an app.
+  bool _mt5Lock = true;
+  String _mt5Status = 'unknown';
+
+  /// Set while a settings screen we opened is in front, so coming back is the
+  /// moment to re-read the permissions instead of guessing.
+  bool _awaitingAccess = false;
+
+  /// The overlay step is offered once per visit to the toggle: a trader who
+  /// declined it is not sent back into the same screen on every resume.
+  bool _overlayOffered = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+    unawaited(_loadFreezer());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_awaitingAccess) return;
+    _awaitingAccess = false;
+    unawaited(_recheckFreezer());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final rule in _rules) {
       rule.dispose();
     }
@@ -448,6 +475,181 @@ class _RulesScreenState extends State<RulesScreen> {
     );
   }
 
+  bool get _android => defaultTargetPlatform == TargetPlatform.android;
+
+  Future<void> _loadFreezer() async {
+    if (!_android) return;
+    final enabled = await Mt5Freezer.lockEnabled();
+    final status = await Mt5Freezer.accessStatus();
+    if (!mounted) return;
+    setState(() {
+      _mt5Lock = enabled;
+      _mt5Status = status;
+    });
+  }
+
+  /// Re-reads the permissions after a settings screen we opened closes.
+  Future<void> _recheckFreezer() async {
+    final status = await Mt5Freezer.accessStatus();
+    if (!mounted) return;
+    setState(() => _mt5Status = status);
+    // Granting accessibility hands straight over to "Display over other apps",
+    // once, so the two permissions are one flow instead of two searches.
+    if (status == 'overlay' && !_overlayOffered) {
+      _overlayOffered = true;
+      _awaitingAccess = true;
+      await Mt5Freezer.requestAccess();
+    }
+  }
+
+  Future<void> _setMt5Lock(bool value) async {
+    if (!value) {
+      await Mt5Freezer.setLockEnabled(false);
+      if (mounted) setState(() => _mt5Lock = false);
+      return;
+    }
+
+    await Mt5Freezer.setLockEnabled(true);
+    if (!mounted) return;
+    setState(() => _mt5Lock = true);
+    await _askForAccess();
+  }
+
+  /// The disclosure and then the first missing permission. Both the switch and
+  /// the Allow button go through here: Play requires the disclosure before the
+  /// accessibility service is requested, whichever way the trader got there.
+  Future<void> _askForAccess() async {
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const FreezerDisclosureDialog(),
+    );
+    if (agreed != true || !mounted) return;
+
+    // One tap walks the whole list: whichever permission is missing opens
+    // first, and the return trip asks for the next one.
+    final status = await Mt5Freezer.accessStatus();
+    if (!mounted) return;
+    setState(() => _mt5Status = status);
+    if (status == 'granted') return;
+    _overlayOffered = status == 'overlay';
+    _awaitingAccess = true;
+    await Mt5Freezer.requestAccess();
+  }
+
+  /// The phone-side cover as its own switch, with the two permissions the
+  /// service needs. An install never prompts for either of them, so this block
+  /// is the only place they are asked for before a stop fires.
+  ///
+  /// Literal English, like the market view: an ARB key would have to be filled
+  /// in all 33 packs before `l10n_test` went green.
+  Widget _mt5LockBlock() {
+    if (!_android) return const SizedBox.shrink();
+    final ready = _mt5Status == 'granted';
+    final missing = switch (_mt5Status) {
+      'accessibility' => 'Accessibility service not allowed yet',
+      'overlay' => 'Display over other apps not allowed yet',
+      _ => '',
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 14),
+        Divider(color: AppColors.border, height: 1),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(Icons.phonelink_lock_outlined, size: 16, color: AppColors.faint),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MT5 lock',
+                    style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'Covers MetaTrader 5 on this phone when the stop fires.',
+                    style: TextStyle(
+                      color: AppColors.faint,
+                      fontSize: 10.5,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Switch(
+              value: _mt5Lock,
+              onChanged: _setMt5Lock,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ],
+        ),
+        if (_mt5Lock && _mt5Status != 'unknown')
+          Padding(
+            padding: const EdgeInsets.only(top: 2, left: 24),
+            child: ready
+                ? Row(
+                    children: [
+                      Icon(Icons.check_circle_outline,
+                          size: 13, color: AppColors.success),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          'Ready — both permissions granted.',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 10.5,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 13, color: AppColors.danger),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          missing,
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 10.5,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _askForAccess,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: const Size(0, 30),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Allow',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+      ],
+    );
+  }
+
   Widget _dailyStopCard() {
     return FlatCard(
       child: Column(
@@ -516,6 +718,7 @@ class _RulesScreenState extends State<RulesScreen> {
               setState(() => _lockMode = 'hard');
             },
           ),
+          _mt5LockBlock(),
         ],
       ),
     );

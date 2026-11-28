@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -39,6 +40,40 @@ class _MarketViewScreenState extends State<MarketViewScreen> {
   MarketInterval _interval = kMarketIntervals[2];
   bool _light = false;
   late final WebViewController _web = _buildController();
+
+  /// Whether the system bars are currently hidden for the landscape chart.
+  bool _immersive = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _applySystemUi(MediaQuery.orientationOf(context) == Orientation.landscape);
+  }
+
+  /// Landscape is the full-frame view, so the status and navigation bars go
+  /// with the app bar. `immersiveSticky` still lets a swipe from an edge bring
+  /// them back without leaving the chart.
+  void _applySystemUi(bool landscape) {
+    if (landscape == _immersive) return;
+    _immersive = landscape;
+    unawaited(
+      SystemChrome.setEnabledSystemUIMode(
+        landscape ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    // The bars belong to the app, not to this screen: leaving it in portrait
+    // must not leave the status bar hidden everywhere else.
+    if (_immersive) {
+      unawaited(
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge),
+      );
+    }
+    super.dispose();
+  }
 
   WebViewController _buildController() {
     return WebViewController()
@@ -462,30 +497,49 @@ class _InstrumentSearchState extends State<_InstrumentSearch> {
                         itemBuilder: (context, index) {
                           final code = results[index];
                           final selected = code == widget.selected;
-                          return ListTile(
-                            dense: true,
-                            title: Text(
-                              marketInstrumentLabel(code),
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight:
-                                    selected ? FontWeight.w700 : FontWeight.w500,
-                                color:
-                                    selected ? AppColors.primaryLight : null,
-                              ),
-                            ),
-                            subtitle: Text(
-                              code,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                            trailing: selected
-                                ? Icon(Icons.check,
-                                    size: 18, color: AppColors.primary)
-                                : null,
+                          // One 42-point line rather than a two-line ListTile:
+                          // landscape leaves about 300 points above the
+                          // keyboard, and this is the difference between one
+                          // result and four.
+                          return InkWell(
                             onTap: () => Navigator.of(context).pop(code),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: SizedBox(
+                                height: 42,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        marketInstrumentLabel(code),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: selected
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: selected
+                                              ? AppColors.primaryLight
+                                              : AppColors.text,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      code,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                    if (selected) ...[
+                                      const SizedBox(width: 8),
+                                      Icon(Icons.check,
+                                          size: 16, color: AppColors.primary),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
                           );
                         },
                       ),

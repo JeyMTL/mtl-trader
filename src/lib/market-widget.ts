@@ -20,9 +20,12 @@ export const MARKET_VIEW_INTERVALS = {
   '1m': { label: '1m', tv: '1' },
   '5m': { label: '5m', tv: '5' },
   '15m': { label: '15m', tv: '15' },
+  '30m': { label: '30m', tv: '30' },
   '1h': { label: '1h', tv: '60' },
   '4h': { label: '4h', tv: '240' },
   '1d': { label: '1d', tv: 'D' },
+  '1W': { label: '1W', tv: 'W' },
+  '1M': { label: '1M', tv: 'M' },
 } as const
 
 export type MarketInterval = keyof typeof MARKET_VIEW_INTERVALS

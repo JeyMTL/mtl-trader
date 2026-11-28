@@ -43,18 +43,41 @@ class MainActivity : FlutterActivity() {
                         isServiceEnabled() && Settings.canDrawOverlays(this)
                     )
 
+                    // Which of the two permissions is still missing. The screen
+                    // shows this as one line, so the trader knows whether the
+                    // cover would actually work before a stop ever fires.
+                    "accessStatus" -> result.success(
+                        when {
+                            !isServiceEnabled() -> "accessibility"
+                            !Settings.canDrawOverlays(this) -> "overlay"
+                            else -> "granted"
+                        }
+                    )
+
+                    // Opens the settings screen for the first missing permission.
+                    // Called once when the toggle goes on and again when the app
+                    // comes back, so the accessibility step hands over to the
+                    // overlay step without the trader hunting for it.
                     "openSettings" -> {
-                        if (!isServiceEnabled()) {
-                            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                        } else {
-                            startActivity(
+                        val step = when {
+                            !isServiceEnabled() -> "accessibility"
+                            !Settings.canDrawOverlays(this) -> "overlay"
+                            else -> "granted"
+                        }
+                        when (step) {
+                            "accessibility" -> startActivity(
+                                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                            )
+                            "overlay" -> startActivity(
                                 Intent(
                                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                     Uri.parse("package:$packageName")
                                 )
                             )
+                            // Nothing left to grant: stay put instead of
+                            // reopening a list that already says yes.
                         }
-                        result.success(true)
+                        result.success(step)
                     }
 
                     else -> result.notImplemented()

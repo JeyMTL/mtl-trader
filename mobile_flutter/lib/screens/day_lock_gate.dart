@@ -218,6 +218,12 @@ class _DayLockGateState extends State<DayLockGate> with WidgetsBindingObserver {
       await Mt5Freezer.sync(active: false);
       return;
     }
+    // The phone-side cover has its own switch. With it off the server's stop
+    // still locks the journal and the desk, it just stops covering MT5 here.
+    if (!await Mt5Freezer.lockEnabled()) {
+      await Mt5Freezer.sync(active: false);
+      return;
+    }
     final day = _asMap(data['day']);
     final end =
         day['end'] is String ? DateTime.tryParse(day['end'] as String) : null;
@@ -226,6 +232,8 @@ class _DayLockGateState extends State<DayLockGate> with WidgetsBindingObserver {
         : 0.0;
     final used =
         state['lossUsed'] is num ? (state['lossUsed'] as num).toDouble() : 0.0;
+    // Reading the switch meant awaiting, so the screen may have gone by now.
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context);
     final message = limit > 0
         ? l10n.lockBudgetMessage(
@@ -624,10 +632,10 @@ class _SoftLockBannerState extends State<_SoftLockBanner>
   /// button leads to Settings.
   Future<void> _enableFreezer() async {
     final agreed = await showGateDialog<bool>(
-      (context) => const _FreezerDisclosureDialog(),
+      (context) => const FreezerDisclosureDialog(),
     );
     if (agreed != true) return;
-    await Mt5Freezer.openSettings();
+    await Mt5Freezer.requestAccess();
   }
 
   Future<void> _unfreeze() async {
@@ -789,8 +797,8 @@ class _Stat extends StatelessWidget {
 /// The prominent disclosure Play requires before an app asks for the
 /// accessibility service and "Display over other apps". It has to sit in the
 /// app's own UI, be separate from the privacy policy, and end in a clear yes.
-class _FreezerDisclosureDialog extends StatelessWidget {
-  const _FreezerDisclosureDialog();
+class FreezerDisclosureDialog extends StatelessWidget {
+  const FreezerDisclosureDialog({super.key});
 
   @override
   Widget build(BuildContext context) {

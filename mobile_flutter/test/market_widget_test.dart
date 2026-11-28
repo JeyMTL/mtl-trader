@@ -61,6 +61,16 @@ void main() {
       );
     });
 
+    test('offers half an hour, a week and a month', () {
+      final byKey = <String, MarketInterval>{
+        for (final interval in kMarketIntervals) interval.key: interval,
+      };
+      expect(byKey.keys, containsAll(<String>['30m', '1W', '1M']));
+      expect(byKey['30m']!.tv, '30');
+      expect(byKey['1W']!.tv, 'W');
+      expect(byKey['1M']!.tv, 'M');
+    });
+
     test('sends TradingView its own codes, in UTC', () {
       final uri = marketViewUri(
         symbol: 'FX:EURUSD',
@@ -92,7 +102,7 @@ void main() {
     test('the daily size is D and the light theme changes the toolbar', () {
       final daily = marketViewUri(
         symbol: 'CAPITALCOM:US30',
-        interval: kMarketIntervals.last,
+        interval: kMarketIntervals.firstWhere((i) => i.key == '1d'),
       );
       expect(daily.queryParameters['interval'], 'D');
 
