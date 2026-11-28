@@ -3201,4 +3201,22 @@ class AppLocalizationsPack extends AppLocalizations {
 
   @override
   String get chartSearchZone => _read('chartSearchZone') ?? _en.chartSearchZone;
+
+  @override
+  String get lockMt5Title => _read('lockMt5Title') ?? _en.lockMt5Title;
+
+  @override
+  String get lockMt5Body => _read('lockMt5Body') ?? _en.lockMt5Body;
+
+  @override
+  String get lockMt5Ready => _read('lockMt5Ready') ?? _en.lockMt5Ready;
+
+  @override
+  String get lockMt5NeedsA11y => _read('lockMt5NeedsA11y') ?? _en.lockMt5NeedsA11y;
+
+  @override
+  String get lockMt5NeedsOverlay => _read('lockMt5NeedsOverlay') ?? _en.lockMt5NeedsOverlay;
+
+  @override
+  String get lockMt5Allow => _read('lockMt5Allow') ?? _en.lockMt5Allow;
 }

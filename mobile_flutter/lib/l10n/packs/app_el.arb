@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "Κλείδωμα MT5",
+  "lockMt5Body": "Καλύπτει το MetaTrader 5 σε αυτό το τηλέφωνο όταν ενεργοποιείται το στοπ.",
+  "lockMt5Ready": "Έτοιμο — δόθηκαν και οι δύο άδειες.",
+  "lockMt5NeedsA11y": "Η υπηρεσία προσβασιμότητας δεν έχει επιτραπεί ακόμη",
+  "lockMt5NeedsOverlay": "Εμφάνιση πάνω από άλλες εφαρμογές δεν έχει επιτραπεί ακόμη",
+  "lockMt5Allow": "Να επιτραπεί"
 }

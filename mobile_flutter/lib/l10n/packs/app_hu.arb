@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "MT5 zár",
+  "lockMt5Body": "Letakarja a MetaTrader 5-öt ezen a telefonon, amikor a stop aktiválódik.",
+  "lockMt5Ready": "Kész — mindkét engedély megadva.",
+  "lockMt5NeedsA11y": "A kisegítő szolgáltatás még nincs engedélyezve",
+  "lockMt5NeedsOverlay": "Megjelenítés más alkalmazások felett még nincs engedélyezve",
+  "lockMt5Allow": "Engedélyezés"
 }

@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "قفل MT5",
+  "lockMt5Body": "يغطي MetaTrader 5 على هذا الهاتف عند تفعيل الإيقاف.",
+  "lockMt5Ready": "جاهز — تم منح الإذنين.",
+  "lockMt5NeedsA11y": "خدمة إمكانية الوصول غير مسموح بها بعد",
+  "lockMt5NeedsOverlay": "العرض فوق التطبيقات الأخرى غير مسموح به بعد",
+  "lockMt5Allow": "السماح"
 }

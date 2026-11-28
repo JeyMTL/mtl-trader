@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "MT5 lukk",
+  "lockMt5Body": "Katab MetaTrader 5 sellel telefonil, kui stopp rakendub.",
+  "lockMt5Ready": "Valmis — mõlemad load antud.",
+  "lockMt5NeedsA11y": "Juurdepääsuteenus pole veel lubatud",
+  "lockMt5NeedsOverlay": "Kuvamine teiste rakenduste kohal pole veel lubatud",
+  "lockMt5Allow": "Luba"
 }

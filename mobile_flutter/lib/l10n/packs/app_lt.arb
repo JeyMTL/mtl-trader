@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "MT5 užraktas",
+  "lockMt5Body": "Uždengia MetaTrader 5 šiame telefone, kai suveikia stopas.",
+  "lockMt5Ready": "Paruošta — abu leidimai suteikti.",
+  "lockMt5NeedsA11y": "Pasiekiamumo paslauga dar neleista",
+  "lockMt5NeedsOverlay": "Rodymas virš kitų programų dar neleistas",
+  "lockMt5Allow": "Leisti"
 }

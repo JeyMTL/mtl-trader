@@ -539,15 +539,12 @@ class _RulesScreenState extends State<RulesScreen> with WidgetsBindingObserver {
   /// The phone-side cover as its own switch, with the two permissions the
   /// service needs. An install never prompts for either of them, so this block
   /// is the only place they are asked for before a stop fires.
-  ///
-  /// Literal English, like the market view: an ARB key would have to be filled
-  /// in all 33 packs before `l10n_test` went green.
   Widget _mt5LockBlock() {
     if (!_android) return const SizedBox.shrink();
     final ready = _mt5Status == 'granted';
     final missing = switch (_mt5Status) {
-      'accessibility' => 'Accessibility service not allowed yet',
-      'overlay' => 'Display over other apps not allowed yet',
+      'accessibility' => _l10n.lockMt5NeedsA11y,
+      'overlay' => _l10n.lockMt5NeedsOverlay,
       _ => '',
     };
     return Column(
@@ -565,7 +562,7 @@ class _RulesScreenState extends State<RulesScreen> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'MT5 lock',
+                    _l10n.lockMt5Title,
                     style: TextStyle(
                       color: AppColors.text,
                       fontSize: 12.5,
@@ -573,7 +570,7 @@ class _RulesScreenState extends State<RulesScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   Text(
-                    'Covers MetaTrader 5 on this phone when the stop fires.',
+                    _l10n.lockMt5Body,
                     style: TextStyle(
                       color: AppColors.faint,
                       fontSize: 10.5,
@@ -602,7 +599,7 @@ class _RulesScreenState extends State<RulesScreen> with WidgetsBindingObserver {
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(
-                          'Ready — both permissions granted.',
+                          _l10n.lockMt5Ready,
                           style: TextStyle(
                             color: AppColors.muted,
                             fontSize: 10.5,
@@ -635,7 +632,7 @@ class _RulesScreenState extends State<RulesScreen> with WidgetsBindingObserver {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: Text(
-                          'Allow',
+                          _l10n.lockMt5Allow,
                           style: TextStyle(
                             color: AppColors.primary,
                             fontSize: 11.5,

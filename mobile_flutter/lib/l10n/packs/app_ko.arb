@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "MT5 잠금",
+  "lockMt5Body": "스톱이 발동하면 이 휴대폰의 MetaTrader 5를 가립니다.",
+  "lockMt5Ready": "준비됨 — 두 권한 모두 허용됨.",
+  "lockMt5NeedsA11y": "접근성 서비스가 아직 허용되지 않았습니다",
+  "lockMt5NeedsOverlay": "다른 앱 위에 표시가 아직 허용되지 않았습니다",
+  "lockMt5Allow": "허용"
 }

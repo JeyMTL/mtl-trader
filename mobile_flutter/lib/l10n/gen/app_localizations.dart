@@ -5333,6 +5333,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search a city or zone'**
   String get chartSearchZone;
+
+  /// No description provided for @lockMt5Title.
+  ///
+  /// In en, this message translates to:
+  /// **'MT5 lock'**
+  String get lockMt5Title;
+
+  /// No description provided for @lockMt5Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers MetaTrader 5 on this phone when the stop fires.'**
+  String get lockMt5Body;
+
+  /// No description provided for @lockMt5Ready.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready — both permissions granted.'**
+  String get lockMt5Ready;
+
+  /// No description provided for @lockMt5NeedsA11y.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility service not allowed yet'**
+  String get lockMt5NeedsA11y;
+
+  /// No description provided for @lockMt5NeedsOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Display over other apps not allowed yet'**
+  String get lockMt5NeedsOverlay;
+
+  /// No description provided for @lockMt5Allow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get lockMt5Allow;
 }
 
 class _AppLocalizationsDelegate

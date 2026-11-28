@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "MT5 bloķēšana",
+  "lockMt5Body": "Nosedz MetaTrader 5 šajā tālrunī, kad iedarbojas stops.",
+  "lockMt5Ready": "Gatavs — abas atļaujas piešķirtas.",
+  "lockMt5NeedsA11y": "Pieejamības pakalpojums vēl nav atļauts",
+  "lockMt5NeedsOverlay": "Rādīšana virs citām lietotnēm vēl nav atļauta",
+  "lockMt5Allow": "Atļaut"
 }

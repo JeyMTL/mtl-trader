@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "Khóa MT5",
+  "lockMt5Body": "Che MetaTrader 5 trên điện thoại này khi lệnh dừng kích hoạt.",
+  "lockMt5Ready": "Sẵn sàng — đã cấp cả hai quyền.",
+  "lockMt5NeedsA11y": "Dịch vụ trợ năng chưa được cho phép",
+  "lockMt5NeedsOverlay": "Hiển thị trên ứng dụng khác chưa được cho phép",
+  "lockMt5Allow": "Cho phép"
 }

@@ -10,6 +10,7 @@ import 'package:mtl_trader_mobile/core/language_packs.dart';
 import 'package:mtl_trader_mobile/core/locale.dart';
 import 'package:mtl_trader_mobile/l10n/app_localizations_pack.dart';
 import 'package:mtl_trader_mobile/l10n/gen/app_localizations.dart';
+import 'package:mtl_trader_mobile/l10n/gen/app_localizations_en.dart';
 
 /// The French strings as published, read from the ARB the pack is built from.
 /// Reading the source rather than the JSON keeps this independent of whether
@@ -79,6 +80,22 @@ void main() {
     expect(fr.accountBalance, 'Solde du compte');
     expect(fr.a11yProfit(r'$120.00'), contains('Gain'));
     expect(fr.a11yLoss(r'$40.00'), contains('Perte'));
+  });
+
+  test('the MT5 lock block is translated, not just present', () {
+    // Present is what the pack-coverage test checks; this one proves the new
+    // messages actually reach the pack reader in the translator's words.
+    for (final code in <String>['fr', 'de', 'ja']) {
+      final pack = AppLocalizationsPack(Locale(code), publishedPack(code));
+      expect(
+        pack.lockMt5Title,
+        isNot(AppLocalizationsEn().lockMt5Title),
+        reason: '$code still shows the English MT5 lock title',
+      );
+      expect(pack.lockMt5Ready, isNot(AppLocalizationsEn().lockMt5Ready));
+      expect(pack.lockMt5NeedsA11y, isNot(AppLocalizationsEn().lockMt5NeedsA11y));
+    }
+    expect(publishedPack('fr')['lockMt5Allow'], 'Autoriser');
   });
 
   test('a message the pack leaves out falls back to English', () {

@@ -3229,4 +3229,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chartSearchZone => 'Search a city or zone';
+
+  @override
+  String get lockMt5Title => 'MT5 lock';
+
+  @override
+  String get lockMt5Body =>
+      'Covers MetaTrader 5 on this phone when the stop fires.';
+
+  @override
+  String get lockMt5Ready => 'Ready — both permissions granted.';
+
+  @override
+  String get lockMt5NeedsA11y => 'Accessibility service not allowed yet';
+
+  @override
+  String get lockMt5NeedsOverlay => 'Display over other apps not allowed yet';
+
+  @override
+  String get lockMt5Allow => 'Allow';
 }

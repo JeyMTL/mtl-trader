@@ -1863,5 +1863,11 @@
   "chartA11yFitScale": "Fit the price scale",
   "chartA11yFinishDrawing": "Finish drawing",
   "chartTimeZoneTitle": "Chart time zone",
-  "chartSearchZone": "Search a city or zone"
+  "chartSearchZone": "Search a city or zone",
+  "lockMt5Title": "MT5 lock",
+  "lockMt5Body": "Covers MetaTrader 5 on this phone when the stop fires.",
+  "lockMt5Ready": "Ready — both permissions granted.",
+  "lockMt5NeedsA11y": "Accessibility service not allowed yet",
+  "lockMt5NeedsOverlay": "Display over other apps not allowed yet",
+  "lockMt5Allow": "Allow"
 }

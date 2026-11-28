@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "Verrou MT5",
+  "lockMt5Body": "Couvre MetaTrader 5 sur ce téléphone quand le stop se déclenche.",
+  "lockMt5Ready": "Prêt — les deux autorisations sont accordées.",
+  "lockMt5NeedsA11y": "Service d’accessibilité pas encore autorisé",
+  "lockMt5NeedsOverlay": "Affichage par-dessus les autres applications pas encore autorisé",
+  "lockMt5Allow": "Autoriser"
 }

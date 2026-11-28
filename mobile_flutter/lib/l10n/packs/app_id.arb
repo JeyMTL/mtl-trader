@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "Kunci MT5",
+  "lockMt5Body": "Menutupi MetaTrader 5 di ponsel ini saat stop aktif.",
+  "lockMt5Ready": "Siap — kedua izin diberikan.",
+  "lockMt5NeedsA11y": "Layanan aksesibilitas belum diizinkan",
+  "lockMt5NeedsOverlay": "Tampilkan di atas aplikasi lain belum diizinkan",
+  "lockMt5Allow": "Izinkan"
 }

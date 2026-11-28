@@ -872,5 +872,11 @@
   "balanceSave": "Save balance",
   "balanceSaved": "Balance updated.",
   "balanceAmountInvalid": "Enter an amount above zero.",
-  "balanceFailed": "Could not save the balance: {error}"
+  "balanceFailed": "Could not save the balance: {error}",
+  "lockMt5Title": "MT5 锁定",
+  "lockMt5Body": "止损触发时覆盖此手机上的 MetaTrader 5。",
+  "lockMt5Ready": "已就绪 — 两项权限均已授予。",
+  "lockMt5NeedsA11y": "辅助功能服务尚未允许",
+  "lockMt5NeedsOverlay": "显示在其他应用上层尚未允许",
+  "lockMt5Allow": "允许"
 }
