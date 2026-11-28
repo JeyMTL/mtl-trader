@@ -125,7 +125,7 @@ export default function LockGate() {
       // closed for the next minute.
       window.location.reload()
     } catch {
-      setError('Could not reach the server. Check your connection and try again.')
+      setError('Could not connect. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -354,7 +354,7 @@ function SoftLockBanner({ data }: { data: DayStateResponse }) {
       }
       window.location.reload()
     } catch {
-      setError('Could not reach the server. Check your connection and try again.')
+      setError('Could not connect. Check your connection and try again.')
     } finally {
       setSaving(false)
     }

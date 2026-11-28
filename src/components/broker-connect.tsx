@@ -152,7 +152,7 @@ export default function BrokerConnect() {
         setProblem(data.error || 'Could not save the connection.')
       }
     } catch {
-      setProblem('Could not reach the server. Check your connection and try again.')
+      setProblem('Could not connect. Check your connection and try again.')
     } finally {
       setSaving(false)
     }

@@ -19,10 +19,10 @@ describe('publicErrorMessage', () => {
 
   it('turns connection failure into a sentence about the connection', () => {
     expect(publicErrorMessage(new Error('TypeError: Failed to fetch'), FALLBACK)).toBe(
-      'Could not reach the server. Check your connection and try again.'
+      'Could not connect. Check your connection and try again.'
     )
     expect(publicErrorMessage(new Error('Upstream timed out'), FALLBACK)).toBe(
-      'Could not reach the server. Check your connection and try again.'
+      'Could not connect. Check your connection and try again.'
     )
   })
 

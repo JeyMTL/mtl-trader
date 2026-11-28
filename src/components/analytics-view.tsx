@@ -859,7 +859,7 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
         ) : (
           <p className="mt-4 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-gray-500">
             {sessionStatsMissing
-              ? 'Session totals are unavailable: this database is missing session_stats(). Apply supabase/migrations/20261105_session_stats.sql.'
+              ? 'Session totals are temporarily unavailable. Try again later.'
               : 'No timed trades yet — sessions are built from the entry time on each trade.'}
           </p>
         )}
@@ -1201,7 +1201,7 @@ export function AnalyticsView({ summary, equity, symbols, tagStats, breakdowns, 
         ) : (
           <p className="text-gray-500 text-sm">
             {strategyStatsMissing
-              ? 'Strategy totals are unavailable: this database is missing strategy_stats(). Apply supabase/migrations/20261107_strategy_stats.sql.'
+              ? 'Strategy totals are temporarily unavailable. Try again later.'
               : 'No trades yet — the strategy field on the journal form is what fills this table.'}
           </p>
         )}

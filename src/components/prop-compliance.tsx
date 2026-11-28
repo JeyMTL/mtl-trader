@@ -181,7 +181,7 @@ export function PropCompliance() {
   if (payload?.missing) {
     return (
       <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
-        Prop-rule monitoring needs the database migration
+        Prop-rule monitoring is temporarily unavailable
         {' '}
         <span className="font-mono text-xs">20261111_prop_rules.sql</span>. Apply it and reload.
       </div>

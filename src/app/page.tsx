@@ -123,7 +123,7 @@ const faqs = [
   },
   {
     question: 'What do I get in the free trial?',
-    answer: `${TRIAL_DAYS} days of every Pro tool with no card required. When the trial ends, the Free tier keeps 30 trades a month, the journal, the chart desk and the prop-firm simulator.`,
+    answer: `${TRIAL_DAYS} days of every Pro tool with no card required, including one AI review and one backtest a day. When the trial ends, the Free tier keeps 30 trades a month, the journal, the market view and the prop-firm simulator.`,
   },
   {
     question: 'Can I cancel a paid plan?',

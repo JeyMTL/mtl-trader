@@ -101,9 +101,7 @@ export default async function ChartPage() {
 
       {tableMissing && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-          Chart drawings are not available on this database yet. Apply{' '}
-          <code className="font-mono">supabase/migrations/20261124_chart_analysis.sql</code>{' '}
-          to save objects.
+          Chart drawings are not available yet. Please try again later.
         </div>
       )}
 

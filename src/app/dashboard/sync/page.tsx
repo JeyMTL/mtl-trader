@@ -85,7 +85,7 @@ export default function SyncPage() {
         }
       } catch {
         setNotice({
-          title: 'Could not reach the server',
+          title: 'Could not connect',
           refused: false,
           message: 'Check your connection and reload the page to load your sync token.',
         })
@@ -389,7 +389,7 @@ export default function SyncPage() {
           <Download className="w-4 h-4" />
           Download setup file
         </button>
-        <p className="text-xs text-gray-500 mt-3">The setup file contains your sync token. Keep it private. Your MT5 password is entered only into the local agent and never sent to our servers.</p>
+        <p className="text-xs text-gray-500 mt-3">The setup file contains your sync token. Keep it private. Your MT5 password is entered only into the local agent and is never sent to us.</p>
       </div>
 
       <div className="bg-surface rounded-xl border border-border p-6">
@@ -476,7 +476,7 @@ export default function SyncPage() {
             <ul className="mt-2 text-sm text-gray-400 space-y-1">
               <li>• MT5 terminal must be running on your computer</li>
               <li>• The agent only works while your computer is on</li>
-              <li>• Your credentials are never stored on our servers (you type the password only in the local prompt)</li>
+              <li>• Your credentials are never stored by us (you type the password only in the local prompt)</li>
               <li>• All data is encrypted during transfer (HTTPS)</li>
             </ul>
           </div>

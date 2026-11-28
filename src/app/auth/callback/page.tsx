@@ -70,7 +70,7 @@ export default function AuthCallbackPage() {
         }
       } catch {
         profileError =
-          'Could not reach the server to finish setting up your profile.'
+          'We could not finish setting up your profile. Check your connection and try again.'
       }
 
       if (cancelled) return

@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         status: 'not_configured',
-        detail: 'PADDLE_API_KEY is not set on this deployment.',
+        detail: 'Card checkout is not configured.',
       },
       { status: 503, headers: { 'Cache-Control': 'no-store' } }
     )
@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         status: 'not_configured',
-        detail: 'No Paddle price id is configured for any paid plan.',
+        detail: 'Card checkout is not configured for any paid plan.',
       },
       { status: 503, headers: { 'Cache-Control': 'no-store' } }
     )

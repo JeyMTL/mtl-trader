@@ -43,7 +43,7 @@ export function publicErrorMessage(error: unknown, fallback: string): string {
   if (!text || text === '{}' || text.startsWith('{')) return fallback
 
   if (CONNECTION.test(text)) {
-    return 'Could not reach the server. Check your connection and try again.'
+    return 'Could not connect. Check your connection and try again.'
   }
   if (RATE_LIMIT.test(text)) {
     return 'Too many attempts. Please wait a moment and try again.'

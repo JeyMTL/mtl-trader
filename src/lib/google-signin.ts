@@ -54,7 +54,7 @@ export async function completeGoogleSignIn(idToken: string): Promise<GoogleSignI
       }
     }
   } catch {
-    return { ok: false, error: 'Could not reach the server to finish setting up your profile.' }
+    return { ok: false, error: 'We could not finish setting up your profile. Check your connection and try again.' }
   }
 
   // A full navigation rather than router.push so middleware and server

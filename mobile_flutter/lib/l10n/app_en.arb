@@ -445,7 +445,7 @@
   },
   "account": "Account",
   "accountSignOutQuestion": "Sign out?",
-  "accountSignOutBody": "Your journal stays on the server. Sign back in any time.",
+  "accountSignOutBody": "Your journal stays in your account. Sign back in any time.",
   "signOut": "Sign out",
   "accountPlan": "Plan",
   "accountStatus": "Status",
@@ -480,8 +480,8 @@
   "accountAbout": "About",
   "accountAboutBody": "Where your journal media lives.",
   "accountPrivateMedia": "Private media",
-  "accountPrivateMediaBody": "Journal photos and voice notes live in a private bucket. Each file is signed for one hour and only your account can request it.",
-  "accountFooter": "MTL Ledger · flat mobile journal\nTrades, notes and media stay on your Supabase project.",
+  "accountPrivateMediaBody": "Journal photos and voice notes are stored privately. Each file link is valid for one hour, and only your account can open it.",
+  "accountFooter": "MTL Ledger · your trading journal\nYour trades, notes and media stay private to your account.",
   "accountRules": "Rules & playbook",
   "accountConnectMt5": "Connect MT5 account",
   "accountImport": "Import trade history",
@@ -957,7 +957,7 @@
   "symbolSearchHint": "Search pairs, metals, indices, crypto",
   "symbolNoMatchTitle": "No instrument matches",
   "symbolNoMatchBody": "Try a shorter search, or type the symbol directly.",
-  "symbolFooter": "{count} instruments · every chart is a live OANDA CFD quote",
+  "symbolFooter": "{count} instruments · live market prices from TradingView",
   "@symbolFooter": {
     "placeholders": {
       "count": {
@@ -969,7 +969,7 @@
   "timeFrameNotServed": "Not served by this chart feed yet",
   "screenshotFailed": "Could not load this screenshot.",
   "confirmTitle": "Confirm your email",
-  "confirmBody": "The journal opens once {email} is confirmed. Open the link Supabase emailed you, then return here.",
+  "confirmBody": "The journal opens once {email} is confirmed. Open the link we emailed you, then return here.",
   "@confirmBody": {
     "placeholders": {
       "email": {
@@ -1295,7 +1295,7 @@
   "importDeleteTooltip": "Delete this import",
   "importHowToTitle": "How to export from MT5",
   "importHowToSteps": "1. Open MetaTrader 5 → History tab.\n2. Right-click → All History, then select the trades.\n3. Right-click → Report / Export and save as CSV or the XML report (ReportHistory files).\n4. Pick that file above.",
-  "importNetNote": "P&L is stored net: MT5 profit plus commission and swap. Excel .xlsx and .xls exports work too — .xls up to 4 MB is read on our server, so larger ones should be saved as .xlsx or CSV.",
+  "importNetNote": "P&L is stored net: MT5 profit plus commission and swap. Excel .xlsx and .xls exports work too — .xls up to 4 MB is accepted, so larger ones should be saved as .xlsx or CSV.",
   "syncTitle": "MT5 Sync",
   "syncSubmitting": "Signing in now. The first sync can take a few minutes — we will notify you when it is live.",
   "syncDisconnectTitle": "Disconnect account?",
@@ -1490,7 +1490,7 @@
       }
     }
   },
-  "cbIntro": "Write the setup in your own words. The server turns it into a rule set, shows you the rules in plain English, and only then can you run them over your bar data.",
+  "cbIntro": "Write the setup in your own words. It becomes a rule set you can read in plain English, and only then can you run it over your bar data.",
   "cbGalleryFailed": "Could not open the gallery. Check the photo permission and try again.",
   "cbUseImage": "Use a PNG, JPEG or WebP screenshot.",
   "cbReadFailed": "Could not read {name}. Try picking it again.",

@@ -93,7 +93,7 @@ export function ExcursionCard() {
           setData(payload)
         }
       } catch {
-        if (!cancelled) setError('Could not reach the server. Try again in a moment.')
+        if (!cancelled) setError('Could not connect. Try again in a moment.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -247,7 +247,7 @@ export function ExcursionCard() {
               ? ` Not on the candle feed: ${data.coverage.unsupportedSymbols.join(', ')}.`
               : ''}
             {!data.persisted
-              ? ' Measurements are not being saved on this database yet, so this runs again on each visit.'
+              ? ' Measurements are not being saved yet, so this runs again on each visit.'
               : ''}
           </p>
         </>

@@ -76,7 +76,7 @@ export default function DeleteAccountPage() {
           before deletion may remain in aggregate form; they are not linked back to your account.
         </li>
         <li>
-          <strong>Backups.</strong> Encrypted database backups roll off within 30 days, after which
+          <strong>Backups.</strong> Encrypted backups are deleted within 30 days, after which
           deleted content is gone from them as well.
         </li>
       </ul>

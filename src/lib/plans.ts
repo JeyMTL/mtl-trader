@@ -3,8 +3,8 @@ import { SubscriptionPlan } from '@/types'
 /** One-line positioning for the marketing pricing cards. */
 export const PLAN_TAGLINES: Record<string, string> = {
   free: 'Try the Pro tools for 3 days, then keep 30 trades a month.',
-  basic: 'The full journal, chart desk and daily-stop guard.',
-  pro: 'Add AI reviews, replay and the backtester.',
+  basic: 'The full journal, the analytics and the daily-stop guard.',
+  pro: 'Add AI reviews, the backtester and priority support.',
 }
 
 /**
@@ -12,13 +12,15 @@ export const PLAN_TAGLINES: Record<string, string> = {
  * Settings, the Paddle checkout, `apply_paid_order`
  * and the Flutter app (`mobile_flutter/lib/core/plans.dart`).
  *
- * What a plan covers is genuinely split: Basic is the journal, the chart desk
- * and the automation that keeps the record accurate — autosync, the soft daily
- * lock, level pinning, photos and voice notes, the time edge, the setup matrix
- * and 30s/45s candles. Pro is what goes beyond journalling — the hard lock, the
- * AI review, the backtester and replay, notifications, and the 5s/10s/15s
- * candles. Each line below describes something the tier can actually open — the
- * gate list is in `PRO_ONLY` (`src/lib/subscription.ts`). MT5
+ * What a plan covers is genuinely split: Basic is the journal and the automation
+ * that keeps the record accurate — autosync, the soft daily lock, photos and
+ * voice notes, the time edge, the setup matrix and the dashboard. Pro is what
+ * goes beyond journalling — the hard lock, the AI review, the backtester and
+ * notifications. Each line below describes something the tier can actually open
+ * — the gate list is in `PRO_ONLY` (`src/lib/subscription.ts`). The licensed
+ * chart desk is off (`MARKET_CHARTS_ENABLED` in `src/lib/features.ts`), so no
+ * plan line sells candles, drawings or replay: every tier gets the same market
+ * view instead. MT5
  * autosync is not listed on any plan while the hosted agent is unfunded — see
  * `MT5_SYNC_ENABLED` in `src/lib/features.ts`. Trade volume is
  * deliberately *not* a differentiator: capping Basic below the unlimited trial
@@ -47,7 +49,7 @@ export const PLANS: SubscriptionPlan[] = [
       '30 trades a month after the trial',
       'Prop-firm simulator: daily loss, drawdown, target and consistency rules',
       'Journal with photos, voice notes, tags, setups and mistakes',
-      'Chart desk from 1m to daily candles, with every drawing tool except position pinning',
+      'Live market view: an interactive chart for every symbol and timeframe',
       'Time edge and setup matrix on your own trades',
       'Import your full MT5 history at any time',
     ],
@@ -63,12 +65,10 @@ export const PLANS: SubscriptionPlan[] = [
       'Journal with photos, voice notes, tags, setups and mistakes',
       'MT5 auto sync, from the hosted agent or your own terminal with a sync token',
       'Daily stop with the soft lock: the guard clears resting orders and closes fills opened after the stop; the journal stays open',
-      'Pin entry, stop and target levels straight off the live chart',
-      'Chart desk from 30s and 45s up to daily candles, with VWAP and session ranges',
       'Time edge: the sessions and weekdays your results actually come from',
       "Setup matrix: each setup's win rate and expectancy by session and symbol",
       'Dashboard: equity curve, P&L calendar, daily and monthly results',
-      'Drawings, layouts and templates that sync across phone and web',
+      'Live market view on web and Android, on every symbol and timeframe',
       'XML, CSV and XLSX import, plus CSV and full account export',
       'The Android app in 30+ languages, on the same account as the web',
     ],
@@ -86,9 +86,7 @@ export const PLANS: SubscriptionPlan[] = [
       '40 AI journal reviews a month, written from your own logged trades',
       'Backtester with saved runs, simulating past sessions only',
       'Write your own entry and exit rules, then test them on past sessions',
-      'Market replay that steps candle by candle through a session',
       'Notifications on your phone: prop-firm breaches and session reminders',
-      '5s, 10s and 15s candles, on top of the 30s and 45s on Basic',
       'Priority support',
     ],
   },

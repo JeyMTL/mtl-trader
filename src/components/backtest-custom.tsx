@@ -225,7 +225,7 @@ export default function BacktestCustom({
       setCriteria(criteria.trim().slice(0, MAX_CRITERIA))
       toast('Acceptance criteria saved.', { tone: 'success' })
     } catch {
-      toast('Could not reach the server.', { tone: 'error' })
+      toast('Could not connect.', { tone: 'error' })
     } finally {
       setCriteriaState('')
     }
@@ -337,7 +337,7 @@ export default function BacktestCustom({
         model: data.meta?.model ?? '',
       })
     } catch {
-      setError('Could not reach the server. Try again.')
+      setError('Could not connect. Try again.')
     } finally {
       setBusy(false)
     }

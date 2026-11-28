@@ -270,7 +270,7 @@ function BacktestWorkbench() {
       )
       void loadRuns()
     } catch {
-      toast('Could not reach the server. Try again.', { tone: 'error' })
+      toast('Could not connect. Try again.', { tone: 'error' })
     } finally {
       setBusy(false)
     }

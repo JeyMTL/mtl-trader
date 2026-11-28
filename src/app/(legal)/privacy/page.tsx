@@ -49,7 +49,7 @@ export default function PrivacyPage() {
         <li>
           <strong>Technical data</strong> — IP-derived rate-limiting keys, error events, timestamps and basic
           request metadata used to keep the service secure and working. Theme preference is stored in your
-          browser, not on our servers.
+          browser.
         </li>
       </ul>
 
@@ -65,11 +65,10 @@ export default function PrivacyPage() {
 
       <h2>3. Who processes data for us</h2>
       <ul>
-        <li><strong>Supabase</strong> — database, authentication and file storage.</li>
-        <li><strong>Vercel</strong> — application hosting and scheduled jobs.</li>
+        <li><strong>Hosting and storage</strong> — contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.</li>
         <li><strong>Paddle</strong> — card subscription checkout, billing and payment capture.</li>
         <li><strong>PayPal</strong> — renewal of subscriptions started before card checkout.</li>
-        <li><strong>An AI provider</strong> (Google Gemini, or Anthropic where configured) — receives the trade summary you submit for a review. Reviews are not used by us to train models.</li>
+        <li><strong>Our AI provider</strong> — receives the trade summary you submit for a review. Reviews are not used by us to train models.</li>
       </ul>
       <p>
         These providers process data on our instructions and under their own safeguards. Some are located

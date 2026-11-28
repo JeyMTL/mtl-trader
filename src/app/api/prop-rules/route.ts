@@ -116,7 +116,7 @@ export async function PUT(req: Request) {
     if (error) {
       if (/prop_rules/.test(error.message)) {
         return NextResponse.json(
-          { error: 'Prop rules are unavailable until the database migration is applied.' },
+          { error: 'Prop rules are temporarily unavailable.' },
           { status: 503 }
         )
       }

@@ -634,7 +634,7 @@ export function DashboardView({
             ) : (
               <p className="mt-1 text-[10px] leading-relaxed text-gray-500">
                 {sessionStatsMissing
-                  ? 'Session totals need the 20261105_session_stats.sql migration.'
+                  ? 'Session totals are temporarily unavailable.'
                   : 'No timed trades yet.'}
               </p>
             )}
