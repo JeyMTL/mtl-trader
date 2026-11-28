@@ -37,14 +37,23 @@ class ApiTransport {
   ApiTransport({
     HttpClient? client,
     String? Function()? accessToken,
+    Future<void> Function()? refreshSession,
+    String? baseUrl,
     Duration timeout = const Duration(seconds: 25),
   })  : _client = client,
         _accessToken = accessToken ?? _noToken,
+        _refreshSessionCallback = refreshSession,
+        _baseUrl = baseUrl,
         _timeout = timeout;
 
   final HttpClient? _client;
   final String? Function() _accessToken;
+  final Future<void> Function()? _refreshSessionCallback;
+  /// Only a test overrides this; every real call goes to the build's API.
+  final String? _baseUrl;
   final Duration _timeout;
+
+  String get _origin => _baseUrl ?? AppConfig.apiBaseUrl;
 
   static String? _noToken() => null;
 
@@ -66,24 +75,49 @@ class ApiTransport {
     Duration? timeout,
     String? fallbackError,
   }) async {
+    Future<ApiResponse> attempt() => _withNetworkRetry(
+          () => _sendOnce(
+            method,
+            path,
+            body: body,
+            timeout: timeout,
+            fallbackError: fallbackError,
+          ),
+        );
+
     try {
-      return await _sendOnce(
-        method,
-        path,
-        body: body,
-        timeout: timeout,
-        fallbackError: fallbackError,
-      );
+      return await attempt();
+    } on ApiTransportException catch (error) {
+      // A 401 is what a token that expired while the phone slept looks like.
+      // Refresh once and send it again before telling the trader to sign in.
+      if (error.statusCode != 401 || !await _refreshSession()) rethrow;
+      return attempt();
+    }
+  }
+
+  /// Runs [send], retrying once when the connection itself failed.
+  Future<ApiResponse> _withNetworkRetry(
+    Future<ApiResponse> Function() send,
+  ) async {
+    try {
+      return await send();
     } on ApiTransportException catch (error) {
       if (error.code != 'network') rethrow;
       await Future<void>.delayed(_retryDelay);
-      return _sendOnce(
-        method,
-        path,
-        body: body,
-        timeout: timeout,
-        fallbackError: fallbackError,
-      );
+      return send();
+    }
+  }
+
+  /// Rotates the session once after a 401. False when there is nothing to
+  /// refresh or the refresh itself failed, so the 401 stands as the answer.
+  Future<bool> _refreshSession() async {
+    final refresh = _refreshSessionCallback;
+    if (refresh == null) return false;
+    try {
+      await refresh();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -100,7 +134,7 @@ class ApiTransport {
     try {
       final request = await client.openUrl(
         method,
-        Uri.parse('${AppConfig.apiBaseUrl}$path'),
+        Uri.parse('$_origin$path'),
       );
       _authorize(request, token);
       if (body != null) {
@@ -138,13 +172,43 @@ class ApiTransport {
     Duration? timeout,
     String? fallbackError,
   }) async {
+    try {
+      return await _uploadOnce(
+        path,
+        fileName: fileName,
+        bytes: bytes,
+        field: field,
+        timeout: timeout,
+        fallbackError: fallbackError,
+      );
+    } on ApiTransportException catch (error) {
+      if (error.statusCode != 401 || !await _refreshSession()) rethrow;
+      return _uploadOnce(
+        path,
+        fileName: fileName,
+        bytes: bytes,
+        field: field,
+        timeout: timeout,
+        fallbackError: fallbackError,
+      );
+    }
+  }
+
+  Future<ApiResponse> _uploadOnce(
+    String path, {
+    required String fileName,
+    required Uint8List bytes,
+    required String field,
+    Duration? timeout,
+    String? fallbackError,
+  }) async {
     final token = _token();
     final boundary = 'mtl${DateTime.now().microsecondsSinceEpoch}';
     final client = _client ??
         (HttpClient()..connectionTimeout = const Duration(seconds: 10));
     try {
       final request = await client.postUrl(
-        Uri.parse('${AppConfig.apiBaseUrl}$path'),
+        Uri.parse('$_origin$path'),
       );
       _authorize(request, token);
       request.headers.contentType = ContentType(

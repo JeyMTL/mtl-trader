@@ -69,6 +69,16 @@ describe('MT5 sync page', () => {
     expect(screen.queryByText('Download setup file')).toBeNull()
   })
 
+  it('asks a dead session to sign in instead of printing Unauthorized', async () => {
+    state.syncResponse = { error: 'Unauthorized' }
+
+    render(<SyncPage />)
+
+    expect(await screen.findByText('Your session expired')).toBeTruthy()
+    expect(screen.getByText('Sign in again to load your sync token.')).toBeTruthy()
+    expect(screen.queryByText('Unauthorized')).toBeNull()
+  })
+
   it('shows the token when the plan allows sync', async () => {
     state.syncResponse = { token: 'tok_live_123', isNew: false }
 

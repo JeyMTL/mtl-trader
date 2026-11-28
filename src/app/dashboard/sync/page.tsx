@@ -74,7 +74,14 @@ export default function SyncPage() {
         } else if (data.token) {
           setToken(data.token)
         } else if (data.error) {
-          setNotice({ title: 'Could not load your sync token', refused: false, message: data.error })
+          // A rejected token is not a sync problem the trader can fix on this
+          // page, so it says what to do instead of echoing "Unauthorized".
+          const expired = data.error === 'Unauthorized'
+          setNotice({
+            title: expired ? 'Your session expired' : 'Could not load your sync token',
+            refused: false,
+            message: expired ? 'Sign in again to load your sync token.' : data.error,
+          })
         }
       } catch {
         setNotice({

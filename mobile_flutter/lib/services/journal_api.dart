@@ -23,6 +23,11 @@ class JournalApi {
       : _db = client ?? Supabase.instance.client {
     _transport = ApiTransport(
       accessToken: () => _db.auth.currentSession?.accessToken,
+      // A token can expire while the phone sleeps. The transport refreshes it
+      // once and re-sends before a screen has to say "sign in again".
+      refreshSession: () async {
+        await _db.auth.refreshSession();
+      },
     );
   }
 

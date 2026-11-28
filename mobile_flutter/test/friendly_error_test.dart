@@ -54,4 +54,18 @@ void main() {
       'Too many attempts. Please wait a moment and try again.',
     );
   });
+
+  test('a rejected token asks for a sign-in, not "Unauthorized"', () {
+    // The sync screen used to print the server's one word verbatim.
+    expect(friendlyError('Unauthorized'),
+        'Your session expired. Sign in again.');
+    expect(friendlyError('unauthorized', fallback: 'Could not sync.'),
+        'Your session expired. Sign in again.');
+    expect(friendlyError('JWT expired'),
+        'Your session expired. Sign in again.');
+    expect(friendlyError('Invalid token'),
+        'Your session expired. Sign in again.');
+    expect(friendlyError('Your session expired. Sign in again.'),
+        'Your session expired. Sign in again.');
+  });
 }

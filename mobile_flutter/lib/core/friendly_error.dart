@@ -16,6 +16,15 @@ final RegExp _connection = RegExp(
   caseSensitive: false,
 );
 
+/// A rejected token, not a rejected request: the server says `Unauthorized`,
+/// Supabase says the JWT expired, and the transport says the session is gone.
+/// All three mean one thing to the trader.
+final RegExp _session = RegExp(
+  r'unauthori[sz]ed|not authori[sz]ed|invalid token|session (expired|missing)|'
+  r'jwt expired|token (expired|revoked)',
+  caseSensitive: false,
+);
+
 final RegExp _vendor = RegExp(
   r'postgrest|supabase|postgres|pgrst|row[- ]level|\brls\b|duplicate key|'
   r'violates .*constraint|schema cache|vercel|jwt|service[_ ]role|'
@@ -46,6 +55,9 @@ String friendlyError(
   }
   if (RegExp(r'rate limit|too many (requests|attempts)').hasMatch(lower)) {
     return 'Too many attempts. Please wait a moment and try again.';
+  }
+  if (_session.hasMatch(lower)) {
+    return 'Your session expired. Sign in again.';
   }
   if (_vendor.hasMatch(lower)) return fallback;
 
