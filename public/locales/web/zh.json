@@ -416,7 +416,6 @@
   "Back to the trade log": "返回交易日志",
   "Background": "背景",
   "Background and crosshair": "背景和十字线",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "回测运行并保存图纸，以及为您生成的每个人工智能评论。",
   "Backtester with saved runs, simulating past sessions only": "回测器已保存运行，仅模拟过去的会话",
   "Backups.": "备份。",
   "badge badge-buy": "徽章徽章购买",
@@ -739,7 +738,6 @@
   "Lines that fire": "火线",
   "Lines that have already fired are kept but taken off the chart.": "已触发的线条将被保留，但从图表中删除。",
   "Live": "直播",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "活蜡烛，与手机使用的饲料相同。固定水平、趋势、斐波那契回撤和区域、用垂直线标记时间、测量走势 - 全部保存到您的帐户中。交易时段VWAP以及亚洲、伦敦和纽约范围是根据蜡烛本身计算的。",
   "Loading": "加载中",
   "Loading profile...": "正在加载个人资料...",
   "Loading prop rules…": "正在加载道具规则...",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "您可以每月更改一次余额。本月的更改仍然可用。",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— 签约基础设施提供商运行应用程序和计划作业，并存储帐户、文件和登录数据。",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— 接收您提交审核的交易摘要。我们不会使用评论来训练模型。",
-  "Chart drawings are not available yet. Please try again later.": "图表绘图尚不可用。请稍后重试。",
   "Hosting and storage": "托管和存储",
   "Our AI provider": "我们的人工智能提供商",
   "Card checkout is not configured for any paid plan.": "没有为任何付费计划配置卡结帐。",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "编写您的进入和退出规则，在保存的会话中测试它们并保留每次运行进行比较。",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "用于记录您自己的交易的日志：在浏览器和 Android 上进行分析、实时市场视图和 MT5 同步，应用程序中提供 30 多种语言。",
   "Example workspace. Market view, analytics and journal share one account.": "示例工作区。市场视图、分析和日记共享一个帐户。",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "您日记中的任何内容都不会受到影响：您已有的交易保持在原来的位置，日历、分析和模拟器继续工作。"
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "您日记中的任何内容都不会受到影响：您已有的交易保持在原来的位置，日历、分析和模拟器继续工作。",
+  "Backtest runs and every AI review generated for you.": "回测运行并为您生成每个人工智能评论。"
 }

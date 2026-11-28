@@ -411,7 +411,6 @@
   "Back to the trade log": "Powrót do dziennika handlu",
   "Background": "Tło",
   "Background and crosshair": "Tło i celownik",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Testy historyczne i zapisane rysunki oraz każda wygenerowana dla Ciebie recenzja AI.",
   "Backtester with saved runs, simulating past sessions only": "Tester wsteczny z zapisanymi przebiegami, symulujący tylko poprzednie sesje",
   "Backups.": "Kopie zapasowe.",
   "badge badge-buy": "odznaka-kupno odznaki",
@@ -736,7 +735,6 @@
   "Lines that fire": "Linie, które strzelają",
   "Lines that have already fired are kept but taken off the chart.": "Linie, które już wystrzeliły, są zachowywane, ale usuwane z wykresu.",
   "Live": "Na żywo",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Świece na żywo, to samo zasilanie, którego używa telefon. Pin poziomy, trendy, zniesienia i strefy fib, zaznacz czas pionową linią, zmierz ruch – wszystko zapisane na Twoim koncie. Sesja VWAP oraz zakresy w Azji, Londynie i Nowym Jorku są obliczane na podstawie samych świec.",
   "Loading": "Ładowanie",
   "Loading profile...": "Ładowanie profilu...",
   "Loading prop rules…": "Ładowanie reguł rekwizytów…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Saldo możesz zmieniać raz w miesiącu. Zmiana z tego miesiąca jest nadal dostępna.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— zakontraktowani dostawcy infrastruktury obsługują aplikacje i zaplanowane zadania oraz przechowują konta, pliki i dane logowania.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— otrzymuje podsumowanie transakcji, które przesyłasz do przeglądu. Recenzje nie są przez nas wykorzystywane do szkolenia modeli.",
-  "Chart drawings are not available yet. Please try again later.": "Rysunki wykresów nie są jeszcze dostępne. Spróbuj ponownie później.",
   "Hosting and storage": "Hosting i przechowywanie",
   "Our AI provider": "Nasz dostawca sztucznej inteligencji",
   "Card checkout is not configured for any paid plan.": "Płatność kartą nie jest skonfigurowana dla żadnego płatnego planu.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Zapisz zasady wejścia i wyjścia, przetestuj je na zapisanych sesjach i przechowuj każde uruchomienie w celu porównania.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Dziennik do rejestrowania własnych transakcji: analizy, podgląd rynku na żywo i synchronizacja z MT5, w przeglądarce i na Androidzie, w aplikacji w ponad 30 językach.",
   "Example workspace. Market view, analytics and journal share one account.": "Przykładowy obszar roboczy. Widok rynku, analityka i czasopismo korzystają z jednego konta.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nie ma to wpływu na nic w Twoim dzienniku: transakcje, które już masz, pozostają tam, gdzie są, a kalendarz, analizy i symulator nadal działają."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nie ma to wpływu na nic w Twoim dzienniku: transakcje, które już masz, pozostają tam, gdzie są, a kalendarz, analizy i symulator nadal działają.",
+  "Backtest runs and every AI review generated for you.": "Testy historyczne i każda recenzja AI wygenerowana dla Ciebie."
 }

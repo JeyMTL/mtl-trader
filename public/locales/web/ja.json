@@ -415,7 +415,6 @@
   "Back to the trade log": "トレードログに戻る",
   "Background": "背景",
   "Background and crosshair": "背景と十字線",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "バックテストが実行され、図面が保存され、すべての AI レビューが生成されます。",
   "Backtester with saved runs, simulating past sessions only": "実行を保存したバックテスター、過去のセッションのみをシミュレート",
   "Backups.": "バックアップ。",
   "badge badge-buy": "バッジ バッジの購入",
@@ -738,7 +737,6 @@
   "Lines that fire": "発射するライン",
   "Lines that have already fired are kept but taken off the chart.": "すでに発動したラインは保持されますが、チャートからは削除されます。",
   "Live": "ライブ",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "ライブキャンドル、電話が使用するのと同じフィード。レベル、トレンド、フィブリトレースメントとゾーンをピン留めし、垂直線で時間をマークし、動きを測定し、すべてアカウントに保存されます。セッション VWAP とアジア、ロンドン、ニューヨークの範囲はローソク足自体から計算されます。",
   "Loading": "読み込み中",
   "Loading profile...": "プロファイルを読み込んでいます...",
   "Loading prop rules…": "プロップルールを読み込み中…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "残高は月に1回変更できます。今月の変更はまだ利用可能です。",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— 契約したインフラストラクチャ プロバイダーは、アプリケーションとスケジュールされたジョブを実行し、アカウント、ファイル、サインイン データを保存します。",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— レビューのために送信した取引概要を受け取ります。レビューはモデルのトレーニングには使用されません。",
-  "Chart drawings are not available yet. Please try again later.": "チャートの描画はまだ利用できません。後でもう一度試してください。",
   "Hosting and storage": "ホスティングとストレージ",
   "Our AI provider": "当社の AI プロバイダー",
   "Card checkout is not configured for any paid plan.": "カード チェックアウトは有料プランには設定されていません。",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "開始ルールと終了ルールを作成し、保存したセッションでテストし、実行ごとに比較してください。",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "自分の取引を記録するためのジャーナル: ブラウザーと Android での分析、ライブ マーケット ビュー、MT5 同期、アプリ内で 30 以上の言語に対応。",
   "Example workspace. Market view, analytics and journal share one account.": "ワークスペースの例。マーケットビュー、分析、ジャーナルは 1 つのアカウントを共有します。",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "ジャーナルの内容は何も影響を受けません。すでに行っている取引はそのまま残り、カレンダー、分析、シミュレーターは引き続き機能します。"
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "ジャーナルの内容は何も影響を受けません。すでに行っている取引はそのまま残り、カレンダー、分析、シミュレーターは引き続き機能します。",
+  "Backtest runs and every AI review generated for you.": "バックテストが実行され、すべての AI レビューが生成されます。"
 }

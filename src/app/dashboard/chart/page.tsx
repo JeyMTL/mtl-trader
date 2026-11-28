@@ -44,7 +44,6 @@ export default async function ChartPage() {
   const paidTimeframes = owner || hasPaidPlan(account)
 
   let drawings: ChartDrawingRow[] = []
-  let tableMissing = false
 
   if (supabase) {
     const read = (columns: string) =>
@@ -65,9 +64,7 @@ export default async function ChartPage() {
       readError = retry.error
     }
 
-    if (readError) {
-      tableMissing = true
-    } else {
+    if (!readError) {
       drawings = (rows ?? []).map((row) => ({
         id: String(row.id),
         symbol: String(row.symbol),
@@ -91,19 +88,7 @@ export default async function ChartPage() {
     <div className="mx-auto w-full max-w-6xl space-y-3 px-3 py-3 lg:px-6">
       <div>
         <h1 className="text-lg font-bold tracking-tight text-white">Chart</h1>
-        <p className="text-[11px] leading-relaxed text-gray-500">
-          Live candles, the same feed the phone uses. Pin levels, trends, fib
-          retracements and zones, mark a time with a vertical line, measure a move
-          — all saved to your account. Session VWAP and the Asia, London and New
-          York ranges are computed from the candles themselves.
-        </p>
       </div>
-
-      {tableMissing && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-          Chart drawings are not available yet. Please try again later.
-        </div>
-      )}
 
       <ChartWorkspace
         initialDrawings={drawings}

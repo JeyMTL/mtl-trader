@@ -229,7 +229,6 @@
   "Background": "Arrière-plan",
   "Background and crosshair": "Arrière-plan et réticule",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Sessions de backtest, dessins enregistrés et chaque analyse IA générée pour vous.",
   "Backtester with saved runs, simulating past sessions only": "Backtester avec sessions enregistrées, simulant uniquement les sessions passées",
   "Backups.": "Sauvegardes.",
   "badge badge-buy": "badge badge-buy",
@@ -611,7 +610,6 @@
   "Lines that fire": "Lignes qui se déclenchent",
   "Lines that have already fired are kept but taken off the chart.": "Les lignes qui se sont déjà déclenchées sont conservées mais retirées du graphique.",
   "Live": "En direct",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Bougies en direct, le même flux que celui de votre téléphone. Épinglez des niveaux, des tendances, des retracements de Fibonacci et des zones, marquez une heure avec une ligne verticale, mesurez un mouvement — le tout enregistré sur votre compte. Le VWAP de session et les ranges d'Asie, de Londres et de New York sont calculés à partir des bougies elles-mêmes.",
   "Live ticket": "Ticket en direct",
   "Loading": "Chargement",
   "Loading profile...": "Chargement du profil...",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Vous pouvez modifier votre solde une fois par mois. Le changement de ce mois-ci est toujours disponible.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— les fournisseurs d'infrastructure sous contrat exécutent l'application et les tâches planifiées, et stockent les comptes, les fichiers et les données de connexion.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— reçoit le résumé de la transaction que vous soumettez pour examen. Nous n’utilisons pas les avis pour former des modèles.",
-  "Chart drawings are not available yet. Please try again later.": "Les dessins cartographiques ne sont pas encore disponibles. Veuillez réessayer plus tard.",
   "Hosting and storage": "Hébergement et stockage",
   "Our AI provider": "Notre fournisseur d'IA",
   "Card checkout is not configured for any paid plan.": "Le paiement par carte n’est configuré pour aucun forfait payant.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Écrivez vos règles d'entrée et de sortie, testez-les sur des sessions enregistrées et conservez chaque exécution pour comparer.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Un journal pour enregistrer vos propres transactions : analyses, vue du marché en direct et synchronisation MT5, dans le navigateur et sur Android, avec plus de 30 langues dans l'application.",
   "Example workspace. Market view, analytics and journal share one account.": "Exemple d'espace de travail. La vue du marché, les analyses et le journal partagent un seul compte.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Rien dans votre journal n'est affecté : les transactions que vous avez déjà effectuées restent là où elles sont et le calendrier, les analyses et le simulateur continuent de fonctionner."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Rien dans votre journal n'est affecté : les transactions que vous avez déjà effectuées restent là où elles sont et le calendrier, les analyses et le simulateur continuent de fonctionner.",
+  "Backtest runs and every AI review generated for you.": "Exécutions de backtest et chaque examen d'IA généré pour vous."
 }

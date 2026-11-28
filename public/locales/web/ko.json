@@ -415,7 +415,6 @@
   "Back to the trade log": "거래 로그로 돌아가기",
   "Background": "배경",
   "Background and crosshair": "배경 및 십자선",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "백테스트 실행 및 저장된 도면, 그리고 생성된 모든 AI 검토.",
   "Backtester with saved runs, simulating past sessions only": "저장된 실행을 사용한 백테스터, 과거 세션만 시뮬레이션",
   "Backups.": "백업.",
   "badge badge-buy": "뱃지 뱃지 구매",
@@ -738,7 +737,6 @@
   "Lines that fire": "발사되는 라인",
   "Lines that have already fired are kept but taken off the chart.": "이미 발사된 라인은 유지되지만 차트에서 제외됩니다.",
   "Live": "라이브",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "라이브 캔들, 전화기가 사용하는 것과 동일한 피드입니다. 레벨, 추세, fib 되돌림 및 영역을 고정하고, 수직선으로 시간을 표시하고, 움직임을 측정합니다. 이 모든 것이 계정에 저장됩니다. 세션 VWAP 및 아시아, 런던, 뉴욕 범위는 양초 자체에서 계산됩니다.",
   "Loading": "로드 중",
   "Loading profile...": "프로필 로드 중...",
   "Loading prop rules…": "소품 규칙 로드 중…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "한 달에 한 번 잔액을 변경할 수 있습니다. 이번 달의 변경사항은 아직 유효합니다.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— 계약된 인프라 제공업체는 애플리케이션과 예약된 작업을 실행하고 계정, 파일 및 로그인 데이터를 저장합니다.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— 검토를 위해 제출한 거래 요약을 받습니다. 리뷰는 모델을 교육하는 데 사용되지 않습니다.",
-  "Chart drawings are not available yet. Please try again later.": "차트 도면은 아직 사용할 수 없습니다. 나중에 다시 시도해 주세요.",
   "Hosting and storage": "호스팅 및 스토리지",
   "Our AI provider": "우리의 AI 제공업체",
   "Card checkout is not configured for any paid plan.": "유료 플랜에는 카드 체크아웃이 구성되어 있지 않습니다.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "시작 및 종료 규칙을 작성하고, 저장된 세션에서 테스트하고, 모든 실행을 유지하여 비교하세요.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "나만의 거래를 기록하기 위한 저널입니다. 브라우저와 Android에서 분석, 실시간 시장 보기, MT5 동기화를 볼 수 있으며 앱에서 30개 이상의 언어를 사용할 수 있습니다.",
   "Example workspace. Market view, analytics and journal share one account.": "예시 작업공간. 시장 보기, 분석 및 저널은 하나의 계정을 공유합니다.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "귀하의 저널에 있는 어떤 것도 영향을 받지 않습니다. 귀하가 이미 진행한 거래는 그대로 유지되며 달력, 분석 및 시뮬레이터는 계속 작동합니다."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "귀하의 저널에 있는 어떤 것도 영향을 받지 않습니다. 귀하가 이미 진행한 거래는 그대로 유지되며 달력, 분석 및 시뮬레이터는 계속 작동합니다.",
+  "Backtest runs and every AI review generated for you.": "백테스트가 실행되고 모든 AI 검토가 생성됩니다."
 }

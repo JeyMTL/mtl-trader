@@ -403,7 +403,6 @@
   "Background": "Hintergrund",
   "Background and crosshair": "Hintergrund und Fadenkreuz",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Backtestläufe und gespeicherte Zeichnungen sowie jede für Sie generierte KI-Bewertung.",
   "Backtester with saved runs, simulating past sessions only": "Backtester mit gespeicherten Läufen, der nur vergangene Sitzungen simuliert",
   "Backups.": "Backups.",
   "badge badge-buy": "Abzeichen-Abzeichen-kaufen",
@@ -729,7 +728,6 @@
   "Lines that fire": "Linien, die feuern",
   "Lines that have already fired are kept but taken off the chart.": "Bereits ausgelöste Linien werden beibehalten, aber aus der Karte entfernt.",
   "Live": "Lebe",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Live-Kerzen, der gleiche Feed, den das Telefon verwendet. Markieren Sie Niveaus, Trends, Fib-Retracements und Zonen, markieren Sie einen Zeitpunkt mit einer vertikalen Linie, messen Sie eine Bewegung – alles wird in Ihrem Konto gespeichert. Sitzung VWAP und die Spannen für Asien, London und New York werden aus den Kerzen selbst berechnet.",
   "Loading": "Laden",
   "Loading profile...": "Profil wird geladen...",
   "Loading prop rules…": "Requisitenregeln werden geladen…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Sie können Ihr Guthaben einmal im Monat ändern. Die Änderung dieses Monats ist noch verfügbar.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— Beauftragte Infrastrukturanbieter führen die Anwendung und geplante Jobs aus und speichern Konten, Dateien und Anmeldedaten.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "– erhält die Handelszusammenfassung, die Sie zur Überprüfung einreichen. Bewertungen werden von uns nicht zum Trainieren von Modellen verwendet.",
-  "Chart drawings are not available yet. Please try again later.": "Diagrammzeichnungen sind noch nicht verfügbar. Bitte versuchen Sie es später noch einmal.",
   "Hosting and storage": "Hosting und Speicherung",
   "Our AI provider": "Unser KI-Anbieter",
   "Card checkout is not configured for any paid plan.": "Der Karten-Checkout ist für keinen kostenpflichtigen Plan konfiguriert.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Schreiben Sie Ihre Ein- und Ausstiegsregeln, testen Sie sie an gespeicherten Sitzungen und bewahren Sie jeden Lauf auf, um ihn zu vergleichen.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Ein Tagebuch zur Aufzeichnung Ihrer eigenen Trades: Analysen, eine Live-Marktansicht und MT5-Synchronisierung, im Browser und auf Android, mit über 30 Sprachen in der App.",
   "Example workspace. Market view, analytics and journal share one account.": "Beispielarbeitsbereich. Marktansicht, Analysen und Journal teilen sich ein Konto.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nichts in Ihrem Tagebuch ist betroffen: Die Trades, die Sie bereits haben, bleiben an ihrem Platz und der Kalender, die Analysen und der Simulator funktionieren weiterhin."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nichts in Ihrem Tagebuch ist betroffen: Die Trades, die Sie bereits haben, bleiben an ihrem Platz und der Kalender, die Analysen und der Simulator funktionieren weiterhin.",
+  "Backtest runs and every AI review generated for you.": "Backtest-Läufe und jede KI-Bewertung werden für Sie generiert."
 }

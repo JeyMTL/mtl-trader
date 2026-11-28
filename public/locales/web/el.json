@@ -411,7 +411,6 @@
   "Background": "φόντο",
   "Background and crosshair": "Φόντο και σταυρόνημα",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Εκτελείται η Backtest και τα αποθηκευμένα σχέδια και κάθε κριτική τεχνητής νοημοσύνης δημιουργείται για εσάς.",
   "Backtester with saved runs, simulating past sessions only": "Backtester με αποθηκευμένες εκτελέσεις, προσομοίωση μόνο προηγούμενων περιόδων σύνδεσης",
   "Backups.": "Αντίγραφα ασφαλείας.",
   "badge badge-buy": "σήμα σήμα-αγορά",
@@ -736,7 +735,6 @@
   "Lines that fire": "Γραμμές που πυροδοτούν",
   "Lines that have already fired are kept but taken off the chart.": "Οι γραμμές που έχουν ήδη ενεργοποιηθεί διατηρούνται αλλά αφαιρούνται από το γράφημα.",
   "Live": "Ζωντανά",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Ζωντανά κεριά, η ίδια τροφοδοσία που χρησιμοποιεί το τηλέφωνο. Καρφιτσώστε τα επίπεδα, τις τάσεις, τις παραλλαγές και τις ζώνες, σημειώστε μια ώρα με μια κάθετη γραμμή, μετρήστε μια κίνηση — όλα αποθηκευμένα στον λογαριασμό σας. Η συνεδρία VWAP και οι σειρές Ασίας, Λονδίνου και Νέας Υόρκης υπολογίζονται από τα ίδια τα κεριά.",
   "Loading": "Φόρτωση",
   "Loading profile...": "Φόρτωση προφίλ...",
   "Loading prop rules…": "Φόρτωση κανόνων στήριξης…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Μπορείτε να αλλάξετε το υπόλοιπό σας μία φορά το μήνα. Η αλλαγή αυτού του μήνα είναι ακόμα διαθέσιμη.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— οι συμβεβλημένοι πάροχοι υποδομής εκτελούν την εφαρμογή και τις προγραμματισμένες εργασίες και αποθηκεύουν λογαριασμούς, αρχεία και δεδομένα εισόδου.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— λαμβάνει τη σύνοψη συναλλαγών που υποβάλλετε για έλεγχο. Οι κριτικές δεν χρησιμοποιούνται από εμάς για την εκπαίδευση μοντέλων.",
-  "Chart drawings are not available yet. Please try again later.": "Τα σχέδια γραφημάτων δεν είναι ακόμη διαθέσιμα. Δοκιμάστε ξανά αργότερα.",
   "Hosting and storage": "Φιλοξενία και αποθήκευση",
   "Our AI provider": "Ο πάροχος τεχνητής νοημοσύνης μας",
   "Card checkout is not configured for any paid plan.": "Το ταμείο κάρτας δεν έχει διαμορφωθεί για κανένα πρόγραμμα επί πληρωμή.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Γράψτε τους κανόνες εισόδου και εξόδου, δοκιμάστε τους σε αποθηκευμένες περιόδους σύνδεσης και κρατήστε κάθε εκτέλεση για σύγκριση.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Ένα ημερολόγιο για την καταγραφή των δικών σας συναλλαγών: αναλυτικά στοιχεία, ζωντανή προβολή αγοράς και συγχρονισμός MT5, στο πρόγραμμα περιήγησης και στο Android, με 30+ γλώσσες στην εφαρμογή.",
   "Example workspace. Market view, analytics and journal share one account.": "Παράδειγμα χώρου εργασίας. Η προβολή αγοράς, τα αναλυτικά στοιχεία και το περιοδικό μοιράζονται έναν λογαριασμό.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Τίποτα στο ημερολόγιό σας δεν επηρεάζεται: οι συναλλαγές που έχετε ήδη μένουν εκεί που είναι και το ημερολόγιο, τα αναλυτικά στοιχεία και ο προσομοιωτής συνεχίζουν να λειτουργούν."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Τίποτα στο ημερολόγιό σας δεν επηρεάζεται: οι συναλλαγές που έχετε ήδη μένουν εκεί που είναι και το ημερολόγιο, τα αναλυτικά στοιχεία και ο προσομοιωτής συνεχίζουν να λειτουργούν.",
+  "Backtest runs and every AI review generated for you.": "Εκτελείται Backtest και κάθε κριτική τεχνητής νοημοσύνης δημιουργείται για εσάς."
 }

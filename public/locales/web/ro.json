@@ -404,7 +404,6 @@
   "Background": "Fundal",
   "Background and crosshair": "Fundal și cruce",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Backtest rulează și desene salvate și fiecare revizuire AI generată pentru tine.",
   "Backtester with saved runs, simulating past sessions only": "Backtester cu rulări salvate, simulând doar sesiunile anterioare",
   "Backups.": "Backup-uri.",
   "badge badge-buy": "badge badge-buy",
@@ -731,7 +730,6 @@
   "Lines that fire": "Liniile care trag",
   "Lines that have already fired are kept but taken off the chart.": "Liniile care au fost deja trase sunt păstrate, dar eliminate de pe diagramă.",
   "Live": "În direct",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Lumânări vii, același aliment pe care îl folosește telefonul. Niveluri de fixare, tendințe, retrageri și zone fib, marchează o oră cu o linie verticală, măsoară o mișcare - toate sunt salvate în contul tău. Sesiunea VWAP și gamele Asia, Londra și New York sunt calculate din lumânările în sine.",
   "Loading": "Încărcare",
   "Loading profile...": "Se încarcă profilul...",
   "Loading prop rules…": "Se încarcă regulile de prop…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Îți poți schimba soldul o dată pe lună. Modificarea din această lună este încă disponibilă.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— furnizorii de infrastructură contractați rulează aplicația și joburile programate și stochează conturi, fișiere și date de conectare.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— primește rezumatul tranzacției pe care îl trimiteți pentru examinare. Recenziile nu sunt folosite de noi pentru a antrena modele.",
-  "Chart drawings are not available yet. Please try again later.": "Desenele grafice nu sunt încă disponibile. Vă rugăm să încercați din nou mai târziu.",
   "Hosting and storage": "Gazduire si stocare",
   "Our AI provider": "Furnizorul nostru AI",
   "Card checkout is not configured for any paid plan.": "Încasarea cardului nu este configurată pentru niciun plan plătit.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Scrieți regulile de intrare și ieșire, testați-le pe sesiunile salvate și păstrați fiecare rulare pentru a compara.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Un jurnal pentru înregistrarea propriilor tranzacții: analize, vizualizare live a pieței și sincronizare MT5, în browser și pe Android, cu peste 30 de limbi în aplicație.",
   "Example workspace. Market view, analytics and journal share one account.": "Exemplu de spațiu de lucru. Vizualizarea pieței, analiza și jurnalul au un singur cont.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nimic din jurnalul dvs. nu este afectat: tranzacțiile pe care le aveți deja rămân acolo unde sunt, iar calendarul, analiza și simulatorul continuă să funcționeze."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nimic din jurnalul dvs. nu este afectat: tranzacțiile pe care le aveți deja rămân acolo unde sunt, iar calendarul, analiza și simulatorul continuă să funcționeze.",
+  "Backtest runs and every AI review generated for you.": "Backtest rulează și fiecare revizuire AI generată pentru tine."
 }

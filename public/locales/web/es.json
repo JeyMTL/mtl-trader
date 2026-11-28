@@ -415,7 +415,6 @@
   "Back to the trade log": "Volver al registro comercial",
   "Background": "Antecedentes",
   "Background and crosshair": "Fondo y punto de mira",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Ejecuciones de pruebas retrospectivas y dibujos guardados, y cada revisión de IA generada para usted.",
   "Backtester with saved runs, simulating past sessions only": "Backtester con ejecuciones guardadas, simulando solo sesiones pasadas",
   "Backups.": "Copias de seguridad.",
   "badge badge-buy": "insignia-compra-de-insignia",
@@ -738,7 +737,6 @@
   "Lines that fire": "Líneas que disparan",
   "Lines that have already fired are kept but taken off the chart.": "Las líneas que ya se han disparado se mantienen pero se eliminan del gráfico.",
   "Live": "en vivo",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Velas vivas, la misma alimentación que utiliza el teléfono. Fije niveles, tendencias, retrocesos y zonas de fibra, marque un tiempo con una línea vertical, mida un movimiento, todo guardado en su cuenta. La sesión VWAP y los rangos de Asia, Londres y Nueva York se calculan a partir de las propias velas.",
   "Loading": "Cargando",
   "Loading profile...": "Cargando perfil...",
   "Loading prop rules…": "Cargando reglas de accesorios...",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Puedes cambiar tu saldo una vez al mes. El cambio de este mes aún está disponible.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— Los proveedores de infraestructura contratados ejecutan la aplicación y los trabajos programados, y almacenan cuentas, archivos y datos de inicio de sesión.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— recibe el resumen comercial que usted envía para su revisión. No utilizamos revisiones para entrenar modelos.",
-  "Chart drawings are not available yet. Please try again later.": "Los dibujos de gráficos aún no están disponibles. Inténtelo de nuevo más tarde.",
   "Hosting and storage": "Alojamiento y almacenamiento",
   "Our AI provider": "Nuestro proveedor de IA",
   "Card checkout is not configured for any paid plan.": "El pago con tarjeta no está configurado para ningún plan pago.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Escriba sus reglas de entrada y salida, pruébelas en sesiones guardadas y guarde cada ejecución para comparar.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Un diario para registrar sus propias operaciones: análisis, vista del mercado en vivo y sincronización MT5, en el navegador y en Android, con más de 30 idiomas en la aplicación.",
   "Example workspace. Market view, analytics and journal share one account.": "Ejemplo de espacio de trabajo. La visión del mercado, los análisis y el diario comparten una sola cuenta.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nada en su diario se ve afectado: las operaciones que ya tiene permanecen donde están y el calendario, los análisis y el simulador siguen funcionando."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nada en su diario se ve afectado: las operaciones que ya tiene permanecen donde están y el calendario, los análisis y el simulador siguen funcionando.",
+  "Backtest runs and every AI review generated for you.": "Ejecuciones de pruebas retrospectivas y cada revisión de IA generada para usted."
 }

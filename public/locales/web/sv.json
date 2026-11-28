@@ -402,7 +402,6 @@
   "Background": "Bakgrund",
   "Background and crosshair": "Bakgrund och hårkors",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Backtest-körningar och sparade ritningar och varje AI-recension som genereras åt dig.",
   "Backtester with saved runs, simulating past sessions only": "Backtester med sparade körningar, simulerar endast tidigare sessioner",
   "Backups.": "Säkerhetskopieringar.",
   "badge badge-buy": "märke märke-köp",
@@ -728,7 +727,6 @@
   "Lines that fire": "Linjer som eldar",
   "Lines that have already fired are kept but taken off the chart.": "Linjer som redan har avfyrats behålls men tas bort från sjökortet.",
   "Live": "Live",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Levande ljus, samma flöde som telefonen använder. Pin nivåer, trender, fib retracements och zoner, markera en tid med en vertikal linje, mät ett drag – allt sparat på ditt konto. Session VWAP och Asien, London och New York-intervallen beräknas från själva ljusen.",
   "Loading": "Laddar",
   "Loading profile...": "Laddar profil...",
   "Loading prop rules…": "Laddar rekvisitaregler...",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Du kan ändra ditt saldo en gång i månaden. Denna månads ändring är fortfarande tillgänglig.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— Kontrakterade infrastrukturleverantörer kör applikationen och schemalagda jobb och lagrar konton, filer och inloggningsdata.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— får den handelssammanfattning som du skickar in för granskning. Recensioner används inte av oss för att träna modeller.",
-  "Chart drawings are not available yet. Please try again later.": "Sjökortsritningar är inte tillgängliga ännu. Försök igen senare.",
   "Hosting and storage": "Hosting och lagring",
   "Our AI provider": "Vår AI-leverantör",
   "Card checkout is not configured for any paid plan.": "Kortutcheckning är inte konfigurerad för någon betalplan.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Skriv dina in- och utträdesregler, testa dem på sparade sessioner och behåll varje körning för att jämföra.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "En journal för att registrera dina egna affärer: analyser, en live-marknadsvy och MT5-synkronisering, i webbläsaren och på Android, med 30+ språk i appen.",
   "Example workspace. Market view, analytics and journal share one account.": "Exempel på arbetsyta. Marknadsvy, analys och journal delar ett konto.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Ingenting i din journal påverkas: de affärer du redan har stannar där de är, och kalendern, analysen och simulatorn fortsätter att fungera."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Ingenting i din journal påverkas: de affärer du redan har stannar där de är, och kalendern, analysen och simulatorn fortsätter att fungera.",
+  "Backtest runs and every AI review generated for you.": "Backtestkörningar och varje AI-recension som genereras åt dig."
 }

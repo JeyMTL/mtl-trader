@@ -405,7 +405,6 @@
   "Background": "Pozadie",
   "Background and crosshair": "Pozadie a zameriavač",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Spustí sa spätný test a uloží sa výkresy a každá recenzia AI vygenerovaná pre vás.",
   "Backtester with saved runs, simulating past sessions only": "Backtester s uloženými behmi, simuluje iba minulé relácie",
   "Backups.": "Zálohy.",
   "badge badge-buy": "odznak odznak-kúpiť",
@@ -730,7 +729,6 @@
   "Lines that fire": "Čiary, ktoré pália",
   "Lines that have already fired are kept but taken off the chart.": "Čiary, ktoré už boli spustené, sa ponechajú, ale odstránia sa z grafu.",
   "Live": "Naživo",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Živé sviečky, rovnaké krmivo, aké používa telefón. Pripnite úrovne, trendy, retracementy a zóny vlákien, označte čas zvislou čiarou, zmerajte pohyb – všetko uložené vo vašom účte. Session VWAP a rozsahy Ázie, Londýna a New Yorku sa počítajú zo samotných sviečok.",
   "Loading": "Načítava sa",
   "Loading profile...": "Načítava sa profil...",
   "Loading prop rules…": "Načítavajú sa pravidlá rekvizít…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Zostatok môžete zmeniť raz za mesiac. Zmena na tento mesiac je stále k dispozícii.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— zmluvní poskytovatelia infraštruktúry spúšťajú aplikáciu a plánované úlohy a ukladajú účty, súbory a prihlasovacie údaje.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— dostane súhrn obchodu, ktorý odošlete na kontrolu. Recenzie u nás neslúžia na trénovanie modelov.",
-  "Chart drawings are not available yet. Please try again later.": "Nákresy grafov zatiaľ nie sú k dispozícii. Skúste to znova neskôr.",
   "Hosting and storage": "Hosting a skladovanie",
   "Our AI provider": "Náš poskytovateľ AI",
   "Card checkout is not configured for any paid plan.": "Pokladňa kartou nie je nakonfigurovaná pre žiadny platený plán.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Napíšte svoje vstupné a výstupné pravidlá, otestujte ich na uložených reláciách a ponechajte si každé spustenie na porovnanie.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Denník na zaznamenávanie vašich vlastných obchodov: analýzy, živé zobrazenie trhu a synchronizácia MT5 v prehliadači a v systéme Android s viac ako 30 jazykmi v aplikácii.",
   "Example workspace. Market view, analytics and journal share one account.": "Príklad pracovného priestoru. Prehľad trhu, analytika a denník zdieľajú jeden účet.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nič vo vašom denníku nie je ovplyvnené: obchody, ktoré už máte, zostávajú tam, kde sú, a kalendár, analytika a simulátor naďalej fungujú."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nič vo vašom denníku nie je ovplyvnené: obchody, ktoré už máte, zostávajú tam, kde sú, a kalendár, analytika a simulátor naďalej fungujú.",
+  "Backtest runs and every AI review generated for you.": "Spustí sa spätný test a každá recenzia AI vygenerovaná pre vás."
 }

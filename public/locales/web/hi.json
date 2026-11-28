@@ -415,7 +415,6 @@
   "Back to the trade log": "ट्रेड लॉग पर वापस जाएँ",
   "Background": "पृष्ठभूमि",
   "Background and crosshair": "पृष्ठभूमि और क्रॉसहेयर",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "बैकटेस्ट रन और सहेजे गए चित्र, और आपके लिए तैयार की गई प्रत्येक एआई समीक्षा।",
   "Backtester with saved runs, simulating past sessions only": "सहेजे गए रनों के साथ बैकटेस्टर, केवल पिछले सत्रों का अनुकरण",
   "Backups.": "बैकअप।",
   "badge badge-buy": "बैज बैज-खरीदें",
@@ -738,7 +737,6 @@
   "Lines that fire": "आग उगलने वाली पंक्तियाँ",
   "Lines that have already fired are kept but taken off the chart.": "जो लाइनें पहले ही सक्रिय हो चुकी हैं उन्हें रखा जाता है लेकिन चार्ट से हटा दिया जाता है।",
   "Live": "जियो",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "लाइव मोमबत्तियाँ, वही फ़ीड जो फ़ोन उपयोग करता है। पिन स्तर, रुझान, फ़ाइब रिट्रेसमेंट और ज़ोन, एक ऊर्ध्वाधर रेखा के साथ एक समय चिह्नित करें, एक चाल को मापें - यह सब आपके खाते में सहेजा गया है। सत्र VWAP और एशिया, लंदन और न्यूयॉर्क श्रेणियों की गणना स्वयं मोमबत्तियों से की जाती है।",
   "Loading": "लोड हो रहा है",
   "Loading profile...": "प्रोफ़ाइल लोड हो रही है...",
   "Loading prop rules…": "प्रोप नियम लोड हो रहे हैं...",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "आप महीने में एक बार अपना बैलेंस बदल सकते हैं। इस माह का परिवर्तन अभी भी उपलब्ध है.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "- अनुबंधित बुनियादी ढांचा प्रदाता एप्लिकेशन और निर्धारित कार्य चलाते हैं, और खाते, फ़ाइलें और साइन-इन डेटा संग्रहीत करते हैं।",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "- आपके द्वारा समीक्षा के लिए सबमिट किया गया व्यापार सारांश प्राप्त होता है। मॉडलों को प्रशिक्षित करने के लिए हमारे द्वारा समीक्षाओं का उपयोग नहीं किया जाता है।",
-  "Chart drawings are not available yet. Please try again later.": "चार्ट चित्र अभी उपलब्ध नहीं हैं. कृपया बाद में पुन: प्रयास करें।",
   "Hosting and storage": "होस्टिंग और भंडारण",
   "Our AI provider": "हमारा एआई प्रदाता",
   "Card checkout is not configured for any paid plan.": "कार्ड चेकआउट किसी भी भुगतान योजना के लिए कॉन्फ़िगर नहीं किया गया है।",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "अपने प्रवेश और निकास नियम लिखें, सहेजे गए सत्रों पर उनका परीक्षण करें और तुलना करने के लिए प्रत्येक रन को रखें।",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "अपने स्वयं के ट्रेडों को रिकॉर्ड करने के लिए एक जर्नल: एनालिटिक्स, एक लाइव मार्केट व्यू और MT5 सिंक, ब्राउज़र में और एंड्रॉइड पर, ऐप में 30+ भाषाओं के साथ।",
   "Example workspace. Market view, analytics and journal share one account.": "उदाहरण कार्यक्षेत्र. मार्केट व्यू, एनालिटिक्स और जर्नल एक खाता साझा करते हैं।",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "आपके जर्नल में कुछ भी प्रभावित नहीं होता है: आपके पास पहले से मौजूद ट्रेड वहीं रहते हैं, और कैलेंडर, एनालिटिक्स और सिम्युलेटर काम करते रहते हैं।"
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "आपके जर्नल में कुछ भी प्रभावित नहीं होता है: आपके पास पहले से मौजूद ट्रेड वहीं रहते हैं, और कैलेंडर, एनालिटिक्स और सिम्युलेटर काम करते रहते हैं।",
+  "Backtest runs and every AI review generated for you.": "बैकटेस्ट रन और प्रत्येक एआई समीक्षा आपके लिए तैयार की गई है।"
 }

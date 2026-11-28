@@ -415,7 +415,6 @@
   "Back to the trade log": "العودة إلى سجل التجارة",
   "Background": "الخلفية",
   "Background and crosshair": "الخلفية والتقاطع",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "يتم تشغيل الاختبار الخلفي والرسومات المحفوظة، ويتم إنشاء كل مراجعة للذكاء الاصطناعي لك.",
   "Backtester with saved runs, simulating past sessions only": "Backtester مع عمليات التشغيل المحفوظة، ومحاكاة الجلسات الماضية فقط",
   "Backups.": "النسخ الاحتياطية.",
   "badge badge-buy": "شارة شارة شراء",
@@ -738,7 +737,6 @@
   "Lines that fire": "الخطوط التي النار",
   "Lines that have already fired are kept but taken off the chart.": "يتم الاحتفاظ بالخطوط التي تم إطلاقها بالفعل ولكن يتم إزالتها من المخطط.",
   "Live": "مباشر",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "الشموع الحية، نفس التغذية التي يستخدمها الهاتف. مستويات الدبوس، والاتجاهات، وتراجعات ومناطق فيبوناتشي، وتحديد الوقت بخط عمودي، وقياس الحركة - كل ذلك محفوظ في حسابك. يتم حساب الجلسة VWAP ونطاقات آسيا ولندن ونيويورك من الشموع نفسها.",
   "Loading": "جاري التحميل",
   "Loading profile...": "جارٍ تحميل الملف الشخصي...",
   "Loading prop rules…": "جارٍ تحميل قواعد الدعم...",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "يمكنك تغيير رصيدك مرة واحدة في الشهر. التغيير لهذا الشهر لا يزال متاحا.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— يقوم موفرو البنية التحتية المتعاقدون بتشغيل التطبيق والمهام المجدولة، وتخزين الحسابات والملفات وبيانات تسجيل الدخول.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— يتلقى ملخص التجارة الذي ترسله للمراجعة. لا نستخدم المراجعات لتدريب النماذج.",
-  "Chart drawings are not available yet. Please try again later.": "رسومات المخططات غير متوفرة بعد. يرجى المحاولة مرة أخرى في وقت لاحق.",
   "Hosting and storage": "الاستضافة والتخزين",
   "Our AI provider": "مزود الذكاء الاصطناعي الخاص بنا",
   "Card checkout is not configured for any paid plan.": "لم يتم تكوين الخروج من البطاقة لأي خطة مدفوعة.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "اكتب قواعد الدخول والخروج الخاصة بك، واختبرها في الجلسات المحفوظة واحتفظ بكل جولة للمقارنة.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "مجلة لتسجيل تداولاتك الخاصة: تحليلات وعرض مباشر للسوق ومزامنة MT5، في المتصفح وعلى نظام Android، مع أكثر من 30 لغة في التطبيق.",
   "Example workspace. Market view, analytics and journal share one account.": "مساحة عمل مثال. عرض السوق والتحليلات والمجلة تشترك في حساب واحد.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "لن يتأثر أي شيء في دفتر يومياتك: تظل الصفقات التي قمت بها بالفعل في مكانها، ويستمر التقويم والتحليلات والمحاكاة في العمل."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "لن يتأثر أي شيء في دفتر يومياتك: تظل الصفقات التي قمت بها بالفعل في مكانها، ويستمر التقويم والتحليلات والمحاكاة في العمل.",
+  "Backtest runs and every AI review generated for you.": "يتم تشغيل الاختبار الخلفي ويتم إنشاء كل مراجعة للذكاء الاصطناعي لك."
 }

@@ -415,7 +415,6 @@
   "Back to the trade log": "Grįžti į prekybos žurnalą",
   "Background": "Fonas",
   "Background and crosshair": "Fonas ir kryželis",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Atgalinis patikrinimas ir išsaugoti brėžiniai bei kiekviena jums sukurta AI apžvalga.",
   "Backtester with saved runs, simulating past sessions only": "Atgalinis testeris su išsaugotais paleidimais, imituojant tik ankstesnes sesijas",
   "Backups.": "Atsarginės kopijos.",
   "badge badge-buy": "ženklelis ženklelis-pirkti",
@@ -739,7 +738,6 @@
   "Lines that fire": "Linijos, kad ugnis",
   "Lines that have already fired are kept but taken off the chart.": "Linijos, kurios jau buvo paleistos, išlaikomos, bet pašalinamos iš diagramos.",
   "Live": "Tiesiogiai",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Gyvos žvakės, tas pats tiekimas, kurį naudoja telefonas. Smeigtukų lygiai, tendencijos, fib tracements ir zonos, pažymėkite laiką vertikalia linija, išmatuokite judesį – visa tai išsaugota jūsų paskyroje. Session VWAP ir Azijos, Londono ir Niujorko diapazonai apskaičiuojami iš pačių žvakių.",
   "Loading": "Įkeliama",
   "Loading profile...": "Įkeliamas profilis...",
   "Loading prop rules…": "Įkeliamos rekvizito taisyklės…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Balansą galite keisti kartą per mėnesį. Vis dar galimas šio mėnesio pakeitimas.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— infrastruktūros teikėjai, su kuriais sudarytos sutartys, vykdo taikomąją programą ir suplanuotas užduotis, saugo paskyras, failus ir prisijungimo duomenis.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— gauna prekybos santrauką, kurią pateikiate peržiūrėti. Apžvalgos nenaudojame modeliams mokyti.",
-  "Chart drawings are not available yet. Please try again later.": "Diagramos brėžiniai dar nepasiekiami. Bandykite dar kartą vėliau.",
   "Hosting and storage": "Priegloba ir saugojimas",
   "Our AI provider": "Mūsų AI teikėjas",
   "Card checkout is not configured for any paid plan.": "Kortelės atsiskaitymas nesukonfigūruotas jokiam mokamam planui.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Parašykite savo įėjimo ir išėjimo taisykles, išbandykite jas išsaugotuose seansuose ir kiekvieną važiavimą palyginkite.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Žurnalas, skirtas įrašyti savo sandorius: analizė, tiesioginis rinkos vaizdas ir MT5 sinchronizavimas naršyklėje ir „Android“, programėlėje daugiau nei 30 kalbų.",
   "Example workspace. Market view, analytics and journal share one account.": "Darbo vietos pavyzdys. Rinkos vaizdas, analizė ir žurnalas bendrina vieną paskyrą.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Niekas jūsų žurnale nebus paveiktas: jau turimi sandoriai lieka ten, kur yra, o kalendorius, analizė ir simuliatorius toliau veikia."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Niekas jūsų žurnale nebus paveiktas: jau turimi sandoriai lieka ten, kur yra, o kalendorius, analizė ir simuliatorius toliau veikia.",
+  "Backtest runs and every AI review generated for you.": "Atgaliniai bandymai ir kiekviena jums sukurta AI apžvalga."
 }

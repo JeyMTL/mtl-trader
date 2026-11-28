@@ -414,7 +414,6 @@
   "Back to the trade log": "Atgriezties uz tirdzniecības žurnālu",
   "Background": "Fons",
   "Background and crosshair": "Fons un krustojums",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Atpakaļpārbaudes darbi un saglabāti zīmējumi, kā arī katrs jums radītais AI pārskats.",
   "Backtester with saved runs, simulating past sessions only": "Atpakaļtestētājs ar saglabātiem skrējieniem, simulējot tikai iepriekšējās sesijas",
   "Backups.": "Dublējumkopijas.",
   "badge badge-buy": "žetonu žetonu pirkšana",
@@ -738,7 +737,6 @@
   "Lines that fire": "Līnijas, kas uguns",
   "Lines that have already fired are kept but taken off the chart.": "Līnijas, kas jau ir aktivizētas, tiek saglabātas, bet noņemtas no diagrammas.",
   "Live": "Tiešraidē",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Dzīvas sveces, tā pati plūsma, ko izmanto tālrunis. Piespraudes līmeņi, tendences, fib retracements un zonas, atzīmējiet laiku ar vertikālu līniju, izmēriet kustību — tas viss tiek saglabāts jūsu kontā. Session VWAP un Āzijas, Londonas un Ņujorkas diapazoni tiek aprēķināti no pašām svecēm.",
   "Loading": "Notiek ielāde",
   "Loading profile...": "Notiek profila ielāde...",
   "Loading prop rules…": "Notiek rekvizītu noteikumu ielāde…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Jūs varat mainīt savu bilanci reizi mēnesī. Šī mēneša izmaiņas joprojām ir pieejamas.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— līgumslēdzēji infrastruktūras nodrošinātāji palaiž lietojumprogrammu un ieplānotos darbus, kā arī uzglabā kontus, failus un pierakstīšanās datus.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— saņem tirdzniecības kopsavilkumu, ko iesniedzat pārskatīšanai. Mēs neizmantojam atsauksmes, lai apmācītu modeļus.",
-  "Chart drawings are not available yet. Please try again later.": "Diagrammu rasējumi vēl nav pieejami. Lūdzu, vēlāk mēģiniet vēlreiz.",
   "Hosting and storage": "Hostings un uzglabāšana",
   "Our AI provider": "Mūsu AI nodrošinātājs",
   "Card checkout is not configured for any paid plan.": "Kartes norēķināšanās nav konfigurēta nevienam maksas plānam.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Uzrakstiet savus ieejas un izejas noteikumus, pārbaudiet tos saglabātajās sesijās un saglabājiet katru skrējienu, lai salīdzinātu.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Žurnāls savu darījumu ierakstīšanai: analītika, tiešais tirgus skats un MT5 sinhronizācija pārlūkprogrammā un operētājsistēmā Android ar 30+ valodām lietotnē.",
   "Example workspace. Market view, analytics and journal share one account.": "Darbvietas piemērs. Tirgus skatam, analīzei un žurnālam ir viens konts.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nekas jūsu žurnālā netiek ietekmēts: jūsu jau veiktie darījumi paliek tur, kur tie ir, un kalendārs, analītika un simulators turpina darboties."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Nekas jūsu žurnālā netiek ietekmēts: jūsu jau veiktie darījumi paliek tur, kur tie ir, un kalendārs, analītika un simulators turpina darboties.",
+  "Backtest runs and every AI review generated for you.": "Atpakaļpārbaudes un katrs jums radītais AI pārskats."
 }

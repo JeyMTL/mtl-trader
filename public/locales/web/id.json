@@ -414,7 +414,6 @@
   "Back to the trade log": "Kembali ke log perdagangan",
   "Background": "Latar Belakang",
   "Background and crosshair": "Latar belakang dan garis bidik",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Backtest berjalan dan menyimpan gambar, dan setiap ulasan AI dibuat untuk Anda.",
   "Backtester with saved runs, simulating past sessions only": "Backtester dengan proses tersimpan, hanya menyimulasikan sesi sebelumnya",
   "Backups.": "Cadangan.",
   "badge badge-buy": "lencana lencana-beli",
@@ -737,7 +736,6 @@
   "Lines that fire": "Garis yang menyala",
   "Lines that have already fired are kept but taken off the chart.": "Garis yang telah ditembakkan dipertahankan tetapi dikeluarkan dari grafik.",
   "Live": "Hidup",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Lilin hidup, umpan yang sama yang digunakan telepon. Pasang pin pada level, tren, retracement fib dan zona, tandai waktu dengan garis vertikal, ukur pergerakan — semuanya disimpan ke akun Anda. Sesi VWAP dan rentang Asia, London, dan New York dihitung dari candle itu sendiri.",
   "Loading": "Memuat",
   "Loading profile...": "Memuat profil...",
   "Loading prop rules…": "Memuat aturan prop…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Anda dapat mengubah saldo Anda sebulan sekali. Perubahan bulan ini masih tersedia.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— penyedia infrastruktur yang dikontrak menjalankan aplikasi dan pekerjaan terjadwal, serta menyimpan akun, file, dan data masuk.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— menerima ringkasan perdagangan yang Anda kirimkan untuk ditinjau. Ulasan tidak kami gunakan untuk melatih model.",
-  "Chart drawings are not available yet. Please try again later.": "Gambar grafik belum tersedia. Silakan coba lagi nanti.",
   "Hosting and storage": "Hosting dan penyimpanan",
   "Our AI provider": "Penyedia AI kami",
   "Card checkout is not configured for any paid plan.": "Pembayaran kartu tidak dikonfigurasi untuk paket berbayar apa pun.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Tulis aturan masuk dan keluar Anda, uji aturan tersebut pada sesi tersimpan, dan bandingkan setiap proses.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Jurnal untuk mencatat perdagangan Anda sendiri: analitik, tampilan pasar langsung, dan sinkronisasi MT5, di browser dan di Android, dengan 30+ bahasa di aplikasi.",
   "Example workspace. Market view, analytics and journal share one account.": "Contoh ruang kerja. Tampilan pasar, analitik, dan jurnal berbagi satu akun.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Tidak ada apa pun di jurnal Anda yang terpengaruh: perdagangan yang Anda lakukan tetap berada di tempatnya, dan kalender, analitik, dan simulator tetap berfungsi."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Tidak ada apa pun di jurnal Anda yang terpengaruh: perdagangan yang Anda lakukan tetap berada di tempatnya, dan kalender, analitik, dan simulator tetap berfungsi.",
+  "Backtest runs and every AI review generated for you.": "Backtest berjalan dan setiap ulasan AI dibuat untuk Anda."
 }

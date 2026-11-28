@@ -409,7 +409,6 @@
   "Background": "Achtergrond",
   "Background and crosshair": "Achtergrond en draadkruis",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Backtestruns en opgeslagen tekeningen, en elke AI-review die voor u wordt gegenereerd.",
   "Backtester with saved runs, simulating past sessions only": "Backtester met opgeslagen runs, waarbij alleen eerdere sessies worden gesimuleerd",
   "Backups.": "Back-ups.",
   "badge badge-buy": "badge badge-kopen",
@@ -734,7 +733,6 @@
   "Lines that fire": "Lijnen die vuren",
   "Lines that have already fired are kept but taken off the chart.": "Lijnen die al hebben geschoten, worden behouden maar van de kaart verwijderd.",
   "Live": "Leef",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Levende kaarsen, dezelfde feed die de telefoon gebruikt. Pin niveaus, trends, fib retracements en zones, markeer een tijd met een verticale lijn, meet een zet - alles opgeslagen in uw account. Sessie VWAP en de bereiken voor Azië, Londen en New York worden berekend op basis van de kaarsen zelf.",
   "Loading": "Laden",
   "Loading profile...": "Profiel laden...",
   "Loading prop rules…": "Propregels laden...",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Eén keer per maand kunt u uw saldo wijzigen. Het wisselgeld van deze maand is nog steeds beschikbaar.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— Gecontracteerde infrastructuuraanbieders voeren de applicatie en geplande taken uit, en slaan accounts, bestanden en inloggegevens op.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— ontvangt het handelsoverzicht dat u ter beoordeling indient. Recensies worden door ons niet gebruikt om modellen te trainen.",
-  "Chart drawings are not available yet. Please try again later.": "Kaarttekeningen zijn nog niet beschikbaar. Probeer het later opnieuw.",
   "Hosting and storage": "Hosting en opslag",
   "Our AI provider": "Onze AI-provider",
   "Card checkout is not configured for any paid plan.": "Kaartafrekenen is voor geen enkel betaald abonnement geconfigureerd.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Schrijf uw in- en uitstapregels, test ze in opgeslagen sessies en bewaar elke run om te vergelijken.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Een dagboek voor het vastleggen van uw eigen transacties: analyses, een live marktweergave en MT5-synchronisatie, in de browser en op Android, met meer dan 30 talen in de app.",
   "Example workspace. Market view, analytics and journal share one account.": "Voorbeeld werkruimte. Marktoverzicht, analyses en dagboek delen één account.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Er wordt niets in uw dagboek beïnvloed: de transacties die u al heeft, blijven waar ze zijn, en de kalender, analyses en simulator blijven werken."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Er wordt niets in uw dagboek beïnvloed: de transacties die u al heeft, blijven waar ze zijn, en de kalender, analyses en simulator blijven werken.",
+  "Backtest runs and every AI review generated for you.": "Backtest-runs en elke AI-beoordeling die voor u wordt gegenereerd."
 }

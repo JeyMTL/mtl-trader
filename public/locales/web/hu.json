@@ -408,7 +408,6 @@
   "Back to the trade log": "Vissza a kereskedelmi naplóhoz",
   "Background": "Háttér",
   "Background and crosshair": "Háttér és célkereszt",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Visszatesztelések és elmentett rajzok, valamint minden Ön számára generált AI áttekintés.",
   "Backtester with saved runs, simulating past sessions only": "Backtester mentett futtatásokkal, csak a korábbi munkamenetek szimulálásával",
   "Backups.": "Biztonsági mentések.",
   "badge badge-buy": "jelvény jelvény-vásárlás",
@@ -732,7 +731,6 @@
   "Lines that fire": "Vonalja a tüzet",
   "Lines that have already fired are kept but taken off the chart.": "A már elindított vonalak megmaradnak, de lekerülnek a diagramról.",
   "Live": "Élőben",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Élő gyertyák, ugyanaz a hírcsatorna, amelyet a telefon használ. Pin szintek, trendek, fib-retracements és zónák, jelölje meg az időt függőleges vonallal, mérje meg a mozgást – mindezt elmenti a fiókjába. Session VWAP, valamint az ázsiai, londoni és New York-i tartományok magukból a gyertyákból vannak kiszámítva.",
   "Loading": "Betöltés",
   "Loading profile...": "Profil betöltése...",
   "Loading prop rules…": "Problémaszabályok betöltése…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Egyenlegét havonta egyszer módosíthatja. Az e havi változtatás még elérhető.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— a szerződött infrastruktúra-szolgáltatók futtatják az alkalmazást és az ütemezett feladatokat, valamint tárolják a fiókokat, fájlokat és bejelentkezési adatokat.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— megkapja az Ön által felülvizsgálatra benyújtott kereskedelmi összefoglalót. Az értékeléseket nem használjuk modellek képzésére.",
-  "Chart drawings are not available yet. Please try again later.": "A diagramrajzok még nem állnak rendelkezésre. Kérjük, próbálja újra később.",
   "Hosting and storage": "Tárhely és tárolás",
   "Our AI provider": "AI szolgáltatónk",
   "Card checkout is not configured for any paid plan.": "A kártyás fizetés nincs konfigurálva egyetlen fizetős csomaghoz sem.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Írja meg a belépési és kilépési szabályokat, tesztelje őket a mentett munkameneteken, és tartsa meg az összes futtatást az összehasonlításhoz.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Egy napló saját kereskedéseinek rögzítéséhez: elemzések, élő piaci nézet és MT5 szinkronizálás, böngészőben és Androidon, több mint 30 nyelven az alkalmazásban.",
   "Example workspace. Market view, analytics and journal share one account.": "Példa munkaterületre. A piaci nézet, az elemzés és a napló egy fiókon osztozik.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "A naplójában szereplő adatok semmit nem érintenek: a már megkötött ügyletei ott maradnak, ahol vannak, a naptár, az analitika és a szimulátor pedig tovább működik."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "A naplójában szereplő adatok semmit nem érintenek: a már megkötött ügyletei ott maradnak, ahol vannak, a naptár, az analitika és a szimulátor pedig tovább működik.",
+  "Backtest runs and every AI review generated for you.": "Visszatesztek és minden mesterséges intelligencia értékelés, amelyet Önnek generál."
 }

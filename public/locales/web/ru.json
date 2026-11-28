@@ -415,7 +415,6 @@
   "Back to the trade log": "Вернуться к журналу сделок",
   "Background": "Фон",
   "Background and crosshair": "Фон и перекрестие",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Выполняется бэктестинг, сохраняются чертежи и каждый обзор ИИ, созданный для вас.",
   "Backtester with saved runs, simulating past sessions only": "Бэктестер с сохраненными прогонами, моделирующий только прошлые сеансы",
   "Backups.": "Резервные копии.",
   "badge badge-buy": "бейдж-купить",
@@ -738,7 +737,6 @@
   "Lines that fire": "Линии, которые стреляют",
   "Lines that have already fired are kept but taken off the chart.": "Линии, которые уже были запущены, сохраняются, но удаляются с карты.",
   "Live": "Живи",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Живые свечи, те же самые, что используются в телефоне. Уровни закрепления, тренды, уровни коррекции и зоны Фибоначчи, отмечайте время вертикальной линией, измеряйте движение — все это сохраняется в вашей учетной записи. Сессия VWAP и диапазоны Азии, Лондона и Нью-Йорка рассчитываются на основе самих свечей.",
   "Loading": "Загрузка",
   "Loading profile...": "Загрузка профиля...",
   "Loading prop rules…": "Загрузка правил реквизита…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Вы можете менять баланс раз в месяц. Изменение этого месяца все еще доступно.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— контрактные поставщики инфраструктуры запускают приложения и запланированные задания, а также хранят учетные записи, файлы и данные для входа.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— получает сводку сделки, которую вы отправляете на рассмотрение. Отзывы не используются нами для обучения моделей.",
-  "Chart drawings are not available yet. Please try again later.": "Чертежи диаграмм пока недоступны. Пожалуйста, повторите попытку позже.",
   "Hosting and storage": "Хостинг и хранилище",
   "Our AI provider": "Наш поставщик ИИ",
   "Card checkout is not configured for any paid plan.": "Оформление заказа по карте не настроено ни для одного платного плана.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Напишите свои правила входа и выхода, протестируйте их на сохраненных сеансах и сохраняйте каждый запуск для сравнения.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Журнал для записи ваших собственных сделок: аналитика, обзор рынка в реальном времени и синхронизация MT5 в браузере и на Android, с более чем 30 языками в приложении.",
   "Example workspace. Market view, analytics and journal share one account.": "Пример рабочего пространства. Обзор рынка, аналитика и журнал используют один аккаунт.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Ничего в вашем журнале не изменится: уже имеющиеся у вас сделки останутся на своих местах, а календарь, аналитика и симулятор продолжат работать."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Ничего в вашем журнале не изменится: уже имеющиеся у вас сделки останутся на своих местах, а календарь, аналитика и симулятор продолжат работать.",
+  "Backtest runs and every AI review generated for you.": "Запускается тестирование на исторических данных и каждый обзор ИИ, созданный для вас."
 }

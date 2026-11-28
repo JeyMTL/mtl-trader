@@ -407,7 +407,6 @@
   "Background": "Ozadje",
   "Background and crosshair": "Ozadje in križec",
   "Backtest": "Backtest",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Preskusi za nazaj in shranjene risbe ter vsak pregled AI, ustvarjen za vas.",
   "Backtester with saved runs, simulating past sessions only": "Backtester s shranjenimi teki, ki simulira samo pretekle seje",
   "Backups.": "Varnostne kopije.",
   "badge badge-buy": "značka značka-kupi",
@@ -732,7 +731,6 @@
   "Lines that fire": "Črte, ki streljajo",
   "Lines that have already fired are kept but taken off the chart.": "Črte, ki so se že sprožile, so ohranjene, a umaknjene z lestvice.",
   "Live": "V živo",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Žive sveče, isti vir kot telefon uporablja. Stopnje zaznamkov, trendi, fib retracements in cone, označite čas z navpično črto, izmerite potezo – vse shranjeno v vašem računu. Seja VWAP ter razponi Azije, Londona in New Yorka so izračunani iz samih sveč.",
   "Loading": "Nalaganje",
   "Loading profile...": "Nalaganje profila ...",
   "Loading prop rules…": "Nalaganje pravil prop …",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Svoje stanje lahko spremenite enkrat mesečno. Sprememba tega meseca je še vedno na voljo.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— pogodbeni ponudniki infrastrukture izvajajo aplikacijo in načrtovana opravila ter shranjujejo račune, datoteke in podatke za prijavo.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— prejme povzetek trgovanja, ki ga pošljete v pregled. Recenzij ne uporabljamo za usposabljanje modelov.",
-  "Chart drawings are not available yet. Please try again later.": "Risbe grafikonov še niso na voljo. Poskusite znova pozneje.",
   "Hosting and storage": "Gostovanje in shranjevanje",
   "Our AI provider": "Naš ponudnik AI",
   "Card checkout is not configured for any paid plan.": "Blagajna s kartico ni konfigurirana za noben plačan paket.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Napišite svoja vstopna in izstopna pravila, jih preizkusite na shranjenih sejah in shranite vsako vožnjo za primerjavo.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Dnevnik za beleženje lastnih trgovanj: analitika, pogled trga v živo in sinhronizacija MT5, v brskalniku in Androidu, z 30+ jeziki v aplikaciji.",
   "Example workspace. Market view, analytics and journal share one account.": "Primer delovnega prostora. Pogled na trg, analitika in dnevnik si delijo en račun.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "To ne vpliva na nič v vašem dnevniku: posli, ki jih že imate, ostanejo tam, kjer so, koledar, analitika in simulator pa še naprej delujejo."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "To ne vpliva na nič v vašem dnevniku: posli, ki jih že imate, ostanejo tam, kjer so, koledar, analitika in simulator pa še naprej delujejo.",
+  "Backtest runs and every AI review generated for you.": "Preskusi za nazaj in vsak pregled AI, ustvarjen za vas."
 }

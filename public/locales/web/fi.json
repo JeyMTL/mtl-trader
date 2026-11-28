@@ -410,7 +410,6 @@
   "Back to the trade log": "Takaisin kauppapäiväkirjaan",
   "Background": "Tausta",
   "Background and crosshair": "Tausta ja ristikko",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Backtest ajot ja tallennetut piirustukset sekä jokainen sinulle luotu tekoälyarvostelu.",
   "Backtester with saved runs, simulating past sessions only": "Backtester tallennetuilla ajoilla, simuloi vain aiempia istuntoja",
   "Backups.": "Varmuuskopiot.",
   "badge badge-buy": "tunnuksen osto",
@@ -734,7 +733,6 @@
   "Lines that fire": "Linjaa että tulipalo",
   "Lines that have already fired are kept but taken off the chart.": "Viivat, jotka ovat jo ammuttu, säilytetään, mutta poistetaan kartasta.",
   "Live": "Livenä",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Eläviä kynttilöitä, samaa syötettä kuin puhelin käyttää. Pin tasot, trendit, retracements ja -vyöhykkeet, merkitse aika pystyviivalla, mittaa liike – kaikki tallennettu tilillesi. Session VWAP ja Aasian, Lontoon ja New Yorkin vaihteluvälit lasketaan kynttilöiden perusteella.",
   "Loading": "Ladataan",
   "Loading profile...": "Ladataan profiilia...",
   "Loading prop rules…": "Ladataan esittelysääntöjä…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Voit muuttaa saldoasi kerran kuukaudessa. Tämän kuun muutos on edelleen saatavilla.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— Sopimuksen tehneet infrastruktuurin tarjoajat suorittavat sovelluksen ja ajoitetut työt sekä tallentavat tilejä, tiedostoja ja kirjautumistietoja.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— vastaanottaa kauppayhteenvedon, jonka lähetät tarkistettavaksi. Emme käytä arvosteluja mallien kouluttamiseen.",
-  "Chart drawings are not available yet. Please try again later.": "Kaaviopiirroksia ei ole vielä saatavilla. Yritä myöhemmin uudelleen.",
   "Hosting and storage": "Isännöinti ja säilytys",
   "Our AI provider": "Tekoälytoimittajamme",
   "Card checkout is not configured for any paid plan.": "Korttikassaa ei ole määritetty millekään maksetulle sopimukselle.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Kirjoita sisään- ja poistumissäännöt, testaa niitä tallennetuissa istunnoissa ja säilytä joka ajo vertaillaksesi.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Päiväkirja omien kauppojen tallentamiseen: analytiikka, suora markkinanäkymä ja MT5-synkronointi selaimessa ja Androidissa, sovelluksessa yli 30 kielellä.",
   "Example workspace. Market view, analytics and journal share one account.": "Esimerkki työtilasta. Markkinanäkymä, analytiikka ja päiväkirja jakavat yhden tilin.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Mikään päiväkirjaasi ei vaikuta: jo tekemäsi kaupat pysyvät ennallaan, ja kalenteri, analytiikka ja simulaattori jatkavat toimintaansa."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Mikään päiväkirjaasi ei vaikuta: jo tekemäsi kaupat pysyvät ennallaan, ja kalenteri, analytiikka ja simulaattori jatkavat toimintaansa.",
+  "Backtest runs and every AI review generated for you.": "Backtest-ajot ja jokainen sinulle luotu tekoälyarvostelu."
 }

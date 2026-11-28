@@ -59,7 +59,7 @@ export default function DeleteAccountPage() {
       <ul>
         <li>Your profile: name, email, avatar, plan and trial dates.</li>
         <li>Every trade, including notes, strategy labels, tags and screenshots or voice notes.</li>
-        <li>Backtest runs and saved drawings, and every AI review generated for you.</li>
+        <li>Backtest runs and every AI review generated for you.</li>
         <li>Sync tokens, broker connection details and any pending rotation codes.</li>
       </ul>
 

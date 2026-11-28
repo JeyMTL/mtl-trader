@@ -414,7 +414,6 @@
   "Back to the trade log": "Ticaret günlüğüne geri dön",
   "Background": "Arka plan",
   "Background and crosshair": "Arka plan ve artı işareti",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Arka test çalıştırmaları, kaydedilen çizimler ve sizin için oluşturulan her yapay zeka incelemesi.",
   "Backtester with saved runs, simulating past sessions only": "Yalnızca geçmiş oturumları simüle eden kayıtlı çalıştırmalara sahip Backtester",
   "Backups.": "Yedeklemeler.",
   "badge badge-buy": "rozet satın al",
@@ -737,7 +736,6 @@
   "Lines that fire": "Ateşleyen çizgiler",
   "Lines that have already fired are kept but taken off the chart.": "Zaten ateşlenmiş olan çizgiler tutulur ancak grafikten çıkarılır.",
   "Live": "Canlı",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Canlı mumlar, telefonun kullandığı beslemenin aynısı. Seviyeleri, trendleri, fib geri çekilmelerini ve bölgeleri sabitleyin, dikey bir çizgiyle zamanı işaretleyin, bir hareketi ölçün — hepsi hesabınıza kaydedilir. Oturum VWAP ve Asya, Londra ve New York aralıkları mumların kendisinden hesaplanır.",
   "Loading": "Yükleniyor",
   "Loading profile...": "Profil yükleniyor...",
   "Loading prop rules…": "Prop kuralları yükleniyor…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Ayda bir kez bakiyenizi değiştirebilirsiniz. Bu ayın değişikliği hâlâ mevcut.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— Sözleşmeli altyapı sağlayıcıları, uygulamayı ve zamanlanmış işleri çalıştırır ve hesapları, dosyaları ve oturum açma verilerini depolar.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— inceleme için gönderdiğiniz işlem özetini alır. Yorumlar tarafımızdan modelleri eğitmek için kullanılmaz.",
-  "Chart drawings are not available yet. Please try again later.": "Grafik çizimleri henüz mevcut değil. Lütfen daha sonra tekrar deneyin.",
   "Hosting and storage": "Barındırma ve depolama",
   "Our AI provider": "Yapay zeka sağlayıcımız",
   "Card checkout is not configured for any paid plan.": "Kartla ödeme herhangi bir ücretli plan için yapılandırılmadı.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Giriş ve çıkış kurallarınızı yazın, bunları kayıtlı oturumlarda test edin ve her çalıştırmayı karşılaştırma için saklayın.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Kendi işlemlerinizi kaydetmeniz için bir günlük: tarayıcıda ve Android'de analizler, canlı piyasa görünümü ve MT5 senkronizasyonu, uygulamada 30'dan fazla dil.",
   "Example workspace. Market view, analytics and journal share one account.": "Örnek çalışma alanı. Pazar görünümü, analiz ve günlük tek bir hesabı paylaşır.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Günlüğünüzdeki hiçbir şey etkilenmez: Halihazırda yaptığınız işlemler oldukları yerde kalır ve takvim, analizler ve simülatör çalışmaya devam eder."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Günlüğünüzdeki hiçbir şey etkilenmez: Halihazırda yaptığınız işlemler oldukları yerde kalır ve takvim, analizler ve simülatör çalışmaya devam eder.",
+  "Backtest runs and every AI review generated for you.": "Geriye dönük testler yürütülür ve sizin için oluşturulan her yapay zeka incelemesi."
 }

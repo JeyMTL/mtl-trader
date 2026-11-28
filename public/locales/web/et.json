@@ -406,7 +406,6 @@
   "Back to the trade log": "Tagasi kaubanduslogi juurde",
   "Background": "Taust",
   "Background and crosshair": "Taust ja rist",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Tagasitestimine ja salvestatud joonised ning iga teie jaoks loodud tehisintellekti ülevaade.",
   "Backtester with saved runs, simulating past sessions only": "Tagasitestija salvestatud käitustega, simuleerides ainult eelmisi seansse",
   "Backups.": "Varukoopiad.",
   "badge badge-buy": "märgi märk-ost",
@@ -731,7 +730,6 @@
   "Lines that fire": "Jooned, mis põlevad",
   "Lines that have already fired are kept but taken off the chart.": "Jooned, mis on juba käivitatud, jäetakse alles, kuid graafikust eemaldatakse.",
   "Live": "Otse",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Live küünlad, sama kanal, mida telefon kasutab. Pin tasemed, trendid, fib-retracements ja tsoonid, märkige aeg vertikaalse joonega, mõõtke liikumist – kõik salvestatakse teie kontole. Seanss VWAP ning Aasia, Londoni ja New Yorgi vahemikud arvutatakse küünalde endi põhjal.",
   "Loading": "Laadimine",
   "Loading profile...": "Profiili laadimine...",
   "Loading prop rules…": "Rekvisiidireeglite laadimine…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Saldot saate muuta kord kuus. Selle kuu muudatus on endiselt saadaval.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— lepingulised infrastruktuuri pakkujad käitavad rakendust ja ajastatud töid ning salvestavad kontosid, faile ja sisselogimisandmeid.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— saab teie poolt ülevaatamiseks esitatud tehingukokkuvõtte. Me ei kasuta arvustusi modellide koolitamiseks.",
-  "Chart drawings are not available yet. Please try again later.": "Diagrammi joonised pole veel saadaval. Proovige hiljem uuesti.",
   "Hosting and storage": "Majutus ja ladustamine",
   "Our AI provider": "Meie AI pakkuja",
   "Card checkout is not configured for any paid plan.": "Kaardi kassast ei ole konfigureeritud ühegi tasulise paketi jaoks.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Kirjutage oma sisenemis- ja väljumisreeglid, testige neid salvestatud seanssidel ja säilitage iga jooks, et võrrelda.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Päevik oma tehingute salvestamiseks: analüüs, reaalajas turuvaade ja MT5 sünkroonimine brauseris ja Androidis, rakenduses 30+ keelt.",
   "Example workspace. Market view, analytics and journal share one account.": "Tööruumi näide. Turuvaade, analüüs ja ajakiri jagavad ühte kontot.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Midagi teie päevikust ei mõjuta: juba tehtud tehingud jäävad sinna, kus nad on, ning kalender, analüütika ja simulaator töötavad edasi."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Midagi teie päevikust ei mõjuta: juba tehtud tehingud jäävad sinna, kus nad on, ning kalender, analüütika ja simulaator töötavad edasi.",
+  "Backtest runs and every AI review generated for you.": "Tagasitestimised ja kõik teie jaoks loodud AI arvustused."
 }

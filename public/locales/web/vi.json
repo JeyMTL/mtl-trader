@@ -412,7 +412,6 @@
   "Back to the trade log": "Quay lại nhật ký giao dịch",
   "Background": "Nền",
   "Background and crosshair": "Hình nền và hình chữ thập",
-  "Backtest runs and saved drawings, and every AI review generated for you.": "Chạy backtest và lưu bản vẽ cũng như mọi đánh giá AI được tạo cho bạn.",
   "Backtester with saved runs, simulating past sessions only": "Backtester với các lần chạy đã lưu, chỉ mô phỏng các phiên trước đó",
   "Backups.": "Sao lưu.",
   "badge badge-buy": "huy hiệu huy hiệu-mua",
@@ -736,7 +735,6 @@
   "Lines that fire": "Đường dây cháy",
   "Lines that have already fired are kept but taken off the chart.": "Các đường đã kích hoạt sẽ được giữ lại nhưng bị loại khỏi biểu đồ.",
   "Live": "Trực tiếp",
-  "Live candles, the same feed the phone uses. Pin levels, trends, fib retracements and zones, mark a time with a vertical line, measure a move — all saved to your account. Session VWAP and the Asia, London and New York ranges are computed from the candles themselves.": "Nến sống, cùng nguồn cấp dữ liệu mà điện thoại sử dụng. Ghim các mức, xu hướng, thoái lui và vùng fib, đánh dấu thời gian bằng đường thẳng đứng, đo lường chuyển động — tất cả đều được lưu vào tài khoản của bạn. Phiên VWAP và các phạm vi Châu Á, Luân Đôn và New York được tính toán từ chính các cây nến.",
   "Loading": "Đang tải",
   "Loading profile...": "Đang tải hồ sơ...",
   "Loading prop rules…": "Đang tải quy tắc hỗ trợ…",
@@ -1428,7 +1426,6 @@
   "You can change your balance once a month. This month's change is still available.": "Bạn có thể thay đổi số dư của mình mỗi tháng một lần. Sự thay đổi của tháng này vẫn còn.",
   "— contracted infrastructure providers run the application and scheduled jobs, and store accounts, files and sign-in data.": "— các nhà cung cấp cơ sở hạ tầng theo hợp đồng chạy ứng dụng và các công việc đã lên lịch, đồng thời lưu trữ tài khoản, tệp và dữ liệu đăng nhập.",
   "— receives the trade summary you submit for a review. Reviews are not used by us to train models.": "— nhận bản tóm tắt giao dịch mà bạn gửi để xem xét. Chúng tôi không sử dụng các bài đánh giá để đào tạo mô hình.",
-  "Chart drawings are not available yet. Please try again later.": "Bản vẽ biểu đồ chưa có sẵn. Vui lòng thử lại sau.",
   "Hosting and storage": "Lưu trữ và lưu trữ",
   "Our AI provider": "Nhà cung cấp AI của chúng tôi",
   "Card checkout is not configured for any paid plan.": "Thanh toán bằng thẻ không được định cấu hình cho bất kỳ gói trả phí nào.",
@@ -1448,5 +1445,6 @@
   "Write your entry and exit rules, test them on saved sessions and keep every run to compare.": "Viết các quy tắc vào và ra của bạn, kiểm tra chúng trên các phiên đã lưu và giữ lại mọi lần chạy để so sánh.",
   "A journal for recording your own trades: analytics, a live market view and MT5 sync, in the browser and on Android, with 30+ languages in the app.": "Nhật ký ghi lại các giao dịch của riêng bạn: phân tích, chế độ xem thị trường trực tiếp và đồng bộ hóa MT5, trong trình duyệt và trên Android, với hơn 30 ngôn ngữ trong ứng dụng.",
   "Example workspace. Market view, analytics and journal share one account.": "Ví dụ về không gian làm việc. Chế độ xem thị trường, phân tích và tạp chí chia sẻ một tài khoản.",
-  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Không có gì trong nhật ký của bạn bị ảnh hưởng: các giao dịch bạn đã thực hiện vẫn giữ nguyên và lịch, phân tích và trình mô phỏng vẫn tiếp tục hoạt động."
+  "Nothing in your journal is affected: the trades you already have stay where they are, and the calendar, analytics and simulator keep working.": "Không có gì trong nhật ký của bạn bị ảnh hưởng: các giao dịch bạn đã thực hiện vẫn giữ nguyên và lịch, phân tích và trình mô phỏng vẫn tiếp tục hoạt động.",
+  "Backtest runs and every AI review generated for you.": "Chạy Backtest và mọi đánh giá AI được tạo cho bạn."
 }
