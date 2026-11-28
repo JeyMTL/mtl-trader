@@ -186,7 +186,7 @@ export default function SyncPage() {
               {notice.refused && (
                 <p className="mt-2 text-xs leading-relaxed text-gray-400">
                   Nothing in your journal is affected: the trades you already have stay where they
-                  are, and the chart desk, calendar and simulator keep working.
+                  are, and the calendar, analytics and simulator keep working.
                 </p>
               )}
               <div className="mt-4 flex flex-wrap items-center gap-3">

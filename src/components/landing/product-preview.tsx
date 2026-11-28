@@ -73,7 +73,7 @@ export function ProductPreview() {
               <span className="hidden text-success sm:inline">+0.42%</span>
             </div>
             <div className="hidden items-center gap-3 text-[11px] text-gray-500 sm:flex">
-              <span className="text-white">Chart</span>
+              <span className="text-white">Market</span>
               <span>Journal</span>
               <span>Analytics</span>
             </div>
@@ -82,14 +82,14 @@ export function ProductPreview() {
           <div className="grid lg:grid-cols-[1fr_250px]">
             <div className="border-b border-border p-3 sm:p-4 lg:border-b-0 lg:border-r">
               <div className="mb-2 flex items-center justify-between text-[10px] text-gray-500">
-                <span>VWAP 1.0842 · Session ranges on</span>
-                <span className="hidden sm:inline">Drawings synced</span>
+                <span>Live market chart · EURUSD</span>
+                <span className="hidden sm:inline">Journal synced</span>
               </div>
               <svg
                 viewBox="0 0 760 300"
                 className="h-auto w-full"
                 role="img"
-                aria-label="Illustrative chart desk with session bands, VWAP, price levels and candles"
+                aria-label="Illustrative market chart with price levels and candles"
               >
                 <rect x={X0} y={TOP} width={224 - X0} height={HEIGHT} className="fill-sky-400/5" />
                 <rect x={224} y={TOP} width={464 - 224} height={HEIGHT} className="fill-primary/5" />
@@ -255,7 +255,7 @@ export function ProductPreview() {
         </div>
       </div>
       <p className="mt-3 text-center text-xs text-gray-600">
-        Example workspace. Chart desk, analytics and journal share one account.
+        Example workspace. Market view, analytics and journal share one account.
       </p>
     </div>
   )

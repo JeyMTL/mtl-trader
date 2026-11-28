@@ -27,9 +27,9 @@ import { LanguagePicker } from '@/components/language-picker'
 const features = [
   {
     icon: CandlestickChart,
-    title: 'A real chart desk',
+    title: 'Market view',
     description:
-      'Seconds to daily candles, VWAP, session levels and drawings synced across web and Android.',
+      'Follow any symbol on an interactive market chart, then journal the trade on the same account.',
     tile: 'icon-tile-blue',
   },
   {
@@ -62,9 +62,9 @@ const features = [
   },
   {
     icon: FlaskConical,
-    title: 'Backtest and replay',
+    title: 'Backtester',
     description:
-      'Replay sessions candle by candle and test your own rules against saved history.',
+      'Write your entry and exit rules, test them on saved sessions and keep every run to compare.',
     tile: 'icon-tile-amber',
   },
   {
@@ -119,7 +119,7 @@ const faqs = [
   {
     question: 'What can I connect?',
     answer:
-      'MT5 auto sync, plus MT5 reports, XML, CSV and XLSX imports. The Android app and the web app share one account, so the journal, drawings and layouts stay together.',
+      'MT5 auto sync, plus MT5 reports, XML, CSV and XLSX imports. The Android app and the web app share one account, so the journal and your settings stay together.',
   },
   {
     question: 'What do I get in the free trial?',
@@ -229,13 +229,13 @@ export default function HomePage() {
           )}
           {/* The four claims the hero is making, in the order a phone trader
               cares about them: where the trades come from, what language they
-              read in, where the app runs, and that the chart is not a mock. */}
+              read in, where the app runs, and that the prices are live. */}
           <div className="fade-up-3 mt-9 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-gray-400">
             {[
               { icon: RefreshCw, label: 'MT5 Auto-Sync' },
               { icon: Languages, label: '30+ Languages' },
               { icon: Smartphone, label: 'Android & Web App' },
-              { icon: CandlestickChart, label: 'Live chart data' },
+              { icon: CandlestickChart, label: 'Live market prices' },
             ].map((item) => (
               <span key={item.label} className="flex items-center gap-2">
                 <item.icon className="h-4 w-4 text-primary-light" />
@@ -260,7 +260,7 @@ export default function HomePage() {
               The toolkit, without the tab-switching
             </h2>
             <p className="mx-auto max-w-xl text-gray-400">
-              Journal, charting, risk controls and review share the same trades.
+              Journal, market view, risk controls and review share the same trades.
             </p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -386,7 +386,7 @@ export default function HomePage() {
             <div>
               <Logo size="sm" />
               <p className="mt-4 max-w-xs text-sm leading-relaxed text-gray-500">
-                A trading journal, chart desk and backtester for MT5 traders. Web and Android,
+                A trading journal, risk guard and backtester for MT5 traders. Web and Android,
                 one account.
               </p>
             </div>
